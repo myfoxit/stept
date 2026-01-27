@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snaprow Process Recorder</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Logo -->
+    <div class="logo">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2">
+        <path d="M3 12h4l3 9l4-18l3 9h4"/>
+      </svg>
+    </div>
+
+    <!-- Login Panel -->
+    <div id="loginPanel" class="panel">
+      <button id="loginBtn" class="btn btn-outline">
+        Sign In
+      </button>
+      <p class="version">version 1.0.0</p>
+    </div>
+
+    <!-- User Panel (authenticated) -->
+    <div id="userPanel" class="panel hidden">
+      <!-- Greeting -->
+      <p id="greeting" class="greeting">Hello!</p>
+
+      <!-- Project Selector -->
+      <select id="projectSelector" class="select">
+        <option value="">Select project</option>
+      </select>
+
+      <!-- Idle State -->
+      <div id="idlePanel">
+        <button id="startBtn" class="btn btn-primary" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Start Capture
+        </button>
+      </div>
+
+      <!-- Recording State -->
+      <div id="recordingPanel" class="hidden">
+        <!-- Status -->
+        <div class="status">
+          <div id="recordingIndicator" class="recording-dot"></div>
+          <span id="statusText">Capturing...</span>
+        </div>
+
+        <!-- Step count -->
+        <p id="stepCount" class="step-count">0 steps recorded</p>
+
+        <!-- Recording time -->
+        <p id="recordingTime" class="recording-time">00:00</p>
+
+        <!-- Control buttons -->
+        <div class="btn-group">
+          <button id="pauseBtn" class="btn btn-outline btn-sm">
+            <svg id="pauseIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="4" width="4" height="16"/>
+              <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            <span id="pauseText">Pause</span>
+          </button>
+          <button id="deleteBtn" class="btn btn-outline btn-sm btn-danger">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            Delete
+          </button>
+        </div>
+
+        <!-- Complete button -->
+        <button id="completeBtn" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Complete Capture
+        </button>
+      </div>
+
+      <!-- Preview Panel -->
+      <div id="previewPanel" class="hidden">
+        <h3>Capture Preview</h3>
+        <div id="stepsContainer" class="steps-container"></div>
+        <div class="btn-group">
+          <button id="closePreviewBtn" class="btn btn-outline">Close</button>
+          <button id="uploadBtn" class="btn btn-primary">Upload</button>
+        </div>
+      </div>
+
+      <!-- Upload Progress -->
+      <div id="uploadPanel" class="hidden">
+        <h3>Uploading...</h3>
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <p id="uploadStatus">Preparing upload...</p>
+      </div>
+
+      <!-- Logout -->
+      <button id="logoutBtn" class="btn btn-outline btn-sm logout-btn">
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

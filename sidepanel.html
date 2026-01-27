@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snaprow - Recording Steps</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2">
+          <path d="M3 12h4l3 9l4-18l3 9h4"/>
+        </svg>
+        <h1>Snaprow</h1>
+      </div>
+      <div class="recording-badge" id="recordingBadge">
+        <span class="recording-dot"></span>
+        <span id="recordingStatus">Recording</span>
+      </div>
+    </header>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-value" id="stepCount">0</span>
+        <span class="stat-label">Steps</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="recordingTime">00:00</span>
+        <span class="stat-label">Duration</span>
+      </div>
+    </div>
+
+    <!-- Steps list -->
+    <div class="steps-list" id="stepsList">
+      <div class="empty-state" id="emptyState">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+        <p>Waiting for actions...</p>
+        <span>Click or type on the page to record steps</span>
+      </div>
+    </div>
+
+    <!-- Upload Panel (shown after completing) -->
+    <div class="upload-panel hidden" id="uploadPanel">
+      <div class="upload-content">
+        <svg class="upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <h3 id="uploadTitle">Ready to Upload</h3>
+        <p id="uploadMessage"><span id="uploadStepCount">0</span> steps captured</p>
+        <div class="progress-bar hidden" id="progressBar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p class="upload-status" id="uploadStatus"></p>
+      </div>
+      <div class="upload-actions" id="uploadActions">
+        <button id="backBtn" class="btn btn-outline">Back</button>
+        <button id="uploadBtn" class="btn btn-primary">Upload to Cloud</button>
+      </div>
+      <div class="upload-actions hidden" id="uploadDoneActions">
+        <button id="newCaptureBtn" class="btn btn-primary">New Capture</button>
+      </div>
+    </div>
+
+    <!-- Footer controls -->
+    <footer class="footer" id="footer">
+      <button id="pauseBtn" class="btn btn-outline">
+        <svg id="pauseIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="6" y="4" width="4" height="16"/>
+          <rect x="14" y="4" width="4" height="16"/>
+        </svg>
+        <span id="pauseText">Pause</span>
+      </button>
+      <button id="completeBtn" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Complete
+      </button>
+    </footer>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
