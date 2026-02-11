@@ -10,7 +10,7 @@ from app.database import Base, DATABASE_URL, engine
 from app.models import (
     User, Project, Folder, Document, TextContainer, Session,
     ProcessRecordingSession, ProcessRecordingStep, ProcessRecordingFile,
-    AuthCode, RefreshToken, AppSettings, project_members,
+    AuthCode, RefreshToken, AppSettings, project_members, Embedding,
 )
 
 # this is the Alembic Config object, which provides

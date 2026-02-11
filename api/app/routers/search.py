@@ -3,6 +3,7 @@ Smart Search router.
 
 Searches across recording titles, summaries, tags, step titles and descriptions.
 Returns ranked results with highlighted matches.
+Includes semantic search via pgvector embeddings.
 """
 
 from __future__ import annotations
@@ -10,13 +11,13 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import or_, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session as get_db
-from app.models import ProcessRecordingSession, ProcessRecordingStep, User
+from app.models import ProcessRecordingSession, ProcessRecordingStep, User, Embedding
 from app.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -174,3 +175,262 @@ def _text_type():
     """Return SQLAlchemy Text type for casting."""
     from sqlalchemy import Text
     return Text
+
+
+# ---------------------------------------------------------------------------
+# Semantic search endpoint
+# ---------------------------------------------------------------------------
+
+@router.get("/semantic")
+async def semantic_search(
+    q: str = Query(..., min_length=1, description="Search query"),
+    project_id: Optional[str] = Query(None, description="Project ID (optional, searches all if omitted)"),
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Semantic search across workflows using vector embeddings.
+    Falls back to keyword search when embeddings are not available.
+    """
+    from app.services.embeddings import (
+        generate_embedding,
+        has_embedding_api,
+        keyword_similarity,
+        workflow_text,
+        step_text,
+    )
+
+    # Try vector search first
+    if has_embedding_api():
+        query_vector = await generate_embedding(q)
+        if query_vector is not None:
+            return await _vector_search(
+                q, query_vector, current_user.id, project_id, limit, db
+            )
+
+    # Fallback: keyword-based search
+    return await _keyword_search(q, current_user.id, project_id, limit, db)
+
+
+async def _vector_search(
+    query: str,
+    query_vector: list[float],
+    user_id: str,
+    project_id: Optional[str],
+    limit: int,
+    db: AsyncSession,
+) -> dict:
+    """Perform cosine similarity search using pgvector."""
+    from sqlalchemy import text as sa_text
+
+    # Build query: join embeddings with workflows, filter by user, order by cosine distance
+    # We search both workflow and step embeddings
+    vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
+
+    sql = sa_text("""
+        SELECT
+            e.source_type,
+            e.source_id,
+            e.metadata,
+            e.embedding <=> :query_vector AS distance
+        FROM embeddings e
+        WHERE e.metadata->>'user_id' = :user_id
+        {project_filter}
+        ORDER BY e.embedding <=> :query_vector
+        LIMIT :limit
+    """.format(
+        project_filter="AND e.metadata->>'project_id' = :project_id" if project_id else ""
+    ))
+
+    params = {
+        "query_vector": vector_str,
+        "user_id": user_id,
+        "limit": limit * 2,  # Fetch more to group steps by workflow
+    }
+    if project_id:
+        params["project_id"] = project_id
+
+    result = await db.execute(sql, params)
+    rows = result.fetchall()
+
+    # Group results by workflow
+    seen_workflows: dict[str, dict] = {}
+    workflow_scores: dict[str, float] = {}
+
+    for source_type, source_id, metadata, distance in rows:
+        score = max(0.0, 1.0 - distance)  # cosine distance → similarity
+        meta = metadata or {}
+
+        if source_type == "workflow":
+            wf_id = source_id
+            if wf_id not in seen_workflows:
+                seen_workflows[wf_id] = {"matching_steps": []}
+                workflow_scores[wf_id] = score
+            else:
+                workflow_scores[wf_id] = max(workflow_scores[wf_id], score)
+        elif source_type == "step":
+            wf_id = meta.get("session_id", "")
+            if not wf_id:
+                continue
+            if wf_id not in seen_workflows:
+                seen_workflows[wf_id] = {"matching_steps": []}
+                workflow_scores[wf_id] = score
+            else:
+                workflow_scores[wf_id] = max(workflow_scores[wf_id], score)
+            seen_workflows[wf_id]["matching_steps"].append({
+                "step_id": source_id,
+                "step_number": meta.get("step_number"),
+                "score": round(score, 4),
+            })
+
+    # Fetch full workflow data for top results
+    sorted_wf_ids = sorted(workflow_scores.keys(), key=lambda k: workflow_scores[k], reverse=True)[:limit]
+
+    results = []
+    for wf_id in sorted_wf_ids:
+        session = await db.get(ProcessRecordingSession, wf_id)
+        if not session:
+            continue
+        # Security: verify user access
+        if session.user_id != user_id:
+            continue
+        if session.is_private and session.owner_id != user_id:
+            continue
+
+        wf_data = seen_workflows[wf_id]
+        results.append({
+            "type": "recording",
+            "recording_id": session.id,
+            "name": session.name,
+            "generated_title": session.generated_title,
+            "summary": session.summary,
+            "tags": session.tags,
+            "is_processed": session.is_processed,
+            "score": round(workflow_scores[wf_id], 4),
+            "matching_steps": wf_data["matching_steps"][:5],
+        })
+
+    return {
+        "query": query,
+        "search_type": "semantic",
+        "total_results": len(results),
+        "results": results,
+    }
+
+
+async def _keyword_search(
+    query: str,
+    user_id: str,
+    project_id: Optional[str],
+    limit: int,
+    db: AsyncSession,
+) -> dict:
+    """Fallback keyword-based search with relevance scoring."""
+    from app.services.embeddings import keyword_similarity, workflow_text, step_text
+
+    # Load all user workflows (within project if specified)
+    conditions = [
+        ProcessRecordingSession.user_id == user_id,
+        ProcessRecordingSession.status == "completed",
+    ]
+    if project_id:
+        conditions.append(ProcessRecordingSession.project_id == project_id)
+
+    stmt = (
+        select(ProcessRecordingSession)
+        .where(and_(*conditions))
+        .options(selectinload(ProcessRecordingSession.steps))
+    )
+    result = await db.execute(stmt)
+    workflows = result.scalars().all()
+
+    scored_results = []
+    for wf in workflows:
+        # Security: skip private workflows not owned by user
+        if wf.is_private and wf.owner_id != user_id:
+            continue
+
+        wf_text = workflow_text(wf)
+        wf_score = keyword_similarity(query, wf_text)
+
+        # Also score steps
+        step_scores = []
+        for step in sorted(wf.steps, key=lambda s: s.step_number):
+            s_text = step_text(step)
+            if s_text.strip():
+                s_score = keyword_similarity(query, s_text)
+                if s_score > 0.05:
+                    step_scores.append({
+                        "step_id": step.id,
+                        "step_number": step.step_number,
+                        "score": round(s_score, 4),
+                    })
+
+        # Use best score from workflow or steps
+        best_step_score = max((s["score"] for s in step_scores), default=0.0)
+        overall_score = max(wf_score, best_step_score)
+
+        if overall_score > 0.05:
+            scored_results.append({
+                "type": "recording",
+                "recording_id": wf.id,
+                "name": wf.name,
+                "generated_title": wf.generated_title,
+                "summary": wf.summary,
+                "tags": wf.tags,
+                "is_processed": wf.is_processed,
+                "score": round(overall_score, 4),
+                "matching_steps": sorted(step_scores, key=lambda s: s["score"], reverse=True)[:5],
+            })
+
+    # Sort by score descending
+    scored_results.sort(key=lambda r: r["score"], reverse=True)
+
+    return {
+        "query": query,
+        "search_type": "keyword",
+        "total_results": len(scored_results[:limit]),
+        "results": scored_results[:limit],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Reindex endpoint
+# ---------------------------------------------------------------------------
+
+@router.post("/reindex")
+async def reindex_embeddings(
+    project_id: Optional[str] = Query(None, description="Project ID to reindex (all if omitted)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Trigger bulk reindexing of embeddings for the current user's workflows.
+    """
+    from app.services.indexer import reindex_project, reindex_all_for_user
+    from app.services.embeddings import has_embedding_api
+
+    if not has_embedding_api():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No embedding API configured. Set an OpenAI API key in LLM settings.",
+        )
+
+    try:
+        if project_id:
+            total = await reindex_project(project_id, current_user.id, db)
+        else:
+            total = await reindex_all_for_user(current_user.id, db)
+
+        return {
+            "status": "success",
+            "embeddings_created": total,
+            "message": f"Indexed {total} embeddings",
+        }
+    except Exception as exc:
+        logger.error("Reindex failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Reindex failed: {exc}",
+        )

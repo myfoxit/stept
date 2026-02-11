@@ -11,6 +11,11 @@ import secrets  # fix: missing import used by PublicAccessToken
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import Table  # new
 
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    Vector = None  # graceful fallback when pgvector package not installed
+
 def enum_values(enum_cls):
     return [member.value for member in enum_cls]
 
@@ -382,3 +387,20 @@ project_members = Table(
     Column('invited_by', String(16), ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
     UniqueConstraint('user_id', 'project_id', name='_project_member_unique'),
 )
+
+
+class Embedding(Base):
+    """Vector embeddings for semantic search (RAG)."""
+    __tablename__ = "embeddings"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    source_type = Column(String(20), nullable=False, index=True)  # workflow | step | document
+    source_id = Column(String(16), nullable=False, index=True)
+    content_hash = Column(String(64), nullable=False)  # SHA-256 to skip re-embedding
+    embedding = Column(Vector(1536), nullable=False) if Vector else Column(Text, nullable=False)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('source_type', 'source_id', name='_embedding_source_unique'),
+    )

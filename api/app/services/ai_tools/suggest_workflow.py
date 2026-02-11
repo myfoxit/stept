@@ -1,5 +1,7 @@
 """
 AI Tool: suggest_workflow — "How do I do X?" Search workflows by description/steps.
+
+Uses semantic search (pgvector embeddings) when available, falls back to keyword search.
 """
 
 from __future__ import annotations
@@ -30,6 +32,111 @@ parameters = {
 }
 
 
+async def _semantic_search(
+    db: AsyncSession,
+    user_id: str,
+    project_id: Optional[str],
+    question: str,
+) -> list[dict] | None:
+    """
+    Try semantic search via embeddings. Returns None if unavailable.
+    """
+    try:
+        from app.services.embeddings import generate_embedding, has_embedding_api
+
+        if not has_embedding_api():
+            return None
+
+        query_vector = await generate_embedding(question)
+        if query_vector is None:
+            return None
+
+        from sqlalchemy import text as sa_text
+
+        vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
+
+        sql = sa_text("""
+            SELECT
+                e.source_type,
+                e.source_id,
+                e.metadata,
+                e.embedding <=> :query_vector AS distance
+            FROM embeddings e
+            WHERE e.metadata->>'user_id' = :user_id
+            {project_filter}
+            ORDER BY e.embedding <=> :query_vector
+            LIMIT 20
+        """.format(
+            project_filter="AND e.metadata->>'project_id' = :project_id" if project_id else ""
+        ))
+
+        params = {"query_vector": vector_str, "user_id": user_id}
+        if project_id:
+            params["project_id"] = project_id
+
+        result = await db.execute(sql, params)
+        rows = result.fetchall()
+
+        if not rows:
+            return None
+
+        # Group by workflow, get top session IDs
+        workflow_scores: dict[str, float] = {}
+        for source_type, source_id, metadata, distance in rows:
+            score = max(0.0, 1.0 - distance)
+            meta = metadata or {}
+            wf_id = source_id if source_type == "workflow" else meta.get("session_id", "")
+            if wf_id:
+                workflow_scores[wf_id] = max(workflow_scores.get(wf_id, 0), score)
+
+        # Sort by score and take top 5
+        sorted_ids = sorted(workflow_scores.keys(), key=lambda k: workflow_scores[k], reverse=True)[:5]
+
+        # Load full workflow data
+        workflows = []
+        for wf_id in sorted_ids:
+            stmt = (
+                select(ProcessRecordingSession)
+                .where(
+                    ProcessRecordingSession.id == wf_id,
+                    ProcessRecordingSession.user_id == user_id,
+                )
+                .options(selectinload(ProcessRecordingSession.steps))
+            )
+            res = await db.execute(stmt)
+            wf = res.scalar_one_or_none()
+            if wf:
+                workflows.append((wf, workflow_scores[wf_id]))
+
+        if not workflows:
+            return None
+
+        suggestions = []
+        for wf, score in workflows:
+            steps = sorted(wf.steps, key=lambda s: s.step_number)
+            key_steps = []
+            for s in steps[:5]:
+                desc = s.generated_description or s.description or s.window_title or f"Step {s.step_number}"
+                key_steps.append(f"Step {s.step_number}: {desc}")
+
+            suggestions.append({
+                "workflow_id": wf.id,
+                "name": wf.name or wf.generated_title or "Untitled Workflow",
+                "summary": wf.summary,
+                "total_steps": len(steps),
+                "key_steps": key_steps,
+                "tags": wf.tags or [],
+                "relevance_score": round(score, 4),
+            })
+
+        return suggestions
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Semantic search failed, falling back: %s", exc)
+        return None
+
+
 async def execute(
     db: AsyncSession,
     user_id: str,
@@ -41,6 +148,26 @@ async def execute(
     if not question:
         return {"error": "A question is required."}
 
+    # Try semantic search first
+    semantic_results = await _semantic_search(db, user_id, project_id, question)
+    if semantic_results is not None:
+        if not semantic_results:
+            return {
+                "success": True,
+                "count": 0,
+                "suggestions": [],
+                "search_type": "semantic",
+                "message": f"No workflows found matching '{question}'. Try different keywords.",
+            }
+        return {
+            "success": True,
+            "count": len(semantic_results),
+            "suggestions": semantic_results,
+            "search_type": "semantic",
+            "message": f"Found {len(semantic_results)} relevant workflow(s) for '{question}'",
+        }
+
+    # Fallback: keyword search (original implementation)
     # Extract keywords from the question (simple approach)
     stop_words = {"how", "do", "i", "can", "to", "the", "a", "an", "in", "on", "is", "it", "what", "where", "when", "why", "does", "should"}
     words = [w.strip("?.,!") for w in question.lower().split() if w.strip("?.,!") not in stop_words and len(w.strip("?.,!")) > 1]
@@ -123,6 +250,7 @@ async def execute(
             "success": True,
             "count": 0,
             "suggestions": [],
+            "search_type": "keyword",
             "message": f"No workflows found matching '{question}'. Try different keywords.",
         }
 
@@ -130,5 +258,6 @@ async def execute(
         "success": True,
         "count": len(suggestions),
         "suggestions": suggestions,
+        "search_type": "keyword",
         "message": f"Found {len(suggestions)} relevant workflow(s) for '{question}'",
     }

@@ -834,6 +834,12 @@ async def process_recording_with_ai(
 
     try:
         result = await auto_processor.process_recording(session_id, db)
+
+        # Auto-index embeddings for semantic search (fire-and-forget)
+        import asyncio
+        from app.services.indexer import index_workflow_background
+        asyncio.create_task(index_workflow_background(session_id))
+
         return ProcessingStatus(
             recording_id=result["recording_id"],
             steps_annotated=result["steps_annotated"],
@@ -871,6 +877,12 @@ async def generate_guide_endpoint(
 
     try:
         guide_md = await auto_processor.generate_guide(session_id, db)
+
+        # Re-index embeddings after guide generation (fire-and-forget)
+        import asyncio
+        from app.services.indexer import index_workflow_background
+        asyncio.create_task(index_workflow_background(session_id))
+
         return GuideResponse(
             recording_id=session_id,
             guide_markdown=guide_md,
