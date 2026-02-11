@@ -3,6 +3,8 @@ Provider-agnostic LLM gateway service.
 
 Supports OpenAI, Anthropic, Ollama, and any OpenAI-compatible endpoint.
 Uses httpx async client — no heavy SDK dependencies.
+
+Configuration priority: DB (app_settings) → environment variables → defaults.
 """
 
 from __future__ import annotations
@@ -16,6 +18,60 @@ import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# In-memory cache for DB-sourced config (refreshed on every save)
+# ---------------------------------------------------------------------------
+
+_db_config_cache: dict | None = None
+
+
+def _get_cached_db_config() -> dict:
+    """Return cached DB config or empty dict."""
+    return _db_config_cache or {}
+
+
+async def load_db_config() -> dict:
+    """Load LLM config from app_settings table and cache it."""
+    global _db_config_cache
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models import AppSettings
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(AppSettings).where(AppSettings.key == "llm_config")
+            )
+            row = result.scalar_one_or_none()
+            if row and row.value:
+                _db_config_cache = row.value
+                return _db_config_cache
+    except Exception as exc:
+        logger.debug("Could not load LLM config from DB: %s", exc)
+    _db_config_cache = {}
+    return _db_config_cache
+
+
+async def save_db_config(config: dict) -> None:
+    """Persist LLM config to app_settings and refresh cache."""
+    global _db_config_cache
+    from app.database import AsyncSessionLocal
+    from app.models import AppSettings
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(AppSettings).where(AppSettings.key == "llm_config")
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            row.value = config
+        else:
+            session.add(AppSettings(key="llm_config", value=config))
+        await session.commit()
+
+    _db_config_cache = config
 
 
 # ---------------------------------------------------------------------------
@@ -39,29 +95,33 @@ class ChatMessage:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers — DB config overrides env vars
 # ---------------------------------------------------------------------------
 
 def _provider() -> str:
-    return (settings.LLM_PROVIDER or "openai").lower()
+    db = _get_cached_db_config()
+    return (db.get("provider") or settings.LLM_PROVIDER or "openai").lower()
 
 
 def _base_url() -> str:
+    db = _get_cached_db_config()
+    explicit = db.get("base_url") or settings.LLM_BASE_URL
+    if explicit:
+        return explicit.rstrip("/")
     p = _provider()
-    if settings.LLM_BASE_URL:
-        return settings.LLM_BASE_URL.rstrip("/")
     if p == "anthropic":
         return "https://api.anthropic.com"
     if p == "ollama":
         return "http://localhost:11434"
-    # Default: OpenAI
     return "https://api.openai.com"
 
 
 def _model() -> str:
+    db = _get_cached_db_config()
+    explicit = db.get("model") or settings.LLM_MODEL
+    if explicit:
+        return explicit
     p = _provider()
-    if settings.LLM_MODEL:
-        return settings.LLM_MODEL
     if p == "anthropic":
         return "claude-sonnet-4-20250514"
     if p == "ollama":
@@ -69,19 +129,25 @@ def _model() -> str:
     return "gpt-4o-mini"
 
 
+def _api_key() -> str | None:
+    db = _get_cached_db_config()
+    return db.get("api_key") or settings.LLM_API_KEY or None
+
+
 def _headers() -> dict[str, str]:
     p = _provider()
+    api_key = _api_key()
     headers: dict[str, str] = {}
     if p == "anthropic":
-        headers["x-api-key"] = settings.LLM_API_KEY or ""
+        headers["x-api-key"] = api_key or ""
         headers["anthropic-version"] = "2023-06-01"
         headers["content-type"] = "application/json"
     elif p == "ollama":
         headers["content-type"] = "application/json"
     else:
         # OpenAI / compatible
-        if settings.LLM_API_KEY:
-            headers["authorization"] = f"Bearer {settings.LLM_API_KEY}"
+        if api_key:
+            headers["authorization"] = f"Bearer {api_key}"
         headers["content-type"] = "application/json"
     return headers
 
@@ -288,5 +354,5 @@ def get_config() -> dict:
         "model": _model(),
         "base_url": _base_url() if _provider() == "ollama" else None,
         "dataveil_enabled": is_dataveil_enabled(),
-        "configured": bool(settings.LLM_API_KEY or _provider() == "ollama"),
+        "configured": bool(_api_key() or _provider() == "ollama"),
     }

@@ -122,3 +122,15 @@ export async function fetchChatConfig(): Promise<ChatConfig> {
   const { data } = await apiClient.get<ChatConfig>('/chat/config');
   return data;
 }
+
+export interface ChatConfigUpdate {
+  provider?: string;
+  model?: string;
+  base_url?: string;
+  api_key?: string;
+}
+
+export async function updateChatConfig(config: ChatConfigUpdate): Promise<ChatConfig> {
+  const { data } = await apiClient.put<ChatConfig>('/chat/config', config);
+  return data;
+}

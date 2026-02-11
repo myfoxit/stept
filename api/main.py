@@ -9,7 +9,18 @@ from app.database import Base, engine, AsyncSessionLocal
 from app.core.config import settings
 
 
-app = FastAPI(title="Ondoki")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: load DB-backed LLM config into memory
+    from app.services.llm import load_db_config
+    try:
+        await load_db_config()
+    except Exception:
+        pass  # DB may not be ready; env vars used as fallback
+    yield
+
+
+app = FastAPI(title="Ondoki", lifespan=lifespan)
 
 # Versioned API router
 api_router = APIRouter(prefix=settings.API_V1_STR)

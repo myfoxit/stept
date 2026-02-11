@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } from '@/api/chat';
+import { fetchChatConfig, fetchChatModels, updateChatConfig, type ChatConfig, type ChatModel } from '@/api/chat';
 import { toast } from 'sonner';
 
 interface LlmSetupWizardProps {
@@ -141,12 +141,29 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
     }
   };
 
-  const handleFinish = () => {
-    toast.success('AI configuration saved!', {
-      description: `Provider: ${selectedProvider}, Model: ${selectedModel || 'default'}`,
-    });
-    onConfigSaved?.();
-    onClose();
+  const [saving, setSaving] = useState(false);
+
+  const handleFinish = async () => {
+    setSaving(true);
+    try {
+      const config: Record<string, string> = { provider: selectedProvider };
+      if (apiKey) config.api_key = apiKey;
+      if (selectedModel) config.model = selectedModel;
+      if (baseUrl) config.base_url = baseUrl;
+
+      await updateChatConfig(config);
+      toast.success('AI configuration saved!', {
+        description: `Provider: ${selectedProvider}, Model: ${selectedModel || 'default'}`,
+      });
+      onConfigSaved?.();
+      onClose();
+    } catch (err) {
+      toast.error('Failed to save AI configuration', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderStepContent = () => {
@@ -279,7 +296,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    Configured via environment variable: LLM_API_KEY
+                    Your key is stored securely on the server.
                   </p>
                 </div>
 
@@ -450,9 +467,18 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
               <IconChevronRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={handleFinish} className="bg-indigo-600 hover:bg-indigo-700">
-              <IconSparkles className="mr-1.5 h-4 w-4" />
-              Start using AI
+            <Button onClick={handleFinish} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
+              {saving ? (
+                <>
+                  <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <IconSparkles className="mr-1.5 h-4 w-4" />
+                  Start using AI
+                </>
+              )}
             </Button>
           )}
         </div>
