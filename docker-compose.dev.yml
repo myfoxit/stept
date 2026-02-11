@@ -1,0 +1,47 @@
+# Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  backend:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    command: fastapi dev main.py --host 0.0.0.0 --port 8000
+    volumes:
+      - ./api:/app
+      - recordings-storage:/app/storage/recordings
+    environment:
+      ENVIRONMENT: local
+      GOTENBERG_URL: http://gotenberg:3000
+      LOCAL_STORAGE_PATH: /app/storage/recordings
+    ports:
+      - "8000:8000"
+    depends_on:
+      - gotenberg
+
+  frontend:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: builder 
+   
+    command: pnpm dev --host 0.0.0.0
+    volumes:
+      - ./app:/app
+      - /app/node_modules 
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000/api/v1
+      API_URL: http://localhost:8000/api/v1
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3000:3000"
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--api-timeout=120s"
+
+volumes:
+  recordings-storage:

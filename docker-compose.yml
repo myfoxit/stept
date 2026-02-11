@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:16
+    container_name: snaprow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-snaprow}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - snaprow-network
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: snaprow-redis
+    restart: unless-stopped
+    networks:
+      - snaprow-network
+
+ 
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: snaprow-gotenberg
+    restart: unless-stopped
+    environment:
+      - GOTENBERG_API_TIMEOUT=300s
+      - GOTENBERG_CHROMIUM_ALLOW_FILE_ACCESS_FROM_FILES=true
+    networks:
+      - snaprow-network
+
+
+  backend:
+    build: ./api
+    container_name: snaprow-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+    
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-snaprow}
+      REDIS_URL: redis://redis:6379/0
+      GOTENBERG_URL: http://gotenberg:3000
+      ENVIRONMENT: production
+    networks:
+      - snaprow-network
+
+
+  frontend:
+    build: ./app
+    container_name: snaprow-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80" 
+    networks:
+      - snaprow-network
+
+volumes:
+  db-data:
+
+networks:
+  snaprow-network:
+    driver: bridge

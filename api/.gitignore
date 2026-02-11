@@ -1,0 +1,43 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv/
+env/
+venv/
+
+# macOS
+.DS_Store
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs and databases
+*.log
+*.sqlite3
+db.sqlite3
+
+# Testing
+.pytest_cache/
+.coverage
+
+# Mypy
+.mypy_cache/
+
+# FastAPI generated docs
+docs/_build/
+
+# Static files
+static/
+staticfiles/
+media/
+
+# Storage directories
+storage/
+/storage/recordings/

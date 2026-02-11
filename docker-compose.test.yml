@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  test-db:
+    image: postgres:15-alpine
+    container_name: snaprow-test-db
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: snaprow_test
+    ports:
+      - '5433:5432' # host:container
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U testuser -d snaprow_test']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  test-backend:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.test
+    container_name: snaprow-test-backend
+    environment:
+      NODE_ENV: test
+      PORT: 8000
+      USE_POSTGRES: 'True'
+      DATABASE_URL: postgresql+asyncpg://testuser:testpass@test-db:5432/snaprow_test
+      JWT_SECRET: test-jwt-secret-key-for-e2e-testing
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - '8000:8000'
+    depends_on:
+      test-db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  test-frontend:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.test
+    container_name: snaprow-test-frontend
+    environment:
+      VITE_API_URL: http://test-backend:8000
+      VITE_NODE_ENV: test
+    ports:
+      - '5173:5173'
+    depends_on:
+      test-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:5173']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test-db-data:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test-db-data:

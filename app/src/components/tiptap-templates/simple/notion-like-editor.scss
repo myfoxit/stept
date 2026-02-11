@@ -1,0 +1,347 @@
+@media print {
+  .tiptap-pages-* { border: 0 !important; }
+  html, body { margin: 0 !important; }
+}
+
+html,
+body,
+#root,
+#app {
+  height: 100%;
+  background-color: var(--tt-bg-color);
+}
+
+::-webkit-scrollbar {
+  width: 0.25rem;
+}
+
+:root {
+  /* Screen approximations (96dpi baseline) */
+  --page-a4-width-px: 794px; /* 210mm */
+  --page-a4-height-px: 1100px; /* 297mm */
+  --page-letter-width-px: 816px; /* 8.5in  */
+  --page-letter-height-px: 1056px; /* 11in */
+
+  /* Content paddings */
+  --page-pad-x: 3rem;
+  --page-pad-y: 2rem;
+
+  /* Document centered width */
+  --page-doc-width: 768px;
+
+  /* Mobile scale - will be overridden by media queries */
+  --page-scale: 1;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tt-scrollbar-color) transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--tt-scrollbar-color);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tiptap.ProseMirror {
+  font-family: 'DM Sans', sans-serif;
+}
+
+:root[data-page-layout='a4'] .notion-like-editor-wrapper {
+  background: #fbfbfb;
+}
+
+.notion-like-editor .ProseMirror p,
+.notion-like-editor .ProseMirror h1,
+.notion-like-editor .ProseMirror h2,
+.notion-like-editor .ProseMirror h3,
+.notion-like-editor .ProseMirror h4,
+.notion-like-editor .ProseMirror h5,
+.notion-like-editor .ProseMirror h6,
+.notion-like-editor .ProseMirror ul,
+.notion-like-editor .ProseMirror ol,
+.notion-like-editor .ProseMirror blockquote,
+.notion-like-editor .ProseMirror pre,
+.notion-like-editor .ProseMirror code,
+.notion-like-editor .ProseMirror hr {
+  margin-top: 0 !important;           /* kill the offender */
+}
+
+
+/* Default editor styles remain */
+.notion-like-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+
+  .notion-page-title {
+    /* visual */
+    font-size: 2rem; // ≈ 32 px
+    font-weight: 600;
+    line-height: 1.2;
+    background: transparent;
+    border: none;
+    max-width: 768px;
+
+    width: 100%;
+    padding: 2rem 0 0 4rem;
+    /* spacing */
+    margin: 0 auto;
+
+    margin-bottom: 0.75rem; // space before the body
+
+    /* UX */
+    outline: none;
+  }
+
+  .notion-page-title::placeholder {
+    color: var(--tt-gray-light-300);
+  }
+}
+
+
+:root[data-page-layout='full'] .notion-like-editor-wrapper {
+  /* Keep existing look, just ensure shadows are not intrusive */
+  overflow-x: hidden; /* prevent horizontal scroll flash */
+}
+:root[data-page-layout='full'] .notion-like-editor-content {
+  max-width: 100%;
+  box-shadow: none;
+  overflow-x: hidden; /* contain oversized nodes */
+}
+:root[data-page-layout='full']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor {
+  padding: 1rem var(--page-pad-x) 30vh;
+  /* add a small symmetric offset in full layout */
+  padding-left: calc(var(--page-pad-x) + 2rem);
+  padding-right: calc(var(--page-pad-x) + 2rem);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+:root[data-page-layout='full']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor img,
+:root[data-page-layout='full']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor video,
+:root[data-page-layout='full']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor table {
+  max-width: 100%;
+  height: auto;
+}
+:root[data-page-layout='full']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor pre {
+  max-width: 100%;
+  overflow-x: auto; /* keep code scrolling inside container */
+}
+:root[data-page-layout='full'] .notion-like-editor-wrapper .notion-page-title {
+  max-width: 100%;
+  padding: 4% var(--page-pad-x) 0;
+  /* align title with content edges in full layout */
+  padding-left: calc(var(--page-pad-x) + 2rem);
+  padding-right: calc(var(--page-pad-x) + 2rem);
+}
+
+/* Document layout: A4 width, centered, no borders/pagination; title aligns with content */
+:root[data-page-layout='document'] .notion-like-editor-content {
+  max-width: var(--page-a4-width-px);
+  margin: 0 auto;
+  box-shadow: none;
+  width: var(--page-a4-width-px);
+  overflow-x: hidden; /* prevent horizontal scroll */
+}
+:root[data-page-layout='document']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor {
+  padding: 1rem var(--page-pad-x) 30vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+:root[data-page-layout='document']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor img,
+:root[data-page-layout='document']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor video,
+:root[data-page-layout='document']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor table {
+  max-width: 100%;
+  height: auto;
+}
+:root[data-page-layout='document']
+  .notion-like-editor-content
+  .tiptap.ProseMirror.notion-like-editor pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+:root[data-page-layout='document'] .notion-page-title {
+  max-width: var(--page-a4-width-px);
+  width: 100%;
+  margin: 0 auto 0.75rem;
+  padding: 2rem var(--page-pad-x) 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Paginated layouts: align title with page content using CSS vars provided by React */
+:root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-page-title,
+:root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-page-title {
+  max-width: var(--page-width); /* set by React based on PAGE_FORMATS */
+  width: 100%;
+  margin: 0 auto 0.75rem;
+  padding: 2rem 0 0 var(--page-left-margin); /* set by React to match left margin inside page */
+  background: transparent;
+  border: none;
+}
+
+/* Optional subtle background behind paginated pages */
+:root[data-page-layout='a4'] .notion-like-editor-wrapper,
+:root[data-page-layout='letter'] .notion-like-editor-wrapper {
+  background: #fbfbfb;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE PAGINATION
+   ======================================== */
+
+/* Container for scaled pagination on mobile */
+.notion-like-editor-wrapper.layout-a4,
+.notion-like-editor-wrapper.layout-letter {
+  --page-scale: 1;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+/* Scaling wrapper for the editor content - desktop (no scaling) */
+.notion-like-editor-wrapper.layout-a4 .notion-like-editor-content,
+.notion-like-editor-wrapper.layout-letter .notion-like-editor-content {
+  transform-origin: top center;
+}
+
+/* Mobile breakpoints for A4 */
+@media screen and (max-width: 850px) {
+  :root[data-page-layout='a4'] .notion-like-editor-wrapper {
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  
+  :root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-like-editor-content {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    /* Set the actual width so transform scales from correct size */
+    width: var(--page-a4-width-px);
+    min-width: var(--page-a4-width-px);
+    max-width: var(--page-a4-width-px);
+    /* Center the scaled content by adjusting margin */
+    margin-left: calc((100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+  }
+  
+  :root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-page-title {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    width: var(--page-width);
+    min-width: var(--page-width);
+    max-width: var(--page-width);
+    padding-left: var(--page-left-margin);
+    margin-left: calc((100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Mobile breakpoints for Letter */
+@media screen and (max-width: 870px) {
+  :root[data-page-layout='letter'] .notion-like-editor-wrapper {
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  
+  :root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-like-editor-content {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    /* Set the actual width so transform scales from correct size */
+    width: var(--page-letter-width-px);
+    min-width: var(--page-letter-width-px);
+    max-width: var(--page-letter-width-px);
+    /* Center the scaled content by adjusting margin */
+    margin-left: calc((100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+  }
+  
+  :root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-page-title {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    width: var(--page-width);
+    min-width: var(--page-width);
+    max-width: var(--page-width);
+    padding-left: var(--page-left-margin);
+    margin-left: calc((100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Ensure minimum scale doesn't go too small on very narrow screens */
+@media screen and (max-width: 400px) {
+  :root[data-page-layout='a4'] .notion-like-editor-wrapper,
+  :root[data-page-layout='letter'] .notion-like-editor-wrapper {
+    --page-scale: 0.45;
+  }
+}
+
+/* Document layout mobile adjustments - simpler, just reduce padding */
+@media screen and (max-width: 850px) {
+  :root[data-page-layout='document'] .notion-like-editor-content {
+    max-width: 100%;
+    width: 100%;
+  }
+  
+  :root[data-page-layout='document']
+    .notion-like-editor-content
+    .tiptap.ProseMirror.notion-like-editor {
+    padding: 1rem 1rem 30vh;
+  }
+  
+  :root[data-page-layout='document'] .notion-page-title {
+    max-width: 100%;
+    padding: 1.5rem 1rem 0;
+  }
+}
+
+/* Full layout mobile adjustments */
+@media screen and (max-width: 600px) {
+  :root[data-page-layout='full']
+    .notion-like-editor-content
+    .tiptap.ProseMirror.notion-like-editor {
+    padding: 1rem 1rem 30vh;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  :root[data-page-layout='full'] .notion-like-editor-wrapper .notion-page-title {
+    padding: 1.5rem 1rem 0;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

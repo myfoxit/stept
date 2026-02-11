@@ -1,0 +1,128 @@
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from pydantic import BaseModel, Field
+from enum import Enum
+
+class StepTypeEnum(str, Enum):
+    screenshot = "screenshot"
+    tip = "tip"
+    alert = "alert"
+    header = "header"
+    text = "text"
+    gif = "gif"
+    video = "video"
+
+class StepType(str, Enum):
+    screenshot = "screenshot"
+    text = "text"
+    header = "header"
+    tip = "tip"
+    alert = "alert"
+    capture = "capture"
+    gif = "gif"
+    video = "video"
+
+class SessionCreate(BaseModel):
+    timestamp: datetime
+    client: Optional[str] = "ProcessRecorder"
+    project_id: Optional[str] = None
+    user_id: Optional[str] = None
+    folder_id: Optional[str] = None  # NEW: Support folder_id
+    name: Optional[str] = None  # NEW: Support name
+    is_private: Optional[bool] = True  # NEW: Default to private
+
+class SessionResponse(BaseModel):
+    session_id: str = Field(alias="sessionId")
+    
+    class Config:
+        populate_by_name = True
+
+class StepMetadata(BaseModel):
+    step_number: int = Field(alias="stepNumber")
+    timestamp: datetime
+    action_type: str = Field(alias="actionType")
+    window_title: Optional[str] = Field(None, alias="windowTitle")
+    description: Optional[str] = None
+    global_position: Optional[dict] = Field(None, alias="globalPosition")
+    relative_position: Optional[dict] = Field(None, alias="relativePosition")
+    window_size: Optional[dict] = Field(None, alias="windowSize")
+    key_pressed: Optional[str] = Field(None, alias="keyPressed")
+    text_typed: Optional[str] = Field(None, alias="textTyped")
+    scroll_delta: Optional[int] = Field(None, alias="scrollDelta")
+    screenshot_size: Optional[dict] = Field(None, alias="screenshotSize")
+    screenshot_relative_position: Optional[dict] = Field(None, alias="screenshotRelativePosition")
+    step_type: Optional[str] = Field(None, alias="stepType")
+    content: Optional[str] = None
+    file_uploaded: Optional[bool] = Field(None, alias="fileUploaded")
+    
+    class Config:
+        populate_by_name = True
+
+class SessionStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    created_at: datetime
+    total_steps: int
+    total_files: int
+    files_uploaded: int
+    metadata: Optional[List[Dict[str, Any]]] = []  # Make it optional with default empty list
+    storage_type: str
+    storage_path: str
+    
+    class Config:
+        from_attributes = True
+        # Add this to help with serialization
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+class FileUploadResponse(BaseModel):
+    success: bool
+    step_number: int
+    filename: Optional[str] = None
+    file_path: Optional[str] = None
+    message: Optional[str] = None
+
+class StepCreate(BaseModel):
+    step_type: StepType
+    description: Optional[str] = None
+    content: Optional[str] = None
+    window_title: Optional[str] = None
+
+class StepUpdate(BaseModel):
+    description: Optional[str] = None
+    content: Optional[str] = None
+    window_title: Optional[str] = None
+
+class StepReorder(BaseModel):
+    step_number: int
+    new_position: int
+
+class BulkStepReorder(BaseModel):
+    reorders: List[StepReorder]
+
+class StepResponse(BaseModel):
+    id: str
+    session_id: str
+    step_number: int
+    step_type: Optional[str] = None
+    description: Optional[str] = None
+    content: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class WorkflowMove(BaseModel):
+    """Schema for moving a workflow to a different folder/position"""
+    folder_id: Optional[str] = Field(None, description="Target folder ID (null for root)")
+    position: Optional[int] = Field(None, description="Position within the folder")
+    is_private: Optional[bool] = None  # NEW: Allow changing privacy when moving
+
+class WorkflowUpdate(BaseModel):
+    name: Optional[str] = None
+    folder_id: Optional[str] = None
+    icon_type: Optional[str] = None
+    icon_value: Optional[str] = None
+    icon_color: Optional[str] = None
+    is_private: Optional[bool] = None  # NEW

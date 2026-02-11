@@ -1,0 +1,48 @@
+# This workflow is ready for GitHub Actions but not active yet
+# To activate, rename to e2e-tests.yml
+
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Start test environment
+        run: ./scripts/test-env.sh start
+
+      - name: Wait for services
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:5174; do sleep 2; done'
+
+      - name: Run E2E tests
+        run: cd app && pnpm test:e2e
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: app/playwright-report/
+
+      - name: Stop test environment
+        if: always()
+        run: ./scripts/test-env.sh stop

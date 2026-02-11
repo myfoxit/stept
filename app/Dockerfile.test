@@ -1,0 +1,14 @@
+FROM node:20-bookworm-slim
+WORKDIR /app
+
+# make pnpm available
+RUN corepack enable
+
+# bring in your whole project
+COPY . .
+ENV NODE_OPTIONS=--max-old-space-size=4096 
+# install deps (no frozen lockfile, no rebuilds)
+RUN pnpm install
+RUN pnpm rebuild esbuild
+EXPOSE 5173
+CMD ["pnpm", "run", "dev"]

@@ -1,0 +1,42 @@
+:root {
+  --tt-notion-like-editor-header-border: var(--tt-gray-light-a-200);
+  --tt-notion-like-editor-header-bg: var(--white);
+}
+
+.dark {
+  --tt-notion-like-editor-header-border: var(--tt-gray-dark-a-200);
+  --tt-notion-like-editor-header-bg: var(--black);
+}
+
+.notion-like-editor-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  height: 3rem;
+  padding: 0.5rem 0.75rem;
+  z-index: 50;
+  background-color: var(--tt-notion-like-editor-header-bg);
+  border-bottom: 1px solid var(--tt-notion-like-editor-header-border);
+  box-sizing: border-box;
+
+  &-actions {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+}
+
+/* Ensure header doesn't get affected by parent transforms */
+@media screen and (max-width: 870px) {
+  .notion-like-editor-header {
+    position: sticky;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100vw;
+  }
+}
