@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers
 
 from app.database import Base, engine, AsyncSessionLocal
 from app.core.config import settings
@@ -17,6 +17,13 @@ async def lifespan(app: FastAPI):
         await load_db_config()
     except Exception:
         pass  # DB may not be ready; env vars used as fallback
+
+    # Startup: restore persisted Copilot token if available
+    from app.services.auth_providers.copilot import load_persisted_token
+    try:
+        await load_persisted_token()
+    except Exception:
+        pass  # Not critical — user can re-authenticate
     yield
 
 
@@ -49,6 +56,7 @@ api_router.include_router(folder.router, prefix="/folders", tags=["folders"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(inline_ai.router, prefix="/chat", tags=["chat"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
+api_router.include_router(auth_providers.router, prefix="/auth/providers", tags=["auth_providers"])
 
 
 # Mount the versioned router on the main app

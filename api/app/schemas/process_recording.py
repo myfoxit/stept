@@ -54,6 +54,9 @@ class StepMetadata(BaseModel):
     step_type: Optional[str] = Field(None, alias="stepType")
     content: Optional[str] = None
     file_uploaded: Optional[bool] = Field(None, alias="fileUploaded")
+    # AI-generated fields from desktop app
+    generated_title: Optional[str] = Field(None, alias="generatedTitle")
+    generated_description: Optional[str] = Field(None, alias="generatedDescription")
     
     class Config:
         populate_by_name = True

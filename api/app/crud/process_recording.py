@@ -247,6 +247,9 @@ async def upload_metadata(
             screenshot_relative_position=meta.screenshot_relative_position,
             step_type=meta.step_type or "screenshot",  # NEW: default screenshot
             content=meta.content,                      # NEW
+            generated_title=meta.generated_title,      # AI titles from desktop
+            generated_description=meta.generated_description,  # AI descriptions from desktop
+            is_annotated=bool(meta.generated_title),   # Mark as annotated if title exists
         )
         db.add(step)
     

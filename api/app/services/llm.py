@@ -122,6 +122,8 @@ def _base_url() -> str:
         return "https://api.anthropic.com"
     if p == "ollama":
         return "http://localhost:11434"
+    if p == "copilot":
+        return "https://api.githubcopilot.com"
     return "https://api.openai.com"
 
 
@@ -135,6 +137,8 @@ def _model() -> str:
         return "claude-sonnet-4-20250514"
     if p == "ollama":
         return "llama3"
+    if p == "copilot":
+        return "gpt-4o"
     return "gpt-4o-mini"
 
 
