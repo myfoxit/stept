@@ -104,10 +104,19 @@ def _provider() -> str:
 
 
 def _base_url() -> str:
+    """
+    Return the base URL *without* a trailing version path.
+    All callers append their own path (e.g. /v1/chat/completions).
+    Strips trailing /v1 or /v1/ if present so we never get /v1/v1/.
+    """
     db = _get_cached_db_config()
     explicit = db.get("base_url") or settings.LLM_BASE_URL
     if explicit:
-        return explicit.rstrip("/")
+        url = explicit.rstrip("/")
+        # Strip trailing /v1 to avoid double-prefix
+        if url.endswith("/v1"):
+            url = url[:-3]
+        return url
     p = _provider()
     if p == "anthropic":
         return "https://api.anthropic.com"
