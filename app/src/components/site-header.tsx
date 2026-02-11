@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from './tiptap-templates/simple/notion-like-editor-theme-toggle';
 import { useChat } from '@/components/Chat/ChatContext';
+import { SearchBar } from '@/components/search/SearchResults';
 
 export function SiteHeader({
   name = 'Documents',
@@ -25,6 +26,7 @@ export function SiteHeader({
         />
         <h1 className="text-base font-medium">{name}</h1>
         <div className="ml-auto flex items-center gap-2">
+          <SearchBar className="hidden sm:block" />
           {children}
           <Button
             variant={isOpen ? 'default' : 'ghost'}

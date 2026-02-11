@@ -646,6 +646,13 @@ async def get_session_status(
             "step_type": step.step_type or "screenshot",   # NEW
             "content": step.content,                      # NEW
             "file_uploaded": step.step_number in file_steps,  # NEW
+            # AI annotation fields
+            "step_id": step.id,
+            "generated_title": step.generated_title,
+            "generated_description": step.generated_description,
+            "ui_element": step.ui_element,
+            "step_category": step.step_category,
+            "is_annotated": step.is_annotated,
         })
     
     return SessionStatusResponse(

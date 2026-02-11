@@ -13,6 +13,7 @@ import {
   IconBrain,
   IconPlugConnected,
   IconShieldLock,
+  IconSparkles,
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -49,6 +50,7 @@ import { useMe } from '@/hooks/api/auth';
 import { useProjectMembers, useRemoveProjectMember, useUpdateMemberRole } from '@/hooks/api/projects';
 import { SiteHeader } from '@/components/site-header';
 import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } from '@/api/chat';
+import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWizard';
 
 const roleIcons = {
   owner: IconCrown,
@@ -85,10 +87,15 @@ export function ProjectSettingsPage() {
   const [aiConfig, setAiConfig] = useState<ChatConfig | null>(null);
   const [aiModels, setAiModels] = useState<ChatModel[]>([]);
   const [aiTesting, setAiTesting] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
-  useEffect(() => {
+  const refreshAiConfig = () => {
     fetchChatConfig().then(setAiConfig).catch(() => {});
     fetchChatModels().then(setAiModels).catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshAiConfig();
   }, []);
 
   const testAiConnection = async () => {
@@ -286,42 +293,33 @@ export function ProjectSettingsPage() {
         {/* AI / LLM Settings Card */}
         <Card className="mt-6">
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <IconBrain className="h-5 w-5" />
-              <CardTitle>AI / LLM Settings</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <IconBrain className="h-5 w-5" />
+                <CardTitle>AI / LLM Settings</CardTitle>
+              </div>
+              <LlmStatusBadge config={aiConfig} />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Provider & Connection */}
+            {/* Current config summary */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="ai-provider">Provider</Label>
-                <Select
-                  value={aiConfig?.provider || 'openai'}
-                  disabled
-                >
-                  <SelectTrigger id="ai-provider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="anthropic">Anthropic</SelectItem>
-                    <SelectItem value="ollama">Ollama (Local)</SelectItem>
-                    <SelectItem value="custom">Custom (OpenAI-compatible)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Configure via environment variables: LLM_PROVIDER, LLM_API_KEY
-                </p>
+                <Label>Provider</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium capitalize">
+                    {aiConfig?.provider || 'Not configured'}
+                  </span>
+                  {aiConfig?.configured && (
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ai-model">Model</Label>
-                <Input
-                  id="ai-model"
-                  value={aiConfig?.model || ''}
-                  readOnly
-                  className="bg-muted"
-                />
+                <Label>Model</Label>
+                <span className="text-sm font-medium">
+                  {aiConfig?.model || '—'}
+                </span>
               </div>
             </div>
 
@@ -331,7 +329,7 @@ export function ProjectSettingsPage() {
                 <IconPlugConnected className="h-4 w-4" />
                 <span>Status:</span>
                 {aiConfig?.configured ? (
-                  <span className="text-green-500 font-medium">Configured</span>
+                  <span className="text-green-500 font-medium">Connected</span>
                 ) : (
                   <span className="text-muted-foreground">Not configured</span>
                 )}
@@ -364,16 +362,31 @@ export function ProjectSettingsPage() {
               </div>
             )}
 
-            {/* Test connection */}
-            <Button
-              variant="outline"
-              onClick={testAiConnection}
-              disabled={aiTesting}
-            >
-              {aiTesting ? 'Testing…' : 'Test Connection'}
-            </Button>
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setWizardOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <IconSparkles className="mr-2 h-4 w-4" />
+                {aiConfig?.configured ? 'Reconfigure AI' : 'Setup AI Provider'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={testAiConnection}
+                disabled={aiTesting}
+              >
+                {aiTesting ? 'Testing…' : 'Test Connection'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
+
+        <LlmSetupWizard
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          onConfigSaved={refreshAiConfig}
+        />
         
         {/* Invite Dialog */}
         <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>

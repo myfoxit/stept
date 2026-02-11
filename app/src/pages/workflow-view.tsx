@@ -19,6 +19,9 @@ import {
 } from '@/components/workflow/step-variants';
 import { ImageUploadModal } from '@/components/workflow/image-upload-modal';
 import { ShareExportModal } from '@/components/workflow/share-export-modal';
+import { AIToolbar } from '@/components/workflow/ai-toolbar';
+import { GuidePanel } from '@/components/workflow/guide-panel';
+import { SmartStepOverlay } from '@/components/workflow/smart-step-card';
 import { formatDuration } from '@/utils/workflow';
 import {
   createStep,
@@ -26,6 +29,13 @@ import {
   deleteStep,
   uploadStepImage
 } from '@/api/workflows';
+import {
+  processRecording,
+  getAISummary,
+  type ProcessingStatus,
+  type AISummary,
+  type StepAnnotation,
+} from '@/api/processing';
 import type { WorkflowStep as WorkflowStepType, Workflow } from '@/types/workflow';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateWorkflow } from '@/hooks/api/workflows';
@@ -270,6 +280,48 @@ export function WorkflowView() {
 
   const [shareModalOpen, setShareModalOpen] = React.useState(false);
 
+  // AI state
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [processingProgress, setProcessingProgress] = React.useState<{ current: number; total: number } | null>(null);
+  const [guideOpen, setGuideOpen] = React.useState(false);
+
+  const isProcessed = typedWorkflow ? Boolean((typedWorkflow as any).is_processed) : false;
+
+  const handleProcessAll = React.useCallback(async () => {
+    if (!workflowId) return;
+    setIsProcessing(true);
+    setProcessingProgress({ current: 0, total: steps.length });
+    try {
+      await processRecording(workflowId);
+      // Poll for completion
+      const poll = setInterval(async () => {
+        try {
+          const summary = await getAISummary(workflowId);
+          if (summary.is_processed) {
+            clearInterval(poll);
+            setIsProcessing(false);
+            setProcessingProgress(null);
+            refreshWorkflow();
+          }
+        } catch { /* keep polling */ }
+      }, 2000);
+      // Safety timeout after 2 minutes
+      setTimeout(() => { clearInterval(poll); setIsProcessing(false); }, 120000);
+    } catch (err) {
+      console.error('Processing failed:', err);
+      setIsProcessing(false);
+      setProcessingProgress(null);
+    }
+  }, [workflowId, steps.length, refreshWorkflow]);
+
+  const handleGenerateGuide = React.useCallback(() => {
+    setGuideOpen(true);
+  }, []);
+
+  const handleAnnotationUpdate = React.useCallback(() => {
+    refreshWorkflow();
+  }, [refreshWorkflow]);
+
   // Add missing handler functions
   const handleDuplicateStep = async (stepNumber: number) => {
     console.log('Duplicate step:', stepNumber);
@@ -474,36 +526,48 @@ export function WorkflowView() {
     };
 
     return (
-      <WorkflowStep
-        key={backendStepNumber}
-        step={step}
-        // NEW: backendStepNumber is still used for API, visibleIndex for display
-        stepNumber={backendStepNumber}
-        visibleIndex={visibleIndex}
-        imageUrl={imageUrl}
-        isEditMode={isEditMode}
-        zoomState={zoomState}
-        zoomLevels={zoomLevels}
-        onZoomIn={() => handleZoomToClick(backendStepNumber, step)}
-        onZoomOut={() => handleZoomOut(backendStepNumber)}
-        onPanStart={e => {
-          if (e.type === 'touchstart') (e as any).preventDefault(); // NEW
-          handlePanStart(e, backendStepNumber);
-        }}
-        onPanMove={e => {
-          if (e.type === 'touchmove') (e as any).preventDefault(); // NEW
-          handlePanMove(e);
-        }}
-        onPanEnd={() => handlePanEnd()}
-        onDelete={() => handleDeleteStep(backendStepNumber)}
-        onDuplicate={() => handleDuplicateStep(backendStepNumber)}
-        onCopyLink={() => handleCopyLinkToStep(backendStepNumber)}
-        onUpdateGuideLink={() => handleUpdateGuideLink(backendStepNumber)}
-        onReplaceImage={() => handleReplaceImage(backendStepNumber)}
-        onDownloadImage={full => handleDownloadImage(backendStepNumber, full)}
-        imageRef={el => { imageRefs.current[backendStepNumber] = el; }}
-        onUpdateTitle={(newTitle) => handleUpdateStep(backendStepNumber, step.content || '', newTitle)}
-      />
+      <div key={backendStepNumber}>
+        <WorkflowStep
+          key={backendStepNumber}
+          step={step}
+          // NEW: backendStepNumber is still used for API, visibleIndex for display
+          stepNumber={backendStepNumber}
+          visibleIndex={visibleIndex}
+          imageUrl={imageUrl}
+          isEditMode={isEditMode}
+          zoomState={zoomState}
+          zoomLevels={zoomLevels}
+          onZoomIn={() => handleZoomToClick(backendStepNumber, step)}
+          onZoomOut={() => handleZoomOut(backendStepNumber)}
+          onPanStart={e => {
+            if (e.type === 'touchstart') (e as any).preventDefault(); // NEW
+            handlePanStart(e, backendStepNumber);
+          }}
+          onPanMove={e => {
+            if (e.type === 'touchmove') (e as any).preventDefault(); // NEW
+            handlePanMove(e);
+          }}
+          onPanEnd={() => handlePanEnd()}
+          onDelete={() => handleDeleteStep(backendStepNumber)}
+          onDuplicate={() => handleDuplicateStep(backendStepNumber)}
+          onCopyLink={() => handleCopyLinkToStep(backendStepNumber)}
+          onUpdateGuideLink={() => handleUpdateGuideLink(backendStepNumber)}
+          onReplaceImage={() => handleReplaceImage(backendStepNumber)}
+          onDownloadImage={full => handleDownloadImage(backendStepNumber, full)}
+          imageRef={el => { imageRefs.current[backendStepNumber] = el; }}
+          onUpdateTitle={(newTitle) => handleUpdateStep(backendStepNumber, step.content || '', newTitle)}
+        />
+        <SmartStepOverlay
+          stepId={step.id}
+          generatedTitle={(step as any).generated_title}
+          generatedDescription={(step as any).generated_description}
+          uiElement={(step as any).ui_element}
+          stepCategory={(step as any).step_category}
+          isAnnotated={(step as any).is_annotated}
+          isEditMode={isEditMode}
+          onAnnotationUpdate={handleAnnotationUpdate}
+        />
+      </div>
     );
   };
 
@@ -529,6 +593,14 @@ export function WorkflowView() {
             iconOverride={iconOverride || undefined}
             // NEW: allow editing title from header
             onUpdateTitle={handleUpdateTitle}
+          />
+
+          <AIToolbar
+            isProcessing={isProcessing}
+            isProcessed={isProcessed}
+            processingProgress={processingProgress}
+            onProcessAll={handleProcessAll}
+            onGenerateGuide={handleGenerateGuide}
           />
 
           {isEditMode ? (
@@ -581,6 +653,13 @@ export function WorkflowView() {
           onClose={() => setShareModalOpen(false)}
           workflowId={workflowId}
           workflowName={typedWorkflow.name || 'Workflow'}
+        />
+
+        <GuidePanel
+          open={guideOpen}
+          onClose={() => setGuideOpen(false)}
+          recordingId={workflowId!}
+          existingGuide={(typedWorkflow as any)?.guide_markdown}
         />
       </div>
     </div>

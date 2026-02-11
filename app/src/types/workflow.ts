@@ -8,7 +8,14 @@ export type WorkflowStep = {
   window_size?: { width: number; height: number };
   screenshot_relative_position?: { x: number; y: number };
   screenshot_size?: { width: number; height: number };
-  [key: string]: any;
+  // AI annotation fields
+  step_id?: string;
+  generated_title?: string | null;
+  generated_description?: string | null;
+  ui_element?: string | null;
+  step_category?: string | null;
+  is_annotated?: boolean;
+  [key: string]: unknown;
 };
 
 export interface ZoomState {
@@ -28,4 +35,12 @@ export interface Workflow {
     name: string;
   };
   metadata?: WorkflowStep[];
+  // AI processing fields
+  generated_title?: string | null;
+  summary?: string | null;
+  tags?: string[] | null;
+  estimated_time?: string | null;
+  difficulty?: string | null;
+  is_processed?: boolean;
+  guide_markdown?: string | null;
 }

@@ -251,6 +251,15 @@ class ProcessRecordingSession(Base):
     is_private = Column(Boolean, nullable=False, default=False, index=True)  # True = only owner can see
     owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # Owner for private workflows
     
+    # AI auto-processing fields
+    generated_title = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+    tags = Column(JSON, nullable=True)  # list of strings
+    estimated_time = Column(String, nullable=True)
+    difficulty = Column(String, nullable=True)  # easy, medium, advanced
+    is_processed = Column(Boolean, nullable=False, default=False)
+    guide_markdown = Column(Text, nullable=True)
+    
     # Relationships
     user = relationship("User", back_populates="recording_sessions", foreign_keys=[user_id])
     files = relationship("ProcessRecordingFile", back_populates="session", cascade="all, delete-orphan")
@@ -285,6 +294,13 @@ class ProcessRecordingStep(Base):
     key_pressed = Column(String, nullable=True)
     text_typed = Column(Text, nullable=True)
     scroll_delta = Column(Integer, nullable=True)
+    
+    # AI annotation fields
+    generated_title = Column(String, nullable=True)
+    generated_description = Column(Text, nullable=True)
+    ui_element = Column(String, nullable=True)
+    step_category = Column(String, nullable=True)  # navigation, data_entry, confirmation, etc.
+    is_annotated = Column(Boolean, nullable=False, default=False)
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

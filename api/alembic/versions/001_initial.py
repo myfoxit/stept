@@ -154,6 +154,14 @@ def upgrade() -> None:
         sa.Column("icon_color", sa.String(7), nullable=True, server_default="#6366f1"),
         sa.Column("is_private", sa.Boolean, nullable=False, server_default=sa.text("false"), index=True),
         sa.Column("owner_id", sa.String(16), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True),
+        # AI auto-processing fields
+        sa.Column("generated_title", sa.String, nullable=True),
+        sa.Column("summary", sa.Text, nullable=True),
+        sa.Column("tags", sa.JSON, nullable=True),
+        sa.Column("estimated_time", sa.String, nullable=True),
+        sa.Column("difficulty", sa.String, nullable=True),
+        sa.Column("is_processed", sa.Boolean, nullable=False, server_default=sa.text("false")),
+        sa.Column("guide_markdown", sa.Text, nullable=True),
     )
 
     # ------------------------------------------------------------------
@@ -178,6 +186,12 @@ def upgrade() -> None:
         sa.Column("key_pressed", sa.String, nullable=True),
         sa.Column("text_typed", sa.Text, nullable=True),
         sa.Column("scroll_delta", sa.Integer, nullable=True),
+        # AI annotation fields
+        sa.Column("generated_title", sa.String, nullable=True),
+        sa.Column("generated_description", sa.Text, nullable=True),
+        sa.Column("ui_element", sa.String, nullable=True),
+        sa.Column("step_category", sa.String, nullable=True),
+        sa.Column("is_annotated", sa.Boolean, nullable=False, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime, server_default=sa.func.now()),
         sa.UniqueConstraint("session_id", "step_number", name="_session_step_number_unique"),

@@ -126,3 +126,42 @@ class WorkflowUpdate(BaseModel):
     icon_value: Optional[str] = None
     icon_color: Optional[str] = None
     is_private: Optional[bool] = None  # NEW
+
+
+# ── AI Processing Schemas ────────────────────────────────────────────────────
+
+class ProcessingStatus(BaseModel):
+    recording_id: str
+    steps_annotated: int
+    total_steps: int
+    has_summary: bool
+    is_processed: bool = False
+
+class GuideResponse(BaseModel):
+    recording_id: str
+    guide_markdown: Optional[str] = None
+    generated_title: Optional[str] = None
+
+class StepAnnotation(BaseModel):
+    step_id: str
+    step_number: int
+    generated_title: Optional[str] = None
+    generated_description: Optional[str] = None
+    ui_element: Optional[str] = None
+    step_category: Optional[str] = None
+    is_annotated: bool = False
+
+    class Config:
+        from_attributes = True
+
+class RecordingAISummary(BaseModel):
+    recording_id: str
+    generated_title: Optional[str] = None
+    summary: Optional[str] = None
+    tags: Optional[List[str]] = None
+    estimated_time: Optional[str] = None
+    difficulty: Optional[str] = None
+    is_processed: bool = False
+
+    class Config:
+        from_attributes = True

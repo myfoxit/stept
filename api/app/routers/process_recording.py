@@ -9,12 +9,13 @@ from datetime import datetime
 import io
 
 from app.database import get_session as get_db
-from app.models import ProcessRecordingSession, ProcessRecordingFile, ProjectRole, User
+from app.models import ProcessRecordingSession, ProcessRecordingFile, ProcessRecordingStep, ProjectRole, User
 from app.schemas.process_recording import (
     SessionCreate, SessionResponse, StepMetadata, 
     SessionStatusResponse, FileUploadResponse,
     StepCreate, StepUpdate, StepResponse, BulkStepReorder,
-    WorkflowMove  # Add this schema
+    WorkflowMove,  # Add this schema
+    ProcessingStatus, GuideResponse, StepAnnotation,  # AI schemas
 )
 from app.crud.process_recording import (
     create_session, upload_metadata, save_uploaded_file,
@@ -804,3 +805,280 @@ async def export_workflow_docx(
             "Content-Disposition": f'attachment; filename="{filename}"',
         }
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AI PROCESSING ENDPOINTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/workflow/{session_id}/process", response_model=ProcessingStatus)
+async def process_recording_with_ai(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger AI auto-processing of a recording: annotate all steps and generate summary."""
+    from app.services.auto_processor import auto_processor
+
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    if session.project_id:
+        await check_project_permission(
+            db=db,
+            user_id=current_user.id,
+            project_id=session.project_id,
+            required_role=ProjectRole.MEMBER,
+        )
+
+    try:
+        result = await auto_processor.process_recording(session_id, db)
+        return ProcessingStatus(
+            recording_id=result["recording_id"],
+            steps_annotated=result["steps_annotated"],
+            total_steps=result["total_steps"],
+            has_summary=result["has_summary"],
+            is_processed=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=f"AI processing failed: {exc}",
+        )
+
+
+@router.post("/workflow/{session_id}/generate-guide", response_model=GuideResponse)
+async def generate_guide_endpoint(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a polished markdown guide for a recording."""
+    from app.services.auto_processor import auto_processor
+
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    if session.project_id:
+        await check_project_permission(
+            db=db,
+            user_id=current_user.id,
+            project_id=session.project_id,
+            required_role=ProjectRole.MEMBER,
+        )
+
+    try:
+        guide_md = await auto_processor.generate_guide(session_id, db)
+        return GuideResponse(
+            recording_id=session_id,
+            guide_markdown=guide_md,
+            generated_title=session.generated_title,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=f"Guide generation failed: {exc}",
+        )
+
+
+@router.get("/workflow/{session_id}/generate-guide/stream")
+async def stream_guide_endpoint(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream a polished markdown guide via SSE."""
+    from app.services.auto_processor import auto_processor
+
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    if session.project_id:
+        await check_project_permission(
+            db=db,
+            user_id=current_user.id,
+            project_id=session.project_id,
+            required_role=ProjectRole.MEMBER,
+        )
+
+    return StreamingResponse(
+        auto_processor.generate_guide_stream(session_id, db),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/workflow/{session_id}/guide", response_model=GuideResponse)
+async def get_guide_endpoint(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get previously generated guide."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    return GuideResponse(
+        recording_id=session_id,
+        guide_markdown=session.guide_markdown,
+        generated_title=session.generated_title,
+    )
+
+
+@router.get("/workflow/{session_id}/ai-summary")
+async def get_ai_summary(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get AI-generated summary and step annotations for a recording."""
+    from sqlalchemy.orm import selectinload as _sel
+
+    stmt = (
+        select(ProcessRecordingSession)
+        .where(ProcessRecordingSession.id == session_id)
+        .options(_sel(ProcessRecordingSession.steps))
+    )
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    steps_data = []
+    for step in sorted(session.steps, key=lambda s: s.step_number):
+        steps_data.append({
+            "step_id": step.id,
+            "step_number": step.step_number,
+            "generated_title": step.generated_title,
+            "generated_description": step.generated_description,
+            "ui_element": step.ui_element,
+            "step_category": step.step_category,
+            "is_annotated": step.is_annotated,
+        })
+
+    return {
+        "recording_id": session_id,
+        "generated_title": session.generated_title,
+        "summary": session.summary,
+        "tags": session.tags,
+        "estimated_time": session.estimated_time,
+        "difficulty": session.difficulty,
+        "is_processed": session.is_processed,
+        "guide_markdown": session.guide_markdown,
+        "steps": steps_data,
+    }
+
+
+@router.post("/steps/{step_id}/annotate")
+async def annotate_single_step(
+    step_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-annotate a single step with AI."""
+    from app.services.auto_processor import auto_processor
+    from app.services import dataveil as dataveil_service
+    from app.models import ProcessRecordingFile
+    from sqlalchemy import and_
+
+    step = await db.get(ProcessRecordingStep, step_id)
+    if not step:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Step not found")
+
+    session = await db.get(ProcessRecordingSession, step.session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+    # Load screenshot if available
+    image_b64 = None
+    stmt = select(ProcessRecordingFile).where(
+        and_(
+            ProcessRecordingFile.session_id == step.session_id,
+            ProcessRecordingFile.step_number == step.step_number,
+        )
+    )
+    file_result = await db.execute(stmt)
+    file_record = file_result.scalar_one_or_none()
+    if file_record and session.storage_path:
+        import base64 as b64mod
+        file_abs = os.path.join(session.storage_path, file_record.file_path) if not os.path.isabs(file_record.file_path) else file_record.file_path
+        if os.path.exists(file_abs):
+            with open(file_abs, "rb") as f:
+                image_b64 = b64mod.b64encode(f.read()).decode("utf-8")
+
+    base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+
+    try:
+        result = await auto_processor.annotate_step(step, image_b64, base_url_override)
+        if result:
+            step.generated_title = result.get("title", "")
+            step.generated_description = result.get("description", "")
+            step.ui_element = result.get("ui_element", "")
+            step.step_category = result.get("category", "")
+            step.is_annotated = True
+            await db.commit()
+
+        return StepAnnotation(
+            step_id=step.id,
+            step_number=step.step_number,
+            generated_title=step.generated_title,
+            generated_description=step.generated_description,
+            ui_element=step.ui_element,
+            step_category=step.step_category,
+            is_annotated=step.is_annotated,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=f"Step annotation failed: {exc}",
+        )
+
+
+@router.post("/steps/{step_id}/improve")
+async def improve_step_endpoint(
+    step_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Improve a step's description using AI."""
+    from app.services.auto_processor import auto_processor
+    from app.services import dataveil as dataveil_service
+
+    step = await db.get(ProcessRecordingStep, step_id)
+    if not step:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Step not found")
+
+    base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+
+    try:
+        result = await auto_processor.improve_step(step, base_url_override)
+        if result:
+            step.generated_title = result.get("title", step.generated_title)
+            step.generated_description = result.get("description", step.generated_description)
+            step.ui_element = result.get("ui_element", step.ui_element)
+            step.step_category = result.get("category", step.step_category)
+            step.is_annotated = True
+            await db.commit()
+
+        return StepAnnotation(
+            step_id=step.id,
+            step_number=step.step_number,
+            generated_title=step.generated_title,
+            generated_description=step.generated_description,
+            ui_element=step.ui_element,
+            step_category=step.step_category,
+            is_annotated=step.is_annotated,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=f"Step improvement failed: {exc}",
+        )
