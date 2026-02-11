@@ -4,7 +4,7 @@
  */
 
 import * as React from 'react';
-import { IconTrash, IconBrain } from '@tabler/icons-react';
+import { IconTrash, IconBrain, IconTool } from '@tabler/icons-react';
 import {
   Sheet,
   SheetContent,
@@ -94,6 +94,12 @@ export function ChatPanel() {
                 <p className="text-xs opacity-60">
                   I can help you understand, summarise, or improve your content.
                 </p>
+                <div className="flex items-center gap-1.5 text-xs opacity-50">
+                  <IconTool className="h-3 w-3" />
+                  <span>
+                    I can also create pages, analyze workflows, and more.
+                  </span>
+                </div>
               </div>
             )}
             {messages

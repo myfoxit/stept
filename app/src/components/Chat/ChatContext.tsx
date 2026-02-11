@@ -1,10 +1,16 @@
 /**
  * React context for Chat state management.
- * Provides messages, loading state, context awareness, and panel visibility.
+ * Provides messages, loading state, context awareness, panel visibility,
+ * and tool call/result tracking.
  */
 
 import * as React from 'react';
-import type { ChatMessage, ChatContext as ChatContextPayload } from '@/api/chat';
+import type {
+  ChatMessage,
+  ChatContext as ChatContextPayload,
+  ToolCallEvent,
+  ToolResultEvent,
+} from '@/api/chat';
 import { streamChatCompletion } from '@/api/chat';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -55,7 +61,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (!content.trim() || isLoading) return;
 
       const userMessage: ChatMessage = { role: 'user', content };
-      const assistantMessage: ChatMessage = { role: 'assistant', content: '' };
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: '',
+        tool_calls: [],
+        tool_results: [],
+      };
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setIsLoading(true);
@@ -66,8 +77,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // Build full message history for the request
-      const allMessages: ChatMessage[] = [...messages, userMessage];
+      // Build full message history for the request (only role + content)
+      const allMessages: ChatMessage[] = [...messages, userMessage].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
       streamChatCompletion(
         {
@@ -100,13 +114,50 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           // Remove the empty assistant message on error
           setMessages((prev) => {
             const last = prev[prev.length - 1];
-            if (last?.role === 'assistant' && !last.content) {
+            if (last?.role === 'assistant' && !last.content && !last.tool_calls?.length && !last.tool_results?.length) {
               return prev.slice(0, -1);
             }
             return prev;
           });
         },
         controller.signal,
+        // onToolCall
+        (toolCall: ToolCallEvent) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === 'assistant') {
+              const existingCalls = last.tool_calls || [];
+              updated[updated.length - 1] = {
+                ...last,
+                tool_calls: [...existingCalls, toolCall],
+              };
+            }
+            return updated;
+          });
+        },
+        // onToolResult
+        (toolResult: ToolResultEvent) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === 'assistant') {
+              const existingResults = last.tool_results || [];
+              // Also update the matching tool_call status
+              const updatedCalls = (last.tool_calls || []).map((tc) =>
+                tc.id === toolResult.tool_call_id
+                  ? { ...tc, status: toolResult.status as ToolCallEvent['status'] }
+                  : tc,
+              );
+              updated[updated.length - 1] = {
+                ...last,
+                tool_calls: updatedCalls,
+                tool_results: [...existingResults, toolResult],
+              };
+            }
+            return updated;
+          });
+        },
       );
     },
     [messages, isLoading, context],

@@ -1,5 +1,6 @@
 /**
  * Chat / LLM API client with SSE streaming support.
+ * Supports tool/function calling events inline in the stream.
  */
 
 import { apiClient, getApiBaseUrl } from '@/lib/apiClient';
@@ -9,11 +10,14 @@ import { apiClient, getApiBaseUrl } from '@/lib/apiClient';
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  tool_calls?: ToolCallEvent[];
+  tool_results?: ToolResultEvent[];
 }
 
 export interface ChatContext {
   recording_id?: string;
   document_id?: string;
+  project_id?: string;
 }
 
 export interface ChatCompletionRequest {
@@ -36,6 +40,27 @@ export interface ChatConfig {
   configured: boolean;
 }
 
+// ── Tool Calling Types ───────────────────────────────────────────────────────
+
+export interface ToolCallEvent {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'executing' | 'completed' | 'error';
+}
+
+export interface ToolResultEvent {
+  tool_call_id: string;
+  result: Record<string, unknown>;
+  status: 'completed' | 'error';
+}
+
+export interface ChatTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
 // ── SSE Streaming ────────────────────────────────────────────────────────────
 
 export async function streamChatCompletion(
@@ -44,6 +69,8 @@ export async function streamChatCompletion(
   onDone: () => void,
   onError: (error: Error) => void,
   signal?: AbortSignal,
+  onToolCall?: (toolCall: ToolCallEvent) => void,
+  onToolResult?: (toolResult: ToolResultEvent) => void,
 ): Promise<void> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}/chat/completions`;
@@ -91,6 +118,20 @@ export async function streamChatCompletion(
 
         try {
           const parsed = JSON.parse(data);
+
+          // Handle tool call events
+          if (parsed.tool_call && onToolCall) {
+            onToolCall(parsed.tool_call);
+            continue;
+          }
+
+          // Handle tool result events
+          if (parsed.tool_result && onToolResult) {
+            onToolResult(parsed.tool_result);
+            continue;
+          }
+
+          // Handle regular text chunks
           const content = parsed.choices?.[0]?.delta?.content;
           if (content) {
             onChunk(content);
@@ -133,4 +174,9 @@ export interface ChatConfigUpdate {
 export async function updateChatConfig(config: ChatConfigUpdate): Promise<ChatConfig> {
   const { data } = await apiClient.put<ChatConfig>('/chat/config', config);
   return data;
+}
+
+export async function fetchChatTools(): Promise<ChatTool[]> {
+  const { data } = await apiClient.get<{ tools: ChatTool[] }>('/chat/tools');
+  return data.tools;
 }

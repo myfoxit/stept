@@ -170,13 +170,17 @@ async def _openai_chat(
     model: str,
     stream: bool,
     base_url: str,
+    tools: list[dict] | None = None,
 ) -> httpx.Response:
     url = f"{base_url}/v1/chat/completions"
-    payload = {
+    payload: dict = {
         "model": model,
         "messages": messages,
         "stream": stream,
     }
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
     client = httpx.AsyncClient(timeout=120.0)
     if stream:
         req = client.build_request("POST", url, json=payload, headers=_headers())
@@ -198,6 +202,7 @@ async def _anthropic_chat(
     model: str,
     stream: bool,
     base_url: str,
+    tools: list[dict] | None = None,
 ) -> httpx.Response:
     url = f"{base_url}/v1/messages"
 
@@ -207,6 +212,38 @@ async def _anthropic_chat(
     for msg in messages:
         if msg["role"] == "system":
             system_text += msg["content"] + "\n"
+        elif msg["role"] == "tool":
+            # Convert OpenAI tool result format to Anthropic format
+            user_messages.append({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": msg.get("tool_call_id", ""),
+                        "content": msg["content"],
+                    }
+                ],
+            })
+        elif msg.get("tool_calls"):
+            # Convert OpenAI assistant tool_calls to Anthropic format
+            content_blocks = []
+            if msg.get("content"):
+                content_blocks.append({"type": "text", "text": msg["content"]})
+            for tc in msg["tool_calls"]:
+                args = tc["function"]["arguments"]
+                if isinstance(args, str):
+                    import json as _json
+                    try:
+                        args = _json.loads(args)
+                    except Exception:
+                        args = {}
+                content_blocks.append({
+                    "type": "tool_use",
+                    "id": tc["id"],
+                    "name": tc["function"]["name"],
+                    "input": args,
+                })
+            user_messages.append({"role": "assistant", "content": content_blocks})
         else:
             user_messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -218,6 +255,18 @@ async def _anthropic_chat(
     }
     if system_text.strip():
         payload["system"] = system_text.strip()
+
+    # Convert OpenAI tools format to Anthropic tools format
+    if tools:
+        anthropic_tools = []
+        for t in tools:
+            func = t.get("function", {})
+            anthropic_tools.append({
+                "name": func["name"],
+                "description": func.get("description", ""),
+                "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
+            })
+        payload["tools"] = anthropic_tools
 
     client = httpx.AsyncClient(timeout=120.0)
     if stream:
@@ -301,32 +350,84 @@ async def chat_completion(
     model: Optional[str] = None,
     stream: bool = True,
     base_url_override: Optional[str] = None,
+    tools: list[dict] | None = None,
 ) -> httpx.Response | AsyncIterator[str]:
     """
     Send a chat completion request.
 
     When *stream* is True, returns an AsyncIterator[str] of SSE lines.
     When *stream* is False, returns the raw httpx.Response (caller reads JSON).
+    
+    If *tools* is provided, includes tool definitions for function calling.
     """
     resolved_model = model or _model()
     resolved_url = base_url_override or _base_url()
     provider = _provider()
 
-    logger.info("LLM request: provider=%s model=%s stream=%s", provider, resolved_model, stream)
+    logger.info("LLM request: provider=%s model=%s stream=%s tools=%d",
+                provider, resolved_model, stream, len(tools) if tools else 0)
 
     if provider == "anthropic":
-        resp = await _anthropic_chat(messages, resolved_model, stream, resolved_url)
+        resp = await _anthropic_chat(messages, resolved_model, stream, resolved_url, tools=tools)
         if stream:
             resp.raise_for_status()
             return _iter_anthropic_stream(resp)
         return resp
     else:
         # OpenAI / Ollama / compatible
-        resp = await _openai_chat(messages, resolved_model, stream, resolved_url)
+        resp = await _openai_chat(messages, resolved_model, stream, resolved_url, tools=tools)
         if stream:
             resp.raise_for_status()
             return _iter_openai_stream(resp)
         return resp
+
+
+def extract_tool_calls_from_response(response_json: dict, provider: str | None = None) -> list[dict]:
+    """
+    Extract tool calls from a non-streaming LLM response.
+    
+    Returns list of dicts: [{id, function: {name, arguments}}]
+    Works for both OpenAI and Anthropic response formats.
+    """
+    resolved_provider = provider or _provider()
+    
+    if resolved_provider == "anthropic":
+        # Anthropic format: content blocks with type="tool_use"
+        content_blocks = response_json.get("content", [])
+        tool_calls = []
+        for block in content_blocks:
+            if block.get("type") == "tool_use":
+                tool_calls.append({
+                    "id": block["id"],
+                    "type": "function",
+                    "function": {
+                        "name": block["name"],
+                        "arguments": json.dumps(block.get("input", {})),
+                    },
+                })
+        return tool_calls
+    else:
+        # OpenAI format: choices[0].message.tool_calls
+        choices = response_json.get("choices", [])
+        if not choices:
+            return []
+        message = choices[0].get("message", {})
+        return message.get("tool_calls", []) or []
+
+
+def extract_text_from_response(response_json: dict, provider: str | None = None) -> str:
+    """Extract text content from a non-streaming LLM response."""
+    resolved_provider = provider or _provider()
+    
+    if resolved_provider == "anthropic":
+        content_blocks = response_json.get("content", [])
+        texts = [b.get("text", "") for b in content_blocks if b.get("type") == "text"]
+        return "".join(texts)
+    else:
+        choices = response_json.get("choices", [])
+        if not choices:
+            return ""
+        return choices[0].get("message", {}).get("content", "") or ""
 
 
 async def list_models() -> list[dict]:

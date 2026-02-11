@@ -40,6 +40,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateWorkflow } from '@/hooks/api/workflows';
 import { SiteHeader } from '@/components/site-header';
 import { useChat } from '@/components/Chat/ChatContext';
+import { useProject } from '@/providers/project-provider';
 
 export function WorkflowView() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -47,6 +48,7 @@ export function WorkflowView() {
   const location = useLocation();
   const { data: workflow, isLoading } = useWorkflow(workflowId || '');
   const { setContext } = useChat();
+  const { selectedProjectId } = useProject();
   
   // NEW: Derive edit mode from URL
   const isEditMode = location.pathname.endsWith('/edit');
@@ -54,10 +56,10 @@ export function WorkflowView() {
   // Set chat context when viewing a workflow
   React.useEffect(() => {
     if (workflowId) {
-      setContext({ recording_id: workflowId });
+      setContext({ recording_id: workflowId, project_id: selectedProjectId || undefined });
     }
     return () => setContext(null);
-  }, [workflowId, setContext]);
+  }, [workflowId, setContext, selectedProjectId]);
   
   const [uploadModalState, setUploadModalState] = React.useState<{
     open: boolean;

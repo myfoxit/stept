@@ -12,11 +12,13 @@ import { useDocument, useUpdateDocumentLayout } from '@/hooks/api/documents';
 import { exportDocument, type DocumentExportFormat } from '@/api/documents';
 import { ExportDialog } from '@/components/export-dialog';
 import { useChat } from '@/components/Chat/ChatContext';
+import { useProject } from '@/providers/project-provider';
 
 export default function EditorPage() {
   const { docId } = useParams<{ docId: string }>();
   const { data: doc } = useDocument(docId!);
   const { setContext } = useChat();
+  const { selectedProjectId } = useProject();
 
   const [pageLayout, setPageLayout] = useState<PageLayout>('full');
   const updateLayout = useUpdateDocumentLayout(docId!);
@@ -24,7 +26,7 @@ export default function EditorPage() {
   // Set chat context when viewing a document
   useEffect(() => {
     if (docId) {
-      setContext({ document_id: docId });
+      setContext({ document_id: docId, project_id: selectedProjectId || undefined });
     }
     return () => setContext(null);
   }, [docId, setContext]);
