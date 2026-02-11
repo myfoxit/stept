@@ -7,7 +7,7 @@ import { Pagination } from './PaginationBreaks';
 
 import { Color, TextStyle } from '@tiptap/extension-text-style';
 
-// shadcn‑ui
+// shadcn-ui
 import {
   Popover,
   PopoverTrigger,
@@ -23,8 +23,8 @@ import {
   CommandSeparator,
 } from '@/components/ui/command';
 
-// tabler‑icons
-import { IconCards, IconPointer, IconTextCaption } from '@tabler/icons-react';
+// tabler-icons
+import { IconCards, IconPointer, IconTextCaption, IconSparkles } from '@tabler/icons-react';
 import ButtonNode from './Nodes/ButtonNode/ButtonNode';
 import HeroNode from './Nodes/HeroNode/HeroNode';
 import CardListNode from './Nodes/CardListNode/CardListNode';
@@ -34,6 +34,9 @@ import { useColumns } from '@/hooks/columns';
 import { useDocument, useRows, useSaveDocument } from '@/hooks';
 import { VariableStore } from './Extensions/VariableStore';
 import { FormatBubbleMenu } from './FormatBubbleMenu';
+
+// AI commands
+import { AICommandPanel, AI_COMMANDS, type AICommandDef } from '@/components/tiptap-extensions/ai-commands';
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -47,13 +50,15 @@ const marginBottomPx = cmToPx(2.5);
 const marginHorizontalPx = cmToPx(2);
 
 // -----------------------------------------------------------------------------
-// React components used inside node‑views
+// React components used inside node-views
 // -----------------------------------------------------------------------------
 
 type CommandDef = {
   title: string;
   icon: React.ElementType;
   action: (editor: Editor) => void;
+  /** If set, this command triggers an AI operation instead */
+  aiCommand?: AICommandDef;
 };
 
 const makeCommands = (): CommandDef[] => [
@@ -87,6 +92,15 @@ const makeCommands = (): CommandDef[] => [
       editor.commands.insertContent({ type: 'variable-node' });
     },
   },
+  // AI commands
+  ...AI_COMMANDS.map(
+    (ai): CommandDef => ({
+      title: ai.title,
+      icon: IconSparkles,
+      action: () => {}, // handled via aiCommand
+      aiCommand: ai,
+    }),
+  ),
 ];
 
 // -----------------------------------------------------------------------------
@@ -117,10 +131,14 @@ export const SnapEditor: React.FC = ({
     y: 0,
   });
 
+  // AI command panel state
+  const [activeAICommand, setActiveAICommand] = useState<AICommandDef | null>(null);
+  const [aiPanelCoords, setAiPanelCoords] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const commands = useMemo<CommandDef[]>(() => {
     if (commandLevel === 'root') return makeCommands();
 
-    // — variable level —
+    // - variable level -
     return cols.map((c) => ({
       title: c.name,
       icon: IconTextCaption,
@@ -180,10 +198,10 @@ export const SnapEditor: React.FC = ({
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const onUpdate = () => {
-      // clear the previous save if we’re still typing
+      // clear the previous save if we're still typing
       clearTimeout(timeoutId);
 
-      // schedule a new save 1 s after the last keystroke
+      // schedule a new save 1 s after the last keystroke
       timeoutId = setTimeout(() => {
         const json = editor.getJSON();
         console.log(`Saving document for table ${tableId}`, json);
@@ -203,12 +221,12 @@ export const SnapEditor: React.FC = ({
 
   useEffect(() => {
     if (editor && doc) {
-      editor.commands.setContent(doc.content, false); // false = do not add to undo‑stack
+      editor.commands.setContent(doc.content, false); // false = do not add to undo-stack
     }
   }, [editor, doc]);
 
   // -------------------------------------------------------------------------
-  // Show slash‑command palette
+  // Show slash-command palette
   // -------------------------------------------------------------------------
 
   const openCommandMenu = useCallback(() => {
@@ -253,11 +271,21 @@ export const SnapEditor: React.FC = ({
       return; // keep palette open
     }
 
-    // Delete the “/” that triggered the palette (if still present)
+    // Delete the "/" that triggered the palette (if still present)
     const { from } = editor.state.selection;
     const charBefore = editor.state.doc.textBetween(from - 1, from, '\0', '\0');
     if (charBefore === '/') {
       editor.commands.deleteRange({ from: from - 1, to: from });
+    }
+
+    // AI command → open the AI panel
+    if (cmd.aiCommand) {
+      const coords = editor.view.coordsAtPos(editor.state.selection.from);
+      setAiPanelCoords({ x: coords.left, y: coords.bottom });
+      setActiveAICommand(cmd.aiCommand);
+      setMenuOpen(false);
+      setCommandLevel('root');
+      return;
     }
 
     // Run the chosen action (insert node, etc.)
@@ -280,7 +308,7 @@ export const SnapEditor: React.FC = ({
 
           <EditorContent editor={editor} />
 
-          {/* Slash‑command popover */}
+          {/* Slash-command popover */}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
               {/* Invisible anchor element to position the popover */}
@@ -305,16 +333,40 @@ export const SnapEditor: React.FC = ({
                   <CommandEmpty>No command found.</CommandEmpty>
 
                   <CommandGroup heading="Components">
-                    {commands.map((cmd) => (
-                      <CommandItem
-                        key={cmd.title}
-                        value={cmd.title}
-                        onSelect={() => handleSelect(cmd)}
-                      >
-                        <cmd.icon className="mr-2 h-4 w-4" />
-                        <span>{cmd.title}</span>
-                      </CommandItem>
-                    ))}
+                    {commands
+                      .filter((cmd) => !cmd.aiCommand)
+                      .map((cmd) => (
+                        <CommandItem
+                          key={cmd.title}
+                          value={cmd.title}
+                          onSelect={() => handleSelect(cmd)}
+                        >
+                          <cmd.icon className="mr-2 h-4 w-4" />
+                          <span>{cmd.title}</span>
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+
+                  <CommandSeparator />
+
+                  <CommandGroup heading="✨ AI">
+                    {commands
+                      .filter((cmd) => cmd.aiCommand)
+                      .map((cmd) => (
+                        <CommandItem
+                          key={cmd.title}
+                          value={cmd.title}
+                          onSelect={() => handleSelect(cmd)}
+                        >
+                          <cmd.icon className="mr-2 h-4 w-4 text-violet-500" />
+                          <div className="flex flex-col">
+                            <span>{cmd.title}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {cmd.aiCommand!.description}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
                   </CommandGroup>
 
                   <CommandSeparator />
@@ -329,6 +381,16 @@ export const SnapEditor: React.FC = ({
               </Command>
             </PopoverContent>
           </Popover>
+
+          {/* AI Command Panel */}
+          {activeAICommand && editor && (
+            <AICommandPanel
+              editor={editor}
+              command={activeAICommand}
+              coords={aiPanelCoords}
+              onClose={() => setActiveAICommand(null)}
+            />
+          )}
         </>
       )}
     </div>
