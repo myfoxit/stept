@@ -3,14 +3,15 @@
  *
  * Uses @mlc-ai/web-llm which compiles models to WebGPU and caches them
  * in IndexedDB so they're only downloaded once.
+ *
+ * The import is DYNAMIC so the app still builds/runs even when
+ * @mlc-ai/web-llm isn't installed — it only loads when actually used.
  */
 
-import {
-  CreateMLCEngine,
-  type MLCEngine,
-  type ChatCompletionMessageParam,
-  type InitProgressReport,
-} from '@mlc-ai/web-llm';
+// Dynamic import — lazily loads the heavy WebLLM package on first use
+async function loadWebLLM() {
+  return await import('@mlc-ai/web-llm');
+}
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
 
@@ -92,7 +93,8 @@ export type ProgressCallback = (progress: WebLLMProgress) => void;
 
 // ── Singleton engine management ──────────────────────────────────────────────
 
-let _engine: MLCEngine | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _engine: any = null;
 let _loadedModel: string | null = null;
 let _loading = false;
 
@@ -103,7 +105,8 @@ let _loading = false;
 export async function getEngine(
   modelId: string = DEFAULT_MODEL,
   onProgress?: ProgressCallback,
-): Promise<MLCEngine> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
   // Already loaded with same model
   if (_engine && _loadedModel === modelId) return _engine;
 
@@ -124,14 +127,16 @@ export async function getEngine(
       _loadedModel = null;
     }
 
-    const progressHandler = (report: InitProgressReport) => {
+    const webllm = await loadWebLLM();
+
+    const progressHandler = (report: { progress: number; text: string }) => {
       onProgress?.({
         progress: report.progress,
         text: report.text,
       });
     };
 
-    _engine = await CreateMLCEngine(modelId, {
+    _engine = await webllm.CreateMLCEngine(modelId, {
       initProgressCallback: progressHandler,
     });
     _loadedModel = modelId;
@@ -202,7 +207,7 @@ export async function streamLocalCompletion(
       return;
     }
 
-    const openaiMessages: ChatCompletionMessageParam[] = messages.map((m) => ({
+    const openaiMessages = messages.map((m) => ({
       role: m.role,
       content: m.content,
     }));
