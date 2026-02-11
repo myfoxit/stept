@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   IconArrowLeft,
@@ -10,11 +10,15 @@ import {
   IconEdit,
   IconEye,
   IconCheck,
+  IconBrain,
+  IconPlugConnected,
+  IconShieldLock,
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -44,6 +48,7 @@ import { apiClient } from '@/lib/apiClient';
 import { useMe } from '@/hooks/api/auth';
 import { useProjectMembers, useRemoveProjectMember, useUpdateMemberRole } from '@/hooks/api/projects';
 import { SiteHeader } from '@/components/site-header';
+import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } from '@/api/chat';
 
 const roleIcons = {
   owner: IconCrown,
@@ -75,6 +80,35 @@ export function ProjectSettingsPage() {
   const [inviteLink, setInviteLink] = useState('');
   const [inviteRole, setInviteRole] = useState<string>('member');
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // ── AI / LLM Settings ──────────────────────────────────────────────────────
+  const [aiConfig, setAiConfig] = useState<ChatConfig | null>(null);
+  const [aiModels, setAiModels] = useState<ChatModel[]>([]);
+  const [aiTesting, setAiTesting] = useState(false);
+
+  useEffect(() => {
+    fetchChatConfig().then(setAiConfig).catch(() => {});
+    fetchChatModels().then(setAiModels).catch(() => {});
+  }, []);
+
+  const testAiConnection = async () => {
+    setAiTesting(true);
+    try {
+      const models = await fetchChatModels();
+      if (models.length > 0) {
+        toast.success('Connection successful', {
+          description: `Found ${models.length} model(s). Provider: ${aiConfig?.provider || 'unknown'}`,
+        });
+        setAiModels(models);
+      } else {
+        toast.warning('Connected but no models found');
+      }
+    } catch {
+      toast.error('Connection failed', { description: 'Check your provider settings and API key.' });
+    } finally {
+      setAiTesting(false);
+    }
+  };
   
   // Check if current user is owner or admin
   const currentUserMember = members?.find(m => m.user_id === currentUser?.id);
@@ -246,6 +280,98 @@ export function ProjectSettingsPage() {
                 No members yet. Invite someone to collaborate!
               </p>
             )}
+          </CardContent>
+        </Card>
+        
+        {/* AI / LLM Settings Card */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <IconBrain className="h-5 w-5" />
+              <CardTitle>AI / LLM Settings</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Provider & Connection */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ai-provider">Provider</Label>
+                <Select
+                  value={aiConfig?.provider || 'openai'}
+                  disabled
+                >
+                  <SelectTrigger id="ai-provider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="ollama">Ollama (Local)</SelectItem>
+                    <SelectItem value="custom">Custom (OpenAI-compatible)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Configure via environment variables: LLM_PROVIDER, LLM_API_KEY
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-model">Model</Label>
+                <Input
+                  id="ai-model"
+                  value={aiConfig?.model || ''}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+
+            {/* Status indicators */}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2 text-sm">
+                <IconPlugConnected className="h-4 w-4" />
+                <span>Status:</span>
+                {aiConfig?.configured ? (
+                  <span className="text-green-500 font-medium">Configured</span>
+                ) : (
+                  <span className="text-muted-foreground">Not configured</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <IconShieldLock className="h-4 w-4" />
+                <span>DataVeil:</span>
+                {aiConfig?.dataveil_enabled ? (
+                  <span className="text-green-500 font-medium">Active</span>
+                ) : (
+                  <span className="text-muted-foreground">Disabled</span>
+                )}
+              </div>
+            </div>
+
+            {/* Available models */}
+            {aiModels.length > 0 && (
+              <div className="space-y-2">
+                <Label>Available Models</Label>
+                <div className="flex flex-wrap gap-2">
+                  {aiModels.map((m) => (
+                    <span
+                      key={m.id}
+                      className="rounded-md border border-border bg-muted px-2 py-1 text-xs"
+                    >
+                      {m.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Test connection */}
+            <Button
+              variant="outline"
+              onClick={testAiConnection}
+              disabled={aiTesting}
+            >
+              {aiTesting ? 'Testing…' : 'Test Connection'}
+            </Button>
           </CardContent>
         </Card>
         

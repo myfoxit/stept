@@ -16,6 +16,8 @@ import { JoinProjectPage } from './pages/join-project';
 import { FolderView } from '@/pages/folder-view';
 import { WorkflowView } from '@/pages/workflow-view';
 import { DocumentGalleryPage } from '@/pages/document-gallery';
+import { ChatProvider } from '@/components/Chat/ChatContext';
+import { ChatPanel } from '@/components/Chat/ChatPanel';
 
 const queryClient = new QueryClient();
 
@@ -24,34 +26,37 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ProjectProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route
-                element={
-                  <RequireAuth>
-                    <Layout />
-                  </RequireAuth>
-                }
-              >
-                <Route index element={<DocumentGalleryPage />} />
-                <Route path="editor/:docId" element={<EditorPage />} />
-                <Route path="editor/:docId/:pageId" element={<EditorPage />} />
-                <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />} />
-                <Route path="/folder/:folderId" element={<FolderView />} />
-                <Route path="/workflow/:workflowId" element={<WorkflowView />} />
-                <Route path="/workflow/:workflowId/edit" element={<WorkflowView />} />
-                <Route path="documents/:type" element={<DocumentGalleryPage />} />
+          <ChatProvider>
+            <BrowserRouter>
+              <Routes>
                 <Route
-                  path="/text-container/:containerId?"
-                  element={<TextContainerEditor />}
-                />
-              </Route>
-              <Route path="login" element={<LoginPage />} />
-              <Route path="/join-project" element={<JoinProjectPage />} />
-             
-              <Route path="*" element={<p>Page not found</p>} />
-            </Routes>
-          </BrowserRouter>
+                  element={
+                    <RequireAuth>
+                      <Layout />
+                    </RequireAuth>
+                  }
+                >
+                  <Route index element={<DocumentGalleryPage />} />
+                  <Route path="editor/:docId" element={<EditorPage />} />
+                  <Route path="editor/:docId/:pageId" element={<EditorPage />} />
+                  <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />} />
+                  <Route path="/folder/:folderId" element={<FolderView />} />
+                  <Route path="/workflow/:workflowId" element={<WorkflowView />} />
+                  <Route path="/workflow/:workflowId/edit" element={<WorkflowView />} />
+                  <Route path="documents/:type" element={<DocumentGalleryPage />} />
+                  <Route
+                    path="/text-container/:containerId?"
+                    element={<TextContainerEditor />}
+                  />
+                </Route>
+                <Route path="login" element={<LoginPage />} />
+                <Route path="/join-project" element={<JoinProjectPage />} />
+               
+                <Route path="*" element={<p>Page not found</p>} />
+              </Routes>
+              <ChatPanel />
+            </BrowserRouter>
+          </ChatProvider>
         </ProjectProvider>
       </AuthProvider>
     </QueryClientProvider>

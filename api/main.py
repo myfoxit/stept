@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat
 
 from app.database import Base, engine, AsyncSessionLocal
 from app.core.config import settings
@@ -35,6 +35,7 @@ api_router.include_router(text_container.router, prefix="/text_container", tags=
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(process_recording.router, prefix="/process-recording", tags=["process_recording"])
 api_router.include_router(folder.router, prefix="/folders", tags=["folders"])
+api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 
 
 # Mount the versioned router on the main app

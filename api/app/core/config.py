@@ -102,6 +102,17 @@ class Settings(BaseSettings):
     # Gotenberg PDF service
     GOTENBERG_URL: str = os.getenv("GOTENBERG_URL", "http://gotenberg:3000")
 
+    # ── LLM / Chat ─────────────────────────────────────────────
+    LLM_PROVIDER: Optional[str] = None          # openai | anthropic | ollama
+    LLM_API_KEY: Optional[str] = None
+    LLM_MODEL: Optional[str] = None
+    LLM_BASE_URL: Optional[str] = None          # custom endpoint URL
+
+    # ── DataVeil privacy proxy ──────────────────────────────────
+    DATAVEIL_ENABLED: bool = False
+    DATAVEIL_URL: Optional[str] = None           # e.g. http://localhost:8080
+    DATAVEIL_FALLBACK: bool = True               # fall back to direct if proxy is down
+
 # Instantiate once and share across the application
 settings = Settings()  # noqa: E305
 

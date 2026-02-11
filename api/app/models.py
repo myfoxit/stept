@@ -346,6 +346,15 @@ class RefreshToken(Base):
     
     user = relationship("User", backref="refresh_tokens")
 
+class AppSettings(Base):
+    """Key-value store for application-level settings (e.g. LLM config)."""
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(JSON, nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 project_members = Table(
     'project_members',
     Base.metadata,

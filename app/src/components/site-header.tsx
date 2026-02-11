@@ -1,8 +1,10 @@
 import { ReactNode } from 'react';
+import { IconMessageCircle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from './tiptap-templates/simple/notion-like-editor-theme-toggle';
+import { useChat } from '@/components/Chat/ChatContext';
 
 export function SiteHeader({
   name = 'Documents',
@@ -11,6 +13,8 @@ export function SiteHeader({
   name?: string;
   children?: ReactNode;
 }) {
+  const { togglePanel, isOpen } = useChat();
+
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
@@ -22,6 +26,15 @@ export function SiteHeader({
         <h1 className="text-base font-medium">{name}</h1>
         <div className="ml-auto flex items-center gap-2">
           {children}
+          <Button
+            variant={isOpen ? 'default' : 'ghost'}
+            size="icon"
+            onClick={togglePanel}
+            title="AI Chat"
+            className="h-8 w-8"
+          >
+            <IconMessageCircle className="h-4 w-4" />
+          </Button>
           <ThemeToggle />
         </div>
       </div>
