@@ -1,103 +1,37 @@
 /**
- * Local chat routing — decides whether to use local (WebLLM) or remote
- * (backend API) for chat completions based on the active provider.
+ * Local chat routing — decides whether to use the remote backend or
+ * a locally running provider (Ollama, future local options).
  *
- * When provider is "webllm" → runs inference in the browser.
- * For all other providers → delegates to the backend as usual.
+ * Currently supports:
+ *   - Remote providers (openai, anthropic, copilot, custom) → backend API
+ *   - Ollama → backend API (proxied through backend for auth + tool calls)
  *
- * Tool calls from a local LLM are forwarded to the backend for execution,
- * then results are fed back into the local LLM.
+ * WebLLM (browser-side inference) was removed — WebGPU is too experimental
+ * and the package is not production-grade yet.
  */
 
-import type {
-  ChatCompletionRequest,
-  ToolCallEvent,
-  ToolResultEvent,
-} from '@/api/chat';
-import { streamChatCompletion as remoteStreamChatCompletion } from '@/api/chat';
-import {
-  streamLocalCompletion,
-  type LocalChatMessage,
-  type ProgressCallback,
-} from '@/services/webllm';
-
-// ── Provider state (stored in localStorage) ──────────────────────────────────
-
-const STORAGE_KEY = 'ondoki_llm_provider';
-const MODEL_STORAGE_KEY = 'ondoki_webllm_model';
+const PROVIDER_STORAGE_KEY = 'ondoki_llm_provider';
 
 export interface LocalProviderConfig {
   provider: string;
-  webllmModel?: string;
 }
 
 export function getLocalProviderConfig(): LocalProviderConfig {
-  const provider = localStorage.getItem(STORAGE_KEY) || '';
-  const webllmModel = localStorage.getItem(MODEL_STORAGE_KEY) || undefined;
-  return { provider, webllmModel };
+  const provider = localStorage.getItem(PROVIDER_STORAGE_KEY) || '';
+  return { provider };
 }
 
 export function setLocalProviderConfig(config: LocalProviderConfig): void {
-  localStorage.setItem(STORAGE_KEY, config.provider);
-  if (config.webllmModel) {
-    localStorage.setItem(MODEL_STORAGE_KEY, config.webllmModel);
+  if (config.provider) {
+    localStorage.setItem(PROVIDER_STORAGE_KEY, config.provider);
+  } else {
+    localStorage.removeItem(PROVIDER_STORAGE_KEY);
   }
 }
 
-export function clearLocalProviderConfig(): void {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(MODEL_STORAGE_KEY);
-}
-
+/** Returns true if the current provider requires local (non-backend) handling. */
 export function isLocalProvider(): boolean {
-  return getLocalProviderConfig().provider === 'webllm';
-}
-
-// ── Unified streaming function ───────────────────────────────────────────────
-
-/**
- * Stream a chat completion, routing to local or remote automatically.
- * Drop-in replacement for the original `streamChatCompletion` from chat.ts.
- */
-export async function routedStreamChatCompletion(
-  request: ChatCompletionRequest,
-  onChunk: (text: string) => void,
-  onDone: () => void,
-  onError: (error: Error) => void,
-  signal?: AbortSignal,
-  onToolCall?: (toolCall: ToolCallEvent) => void,
-  onToolResult?: (toolResult: ToolResultEvent) => void,
-  onProgress?: ProgressCallback,
-): Promise<void> {
-  const config = getLocalProviderConfig();
-
-  if (config.provider === 'webllm') {
-    // ── Local WebLLM path ──────────────────────────────────────────────
-
-    const localMessages: LocalChatMessage[] = request.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    return streamLocalCompletion(
-      localMessages,
-      onChunk,
-      onDone,
-      onError,
-      signal,
-      config.webllmModel,
-      onProgress,
-    );
-  }
-
-  // ── Remote backend path (default) ──────────────────────────────────────
-  return remoteStreamChatCompletion(
-    request,
-    onChunk,
-    onDone,
-    onError,
-    signal,
-    onToolCall,
-    onToolResult,
-  );
+  // All providers currently route through the backend.
+  // This hook exists for future local-only providers.
+  return false;
 }
