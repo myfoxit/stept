@@ -7,7 +7,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.database import Base, DATABASE_URL, engine
-from app.models import User, ColumnMeta, TableMeta, SelectOption, RelationMeta, Project, ColumnType, FieldMeta, TableType
+from app.models import (
+    User, Project, Folder, Document, TextContainer, Session,
+    ProcessRecordingSession, ProcessRecordingStep, ProcessRecordingFile,
+    AuthCode, RefreshToken, AppSettings, project_members,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -20,14 +24,7 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
 
 DYNAMIC_TABLE_RE = re.compile(r"^sr_[A-Za-z0-9]{5}_")
 
@@ -45,17 +42,7 @@ def include_object(obj, name, type_, reflected, compare_to):
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    """
+    """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
