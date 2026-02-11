@@ -19,7 +19,6 @@ import {
 } from '@/components/workflow/step-variants';
 import { ImageUploadModal } from '@/components/workflow/image-upload-modal';
 import { ShareExportModal } from '@/components/workflow/share-export-modal';
-import { AIToolbar } from '@/components/workflow/ai-toolbar';
 import { GuidePanel } from '@/components/workflow/guide-panel';
 import { SmartStepOverlay } from '@/components/workflow/smart-step-card';
 import { formatDuration } from '@/utils/workflow';
@@ -281,38 +280,9 @@ export function WorkflowView() {
   const [shareModalOpen, setShareModalOpen] = React.useState(false);
 
   // AI state
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const [processingProgress, setProcessingProgress] = React.useState<{ current: number; total: number } | null>(null);
   const [guideOpen, setGuideOpen] = React.useState(false);
 
   const isProcessed = typedWorkflow ? Boolean((typedWorkflow as any).is_processed) : false;
-
-  const handleProcessAll = React.useCallback(async () => {
-    if (!workflowId) return;
-    setIsProcessing(true);
-    setProcessingProgress({ current: 0, total: steps.length });
-    try {
-      await processRecording(workflowId);
-      // Poll for completion
-      const poll = setInterval(async () => {
-        try {
-          const summary = await getAISummary(workflowId);
-          if (summary.is_processed) {
-            clearInterval(poll);
-            setIsProcessing(false);
-            setProcessingProgress(null);
-            refreshWorkflow();
-          }
-        } catch { /* keep polling */ }
-      }, 2000);
-      // Safety timeout after 2 minutes
-      setTimeout(() => { clearInterval(poll); setIsProcessing(false); }, 120000);
-    } catch (err) {
-      console.error('Processing failed:', err);
-      setIsProcessing(false);
-      setProcessingProgress(null);
-    }
-  }, [workflowId, steps.length, refreshWorkflow]);
 
   const handleGenerateGuide = React.useCallback(() => {
     setGuideOpen(true);
@@ -593,14 +563,6 @@ export function WorkflowView() {
             iconOverride={iconOverride || undefined}
             // NEW: allow editing title from header
             onUpdateTitle={handleUpdateTitle}
-          />
-
-          <AIToolbar
-            isProcessing={isProcessing}
-            isProcessed={isProcessed}
-            processingProgress={processingProgress}
-            onProcessAll={handleProcessAll}
-            onGenerateGuide={handleGenerateGuide}
           />
 
           {isEditMode ? (
