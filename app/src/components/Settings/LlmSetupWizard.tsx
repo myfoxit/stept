@@ -1086,6 +1086,33 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
                       <span className="text-sm">Your device (private)</span>
                     </div>
                   </>
+                ) : selectedProvider === 'copilot' ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Status</span>
+                      <span className="text-sm flex items-center gap-1.5">
+                        {copilotConnected ? (
+                          <>
+                            <div className="h-2 w-2 rounded-full bg-green-500" />
+                            Connected
+                          </>
+                        ) : (
+                          <>
+                            <div className="h-2 w-2 rounded-full bg-red-400" />
+                            Not connected
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Model</span>
+                      <Badge variant="outline">{selectedModel || 'gpt-4o'}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">API</span>
+                      <span className="text-sm font-mono text-xs">api.githubcopilot.com</span>
+                    </div>
+                  </>
                 ) : (
                   <>
                     {selectedModel && (
@@ -1164,6 +1191,14 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
                 <p className="text-sm text-blue-700">
                   💡 The model will be downloaded when you first send a message.
                   This may take a moment depending on your connection speed.
+                </p>
+              </div>
+            )}
+
+            {selectedProvider === 'copilot' && !copilotConnected && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm text-amber-700">
+                  ⚠️ You haven't completed the GitHub login yet. Go back and connect your account first.
                 </p>
               </div>
             )}
@@ -1259,6 +1294,18 @@ export function LlmStatusBadge({ config }: { config: ChatConfig | null }) {
         });
     }
   }, [config?.provider, localConfig.provider]);
+
+  // Copilot provider
+  if (config?.provider === 'copilot') {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-2 w-2 rounded-full bg-green-500" />
+        <span className="text-sm">
+          GitHub Copilot — {config.model || 'gpt-4o'}
+        </span>
+      </div>
+    );
+  }
 
   // WebLLM provider (frontend-only)
   if (localConfig.provider === 'webllm') {
