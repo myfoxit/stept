@@ -235,8 +235,12 @@ async def _execute_tool_calls(
                     project_id=project_id,
                     **args,
                 )
+                # Commit immediately so tool side-effects persist
+                # even if the SSE stream disconnects later
+                await db.commit()
             except Exception as exc:
                 logger.error("Tool %s execution failed: %s", tool_name, exc)
+                await db.rollback()
                 result = {"error": f"Tool execution failed: {str(exc)}"}
 
         results.append({

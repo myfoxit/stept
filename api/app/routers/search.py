@@ -64,7 +64,7 @@ async def smart_search(
             ProcessRecordingSession.name.ilike(search_term),
             ProcessRecordingSession.generated_title.ilike(search_term),
             ProcessRecordingSession.summary.ilike(search_term),
-            func.cast(ProcessRecordingSession.tags, sa_type=_text_type()).ilike(search_term),
+            func.cast(ProcessRecordingSession.tags, _text_type()).ilike(search_term),
         ),
     ]
 

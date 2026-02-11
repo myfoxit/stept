@@ -257,6 +257,14 @@ async def upload_metadata(
     session.total_steps = len(metadata)
     session.updated_at = datetime.utcnow()
 
+    # Auto-set session name/title from AI-generated step titles
+    ai_titled_steps = [m for m in metadata if m.generated_title]
+    if ai_titled_steps and (not session.generated_title):
+        # Use first step's generated title as session title
+        session.generated_title = ai_titled_steps[0].generated_title
+    if session.name == "Untitled Workflow" and session.generated_title:
+        session.name = session.generated_title
+
     # Still persist metadata to storage for backup/export
     metadata_json = []
     for meta in metadata:

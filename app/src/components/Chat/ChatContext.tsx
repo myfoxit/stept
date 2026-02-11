@@ -12,6 +12,7 @@ import type {
   ToolResultEvent,
 } from '@/api/chat';
 import { streamChatCompletion } from '@/api/chat';
+import { useProject } from '@/providers/project-provider';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [context, setContext] = React.useState<ChatContextPayload | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
+  const { selectedProjectId } = useProject();
+
+  // Build effective context: always include project_id from global state
+  const effectiveContext = React.useMemo<ChatContextPayload | undefined>(() => {
+    const pid = context?.project_id || selectedProjectId || undefined;
+    if (!pid && !context?.recording_id && !context?.document_id) return undefined;
+    return {
+      ...context,
+      project_id: pid,
+    };
+  }, [context, selectedProjectId]);
 
   const sendMessage = React.useCallback(
     (content: string) => {
@@ -87,7 +99,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         {
           messages: allMessages,
           stream: true,
-          context: context ?? undefined,
+          context: effectiveContext,
         },
         // onChunk — append to the last (assistant) message
         (text: string) => {
@@ -160,7 +172,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         },
       );
     },
-    [messages, isLoading, context],
+    [messages, isLoading, effectiveContext],
   );
 
   const togglePanel = React.useCallback(() => setIsOpen((v) => !v), []);
