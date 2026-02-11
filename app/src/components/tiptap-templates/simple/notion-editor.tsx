@@ -16,14 +16,12 @@ import { useCallback, useEffect, useLayoutEffect } from 'react';
 import { useSnapEditor } from './useSnapEditor';
 import { useDocumentAutoSave } from './useDocumentAutoSave';
 import type { PageLayout } from '@/components/page-layout-selector';
-import { PAGE_FORMATS } from '@/components/tiptap-extensions/pagination'; // + import formats for CSS vars
+import { PAGE_FORMATS } from '@/components/tiptap-extensions/pagination';
 
 
 import { IconInputCheck } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useColumns } from '@/hooks/api/columns';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
-import { useRows } from '@/hooks/api/fields';
 
 export interface NotionEditorProps {
   room: string;
@@ -43,7 +41,7 @@ export function NotionEditor({ docId }: { docId: string }) {
   const [title, setTitle] = React.useState<string>('');
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [currentDocId, setCurrentDocId] = React.useState<string>(docId);
-  const [contentInitialized, setContentInitialized] = React.useState(false); // NEW: Track content initialization
+  const [contentInitialized, setContentInitialized] = React.useState(false);
   // Keep a stable layout; initialize from current DOM attr to avoid fallback flicker
   const [layout, setLayout] = React.useState<string>(() => {
     return document.documentElement.getAttribute('data-page-layout') || 'document';
@@ -53,7 +51,7 @@ export function NotionEditor({ docId }: { docId: string }) {
   useEffect(() => {
     if (docId !== currentDocId) {
       setIsInitialized(false);
-      setContentInitialized(false); // NEW: Reset content initialization flag
+      setContentInitialized(false);
       setCurrentDocId(docId);
       setTitle(''); // Clear title immediately to prevent cross-contamination
     }
@@ -70,12 +68,10 @@ export function NotionEditor({ docId }: { docId: string }) {
   const save = useCallback(
     (content: unknown) => {
       if (!isInitialized) return;
-      // use stable layout state to avoid racing with DOM attribute
       saveDocument.mutate(
         { name: title, content, page_layout: layout || 'document' },
         {
           onSuccess: () => {
-            // Invalidate documents query to refresh the navbar with latest title from DB
             queryClient.invalidateQueries({ queryKey: ['documents'] });
           },
         }
@@ -120,61 +116,13 @@ export function NotionEditor({ docId }: { docId: string }) {
     [containerSlashItems]
   );
 
-  // NEW ───────────────────────────────────────────────────────────
-  const linkedTableId = doc?.linked_table_id ?? '';
-  const linkedRowId = doc?.linked_row_id ?? null;
-
-  const { data: cols = [], isLoading: colsLoading } = useColumns(linkedTableId);
-
-  const { data: rowsData, isLoading: rowsLoading } = useRows(linkedTableId);
-  
-  // Handle both paginated response and single row response
-  const rows = React.useMemo(() => {
-    if (!rowsData) return [];
-    // If it's a paginated response with items array
-    if (rowsData?.items) return rowsData.items;
-    // If it's an array directly
-    if (Array.isArray(rowsData)) return rowsData;
-    // If it's a single row object
-    if (rowsData?.id) return [rowsData];
-    return [];
-  }, [rowsData]);
-  // ───────────────────────────────────────────────────────────
-
-  /* inject variable store only when the data are ready */
-  useEffect(() => {
-    const ready = editor && linkedTableId ? !colsLoading && !rowsLoading : true; // no table → always ready
-
-    if (ready && editor) {
-      (editor as any).storage.variableStore = {
-        cols,
-        rows: rowsData,  // Pass the original data structure
-        tableId: linkedTableId,
-        rowId: linkedRowId,
-        tableName: '',
-      };
-      // notify node-views
-      (editor as any).emit?.('variableStoreUpdate');
-    }
-  }, [
-    editor,
-    cols,
-    rowsData,  // Changed from rows to rowsData
-    colsLoading,
-    rowsLoading,
-    linkedTableId,
-    linkedRowId,
-  ]);
-
   /* set the document content only when everything is ready */
   useEffect(() => {
-    const ready = doc && (!linkedTableId || (!colsLoading && !rowsLoading));
-    if (editor && ready && !contentInitialized) {  // NEW: Check contentInitialized flag
-      // Only set content if this is the first time loading this document
+    if (editor && doc && !contentInitialized) {
       editor.commands.setContent(doc!.content, false);
-      setContentInitialized(true); // NEW: Mark content as initialized
+      setContentInitialized(true);
     }
-  }, [editor, doc, colsLoading, rowsLoading, linkedTableId, contentInitialized]); // NEW: Add contentInitialized to deps
+  }, [editor, doc, contentInitialized]);
 
   // Adopt document's stored layout once available, otherwise keep current (prevents flash)
   useEffect(() => {
@@ -217,7 +165,6 @@ export function NotionEditor({ docId }: { docId: string }) {
         ['--page-letter-width-px' as any]: `${PAGE_FORMATS.Letter.width}px`,
       };
     }
-    // no extra vars for 'full' or 'document'
     return {};
   }, [layout]);
 

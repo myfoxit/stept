@@ -51,15 +51,6 @@ class ProjectRole(enum.Enum):
             # Default to viewer for unknown roles
             return cls.VIEWER
 
-class ColumnType(enum.Enum):
-    PHYSICAL = "physical"
-    VIRTUAL  = "virtual"
-
-class TableType(enum.Enum):
-    USER  = "user"
-    JOIN  = "join"
-    OTHER = "other"
-
 # New: Permission levels for resource access
 class PermissionLevel(enum.Enum):
     VIEW = "view"
@@ -174,130 +165,6 @@ class Project(Base):
         return any(member.id == user_id for member in self.members)
 
 
-class TableMeta(Base):
-    __tablename__ = "table_meta"
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    name = Column(String, index=True)
-    physical_name = Column(String, unique=True)
-    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"))
-    project = relationship("Project", backref="tables")
-    table_type = Column(
-        SQLEnum(
-            TableType,
-            name="table_type_enum",
-            values_callable=enum_values,
-            validate_strings=True,
-            create_constraint=True,
-            native_enum=False,
-        ),
-        nullable=False,
-        server_default=text("'user'")
-    )
-    # NEW: Track if order column has been added (for migration)
-    has_order_column = Column(Boolean, nullable=False, default=False, server_default=text("false"))
-
-
-class ColumnMeta(Base):
-    __tablename__ = "column_meta"
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"))
-    display_name=Column(String)
-    name = Column(String)
-    ui_type = Column(String)
-    fk_type = Column(String)
-    relations_table_id = Column(
-        String(16),
-        nullable=True,
-        default=None
-    )
-    column_type = Column(
-        SQLEnum(
-            ColumnType,
-            name="column_type_enum",
-            values_callable=enum_values,
-            validate_strings=True,
-            create_constraint=True,
-            native_enum=False,
-        ),
-        nullable=False,
-        server_default=text("'physical'"),
-    )
-    # Simple INTEGER ordering with rebalancing when needed
-    sr__order = Column(Integer, nullable=False, default=1000, server_default=text("1000"))
-    
-    
-    default_value = Column(JSON, nullable=True, default=None)
-    
-    
-    settings = Column(JSON, nullable=True, default=None)
-    
-    table = relationship("TableMeta", backref="columns")
-
-
-class FieldMeta(Base):
-    __tablename__ = "field_meta"
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"))
-    row_id = Integer()
-    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"))
-    value = Column(Text)
-
-class RelationMeta(Base):
-    __tablename__ = "relation_meta"
-
-    id = Column(String, primary_key=True, index=True)
-    left_table_id = Column(String, ForeignKey(TableMeta.id, ondelete="CASCADE"), nullable=False)
-    right_table_id = Column(String, ForeignKey(TableMeta.id, ondelete="CASCADE"), nullable=False)
-    relation_type = Column(String, nullable=False)  # one_to_one, many_to_one, many_to_many
-    fk_name = Column(String, nullable=True)  # For one_to_one and many_to_one
-    display_name = Column(String, nullable=True)
-    join_table_id = Column(String, ForeignKey(TableMeta.id, ondelete="CASCADE"), nullable=True)
-    left_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=True)
-    right_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=True)
-
-    left_table = relationship(
-        TableMeta,
-        foreign_keys=[left_table_id],
-        backref="outgoing_relations",
-    )
-    right_table = relationship(
-        TableMeta,
-        foreign_keys=[right_table_id],
-        backref="incoming_relations",
-    )
-    join_table = relationship(
-        TableMeta,
-        foreign_keys=[join_table_id],
-        backref="relation_join_table",
-    )
-    left_column = relationship(
-        "ColumnMeta",
-        foreign_keys=[left_column_id],
-        backref="outgoing_column_relations",
-    )
-    right_column = relationship(
-        "ColumnMeta",
-        foreign_keys=[right_column_id],
-        backref="incoming_column_relations",
-    )
-
-
-class SelectOption(Base):
-    __tablename__ = "select_options"
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    column = relationship("ColumnMeta", backref="select_options")
-    name = Column(String, nullable=False)
-    color = Column(String, nullable=True)
-    order = Column(Integer, default=0)
-
-class LookUpColumn(Base):
-    __tablename__ = "lookup_columns"
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    relation_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    lookup_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-
 class Document(Base):
     __tablename__ = "documents"
 
@@ -318,10 +185,6 @@ class Document(Base):
     # NEW: ordering within a folder (or root if folder_id is NULL)
     position   = Column(Integer, nullable=False, default=0, index=True)
     
-    # Direct link to a single table and row
-    linked_table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="SET NULL"), nullable=True, index=True)
-    linked_row_id = Column(Integer, nullable=True, index=True)
-    
     # NEW: Privacy settings
     is_private = Column(Boolean, nullable=False, default=False, index=True)  # True = only owner can see
     owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # Owner for private documents
@@ -329,7 +192,6 @@ class Document(Base):
     # Relationships
     project = relationship("Project", backref="documents")
     folder = relationship("Folder", back_populates="documents")
-    linked_table = relationship("TableMeta", backref="linked_documents")
     owner = relationship("User", foreign_keys=[owner_id], backref="private_documents")
 
 class TextContainer(Base):
@@ -340,110 +202,6 @@ class TextContainer(Base):
     content     = Column(JSON, nullable=False, server_default="{}")  
     created_at  = Column(DateTime, server_default=func.now())
     updated_at  = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-class Formulas(Base):
-    __tablename__ = "formulas"
-
-    id          = Column(String(16), primary_key=True, default=gen_suffix)
-    column_id   = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"))
-    formula     = Column(Text, nullable=False)
-    formula_raw = Column(Text, nullable=False)
-    created_at  = Column(DateTime, server_default=func.now())
-    updated_at  = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    column = relationship("ColumnMeta", backref="formulas")
-
-# New: Rollups configuration (virtual column config; aggregation is computed in frontend)
-class Rollup(Base):
-    __tablename__ = "rollups"
-
-    id                   = Column(String(16), primary_key=True, default=gen_suffix)
-    column_id            = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False, unique=True)
-    # Which relation field on the same table to traverse
-    relation_column_id   = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    # Which field on the related table to aggregate (nullable for Count)
-    rollup_column_id     = Column(String(16), ForeignKey("column_meta.id", ondelete="SET NULL"), nullable=True)
-    # Aggregate function: 'count', 'sum', 'avg', 'min', 'max' (frontend computes)
-    aggregate_func       = Column(String, nullable=False, server_default=text("'count'"))
-    # Optional formatting
-    precision            = Column(Integer, nullable=True)
-    show_thousands_sep   = Column(Boolean, nullable=False, server_default=text("false"))
-    created_at           = Column(DateTime, server_default=func.now())
-    updated_at           = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    # One rollup per virtual column
-    column               = relationship("ColumnMeta", backref="rollup", foreign_keys=[column_id], uselist=False)
-
-# New: Filter model for table filtering
-class Filter(Base):
-    __tablename__ = "filters"
-    
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    name = Column(String, nullable=False)
-    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    operation = Column(String, nullable=False)  # equals, contains, not_contains, gt, lt, gte, lte, is_empty, is_not_empty
-    value = Column(Text, nullable=True)  # JSON string for complex values
-    is_reusable = Column(Boolean, default=False, nullable=False)  # Can be used on other tables
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    table = relationship("TableMeta", backref="filters")
-    user = relationship("User", backref="filters")
-    column = relationship("ColumnMeta", backref="filters")
-    
-    # Unique constraint to prevent duplicate filters
-    __table_args__ = (
-        UniqueConstraint('table_id', 'user_id', 'column_id', 'operation', 'value', name='_filter_unique'),
-    )
-
-# New: Sort model for table sorting
-class Sort(Base):
-    __tablename__ = "sorts"
-    
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    direction = Column(String, nullable=False, server_default=text("'asc'"))  # 'asc' or 'desc'
-    priority = Column(Integer, nullable=False, default=0)  # Sort order priority (0 = highest)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    table = relationship("TableMeta", backref="sorts")
-    user = relationship("User", backref="sorts")
-    column = relationship("ColumnMeta", backref="sorts")
-    
-    # Unique constraint to prevent duplicate sorts on same column
-    __table_args__ = (
-        UniqueConstraint('table_id', 'user_id', 'column_id', name='_sort_unique'),
-    )
-
-# New: Column visibility preferences for users
-class ColumnVisibility(Base):
-    __tablename__ = "column_visibility"
-    
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
-    is_visible = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    table = relationship("TableMeta", backref="column_visibility")
-    user = relationship("User", backref="column_visibility")
-    column = relationship("ColumnMeta", backref="column_visibility")
-    
-    # Unique constraint to prevent duplicate visibility settings
-    __table_args__ = (
-        UniqueConstraint('table_id', 'user_id', 'column_id', name='_column_visibility_unique'),
-    )
 
 # New: server-side sessions for cookie-based auth
 class Session(Base):
@@ -599,60 +357,3 @@ project_members = Table(
     Column('invited_by', String(16), ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
     UniqueConstraint('user_id', 'project_id', name='_project_member_unique'),
 )
-
-class Dashboard(Base):
-    __tablename__ = "dashboards"
-    
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    name = Column(String, nullable=False)
-    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    layout = Column(JSON, nullable=False, default=list)  # Grid layout configuration
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    project = relationship("Project", backref="dashboards")
-    user = relationship("User", backref="dashboards")
-    widgets = relationship("DashboardWidget", back_populates="dashboard", cascade="all, delete-orphan")
-
-class DashboardWidget(Base):
-    __tablename__ = "dashboard_widgets"
-    
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    dashboard_id = Column(String(16), ForeignKey("dashboards.id", ondelete="CASCADE"), nullable=False, index=True)
-    title = Column(String, nullable=False)
-    chart_type = Column(String, nullable=False)  # bar, line, pie, area, etc.
-    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False)
-    
-    # Chart configuration
-    x_axis_column = Column(String, nullable=True)  # Column name for x-axis
-    y_axis_column = Column(String, nullable=True)  # Column name for y-axis
-    group_by_column = Column(String, nullable=True)  # Column for grouping/categorizing
-    aggregation = Column(String, nullable=True, default="count")  # count, sum, avg, min, max
-    filters = Column(JSON, nullable=True, default=list)  # Applied filters
-    
-    # Widget position and size in grid
-    x = Column(Integer, nullable=False, default=0)
-    y = Column(Integer, nullable=False, default=0)
-    w = Column(Integer, nullable=False, default=6)  # Width in grid units
-    h = Column(Integer, nullable=False, default=4)  # Height in grid units
-    
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    dashboard = relationship("Dashboard", back_populates="widgets")
-    table = relationship("TableMeta", backref="widget_references")
-    y = Column(Integer, nullable=False, default=0)
-    w = Column(Integer, nullable=False, default=6)  # Width in grid units
-    h = Column(Integer, nullable=False, default=4)  # Height in grid units
-    
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    dashboard = relationship("Dashboard", back_populates="widgets")
-    table = relationship("TableMeta", backref="widget_references")
-
-

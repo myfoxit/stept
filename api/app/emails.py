@@ -15,7 +15,7 @@ SMTP_HOST = os.getenv("SR_SMTP_HOST", "localhost")
 SMTP_PORT = int(os.getenv("SR_SMTP_PORT", 25))
 SMTP_USER = os.getenv("SR_SMTP_USER", "")
 SMTP_PASS = os.getenv("SR_SMTP_PASS", "")
-FROM_ADDR = os.getenv("SR_FROM_EMAIL", "noreply@snaprow.local")
+FROM_ADDR = os.getenv("SR_FROM_EMAIL", "noreply@ondoki.local")
 
 def _render(template_name: str, **ctx) -> str:
     return env.get_template(template_name).render(**ctx)

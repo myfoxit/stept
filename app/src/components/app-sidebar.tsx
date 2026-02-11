@@ -3,19 +3,11 @@
 import * as React from 'react';
 import {
   IconCamera,
-  IconChartBar,
-  IconDashboard,
-  IconDatabase,
   IconFileAi,
   IconFileDescription,
-  IconFileWord,
   IconFolder,
   IconHelp,
-  IconInnerShadowTop,
-  IconLayoutDashboardFilled,
-  IconListDetails,
   IconPlus,
-  IconReport,
   IconSearch,
   IconSettings,
   IconTableFilled,
@@ -27,7 +19,6 @@ import {
   IconDotsVertical,
 } from '@tabler/icons-react';
 
-import { NavDocuments } from '@/components/nav-documents';
 import { NavMain } from '@/components/nav-main';
 import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
@@ -45,7 +36,6 @@ import {
 import { useProject } from '@/providers/project-provider';
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -65,22 +55,15 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Link, useNavigate } from 'react-router-dom';
-import { useCreateTable, useTables } from '@/hooks/api/tables';
 import { useUpdateProject } from '@/hooks/api/projects';
 
 const data = {
   user: {
     name: 'Alexander Höhne',
-    email: 'hello@snaprow.com',
+    email: 'hello@ondoki.com',
     avatar: '/profile.png',
   },
   navMain: [
-    {
-      title: 'Dashboard',
-      url: '#',
-      icon: IconLayoutDashboardFilled,
-    },
-
     {
       title: 'Projects',
       url: '#',
@@ -157,23 +140,6 @@ const data = {
       icon: IconSearch,
     },
   ],
-  documents: [
-    {
-      name: 'Data Library',
-      url: '#',
-      icon: IconDatabase,
-    },
-    {
-      name: 'Reports',
-      url: '#',
-      icon: IconReport,
-    },
-    {
-      name: 'Word Assistant',
-      url: '#',
-      icon: IconFileWord,
-    },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -188,16 +154,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     deleteProject,
     userRole,
   } = useProject();
-  const {
-    data: tables,
-    isLoading,
-    error,
-  } = useTables(selectedProjectId || undefined);
-  const createTableMutation = useCreateTable();
   const updateProjectMutation = useUpdateProject();
 
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [tableName, setTableName] = React.useState('');
   const [newProjectDialogOpen, setNewProjectDialogOpen] = React.useState(false);
   const [newProjectName, setNewProjectName] = React.useState('');
   const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
@@ -209,21 +167,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [deleteProjectId, setDeleteProjectId] = React.useState<string | null>(
     null
   );
-
-  const documents = React.useMemo(() => {
-    if (isLoading || error || !tables) {
-      return [];
-    }
-
-    return tables.map((table) => ({
-      name: table.name,
-      url: `/tables/${table.id}`,
-      urlKanban: `/kanban/${table.id}`,
-      icon: IconDatabase,
-    }));
-  }, [tables, isLoading, error]);
-
-  console.log(tables);
 
   function openRename(p: { id: string; name: string }) {
     setRenameProjectId(p.id);
@@ -324,7 +267,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center">
                             <div className="pointer-events-auto opacity-0 transition-opacity group-hover:opacity-100">
                               <DropdownMenu
-                                // prevent parent onClick when opening menu
                                 onOpenChange={() => {}}
                               >
                                 <DropdownMenuTrigger asChild>
@@ -403,11 +345,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments
-          items={documents}
-          projectId={selectedProjectId || ''}
-          userRole={userRole}
-        />
         <NavPages userRole={userRole} />
 
         {/* New Project Dialog */}
@@ -419,7 +356,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <DialogHeader>
               <DialogTitle>Create Project</DialogTitle>
               <DialogDescription>
-                Add a new project to organize your tables.
+                Add a new project to organize your documents.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -495,7 +432,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </DialogClose>
               <Button
                 disabled={
-                  updateProjectMutation.isPending || // +++++ added pending disable
+                  updateProjectMutation.isPending ||
                   !renameProjectName.trim() ||
                   !renameProjectId ||
                   renameProjectName.trim() ===
@@ -503,7 +440,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 }
                 onClick={async () => {
                   if (!renameProjectId) return;
-                  // +++++ REPLACED: use mutation to send request
                   updateProjectMutation.mutate(
                     {
                       projectId: renameProjectId,
@@ -559,7 +495,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     const removedActive = deleteProjectId === selectedProjectId;
                     await deleteProject?.(deleteProjectId);
                     if (removedActive) {
-                      // Select another project if available
                       const remaining = projects.filter(
                         (p) => p.id !== deleteProjectId
                       );

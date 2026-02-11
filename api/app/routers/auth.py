@@ -34,7 +34,7 @@ import json
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-COOKIE_NAME = "session_snaprow"
+COOKIE_NAME = "session_ondoki"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
 
 # Simple in-memory rate limiting (per-IP)

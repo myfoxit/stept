@@ -8,12 +8,12 @@ from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from app.database import get_session as get_db
-from app.models import User, Session, Document, TableMeta, project_members, ProjectRole, ColumnMeta
+from app.models import User, Session, Document, project_members, ProjectRole
 from hashlib import sha256
 from enum import Enum
 from app.models import PermissionLevel
 
-SESSION_COOKIE_NAME = "session_snaprow"
+SESSION_COOKIE_NAME = "session_ondoki"
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -108,30 +108,12 @@ class ProjectContextExtractor(Protocol):
         ...
 
 
-class TableProjectExtractor:
-    """Extract project_id from table_id"""
-    async def extract(self, db: AsyncSession, table_id: str = None, **kwargs) -> Optional[str]:
-        if not table_id:
-            return None
-        stmt = select(TableMeta.project_id).where(TableMeta.id == table_id)
-        return await db.scalar(stmt)
-
-
 class DocumentProjectExtractor:
     """Extract project_id from document_id"""
     async def extract(self, db: AsyncSession, document_id: str = None, **kwargs) -> Optional[str]:
         if not document_id:
             return None
         stmt = select(Document.project_id).where(Document.id == document_id)
-        return await db.scalar(stmt)
-
-
-class ColumnProjectExtractor:
-    """Extract project_id from column_id via table"""
-    async def extract(self, db: AsyncSession, column_id: str = None, **kwargs) -> Optional[str]:
-        if not column_id:
-            return None
-        stmt = select(TableMeta.project_id).join(ColumnMeta).where(ColumnMeta.id == column_id)
         return await db.scalar(stmt)
 
 
@@ -165,9 +147,7 @@ class ProjectPermissionChecker:
         # Initialize extractors in priority order
         self.extractors = [
             DirectProjectExtractor(),
-            TableProjectExtractor(),
             DocumentProjectExtractor(),
-            ColumnProjectExtractor(),
         ]
     
     async def _extract_project_id(
@@ -191,28 +171,10 @@ class ProjectPermissionChecker:
             # Handle Pydantic models
             if hasattr(body, "project_id"):
                 return body.project_id
-            elif hasattr(body, "table_id"):
-                # Extract project_id from table_id in body
-                table_id = body.table_id
-                if table_id:
-                    stmt = select(TableMeta.project_id).where(TableMeta.id == table_id)
-                    project_id = await db.scalar(stmt)
-                    if project_id:
-                        logger.debug(f"Extracted project_id {project_id} from body.table_id")
-                        return project_id
             # Handle dict-like objects
             elif isinstance(body, dict):
                 if "project_id" in body:
                     return body.get("project_id")
-                elif "table_id" in body:
-                    # Extract project_id from table_id in body dict
-                    table_id = body.get("table_id")
-                    if table_id:
-                        stmt = select(TableMeta.project_id).where(TableMeta.id == table_id)
-                        project_id = await db.scalar(stmt)
-                        if project_id:
-                            logger.debug(f"Extracted project_id {project_id} from body dict table_id")
-                            return project_id
         
         # NEW: Fallbacks when dependency params are not populated
         # 1) Path params
@@ -231,14 +193,6 @@ class ProjectPermissionChecker:
                     pid = payload.get("project_id")
                     if pid:
                         return pid
-                    # Try extracting from table_id in JSON body
-                    table_id = payload.get("table_id")
-                    if table_id:
-                        stmt = select(TableMeta.project_id).where(TableMeta.id == table_id)
-                        project_id = await db.scalar(stmt)
-                        if project_id:
-                            logger.debug(f"Extracted project_id {project_id} from JSON body table_id")
-                            return project_id
             except Exception:
                 pass
         
@@ -248,9 +202,7 @@ class ProjectPermissionChecker:
         self,
         request: Request,
         db: AsyncSession = Depends(get_db),
-        table_id: Optional[str] = None,
         document_id: Optional[str] = None,
-        column_id: Optional[str] = None,
         project_id: Optional[str] = None,
         body: Optional[Any] = None,  # Will be injected by FastAPI for POST requests
     ) -> tuple[User, ProjectRole]:
@@ -261,19 +213,13 @@ class ProjectPermissionChecker:
         # Get current user automatically - this will raise 401 if not authenticated
         current_user = await get_current_user(request, db)
         
-        # Extract table_id from path if not provided as parameter
-        if not table_id and hasattr(request, 'path_params'):
-            table_id = request.path_params.get("table_id")
-        
-        logger.debug(f"Permission check for user {current_user.id}: table_id={table_id}, project_id={project_id}, document_id={document_id}, column_id={column_id}")
+        logger.debug(f"Permission check for user {current_user.id}: project_id={project_id}, document_id={document_id}")
         
         # Extract project_id using the chain of extractors
         extracted_project_id = await self._extract_project_id(
             db=db,
             request=request,
-            table_id=table_id,
             document_id=document_id,
-            column_id=column_id,
             project_id=project_id,
             body=body
         )

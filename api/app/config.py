@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     local_storage_path: str = os.getenv("local_storage_path", "./storage/recordings")
     
     # CORS
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "snaprow://"]
+    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "ondoki://"]
     
     # Frontend URL
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")

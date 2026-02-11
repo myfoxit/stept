@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 async def get_document(db: AsyncSession, doc_id: str) -> Optional[Document]:
     stmt = select(Document).where(Document.id == doc_id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -108,7 +107,6 @@ async def create_document(
     
     # Refresh and eagerly load relationships
     stmt = select(Document).where(Document.id == doc.id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.project),
         selectinload(Document.folder)
     )
@@ -128,7 +126,6 @@ async def update_document(
 ) -> Document:
     # First get the document with eager loading
     stmt = select(Document).where(Document.id == doc_id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -154,7 +151,6 @@ async def update_document(
     # Refresh with eager loading
     await db.refresh(doc)
     stmt = select(Document).where(Document.id == doc_id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -167,56 +163,8 @@ async def get_documents(
     limit: int = 100,
 ) -> List[Document]:
     stmt = select(Document).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     ).offset(skip).limit(limit)
-    result = await db.execute(stmt)
-    return result.scalars().all()
-
-async def link_document_to_table(
-    db: AsyncSession,
-    document_id: str,
-    table_id: Optional[str],
-    row_id: Optional[int],
-) -> Document:
-    """Link or update the document's single table-row link."""
-    stmt = select(Document).where(Document.id == document_id).options(
-        selectinload(Document.linked_table)
-    )
-    result = await db.execute(stmt)
-    doc = result.scalar_one_or_none()
-    
-    if not doc:
-        raise ValueError("Document not found")
-    
-    # Update the link (set to None to unlink)
-    doc.linked_table_id = table_id
-    doc.linked_row_id = row_id
-    
-    await db.commit()
-    await db.refresh(doc)
-    
-    # Return with eager loading
-    stmt = select(Document).where(Document.id == document_id).options(
-        selectinload(Document.linked_table)
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one()
-
-async def get_documents_by_table_row(
-    db: AsyncSession,
-    table_id: str,
-    row_id: int,
-) -> List[Document]:
-    """Get all documents linked to a specific table row."""
-    stmt = select(Document).where(
-        and_(
-            Document.linked_table_id == table_id,
-            Document.linked_row_id == row_id
-        )
-    ).options(
-        selectinload(Document.linked_table)
-    )
     result = await db.execute(stmt)
     return result.scalars().all()
 
@@ -232,7 +180,7 @@ async def move_document(
     # Get the document to move
     stmt = select(Document).where(Document.id == doc_id).options(
         selectinload(Document.folder),
-        selectinload(Document.linked_table)
+        
     )
     result = await db.execute(stmt)
     doc = result.scalar_one_or_none()
@@ -344,7 +292,6 @@ async def move_document(
     # Refresh with eager loading
     await db.refresh(doc)
     stmt = select(Document).where(Document.id == doc_id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -358,7 +305,6 @@ async def duplicate_document(
     """Duplicate a document"""
     # Get original document
     stmt = select(Document).where(Document.id == doc_id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -401,7 +347,6 @@ async def duplicate_document(
 
     # Reload with relations
     stmt = select(Document).where(Document.id == new_doc.id).options(
-        selectinload(Document.linked_table),
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -438,7 +383,7 @@ async def get_documents_for_user(
                 Project.owner_id == user_id,
             )
         )
-        .options(selectinload(Document.linked_table))
+        
         .offset(skip)
         .limit(limit)
     )
@@ -494,7 +439,6 @@ async def get_filtered_documents(
     
     # Apply pagination
     stmt = stmt.options(
-        selectinload(Document.linked_table),
         selectinload(Document.project),
         selectinload(Document.folder)
     ).offset(skip).limit(limit)

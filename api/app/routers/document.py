@@ -7,7 +7,6 @@ from app.schemas.document import (
     DocumentRead, 
     DocumentCreate, 
     DocumentUpdate,
-    DocumentLink,
     DocumentMove
 )
 from app.crud.document import (
@@ -15,8 +14,6 @@ from app.crud.document import (
     create_document,
     update_document,
     get_documents,
-    link_document_to_table,
-    get_documents_by_table_row,
     delete_document,
     get_filtered_documents,
     move_document,           
@@ -59,16 +56,6 @@ async def api_get_filtered_documents(
         limit=limit,
         user_id=current_user.id,  # NEW: Pass user_id for privacy filtering
     )
-
-# Get documents by table row
-@router.get("/by-table/{table_id}/row/{row_id}", response_model=list[DocumentRead])
-async def api_get_documents_by_table_row(
-    table_id: str,
-    row_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get all documents linked to a specific table row."""
-    return await get_documents_by_table_row(db, table_id, row_id)
 
 # Create new document
 @router.post("/", response_model=DocumentRead, status_code=201)
@@ -144,41 +131,6 @@ async def api_duplicate_document(
             db,
             doc_id=doc_id,
             include_children=include_children  # Ignored since documents don't have children
-        )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
-
-# Link document
-@router.put("/{doc_id}/link", response_model=DocumentRead)
-async def api_link_document(
-    doc_id: str,
-    payload: DocumentLink,
-    db: AsyncSession = Depends(get_db)
-):
-    """Update the document's single table-row link."""
-    try:
-        return await link_document_to_table(
-            db,
-            document_id=doc_id,
-            table_id=payload.table_id,
-            row_id=payload.row_id
-        )
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-
-# Unlink document
-@router.delete("/{doc_id}/link", response_model=DocumentRead)
-async def api_unlink_document(
-    doc_id: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Remove the document's table-row link."""
-    try:
-        return await link_document_to_table(
-            db,
-            document_id=doc_id,
-            table_id=None,
-            row_id=None
         )
     except ValueError as e:
         raise HTTPException(404, str(e))

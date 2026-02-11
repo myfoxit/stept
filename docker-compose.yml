@@ -1,12 +1,12 @@
 services:
   db:
     image: postgres:16
-    container_name: snaprow-db
+    container_name: ondoki-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-snaprow}
+      POSTGRES_DB: ${POSTGRES_DB:-ondoki}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -15,31 +15,31 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - snaprow-network
+      - ondoki-network
 
 
   redis:
     image: redis:7-alpine
-    container_name: snaprow-redis
+    container_name: ondoki-redis
     restart: unless-stopped
     networks:
-      - snaprow-network
+      - ondoki-network
 
  
   gotenberg:
     image: gotenberg/gotenberg:8
-    container_name: snaprow-gotenberg
+    container_name: ondoki-gotenberg
     restart: unless-stopped
     environment:
       - GOTENBERG_API_TIMEOUT=300s
       - GOTENBERG_CHROMIUM_ALLOW_FILE_ACCESS_FROM_FILES=true
     networks:
-      - snaprow-network
+      - ondoki-network
 
 
   backend:
     build: ./api
-    container_name: snaprow-backend
+    container_name: ondoki-backend
     restart: unless-stopped
     depends_on:
       db:
@@ -48,28 +48,28 @@ services:
         condition: service_started
     environment:
     
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-snaprow}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
       ENVIRONMENT: production
     networks:
-      - snaprow-network
+      - ondoki-network
 
 
   frontend:
     build: ./app
-    container_name: snaprow-frontend
+    container_name: ondoki-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
       - "80:80" 
     networks:
-      - snaprow-network
+      - ondoki-network
 
 volumes:
   db-data:
 
 networks:
-  snaprow-network:
+  ondoki-network:
     driver: bridge
