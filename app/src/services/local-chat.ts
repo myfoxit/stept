@@ -10,7 +10,6 @@
  */
 
 import type {
-  ChatMessage,
   ChatCompletionRequest,
   ToolCallEvent,
   ToolResultEvent,

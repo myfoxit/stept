@@ -51,6 +51,7 @@ import { useProjectMembers, useRemoveProjectMember, useUpdateMemberRole } from '
 import { SiteHeader } from '@/components/site-header';
 import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } from '@/api/chat';
 import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWizard';
+import { ProviderLogin } from '@/components/Settings/ProviderLogin';
 
 const roleIcons = {
   owner: IconCrown,
@@ -361,6 +362,15 @@ export function ProjectSettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* Provider Login (OAuth / Device Flow) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Quick Login</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Login with your existing provider account — no API key needed.
+              </p>
+              <ProviderLogin onStatusChange={refreshAiConfig} />
+            </div>
 
             {/* Actions */}
             <div className="flex items-center gap-3">

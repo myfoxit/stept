@@ -144,7 +144,31 @@ def _model() -> str:
 
 def _api_key() -> str | None:
     db = _get_cached_db_config()
+    p = _provider()
+    if p == "copilot":
+        # Copilot uses its own token management — return None here;
+        # the actual token is injected via _headers()
+        return None
     return db.get("api_key") or settings.LLM_API_KEY or None
+
+
+def _copilot_session_token_sync() -> str | None:
+    """
+    Try to get a cached Copilot session token without async.
+    Returns None if unavailable — the async path will refresh it.
+    """
+    from app.services.auth_providers.copilot import (
+        _session_token,
+        _session_token_expires,
+        is_authenticated,
+    )
+    import time as _time
+
+    if not is_authenticated():
+        return None
+    if _session_token and _time.time() < (_session_token_expires - 60):
+        return _session_token
+    return None
 
 
 def _headers() -> dict[str, str]:
@@ -157,11 +181,27 @@ def _headers() -> dict[str, str]:
         headers["content-type"] = "application/json"
     elif p == "ollama":
         headers["content-type"] = "application/json"
+    elif p == "copilot":
+        from app.services.auth_providers.copilot import get_copilot_headers
+        headers.update(get_copilot_headers())
+        # Session token will be set via _ensure_copilot_headers()
+        token = _copilot_session_token_sync()
+        if token:
+            headers["authorization"] = f"Bearer {token}"
+        headers["content-type"] = "application/json"
     else:
         # OpenAI / compatible
         if api_key:
             headers["authorization"] = f"Bearer {api_key}"
         headers["content-type"] = "application/json"
+    return headers
+
+
+async def _ensure_copilot_headers(headers: dict[str, str]) -> dict[str, str]:
+    """Ensure Copilot headers have a fresh session token (async refresh)."""
+    from app.services.auth_providers.copilot import get_session_token
+    token = await get_session_token()
+    headers["authorization"] = f"Bearer {token}"
     return headers
 
 
@@ -185,14 +225,21 @@ async def _openai_chat(
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+
+    headers = _headers()
+
+    # For Copilot, ensure we have a fresh session token (async refresh)
+    if _provider() == "copilot":
+        headers = await _ensure_copilot_headers(headers)
+
     client = httpx.AsyncClient(timeout=120.0)
     if stream:
-        req = client.build_request("POST", url, json=payload, headers=_headers())
+        req = client.build_request("POST", url, json=payload, headers=headers)
         resp = await client.send(req, stream=True)
         resp._client = client  # type: ignore[attr-defined] # prevent GC
         return resp
     else:
-        resp = await client.post(url, json=payload, headers=_headers())
+        resp = await client.post(url, json=payload, headers=headers)
         await client.aclose()
         return resp
 
@@ -440,15 +487,23 @@ async def list_models() -> list[dict]:
     base = _base_url()
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            if provider == "anthropic":
-                # Anthropic doesn't have a public models endpoint; return known models.
-                return [
-                    {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4"},
-                    {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku"},
-                    {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet"},
-                ]
-            else:
+        if provider == "anthropic":
+            # Anthropic doesn't have a public models endpoint; return known models.
+            return [
+                {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4"},
+                {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku"},
+                {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet"},
+            ]
+        elif provider == "copilot":
+            # Copilot supports these models via its OpenAI-compatible API
+            return [
+                {"id": "gpt-4o", "name": "GPT-4o (Copilot)"},
+                {"id": "gpt-4o-mini", "name": "GPT-4o Mini (Copilot)"},
+                {"id": "claude-sonnet-4", "name": "Claude Sonnet 4 (Copilot)"},
+                {"id": "o3-mini", "name": "o3-mini (Copilot)"},
+            ]
+        else:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(f"{base}/v1/models", headers=_headers())
                 resp.raise_for_status()
                 data = resp.json()
@@ -462,11 +517,15 @@ async def list_models() -> list[dict]:
 def get_config() -> dict:
     """Return non-sensitive LLM configuration."""
     from app.services.dataveil import is_dataveil_enabled
+    from app.services.auth_providers.copilot import is_authenticated as copilot_authenticated
+
+    provider = _provider()
+    configured = bool(_api_key() or provider == "ollama" or (provider == "copilot" and copilot_authenticated()))
 
     return {
-        "provider": _provider(),
+        "provider": provider,
         "model": _model(),
-        "base_url": _base_url() if _provider() == "ollama" else None,
+        "base_url": _base_url() if provider == "ollama" else None,
         "dataveil_enabled": is_dataveil_enabled(),
-        "configured": bool(_api_key() or _provider() == "ollama"),
+        "configured": configured,
     }
