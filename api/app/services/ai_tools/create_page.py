@@ -1,5 +1,6 @@
 """
 AI Tool: create_page — Create a TipTap document (page) in a project.
+Accepts folder by ID or name. Creates folder if it doesn't exist.
 """
 
 from __future__ import annotations
@@ -14,7 +15,8 @@ from app.models import Document, Folder, project_members
 name = "create_page"
 description = (
     "Create a new page/document in the user's project. "
-    "Optionally place it in a specific folder and provide initial content."
+    "Optionally place it in a specific folder (by name or ID). "
+    "If the folder doesn't exist, it will be created automatically."
 )
 parameters = {
     "type": "object",
@@ -25,11 +27,15 @@ parameters = {
         },
         "content": {
             "type": "string",
-            "description": "Optional initial text content for the page (plain text, will be wrapped in a TipTap paragraph)",
+            "description": "Optional initial text content for the page",
         },
         "folder_id": {
             "type": "string",
-            "description": "Optional folder ID to place the page in",
+            "description": "Folder ID to place the page in (optional)",
+        },
+        "folder_name": {
+            "type": "string",
+            "description": "Folder name to place the page in — will be found or created (optional)",
         },
     },
     "required": ["title"],
@@ -51,6 +57,48 @@ def _text_to_tiptap(text: str) -> dict:
     return {"type": "doc", "content": content}
 
 
+async def _resolve_folder(
+    db: AsyncSession,
+    project_id: str,
+    user_id: str,
+    folder_id: Optional[str],
+    folder_name: Optional[str],
+) -> Optional[str]:
+    """Find folder by ID or name. Creates it if name is given and not found."""
+    if folder_id:
+        stmt = select(Folder).where(
+            Folder.id == folder_id,
+            Folder.project_id == project_id,
+        )
+        folder = await db.scalar(stmt)
+        return folder.id if folder else None
+
+    if folder_name:
+        pattern = f"%{folder_name}%"
+        stmt = select(Folder).where(
+            Folder.project_id == project_id,
+            Folder.name.ilike(pattern),
+        ).limit(1)
+        folder = await db.scalar(stmt)
+        if folder:
+            return folder.id
+
+        # Create the folder automatically
+        new_folder = Folder(
+            name=folder_name,
+            project_id=project_id,
+            parent_id=None,
+            owner_id=user_id,
+        )
+        db.add(new_folder)
+        await db.flush()
+        new_folder.set_path("")
+        await db.flush()
+        return new_folder.id
+
+    return None
+
+
 async def execute(
     db: AsyncSession,
     user_id: str,
@@ -60,6 +108,7 @@ async def execute(
     title = kwargs.get("title", "Untitled")
     content_text = kwargs.get("content", "")
     folder_id = kwargs.get("folder_id")
+    folder_name = kwargs.get("folder_name")
 
     if not project_id:
         return {"error": "No project context — cannot create page."}
@@ -73,33 +122,35 @@ async def execute(
     if not member:
         return {"error": "You don't have access to this project."}
 
-    # Validate folder if provided
-    if folder_id:
-        folder_stmt = select(Folder).where(
-            Folder.id == folder_id,
-            Folder.project_id == project_id,
-        )
-        folder = await db.scalar(folder_stmt)
-        if not folder:
-            return {"error": f"Folder '{folder_id}' not found in this project."}
+    # Resolve folder
+    resolved_folder_id = await _resolve_folder(
+        db, project_id, user_id, folder_id, folder_name,
+    )
 
     # Build TipTap content
-    tiptap_content = _text_to_tiptap(content_text) if content_text else {"type": "doc", "content": [{"type": "paragraph"}]}
+    tiptap_content = _text_to_tiptap(content_text) if content_text else {
+        "type": "doc",
+        "content": [{"type": "paragraph"}],
+    }
 
     doc = Document(
         name=title,
         content=tiptap_content,
         project_id=project_id,
-        folder_id=folder_id,
+        folder_id=resolved_folder_id,
         owner_id=user_id,
     )
     db.add(doc)
     await db.flush()
 
+    msg = f"Created page '{title}'"
+    if folder_name:
+        msg += f" in folder '{folder_name}'"
+
     return {
         "success": True,
         "document_id": doc.id,
         "title": title,
-        "folder_id": folder_id,
-        "message": f"Created page '{title}'",
+        "folder_id": resolved_folder_id,
+        "message": msg,
     }
