@@ -54,7 +54,11 @@ export function SmartStepOverlay({
   const [isReannotating, setIsReannotating] = React.useState(false);
   const [isImproving, setIsImproving] = React.useState(false);
 
+  // Don't show overlay if generated_title is already displayed in the card header
+  // (the card now uses generated_title as its primary title)
+  const hasOnlyTitle = generatedTitle && !generatedDescription && !stepCategory && !uiElement;
   if (!isAnnotated && !generatedTitle) return null;
+  if (hasOnlyTitle && !isEditMode) return null;
 
   const handleReannotate = async () => {
     if (!stepId) return;

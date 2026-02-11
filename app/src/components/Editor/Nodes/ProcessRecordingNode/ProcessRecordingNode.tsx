@@ -192,7 +192,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
                     {getActionIcon(step.action_type)}
                     <div className="flex-1">
                       <p className="text-base font-semibold text-gray-900">
-                        {step.description || `${step.action_type} action`}
+                        {step.generated_title || step.description || `${step.action_type} action`}
                       </p>
                       <p className="text-sm text-gray-500">{step.window_title}</p>
                     </div>
@@ -270,7 +270,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
                   {getActionIcon(step.action_type)}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900">
-                      {step.description || `${step.action_type} action`}
+                      {step.generated_title || step.description || `${step.action_type} action`}
                     </p>
                     <p className="text-xs text-gray-500">{step.window_title}</p>
                   </div>

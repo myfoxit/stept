@@ -70,8 +70,8 @@ export function WorkflowStep({
   onUpdateTitle, // NEW
   imageRef,
 }: WorkflowStepProps) {
-  // NEW: use visibleIndex for title fallback
-  const title = step.description || step.window_title || `Step ${visibleIndex}`;
+  // Use AI-generated title first, fall back to raw description/window_title
+  const title = step.generated_title || step.description || step.window_title || `Step ${visibleIndex}`;
   const scale = zoomLevels[zoomState.zoomLevel ?? 0];
 
   const screenshotSize = step.screenshot_size ?? step.window_size ?? null;
