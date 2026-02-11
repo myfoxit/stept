@@ -11,7 +11,7 @@ import type {
   ToolCallEvent,
   ToolResultEvent,
 } from '@/api/chat';
-import { routedStreamChatCompletion } from '@/services/local-chat';
+import { streamChatCompletion } from '@/api/chat';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         content: m.content,
       }));
 
-      routedStreamChatCompletion(
+      streamChatCompletion(
         {
           messages: allMessages,
           stream: true,
