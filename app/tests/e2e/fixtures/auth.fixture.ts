@@ -8,14 +8,20 @@ type AuthFixtures = {
 
 export const test = base.extend<AuthFixtures>({
   testData: async ({}, use) => {
-    // Reuse globally seeded test data (no per-test seed/cleanup)
     const data = getGlobalTestData();
+    if (!data) {
+      throw new Error(
+        'Test seed data not found. Did global-setup run? Check playwright/.auth/seed-data.json',
+      );
+    }
     await use(data);
   },
 
   authenticatedPage: async ({ page }, use) => {
-    // Page is already authenticated via storageState; just go to the app
+    // storageState from playwright config provides auth cookies
     await page.goto('/');
+    // Wait for the app to load past any redirects
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await use(page);
   },
 });

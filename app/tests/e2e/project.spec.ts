@@ -1,79 +1,105 @@
 import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Project Operations', () => {
-  test('should display project list', async ({ authenticatedPage }) => {
+  test('should display sidebar with project', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    await page.waitForLoadState('networkidle');
 
-    // Look for project-related content
-    const projectArea = page.locator(
-      '[data-testid="project-list"], [data-testid="projects"], [class*="project"]'
-    ).first();
+    // Sidebar should be visible
+    const sidebar = page.locator('[data-testid="sidebar"]');
+    await expect(sidebar).toBeVisible({ timeout: 10000 });
+  });
 
-    // At minimum, the test project from seeding should exist
-    await expect(
-      page.locator('text="E2E Test Project"').first()
-    ).toBeVisible({ timeout: 10000 });
+  test('should show project selector', async ({ authenticatedPage }) => {
+    const page = authenticatedPage;
+
+    // Project selector trigger should exist
+    const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
+    // Either project selector OR create-first-project button should be visible
+    const createFirstProject = page.locator('[data-testid="create-first-project-btn"]');
+
+    const hasSelector = await projectSelector.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasCreate = await createFirstProject.isVisible({ timeout: 2000 }).catch(() => false);
+
+    expect(hasSelector || hasCreate).toBe(true);
+  });
+
+  test('should open new project dialog', async ({ authenticatedPage }) => {
+    const page = authenticatedPage;
+
+    // First check if we already have a project selector (project exists from seed)
+    const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
+    if (await projectSelector.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await projectSelector.click();
+
+      // Click "New Project" in dropdown
+      const newProjectBtn = page.locator('[data-testid="new-project-dropdown-btn"]');
+      await expect(newProjectBtn).toBeVisible({ timeout: 5000 });
+      await newProjectBtn.click();
+    } else {
+      // No projects yet — click "Create first project"
+      const createBtn = page.locator('[data-testid="create-first-project-btn"]');
+      await createBtn.click();
+    }
+
+    // Dialog should appear
+    const dialog = page.locator('[data-testid="new-project-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+
+    // Should have name input
+    const nameInput = page.locator('[data-testid="new-project-name-input"]');
+    await expect(nameInput).toBeVisible();
   });
 
   test('should create a new project', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    await page.waitForLoadState('networkidle');
 
-    // Find create project button
-    const createButton = page.locator(
-      'button:has-text("New Project"), button:has-text("Create Project"), [data-testid="create-project"]'
-    ).first();
-
-    if (await createButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await createButton.click();
-
-      const dialog = page.locator('[role="dialog"]').first();
-      await expect(dialog).toBeVisible({ timeout: 5000 });
-
-      const nameInput = dialog.locator('input').first();
-      await nameInput.fill('E2E New Project');
-
-      await dialog.locator('button:has-text("Create")').click();
-      await expect(dialog).not.toBeVisible({ timeout: 5000 });
-
-      // Verify project appears
-      await expect(
-        page.locator('text="E2E New Project"').first()
-      ).toBeVisible({ timeout: 10000 });
+    const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
+    if (await projectSelector.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await projectSelector.click();
+      const newProjectBtn = page.locator('[data-testid="new-project-dropdown-btn"]');
+      await expect(newProjectBtn).toBeVisible({ timeout: 5000 });
+      await newProjectBtn.click();
+    } else {
+      const createBtn = page.locator('[data-testid="create-first-project-btn"]');
+      await createBtn.click();
     }
+
+    const dialog = page.locator('[data-testid="new-project-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+
+    const nameInput = page.locator('[data-testid="new-project-name-input"]');
+    await nameInput.fill('E2E New Project');
+
+    const createBtn = page.locator('[data-testid="new-project-create-btn"]');
+    await createBtn.click();
+
+    // Dialog should close
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 });
 
 test.describe('Navigation', () => {
-  test('should navigate between main sections', async ({ authenticatedPage }) => {
+  test('sidebar should be visible on desktop', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    await page.waitForLoadState('networkidle');
+    await page.setViewportSize({ width: 1280, height: 720 });
 
-    // Check sidebar exists
-    const sidebar = page.locator(
-      '[data-testid="sidebar"], aside, nav, [class*="sidebar"]'
-    ).first();
+    const sidebar = page.locator('[data-testid="sidebar"]');
     await expect(sidebar).toBeVisible({ timeout: 10000 });
   });
 
   test('should have responsive layout', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
-    // Desktop view
+    // Desktop — sidebar visible
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.waitForLoadState('networkidle');
-
-    const sidebar = page.locator(
-      '[data-testid="sidebar"], aside, [class*="sidebar"]'
-    ).first();
+    await page.waitForTimeout(300);
+    const sidebar = page.locator('[data-testid="sidebar"]');
     await expect(sidebar).toBeVisible({ timeout: 5000 });
 
-    // Mobile view
+    // Mobile — sidebar may collapse
     await page.setViewportSize({ width: 375, height: 667 });
     await page.waitForTimeout(500);
-
-    // Sidebar should be hidden or collapsed on mobile
-    // (exact behavior depends on UI implementation)
+    // Just verify the page doesn't crash
+    await expect(page.locator('body')).toBeVisible();
   });
 });

@@ -1,8 +1,8 @@
 import { getTestUrls } from './config';
+import * as fs from 'fs';
+import * as path from 'path';
 
-function getApiUrl(): string {
-  return getTestUrls().apiUrl;
-}
+const SEED_DATA_PATH = path.join(__dirname, '..', '..', '..', 'playwright', '.auth', 'seed-data.json');
 
 export type TestSeedData = {
   user_id: string;
@@ -14,14 +14,34 @@ export type TestSeedData = {
 // Alias for backwards compat with fixtures
 export type TestData = TestSeedData;
 
-let globalTestData: TestSeedData | null = null;
-
-export function setGlobalTestData(data: TestSeedData) {
-  globalTestData = data;
+function getApiUrl(): string {
+  return getTestUrls().apiUrl;
 }
 
+/**
+ * Persist seed data to disk so worker processes can read it.
+ * (global-setup runs in a separate process from test workers)
+ */
+export function setGlobalTestData(data: TestSeedData) {
+  const dir = path.dirname(SEED_DATA_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(SEED_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+/**
+ * Read seed data from disk. Returns null if not seeded yet.
+ */
 export function getGlobalTestData(): TestSeedData | null {
-  return globalTestData;
+  try {
+    if (fs.existsSync(SEED_DATA_PATH)) {
+      return JSON.parse(fs.readFileSync(SEED_DATA_PATH, 'utf-8'));
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 export async function seedTestData(): Promise<TestSeedData> {
@@ -33,9 +53,7 @@ export async function seedTestData(): Promise<TestSeedData> {
   if (!res.ok) {
     const body = await safeJson(res);
     throw new Error(
-      `Failed to seed test data: ${res.status} ${res.statusText} - ${JSON.stringify(
-        body,
-      )}`,
+      `Failed to seed test data: ${res.status} ${res.statusText} - ${JSON.stringify(body)}`,
     );
   }
 
@@ -52,33 +70,22 @@ export async function cleanupTestData(): Promise<void> {
     if (!res.ok) {
       const body = await safeJson(res);
       console.warn(
-        `cleanupTestData non-OK response: ${res.status} ${res.statusText} - ${JSON.stringify(
-          body,
-        )}`,
+        `cleanupTestData non-OK response: ${res.status} ${res.statusText} - ${JSON.stringify(body)}`,
       );
     }
+    console.log('Test data cleaned up');
   } catch (err) {
     console.warn('cleanupTestData request failed:', err);
   } finally {
-    globalTestData = null;
+    // Remove seed data file
+    try {
+      if (fs.existsSync(SEED_DATA_PATH)) {
+        fs.unlinkSync(SEED_DATA_PATH);
+      }
+    } catch {
+      // ignore
+    }
   }
-}
-
-export async function getTestSeedStatus(): Promise<any> {
-  const res = await fetch(`${getApiUrl()}/test/status`, {
-    method: 'GET',
-  });
-
-  if (!res.ok) {
-    const body = await safeJson(res);
-    throw new Error(
-      `Failed to get test seed status: ${res.status} ${res.statusText} - ${JSON.stringify(
-        body,
-      )}`,
-    );
-  }
-
-  return res.json();
 }
 
 async function safeJson(res: Response): Promise<unknown> {
