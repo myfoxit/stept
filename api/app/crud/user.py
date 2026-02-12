@@ -3,13 +3,14 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils import gen_suffix
 from app.models import User, Session
-from app.security import hash_password
+from app.security import hash_password, normalize_email
 
 async def create_user(db: AsyncSession, email: str, password: str, name: Optional[str] = None):
     meta_id = gen_suffix(16)
     user = User(
         id=meta_id,
         email=email,
+        normalized_email=normalize_email(email),
         name=name,
         hashed_password=hash_password(password),
         is_verified=True,       # created by admin route, skip e-mail flow
