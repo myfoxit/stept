@@ -104,6 +104,8 @@ print(f"[conftest] Tables:      {len(Base.metadata.sorted_tables)}")
 async def _setup_db():
     """Drop and recreate all tables once for the test session."""
     async with _test_engine.begin() as conn:
+        # Ensure pgvector extension exists (needed for Embedding model)
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield

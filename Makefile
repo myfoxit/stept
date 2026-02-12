@@ -32,11 +32,12 @@ test-backend: test-db
 		-e JWT_SECRET=test-secret \
 		backend python -m pytest tests/ -v --tb=short
 
-# Ensure the test database exists
+# Ensure the test database and pgvector extension exist
 test-db:
 	@$(COMPOSE_DEV) exec db psql -U postgres -tc \
 		"SELECT 1 FROM pg_database WHERE datname = 'ondoki_test'" | grep -q 1 || \
 		$(COMPOSE_DEV) exec db psql -U postgres -c "CREATE DATABASE ondoki_test"
+	@$(COMPOSE_DEV) exec db psql -U postgres -d ondoki_test -c "CREATE EXTENSION IF NOT EXISTS vector" 2>/dev/null || true
 
 # Frontend tests (local, no Docker needed)
 test-frontend:
