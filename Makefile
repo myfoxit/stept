@@ -1,45 +1,65 @@
-.PHONY: dev build test test-backend test-frontend lint migrate clean
+.PHONY: dev dev-up dev-down dev-logs build test test-backend test-frontend test-db lint migrate clean restart-backend generate-key
 
-# Start all services in development mode
+# ─── Development ──────────────────────────────────────────────
+# Start everything in dev mode (hot-reload, volume mounts)
 dev:
-	docker compose up -d
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+	@echo ""
+	@echo "  Frontend: http://localhost:5173"
+	@echo "  Backend:  http://localhost:8000"
+	@echo "  Logs:     make dev-logs"
+	@echo ""
 
-# Build all Docker images
+dev-up: dev
+
+dev-down:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+dev-logs:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+
+# ─── Build ────────────────────────────────────────────────────
 build:
 	docker compose build
 
+# ─── Tests ────────────────────────────────────────────────────
 # Run all tests
 test: test-backend test-frontend
 
-# Run backend tests (requires: docker compose up db)
-test-backend:
-	cd api && NO_PROXY="*" python3 -m pytest tests/ -v --tb=short
+# Create ondoki_test database if it doesn't exist, then run backend tests
+# Tests run INSIDE Docker against the same Postgres the app uses
+test-backend: test-db
+	docker compose exec -e DATABASE_URL_TEST=postgresql+asyncpg://postgres:postgres@db:5432/ondoki_test \
+		backend python -m pytest tests/ -v --tb=short
 
-# Run frontend tests
+# Ensure the test database exists
+test-db:
+	@docker compose exec db psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'ondoki_test'" | grep -q 1 || \
+		docker compose exec db psql -U postgres -c "CREATE DATABASE ondoki_test"
+
+# Run frontend tests (runs locally, no Docker needed)
 test-frontend:
 	cd app && npx jest --passWithNoTests
 
-# Lint and type-check
+# ─── Lint ─────────────────────────────────────────────────────
 lint:
-	cd api && python -m ruff check . || true
+	cd api && python3 -m ruff check . || true
 	cd app && npx tsc --noEmit || true
 
-# Run database migrations
+# ─── Database ─────────────────────────────────────────────────
 migrate:
-	cd api && alembic upgrade head
+	docker compose exec backend alembic upgrade head
 
-# Stop and remove all containers + volumes
+# ─── Cleanup ──────────────────────────────────────────────────
 clean:
-	docker compose down -v
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
 
-# Show logs
 logs:
 	docker compose logs -f
 
-# Restart backend only
 restart-backend:
 	docker compose restart backend
 
-# Generate a new Fernet encryption key
+# ─── Utils ────────────────────────────────────────────────────
 generate-key:
 	python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
