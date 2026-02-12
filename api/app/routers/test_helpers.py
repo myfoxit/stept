@@ -81,10 +81,11 @@ async def test_status(db: AsyncSession = Depends(get_db)):
 
 
 async def _cleanup(db: AsyncSession):
-    """Truncate all tables."""
-    table_names = ", ".join(
-        f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
-    )
-    if table_names:
-        await db.execute(text(f"TRUNCATE TABLE {table_names} CASCADE"))
+    """Truncate all tables. Gracefully handles missing tables (pending migrations)."""
+    for t in reversed(Base.metadata.sorted_tables):
+        try:
+            await db.execute(text(f'TRUNCATE TABLE "{t.name}" CASCADE'))
+        except Exception:
+            # Table doesn't exist yet (migration not run) — skip
+            await db.rollback()
     await db.commit()
