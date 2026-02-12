@@ -11,9 +11,9 @@ build:
 # Run all tests
 test: test-backend test-frontend
 
-# Run backend tests
+# Run backend tests (requires: docker compose up db)
 test-backend:
-	cd api && python -m pytest tests/ -v --tb=short
+	cd api && NO_PROXY="*" python3 -m pytest tests/ -v --tb=short
 
 # Run frontend tests
 test-frontend:

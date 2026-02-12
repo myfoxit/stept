@@ -135,8 +135,10 @@ async def register(
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
-    except ValueError:
-        raise HTTPException(status_code=409, detail="EMAIL_TAKEN")
+    except ValueError as e:
+        if "email" in str(e).lower() or "taken" in str(e).lower():
+            raise HTTPException(status_code=409, detail="EMAIL_TAKEN")
+        raise HTTPException(status_code=400, detail=str(e))
     
     # Avoid touching lazy relationships during serialization
     payload = UserRead.model_validate(user, from_attributes=True).model_dump()

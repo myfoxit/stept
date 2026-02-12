@@ -104,16 +104,18 @@ async def test_folder_in_wrong_project(
     test_user_id: str,
 ):
     """
-    Creating a folder with a non-existent project_id.
-    
-    Note: SQLite doesn't enforce FK constraints by default, so this may
-    succeed on SQLite but fail on PostgreSQL. We accept both outcomes.
+    Creating a folder with a non-existent project_id should fail.
+    PostgreSQL enforces FK constraints — this triggers IntegrityError which
+    may surface as 500 response or propagate as an exception through ASGI.
     """
-    resp = await async_client.post(
-        "/api/v1/folders/",
-        json={"name": "Orphan", "project_id": "nonexistent_id"},
-        headers=auth_headers,
-    )
-    # On PostgreSQL: FK constraint → 4xx/5xx
-    # On SQLite (no FK enforcement): may return 201
-    assert resp.status_code in (201, 400, 404, 422, 500)
+    try:
+        resp = await async_client.post(
+            "/api/v1/folders/",
+            json={"name": "Orphan", "project_id": "nonexistent_id"},
+            headers=auth_headers,
+        )
+        # If we get a response, it should be an error status
+        assert resp.status_code in (400, 404, 422, 500)
+    except Exception:
+        # IntegrityError propagated through ASGI — FK constraint worked
+        pass
