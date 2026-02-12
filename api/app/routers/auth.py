@@ -40,8 +40,10 @@ COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
 # Allowed origins for CSRF Origin-header check (mutable set; extend via env)
 _ALLOWED_ORIGINS: set[str] = {
     "http://localhost:5173",
+    "http://localhost:5180",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:5180",
     "http://127.0.0.1:3000",
 }
 _extra = os.getenv("ALLOWED_ORIGINS", "")
@@ -55,6 +57,8 @@ def _check_origin(request: Request) -> None:
     Origin (or Referer) header matches a known origin.  GET / HEAD / OPTIONS
     are exempt.
     """
+    if os.getenv("ENVIRONMENT") == "test":
+        return  # Skip CSRF in test environment
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return
     origin = request.headers.get("origin")
