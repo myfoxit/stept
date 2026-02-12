@@ -13,14 +13,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Use raw SQL with IF NOT EXISTS for idempotency
-    op.execute("CREATE INDEX IF NOT EXISTS idx_steps_session ON process_recording_step(session_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_folders_project ON folder(project_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_folders_parent ON folder(parent_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_documents_folder ON document(folder_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_embeddings_type_id ON embedding(content_type, content_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON process_recording_session(user_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_app_settings_key ON app_settings(key)")
+    # Use IF NOT EXISTS for idempotency. Table names must match actual schema.
+    op.execute("CREATE INDEX IF NOT EXISTS idx_steps_session ON process_recording_steps(session_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_folders_project ON folders(project_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_documents_folder ON documents(folder_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON process_recording_sessions(user_id)")
+    # app_settings already has a PK on key — no extra index needed
 
 
 def downgrade() -> None:
@@ -28,6 +27,4 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS idx_folders_project")
     op.execute("DROP INDEX IF EXISTS idx_folders_parent")
     op.execute("DROP INDEX IF EXISTS idx_documents_folder")
-    op.execute("DROP INDEX IF EXISTS idx_embeddings_type_id")
     op.execute("DROP INDEX IF EXISTS idx_sessions_user")
-    op.execute("DROP INDEX IF EXISTS idx_app_settings_key")
