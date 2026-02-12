@@ -22,42 +22,47 @@ TEST_PROJECT_NAME = "E2E Test Project"
 @router.post("/seed")
 async def seed_test_data(db: AsyncSession = Depends(get_db)):
     """Create a test user and project for E2E tests."""
-    # Clean first
-    await _cleanup(db)
+    try:
+        # Clean first
+        await _cleanup(db)
 
-    # Create user
-    user = await create_user(
-        db,
-        email=TEST_EMAIL,
-        password=TEST_PASSWORD,
-        name=TEST_NAME,
-    )
-
-    # Create project
-    project = Project(
-        name=TEST_PROJECT_NAME,
-        user_id=user.id,
-        owner_id=user.id,
-    )
-    db.add(project)
-    await db.flush()
-
-    # Add user as admin member via the association table
-    await db.execute(
-        insert(project_members).values(
-            user_id=user.id,
-            project_id=project.id,
-            role=ProjectRole.ADMIN,
+        # Create user
+        user = await create_user(
+            db,
+            email=TEST_EMAIL,
+            password=TEST_PASSWORD,
+            name=TEST_NAME,
         )
-    )
-    await db.commit()
 
-    return {
-        "user_id": user.id,
-        "project_id": project.id,
-        "email": TEST_EMAIL,
-        "password": TEST_PASSWORD,
-    }
+        # Create project
+        project = Project(
+            name=TEST_PROJECT_NAME,
+            user_id=user.id,
+            owner_id=user.id,
+        )
+        db.add(project)
+        await db.flush()
+
+        # Add user as admin member via the association table
+        await db.execute(
+            insert(project_members).values(
+                user_id=user.id,
+                project_id=project.id,
+                role=ProjectRole.ADMIN,
+            )
+        )
+        await db.commit()
+
+        return {
+            "user_id": user.id,
+            "project_id": project.id,
+            "email": TEST_EMAIL,
+            "password": TEST_PASSWORD,
+        }
+    except Exception as e:
+        await db.rollback()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Seed failed: {str(e)}")
 
 
 @router.delete("/cleanup")
@@ -81,11 +86,18 @@ async def test_status(db: AsyncSession = Depends(get_db)):
 
 
 async def _cleanup(db: AsyncSession):
-    """Truncate all tables. Gracefully handles missing tables (pending migrations)."""
-    for t in reversed(Base.metadata.sorted_tables):
-        try:
-            await db.execute(text(f'TRUNCATE TABLE "{t.name}" CASCADE'))
-        except Exception:
-            # Table doesn't exist yet (migration not run) — skip
-            await db.rollback()
+    """Truncate all existing tables. Skips tables that don't exist (pending migrations)."""
+    # Query actual tables in the database
+    result = await db.execute(text(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+    ))
+    existing = {row[0] for row in result.fetchall()}
+
+    # Only truncate tables that actually exist
+    to_truncate = [
+        f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
+        if t.name in existing
+    ]
+    if to_truncate:
+        await db.execute(text(f"TRUNCATE TABLE {', '.join(to_truncate)} CASCADE"))
     await db.commit()
