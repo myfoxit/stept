@@ -1,9 +1,19 @@
 """
 Test fixtures for the Ondoki backend test suite.
 
-Uses a real PostgreSQL test database (ondoki_test) on localhost.
-Requires: docker compose up db (or any Postgres on localhost:5432).
-Override with DATABASE_URL_TEST env var.
+Best-practice approach:
+  1. Tests run inside Docker (same container as the app)
+  2. Connect to a dedicated 'ondoki_test' database (created by Makefile)
+  3. Use alembic migrations to create schema (matches production exactly)
+  4. Truncate between tests for isolation
+  5. Monkey-patch app.database BEFORE importing app code
+
+Run with:
+  make test-backend         (from host — runs inside Docker)
+  
+Or manually inside the container:
+  DATABASE_URL_TEST=postgresql+asyncpg://postgres:postgres@db:5432/ondoki_test \
+    python -m pytest tests/ -v
 """
 
 import os
@@ -22,30 +32,46 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 # ---------------------------------------------------------------------------
-# Path setup — must happen before any app imports
+# 1. Environment — must be set BEFORE any app imports
 # ---------------------------------------------------------------------------
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 _TEST_DB_URL = os.environ.get(
     "DATABASE_URL_TEST",
     "postgresql+asyncpg://postgres:postgres@localhost:5432/ondoki_test",
 )
+
+# Force DATABASE_URL to test DB — must happen before app.database import
+# This overrides any value set by Docker or .env files
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ.setdefault("JWT_SECRET", "test-secret-for-ci")
 os.environ.setdefault("ONDOKI_ENCRYPTION_KEY", "dGVzdC1rZXktMzItYnl0ZXMtZm9yLWZlcm5ldC14eA==")
 
-# ---------------------------------------------------------------------------
-# Monkey-patch app.database BEFORE importing main (which wires middleware)
-# Use NullPool to avoid connection caching issues across event loops.
-# ---------------------------------------------------------------------------
-import app.database as _db_mod
+# Prevent dotenv from loading any .env file that might override DATABASE_URL
+os.environ["DOTENV_LOADED"] = "1"
 
-# Replace the import-time engine with NullPool so each connection is fresh
-# and not bound to the wrong event loop
+# ---------------------------------------------------------------------------
+# 2. Monkey-patch app.database BEFORE importing the app
+#
+#    app.database creates an engine at import time. We replace it with a
+#    NullPool engine pointing at the test DB. NullPool = no cached connections
+#    = no event-loop mismatch issues with asyncpg.
+# ---------------------------------------------------------------------------
+import app.database as _db_mod  # noqa: E402 — must be after env setup
+
+# Verify the engine URL (app.database may have read the wrong DATABASE_URL)
+_actual_url = str(_db_mod.engine.url)
+if "ondoki_test" not in _actual_url:
+    # app.database grabbed the production URL — we MUST replace the engine
+    import logging
+    logging.getLogger(__name__).warning(
+        f"app.database.engine points to '{_actual_url}', expected ondoki_test. "
+        "Replacing with test engine."
+    )
+
 _test_engine = create_async_engine(
     _TEST_DB_URL,
     echo=False,
-    pool_pre_ping=True,
     poolclass=NullPool,
 )
 _test_session_factory = async_sessionmaker(
@@ -55,21 +81,28 @@ _test_session_factory = async_sessionmaker(
     autoflush=False,
     autocommit=False,
 )
+
+# Patch BEFORE any router/main imports
 _db_mod.engine = _test_engine
 _db_mod.AsyncSessionLocal = _test_session_factory
 
-from app.database import get_session, Base
-from app.models import User, Project, Folder, Document, project_members, ProjectRole
-import app.models  # noqa: F401
+# Now safe to import models and app code
+from app.database import Base  # noqa: E402
+import app.models  # noqa: E402,F401 — registers all models with Base.metadata
+
+# Sanity check at import time
+print(f"[conftest] Test DB URL: {_TEST_DB_URL}")
+print(f"[conftest] Engine URL:  {_db_mod.engine.url}")
+print(f"[conftest] Tables:      {len(Base.metadata.sorted_tables)}")
 
 
 # ---------------------------------------------------------------------------
-# Session-scoped: create tables once, drop at end
+# 3. Session-scoped: create schema once using metadata.create_all
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _setup_db():
-    """Create all tables once for the entire test session."""
+    """Drop and recreate all tables once for the test session."""
     async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
@@ -80,12 +113,12 @@ async def _setup_db():
 
 
 # ---------------------------------------------------------------------------
-# Function-scoped: truncate all tables between tests
+# 4. Function-scoped: truncate tables between tests
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def _clean_tables():
-    """Truncate all tables before each test for isolation."""
+    """Truncate all tables before each test for full isolation."""
     async with _test_engine.begin() as conn:
         table_names = ", ".join(
             f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
@@ -96,29 +129,24 @@ async def _clean_tables():
 
 
 # ---------------------------------------------------------------------------
-# DB session fixture
+# 5. DB session fixture (for tests that need direct DB access)
 # ---------------------------------------------------------------------------
 
-@pytest_asyncio.fixture(scope="function")
-async def async_db():
+@pytest_asyncio.fixture()
+async def db():
     """Provide a fresh AsyncSession per test."""
     async with _test_session_factory() as session:
         yield session
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db(async_db):
-    yield async_db
-
-
 # ---------------------------------------------------------------------------
-# App / Client
+# 6. App client — wired to FastAPI via ASGI transport (no real HTTP)
 # ---------------------------------------------------------------------------
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture()
 async def async_client():
-    """HTTPX AsyncClient wired to the FastAPI app."""
-    from main import app
+    """HTTPX AsyncClient talking to the FastAPI app in-process."""
+    from main import app  # noqa: E402 — import after patching
 
     with (
         patch("app.emails._send", return_value=None),
@@ -129,13 +157,13 @@ async def async_client():
     ):
         async with AsyncClient(
             transport=ASGITransport(app=app),
-            base_url="http://localhost",
+            base_url="http://test",
         ) as client:
             yield client
 
 
 # ---------------------------------------------------------------------------
-# Auth helper fixtures
+# 7. Auth helpers
 # ---------------------------------------------------------------------------
 
 TEST_USER_EMAIL = "test@example.com"
@@ -145,7 +173,7 @@ TEST_USER_NAME = "testuser"
 
 @pytest_asyncio.fixture()
 async def auth_headers(async_client: AsyncClient) -> dict:
-    """Register + login a test user and return auth headers."""
+    """Register + login a test user, return auth headers with session cookie."""
     resp = await async_client.post(
         "/api/v1/auth/register",
         json={
@@ -162,7 +190,7 @@ async def auth_headers(async_client: AsyncClient) -> dict:
 
 @pytest_asyncio.fixture()
 async def second_auth_headers(async_client: AsyncClient) -> dict:
-    """Register + login a second test user for cross-user access tests."""
+    """Register a second user for cross-user access tests."""
     resp = await async_client.post(
         "/api/v1/auth/register",
         json={
@@ -178,7 +206,7 @@ async def second_auth_headers(async_client: AsyncClient) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# CRUD helper fixtures
+# 8. CRUD helpers
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture()
@@ -207,7 +235,7 @@ async def test_folder(
     auth_headers: dict,
     test_project: dict,
 ) -> dict:
-    """Create a folder inside the test project and return its JSON."""
+    """Create a folder inside the test project."""
     resp = await async_client.post(
         "/api/v1/folders/",
         json={
