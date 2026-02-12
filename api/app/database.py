@@ -22,12 +22,21 @@ load_dotenv(env_path)
 
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./dev.db")
 
+# Pool configuration — tuned for production workloads
+_pool_kwargs = {}
+if "sqlite" not in DATABASE_URL:
+    _pool_kwargs = {
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "20")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+    }
+
 engine = create_async_engine(
     DATABASE_URL,
-    echo=False,            
-    
-    pool_pre_ping=True,  
-    
+    echo=False,
+    pool_pre_ping=True,
+    **_pool_kwargs,
 )
 
 # ---------------------------------------------------------------------------

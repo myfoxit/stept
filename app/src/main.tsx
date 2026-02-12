@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import { Layout } from '@/components/Layout';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EditorPage from './pages/EditorPage';
 import { TextContainerEditor } from './components/tiptap-templates/simple/text-container-editor';
@@ -23,6 +24,7 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ProjectProvider>
@@ -60,5 +62,6 @@ createRoot(document.getElementById('root')!).render(
         </ProjectProvider>
       </AuthProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>
 );

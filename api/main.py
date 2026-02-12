@@ -4,9 +4,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
 from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health
+from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
 from app.core.config import settings
+
+# Configure structured logging early
+setup_logging()
 
 
 @asynccontextmanager
@@ -34,6 +38,7 @@ api_router = APIRouter(prefix=settings.API_V1_STR)
 
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     # Wildcard + credentials do not work.

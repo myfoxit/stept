@@ -20,6 +20,46 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Circuit breaker for LLM API calls
+# ---------------------------------------------------------------------------
+
+import time as _time
+
+_circuit_failures: int = 0
+_circuit_open_until: float = 0.0
+_CIRCUIT_THRESHOLD = 3      # consecutive failures before opening
+_CIRCUIT_COOLDOWN = 60.0    # seconds to wait before retrying
+
+
+def _circuit_is_open() -> bool:
+    """Check if the circuit breaker is open (LLM unavailable)."""
+    if _circuit_failures < _CIRCUIT_THRESHOLD:
+        return False
+    if _time.time() > _circuit_open_until:
+        # Cooldown expired — half-open, allow one attempt
+        return False
+    return True
+
+
+def _circuit_record_success():
+    global _circuit_failures, _circuit_open_until
+    _circuit_failures = 0
+    _circuit_open_until = 0.0
+
+
+def _circuit_record_failure():
+    global _circuit_failures, _circuit_open_until
+    _circuit_failures += 1
+    if _circuit_failures >= _CIRCUIT_THRESHOLD:
+        _circuit_open_until = _time.time() + _CIRCUIT_COOLDOWN
+        logger.warning(
+            "LLM circuit breaker OPEN — %d consecutive failures, "
+            "backing off for %.0fs",
+            _circuit_failures,
+            _CIRCUIT_COOLDOWN,
+        )
+
+# ---------------------------------------------------------------------------
 # In-memory cache for DB-sourced config (refreshed on every save)
 # ---------------------------------------------------------------------------
 
@@ -433,19 +473,35 @@ async def chat_completion(
     logger.info("LLM request: provider=%s model=%s stream=%s tools=%d",
                 provider, resolved_model, stream, len(tools) if tools else 0)
 
-    if provider == "anthropic":
-        resp = await _anthropic_chat(messages, resolved_model, stream, resolved_url, tools=tools)
-        if stream:
-            resp.raise_for_status()
-            return _iter_anthropic_stream(resp)
-        return resp
-    else:
-        # OpenAI / Ollama / compatible
-        resp = await _openai_chat(messages, resolved_model, stream, resolved_url, tools=tools)
-        if stream:
-            resp.raise_for_status()
-            return _iter_openai_stream(resp)
-        return resp
+    # Circuit breaker — fail fast when LLM has been consistently failing
+    if _circuit_is_open():
+        raise httpx.HTTPStatusError(
+            "AI service temporarily unavailable (circuit breaker open)",
+            request=httpx.Request("POST", resolved_url or ""),
+            response=httpx.Response(503),
+        )
+
+    try:
+        if provider == "anthropic":
+            resp = await _anthropic_chat(messages, resolved_model, stream, resolved_url, tools=tools)
+            if stream:
+                resp.raise_for_status()
+                _circuit_record_success()
+                return _iter_anthropic_stream(resp)
+            _circuit_record_success()
+            return resp
+        else:
+            # OpenAI / Ollama / compatible
+            resp = await _openai_chat(messages, resolved_model, stream, resolved_url, tools=tools)
+            if stream:
+                resp.raise_for_status()
+                _circuit_record_success()
+                return _iter_openai_stream(resp)
+            _circuit_record_success()
+            return resp
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as exc:
+        _circuit_record_failure()
+        raise
 
 
 def extract_tool_calls_from_response(response_json: dict, provider: str | None = None) -> list[dict]:

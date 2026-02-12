@@ -1,5 +1,8 @@
 # Ondoki
 
+[![CI](https://github.com/myfoxit/ondoki-web/actions/workflows/ci.yml/badge.svg)](https://github.com/myfoxit/ondoki-web/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Process recording platform with AI-powered documentation. Record user workflows,
 generate step-by-step guides, and chat with an AI assistant that understands your recordings.
 
@@ -121,6 +124,23 @@ The companion [Ondoki Desktop](https://github.com/myfoxit/ondoki-desktop) app (W
 - **Privacy:** DataVeil (optional Go proxy for PII obfuscation)
 - **Desktop:** .NET 9 / WPF / C# ([separate repo](https://github.com/myfoxit/ondoki-desktop))
 
+## Running Tests
+
+```bash
+# All tests
+make test
+
+# Backend only (uses SQLite in-memory, no external DB needed)
+cd api && python -m pytest tests/ -v
+
+# Frontend only
+cd app && npx jest --passWithNoTests
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
+
 ## License
 
-Private — © 2025 Alex Hoehne
+MIT — See [LICENSE](LICENSE).

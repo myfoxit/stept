@@ -26,4 +26,4 @@ dist-ssr
 .venv
 /test-results/
 /playwright-report/
-/playwright/
+/playwright/api/dev.db
