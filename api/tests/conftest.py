@@ -103,9 +103,16 @@ print(f"[conftest] Tables:      {len(Base.metadata.sorted_tables)}")
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _setup_db():
     """Drop and recreate all tables once for the test session."""
+    # Try to enable pgvector extension (needed for Embedding model's Vector column).
+    # If unavailable (plain postgres without pgvector), the Embedding model
+    # falls back to a Text column — see app/models.py.
     async with _test_engine.begin() as conn:
-        # Ensure pgvector extension exists (needed for Embedding model)
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        except Exception:
+            pass  # Extension not installed — that's fine for tests
+
+    async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield

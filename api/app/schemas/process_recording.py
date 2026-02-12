@@ -65,8 +65,8 @@ class SessionStatusResponse(BaseModel):
     session_id: str
     status: str
     created_at: datetime
-    total_steps: int
-    total_files: int
+    total_steps: Optional[int] = 0
+    total_files: Optional[int] = 0
     files_uploaded: int
     metadata: Optional[List[Dict[str, Any]]] = []  # Make it optional with default empty list
     storage_type: str
