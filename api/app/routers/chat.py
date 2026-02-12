@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.database import get_session as get_db
+from app.database import get_session as get_db, AsyncSessionLocal
 from app.models import (
     Document,
     ProcessRecordingSession,
@@ -34,6 +34,7 @@ from app.security import get_current_user
 from app.services import llm as llm_service
 from app.services import dataveil as dataveil_service
 from app.services.ai_tools import registry as tool_registry
+from app.middleware.rate_limit import chat_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -203,17 +204,15 @@ def _build_system_prompt_with_tools() -> str:
 # ---------------------------------------------------------------------------
 
 async def _execute_tool_calls(
-    db: AsyncSession,
     user_id: str,
     project_id: Optional[str],
     tool_calls: list[dict],
 ) -> list[dict]:
     """
-    Execute tool calls and return tool result messages.
-    
-    Returns list of:
-      - The assistant message with tool_calls
-      - Tool result messages (role=tool)
+    Execute tool calls using a fresh DB session per call, so the SSE stream
+    does not hold a long-lived connection.
+
+    Returns list of tool result messages (role=tool).
     """
     results = []
     for tc in tool_calls:
@@ -237,18 +236,22 @@ async def _execute_tool_calls(
             result = {"error": f"Unknown tool: {tool_name}"}
         else:
             try:
-                result = await tool.execute(
-                    db=db,
-                    user_id=user_id,
-                    project_id=project_id,
-                    **args,
-                )
-                # Commit immediately so tool side-effects persist
-                # even if the SSE stream disconnects later
-                await db.commit()
+                # Open a short-lived DB session for this single tool call
+                async with AsyncSessionLocal() as db:
+                    try:
+                        result = await tool.execute(
+                            db=db,
+                            user_id=user_id,
+                            project_id=project_id,
+                            **args,
+                        )
+                        await db.commit()
+                    except Exception as exc:
+                        logger.error("Tool %s execution failed: %s", tool_name, exc)
+                        await db.rollback()
+                        result = {"error": f"Tool execution failed: {str(exc)}"}
             except Exception as exc:
-                logger.error("Tool %s execution failed: %s", tool_name, exc)
-                await db.rollback()
+                logger.error("Tool %s session error: %s", tool_name, exc)
                 result = {"error": f"Tool execution failed: {str(exc)}"}
 
         results.append({
@@ -264,7 +267,6 @@ async def _chat_with_tools(
     messages: list[dict],
     model: Optional[str],
     base_url_override: Optional[str],
-    db: AsyncSession,
     user_id: str,
     project_id: Optional[str],
 ) -> AsyncIterator[str]:
@@ -272,7 +274,7 @@ async def _chat_with_tools(
     Multi-round chat with tool calling.
     
     1. Send messages + tool definitions (non-streaming) to the LLM
-    2. If LLM returns tool_calls, execute them
+    2. If LLM returns tool_calls, execute them (each in its own DB session)
     3. Append tool results and repeat (up to MAX_TOOL_ROUNDS)
     4. When LLM returns a regular text response, stream it back
     
@@ -359,7 +361,6 @@ async def _chat_with_tools(
 
         # Execute the tools
         tool_results = await _execute_tool_calls(
-            db=db,
             user_id=user_id,
             project_id=project_id,
             tool_calls=tool_calls,
@@ -414,6 +415,7 @@ async def chat_completions(
     body: ChatCompletionRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _rl=Depends(chat_rate_limiter),
 ):
     """
     Chat completion endpoint. Supports streaming (SSE) and non-streaming.
@@ -461,7 +463,6 @@ async def chat_completions(
                 messages=messages,
                 model=body.model,
                 base_url_override=base_url_override,
-                db=db,
                 user_id=current_user.id,
                 project_id=project_id,
             ),

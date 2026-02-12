@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health
 
 from app.database import Base, engine, AsyncSessionLocal
 from app.core.config import settings
@@ -62,8 +62,5 @@ api_router.include_router(auth_providers.router, prefix="/auth/providers", tags=
 # Mount the versioned router on the main app
 app.include_router(api_router)
 
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Docker health checks"""
-    return {"status": "healthy"}
+# Health/ready endpoints (no version prefix — used by load balancers/Docker)
+app.include_router(health.router)

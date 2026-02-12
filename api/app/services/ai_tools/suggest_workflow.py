@@ -143,7 +143,12 @@ async def execute(
     project_id: Optional[str],
     **kwargs: Any,
 ) -> dict:
-    question = kwargs.get("question", "")
+    try:
+        from app.services.ai_tools.validation import sanitize_string
+
+        question = sanitize_string(kwargs.get("question", ""), "question") or ""
+    except (ValueError, TypeError) as exc:
+        return {"error": f"Invalid input: {exc}"}
 
     if not question:
         return {"error": "A question is required."}

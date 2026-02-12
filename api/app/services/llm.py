@@ -32,11 +32,12 @@ def _get_cached_db_config() -> dict:
 
 
 async def load_db_config() -> dict:
-    """Load LLM config from app_settings table and cache it."""
+    """Load LLM config from app_settings table, decrypt secrets, and cache."""
     global _db_config_cache
     try:
         from app.database import AsyncSessionLocal
         from app.models import AppSettings
+        from app.services.crypto import decrypt
         from sqlalchemy import select
 
         async with AsyncSessionLocal() as session:
@@ -45,7 +46,11 @@ async def load_db_config() -> dict:
             )
             row = result.scalar_one_or_none()
             if row and row.value:
-                _db_config_cache = row.value
+                cfg = dict(row.value)
+                # Transparently decrypt the api_key (backward-compatible)
+                if cfg.get("api_key"):
+                    cfg["api_key"] = decrypt(cfg["api_key"])
+                _db_config_cache = cfg
                 return _db_config_cache
     except Exception as exc:
         logger.debug("Could not load LLM config from DB: %s", exc)
@@ -54,11 +59,20 @@ async def load_db_config() -> dict:
 
 
 async def save_db_config(config: dict) -> None:
-    """Persist LLM config to app_settings and refresh cache."""
+    """Persist LLM config to app_settings and refresh cache.
+
+    The ``api_key`` field (if present) is encrypted before storage.
+    """
     global _db_config_cache
     from app.database import AsyncSessionLocal
     from app.models import AppSettings
+    from app.services.crypto import encrypt
     from sqlalchemy import select
+
+    # Encrypt the api_key before persisting
+    stored = dict(config)
+    if stored.get("api_key"):
+        stored["api_key"] = encrypt(stored["api_key"])
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -66,11 +80,12 @@ async def save_db_config(config: dict) -> None:
         )
         row = result.scalar_one_or_none()
         if row:
-            row.value = config
+            row.value = stored
         else:
-            session.add(AppSettings(key="llm_config", value=config))
+            session.add(AppSettings(key="llm_config", value=stored))
         await session.commit()
 
+    # Keep the in-memory cache with the *decrypted* value so callers work
     _db_config_cache = config
 
 

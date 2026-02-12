@@ -88,48 +88,56 @@ async def execute(
     project_id: Optional[str],
     **kwargs: Any,
 ) -> dict:
-    folder_name = kwargs.get("name", "Untitled")
-    parent_folder_id = kwargs.get("parent_folder_id")
-    parent_folder_name = kwargs.get("parent_folder_name")
+    try:
+        from app.services.ai_tools.validation import sanitize_string, validate_id
+
+        folder_name = sanitize_string(kwargs.get("name", "Untitled"), "name") or "Untitled"
+        parent_folder_id = validate_id(kwargs.get("parent_folder_id"), "parent_folder_id")
+        parent_folder_name = sanitize_string(kwargs.get("parent_folder_name"), "parent_folder_name")
+    except (ValueError, TypeError) as exc:
+        return {"error": f"Invalid input: {exc}"}
 
     if not project_id:
         return {"error": "No project context — cannot create folder."}
 
-    # Verify user has access to the project
-    stmt = select(project_members.c.user_id).where(
-        project_members.c.user_id == user_id,
-        project_members.c.project_id == project_id,
-    )
-    member = await db.scalar(stmt)
-    if not member:
-        return {"error": "You don't have access to this project."}
+    try:
+        # Verify user has access to the project
+        stmt = select(project_members.c.user_id).where(
+            project_members.c.user_id == user_id,
+            project_members.c.project_id == project_id,
+        )
+        member = await db.scalar(stmt)
+        if not member:
+            return {"error": "You don't have access to this project."}
 
-    # Resolve parent folder
-    resolved_parent_id, parent_path = await _find_or_create_parent(
-        db, project_id, user_id, parent_folder_id, parent_folder_name,
-    )
+        # Resolve parent folder
+        resolved_parent_id, parent_path = await _find_or_create_parent(
+            db, project_id, user_id, parent_folder_id, parent_folder_name,
+        )
 
-    folder = Folder(
-        name=folder_name,
-        project_id=project_id,
-        parent_id=resolved_parent_id,
-        owner_id=user_id,
-    )
-    db.add(folder)
-    await db.flush()
+        folder = Folder(
+            name=folder_name,
+            project_id=project_id,
+            parent_id=resolved_parent_id,
+            owner_id=user_id,
+        )
+        db.add(folder)
+        await db.flush()
 
-    # Set materialized path after we have the ID
-    folder.set_path(parent_path)
-    await db.flush()
+        # Set materialized path after we have the ID
+        folder.set_path(parent_path)
+        await db.flush()
 
-    msg = f"Created folder '{folder_name}'"
-    if parent_folder_name and resolved_parent_id:
-        msg += f" inside '{parent_folder_name}'"
+        msg = f"Created folder '{folder_name}'"
+        if parent_folder_name and resolved_parent_id:
+            msg += f" inside '{parent_folder_name}'"
 
-    return {
-        "success": True,
-        "folder_id": folder.id,
-        "name": folder_name,
-        "parent_folder_id": resolved_parent_id,
-        "message": msg,
-    }
+        return {
+            "success": True,
+            "folder_id": folder.id,
+            "name": folder_name,
+            "parent_folder_id": resolved_parent_id,
+            "message": msg,
+        }
+    except Exception as exc:
+        return {"error": f"Failed to create folder: {exc}"}

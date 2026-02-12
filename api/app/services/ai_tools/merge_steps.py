@@ -72,67 +72,80 @@ async def execute(
     project_id: Optional[str],
     **kwargs: Any,
 ) -> dict:
-    workflow_id = kwargs.get("workflow_id")
-    step_numbers = kwargs.get("step_numbers")
+    try:
+        from app.services.ai_tools.validation import validate_id, validate_positive_int
+
+        workflow_id = validate_id(kwargs.get("workflow_id"), "workflow_id")
+        step_numbers = kwargs.get("step_numbers")
+        if step_numbers is not None:
+            if not isinstance(step_numbers, list):
+                return {"error": "step_numbers must be a list of integers."}
+            for sn in step_numbers:
+                validate_positive_int(sn, "step_number")
+    except (ValueError, TypeError) as exc:
+        return {"error": f"Invalid input: {exc}"}
 
     if not workflow_id:
         return {"error": "workflow_id is required."}
 
-    # Fetch workflow with steps — ensure user owns it
-    stmt = (
-        select(ProcessRecordingSession)
-        .where(
-            ProcessRecordingSession.id == workflow_id,
-            ProcessRecordingSession.user_id == user_id,
+    try:
+        # Fetch workflow with steps — ensure user owns it
+        stmt = (
+            select(ProcessRecordingSession)
+            .where(
+                ProcessRecordingSession.id == workflow_id,
+                ProcessRecordingSession.user_id == user_id,
+            )
+            .options(selectinload(ProcessRecordingSession.steps))
         )
-        .options(selectinload(ProcessRecordingSession.steps))
-    )
-    workflow = await db.scalar(stmt)
-    if not workflow:
-        return {"error": f"Workflow '{workflow_id}' not found or access denied."}
+        workflow = await db.scalar(stmt)
+        if not workflow:
+            return {"error": f"Workflow '{workflow_id}' not found or access denied."}
 
-    steps = sorted(workflow.steps, key=lambda s: s.step_number)
-    original_count = len(steps)
+        steps = sorted(workflow.steps, key=lambda s: s.step_number)
+        original_count = len(steps)
 
-    # Determine which steps to remove
-    if step_numbers:
-        to_remove = set(step_numbers)
-    else:
-        to_remove = set(_auto_detect_duplicates(steps))
+        # Determine which steps to remove
+        if step_numbers:
+            to_remove = set(step_numbers)
+        else:
+            to_remove = set(_auto_detect_duplicates(steps))
 
-    if not to_remove:
+        if not to_remove:
+            return {
+                "success": True,
+                "workflow_id": workflow_id,
+                "removed_count": 0,
+                "remaining_count": original_count,
+                "message": "No duplicate steps detected — workflow is already clean.",
+            }
+
+        # Delete the redundant steps
+        remove_ids = [s.id for s in steps if s.step_number in to_remove]
+        if remove_ids:
+            await db.execute(
+                delete(ProcessRecordingStep).where(
+                    ProcessRecordingStep.id.in_(remove_ids)
+                )
+            )
+
+        # Renumber remaining steps sequentially
+        remaining = [s for s in steps if s.step_number not in to_remove]
+        remaining.sort(key=lambda s: s.step_number)
+        for idx, step in enumerate(remaining, start=1):
+            step.step_number = idx
+
+        # Update total steps count
+        workflow.total_steps = len(remaining)
+        await db.flush()
+
         return {
             "success": True,
             "workflow_id": workflow_id,
-            "removed_count": 0,
-            "remaining_count": original_count,
-            "message": "No duplicate steps detected — workflow is already clean.",
+            "removed_count": len(to_remove),
+            "removed_steps": sorted(to_remove),
+            "remaining_count": len(remaining),
+            "message": f"Merged {len(to_remove)} redundant steps. {len(remaining)} steps remaining.",
         }
-
-    # Delete the redundant steps
-    remove_ids = [s.id for s in steps if s.step_number in to_remove]
-    if remove_ids:
-        await db.execute(
-            delete(ProcessRecordingStep).where(
-                ProcessRecordingStep.id.in_(remove_ids)
-            )
-        )
-
-    # Renumber remaining steps sequentially
-    remaining = [s for s in steps if s.step_number not in to_remove]
-    remaining.sort(key=lambda s: s.step_number)
-    for idx, step in enumerate(remaining, start=1):
-        step.step_number = idx
-
-    # Update total steps count
-    workflow.total_steps = len(remaining)
-    await db.flush()
-
-    return {
-        "success": True,
-        "workflow_id": workflow_id,
-        "removed_count": len(to_remove),
-        "removed_steps": sorted(to_remove),
-        "remaining_count": len(remaining),
-        "message": f"Merged {len(to_remove)} redundant steps. {len(remaining)} steps remaining.",
-    }
+    except Exception as exc:
+        return {"error": f"Failed to merge steps: {exc}"}

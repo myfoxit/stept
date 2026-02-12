@@ -76,9 +76,14 @@ async def execute(
     project_id: Optional[str],
     **kwargs: Any,
 ) -> dict:
-    workflow_id = kwargs.get("workflow_id")
-    name_query = kwargs.get("name_query")
-    new_name = kwargs.get("new_name")
+    try:
+        from app.services.ai_tools.validation import sanitize_string, validate_id
+
+        workflow_id = validate_id(kwargs.get("workflow_id"), "workflow_id")
+        name_query = sanitize_string(kwargs.get("name_query"), "name_query")
+        new_name = sanitize_string(kwargs.get("new_name"), "new_name")
+    except (ValueError, TypeError) as exc:
+        return {"error": f"Invalid input: {exc}"}
 
     if not new_name:
         return {"error": "new_name is required."}
@@ -86,19 +91,22 @@ async def execute(
     if not workflow_id and not name_query:
         return {"error": "Provide workflow_id or name_query to identify the workflow."}
 
-    workflow = await _find_workflow(db, user_id, project_id, workflow_id, name_query)
-    if not workflow:
-        identifier = workflow_id or name_query
-        return {"error": f"Workflow matching '{identifier}' not found or access denied."}
+    try:
+        workflow = await _find_workflow(db, user_id, project_id, workflow_id, name_query)
+        if not workflow:
+            identifier = workflow_id or name_query
+            return {"error": f"Workflow matching '{identifier}' not found or access denied."}
 
-    old_name = workflow.name or "Untitled Workflow"
-    workflow.name = new_name
-    await db.flush()
+        old_name = workflow.name or "Untitled Workflow"
+        workflow.name = new_name
+        await db.flush()
 
-    return {
-        "success": True,
-        "workflow_id": workflow.id,
-        "old_name": old_name,
-        "new_name": new_name,
-        "message": f"Renamed workflow from '{old_name}' to '{new_name}'",
-    }
+        return {
+            "success": True,
+            "workflow_id": workflow.id,
+            "old_name": old_name,
+            "new_name": new_name,
+            "message": f"Renamed workflow from '{old_name}' to '{new_name}'",
+        }
+    except Exception as exc:
+        return {"error": f"Failed to rename workflow: {exc}"}

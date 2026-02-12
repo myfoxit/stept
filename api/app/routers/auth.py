@@ -37,6 +37,45 @@ logger = logging.getLogger(__name__)
 COOKIE_NAME = "session_ondoki"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
 
+# Allowed origins for CSRF Origin-header check (mutable set; extend via env)
+_ALLOWED_ORIGINS: set[str] = {
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+}
+_extra = os.getenv("ALLOWED_ORIGINS", "")
+if _extra:
+    _ALLOWED_ORIGINS.update(o.strip() for o in _extra.split(",") if o.strip())
+
+
+def _check_origin(request: Request) -> None:
+    """
+    Lightweight CSRF guard: for state-changing methods, verify that the
+    Origin (or Referer) header matches a known origin.  GET / HEAD / OPTIONS
+    are exempt.
+    """
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    origin = request.headers.get("origin")
+    if not origin:
+        # Fall back to Referer
+        referer = request.headers.get("referer", "")
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+    if not origin:
+        # No origin info at all — allow (could be server-to-server or curl)
+        return
+    # Normalise
+    origin = origin.rstrip("/")
+    if origin not in _ALLOWED_ORIGINS:
+        # Also allow same-origin (compare with request host)
+        request_origin = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+        if origin != request_origin:
+            raise HTTPException(status_code=403, detail="CSRF_ORIGIN_DENIED")
+
 # Simple in-memory rate limiting (per-IP)
 _RATE_LIMITS = {
     "login": {"limit": 5, "window": 60, "buckets": defaultdict(deque)},           # 5 attempts per 60s
@@ -71,7 +110,7 @@ def _set_session_cookie(resp: Response, token: str, request: Request):
         max_age=COOKIE_MAX_AGE,
         httponly=True,
         secure=is_https and not is_localhost,  # Don't use secure on localhost
-        samesite="lax",  # Strengthened for CSRF protection
+        samesite="strict",  # Strict for CSRF protection
         path="/"
     )
 
@@ -86,6 +125,7 @@ async def register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    _check_origin(request)
     try:
         user, session_token = await auth_crud.register(
             db,
@@ -111,6 +151,7 @@ async def login(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    _check_origin(request)
     # Apply rate limiting
     _rate_limit(request, "login")
     session_token = await auth_crud.authenticate(
@@ -668,6 +709,7 @@ async def logout(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _check_origin(request)
     token = request.cookies.get(COOKIE_NAME)
     if token:
         await auth_crud.logout(db, token)

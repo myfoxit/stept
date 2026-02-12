@@ -38,51 +38,63 @@ async def execute(
     project_id: Optional[str],
     **kwargs: Any,
 ) -> dict:
-    query = kwargs.get("query", "")
-    limit = min(kwargs.get("limit", 10), 50)
+    try:
+        from app.services.ai_tools.validation import sanitize_string, validate_positive_int
 
-    # Base query — only user's own workflows
-    stmt = select(ProcessRecordingSession).where(
-        ProcessRecordingSession.user_id == user_id,
-        ProcessRecordingSession.status == "completed",
-    )
+        query = sanitize_string(kwargs.get("query", ""), "query") or ""
+        raw_limit = kwargs.get("limit", 10)
+        if isinstance(raw_limit, str):
+            raw_limit = int(raw_limit)
+        validate_positive_int(raw_limit, "limit")
+        limit = min(raw_limit, 50)
+    except (ValueError, TypeError) as exc:
+        return {"error": f"Invalid input: {exc}"}
 
-    # Add project filter if in project context
-    if project_id:
-        stmt = stmt.where(ProcessRecordingSession.project_id == project_id)
-
-    # Search filter
-    if query:
-        pattern = f"%{query}%"
-        stmt = stmt.where(
-            or_(
-                ProcessRecordingSession.name.ilike(pattern),
-                ProcessRecordingSession.generated_title.ilike(pattern),
-                ProcessRecordingSession.summary.ilike(pattern),
-            )
+    try:
+        # Base query — only user's own workflows
+        stmt = select(ProcessRecordingSession).where(
+            ProcessRecordingSession.user_id == user_id,
+            ProcessRecordingSession.status == "completed",
         )
 
-    stmt = stmt.order_by(ProcessRecordingSession.created_at.desc()).limit(limit)
-    result = await db.execute(stmt)
-    workflows = result.scalars().all()
+        # Add project filter if in project context
+        if project_id:
+            stmt = stmt.where(ProcessRecordingSession.project_id == project_id)
 
-    items = []
-    for w in workflows:
-        items.append({
-            "id": w.id,
-            "name": w.name or w.generated_title or "Untitled Workflow",
-            "status": w.status,
-            "total_steps": w.total_steps,
-            "created_at": w.created_at.isoformat() if w.created_at else None,
-            "tags": w.tags or [],
-            "difficulty": w.difficulty,
-            "summary": (w.summary[:150] + "...") if w.summary and len(w.summary) > 150 else w.summary,
-        })
+        # Search filter
+        if query:
+            pattern = f"%{query}%"
+            stmt = stmt.where(
+                or_(
+                    ProcessRecordingSession.name.ilike(pattern),
+                    ProcessRecordingSession.generated_title.ilike(pattern),
+                    ProcessRecordingSession.summary.ilike(pattern),
+                )
+            )
 
-    return {
-        "success": True,
-        "count": len(items),
-        "workflows": items,
-        "query": query or None,
-        "message": f"Found {len(items)} workflow(s)" + (f" matching '{query}'" if query else ""),
-    }
+        stmt = stmt.order_by(ProcessRecordingSession.created_at.desc()).limit(limit)
+        result = await db.execute(stmt)
+        workflows = result.scalars().all()
+
+        items = []
+        for w in workflows:
+            items.append({
+                "id": w.id,
+                "name": w.name or w.generated_title or "Untitled Workflow",
+                "status": w.status,
+                "total_steps": w.total_steps,
+                "created_at": w.created_at.isoformat() if w.created_at else None,
+                "tags": w.tags or [],
+                "difficulty": w.difficulty,
+                "summary": (w.summary[:150] + "...") if w.summary and len(w.summary) > 150 else w.summary,
+            })
+
+        return {
+            "success": True,
+            "count": len(items),
+            "workflows": items,
+            "query": query or None,
+            "message": f"Found {len(items)} workflow(s)" + (f" matching '{query}'" if query else ""),
+        }
+    except Exception as exc:
+        return {"error": f"Failed to list workflows: {exc}"}

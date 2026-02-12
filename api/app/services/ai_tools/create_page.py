@@ -105,52 +105,60 @@ async def execute(
     project_id: Optional[str],
     **kwargs: Any,
 ) -> dict:
-    title = kwargs.get("title", "Untitled")
-    content_text = kwargs.get("content", "")
-    folder_id = kwargs.get("folder_id")
-    folder_name = kwargs.get("folder_name")
+    try:
+        from app.services.ai_tools.validation import sanitize_string, validate_id
+
+        title = sanitize_string(kwargs.get("title", "Untitled"), "title") or "Untitled"
+        content_text = sanitize_string(kwargs.get("content", ""), "content") or ""
+        folder_id = validate_id(kwargs.get("folder_id"), "folder_id")
+        folder_name = sanitize_string(kwargs.get("folder_name"), "folder_name")
+    except (ValueError, TypeError) as exc:
+        return {"error": f"Invalid input: {exc}"}
 
     if not project_id:
         return {"error": "No project context — cannot create page."}
 
-    # Verify user has access to the project
-    stmt = select(project_members.c.user_id).where(
-        project_members.c.user_id == user_id,
-        project_members.c.project_id == project_id,
-    )
-    member = await db.scalar(stmt)
-    if not member:
-        return {"error": "You don't have access to this project."}
+    try:
+        # Verify user has access to the project
+        stmt = select(project_members.c.user_id).where(
+            project_members.c.user_id == user_id,
+            project_members.c.project_id == project_id,
+        )
+        member = await db.scalar(stmt)
+        if not member:
+            return {"error": "You don't have access to this project."}
 
-    # Resolve folder
-    resolved_folder_id = await _resolve_folder(
-        db, project_id, user_id, folder_id, folder_name,
-    )
+        # Resolve folder
+        resolved_folder_id = await _resolve_folder(
+            db, project_id, user_id, folder_id, folder_name,
+        )
 
-    # Build TipTap content
-    tiptap_content = _text_to_tiptap(content_text) if content_text else {
-        "type": "doc",
-        "content": [{"type": "paragraph"}],
-    }
+        # Build TipTap content
+        tiptap_content = _text_to_tiptap(content_text) if content_text else {
+            "type": "doc",
+            "content": [{"type": "paragraph"}],
+        }
 
-    doc = Document(
-        name=title,
-        content=tiptap_content,
-        project_id=project_id,
-        folder_id=resolved_folder_id,
-        owner_id=user_id,
-    )
-    db.add(doc)
-    await db.flush()
+        doc = Document(
+            name=title,
+            content=tiptap_content,
+            project_id=project_id,
+            folder_id=resolved_folder_id,
+            owner_id=user_id,
+        )
+        db.add(doc)
+        await db.flush()
 
-    msg = f"Created page '{title}'"
-    if folder_name:
-        msg += f" in folder '{folder_name}'"
+        msg = f"Created page '{title}'"
+        if folder_name:
+            msg += f" in folder '{folder_name}'"
 
-    return {
-        "success": True,
-        "document_id": doc.id,
-        "title": title,
-        "folder_id": resolved_folder_id,
-        "message": msg,
-    }
+        return {
+            "success": True,
+            "document_id": doc.id,
+            "title": title,
+            "folder_id": resolved_folder_id,
+            "message": msg,
+        }
+    except Exception as exc:
+        return {"error": f"Failed to create page: {exc}"}
