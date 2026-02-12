@@ -5,8 +5,6 @@ Uses Redis when available; falls back to an in-memory ``defaultdict`` so the
 app still works (with per-process limits) when Redis is down or absent.
 """
 
-from __future__ import annotations
-
 import logging
 import time
 from collections import defaultdict

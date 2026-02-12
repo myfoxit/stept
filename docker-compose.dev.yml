@@ -4,7 +4,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
-    command: fastapi dev main.py --host 0.0.0.0 --port 8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-include '*.py'
     volumes:
       - ./api:/app
       - recordings-storage:/app/storage/recordings
@@ -12,6 +12,7 @@ services:
       ENVIRONMENT: local
       GOTENBERG_URL: http://gotenberg:3000
       LOCAL_STORAGE_PATH: /app/storage/recordings
+      WATCHFILES_FORCE_POLLING: "false"
     ports:
       - "8000:8000"
     depends_on:
