@@ -74,19 +74,21 @@ timeout 60s bash -c "until curl -s http://localhost:$APP_PORT > /dev/null; do sl
 echo "✅ App is up."
 
 # --- 6. Run All Tests ---
-echo ""
-echo "═══════════════════════════════════════"
-echo "  Running Unit Tests (Backend)"
-echo "═══════════════════════════════════════"
-cd "$ROOT_DIR/api"
-python3 -m pytest tests/ -q --tb=short || true
+if [ -z "$SKIP_UNIT" ]; then
+  echo ""
+  echo "═══════════════════════════════════════"
+  echo "  Running Unit Tests (Backend)"
+  echo "═══════════════════════════════════════"
+  cd "$ROOT_DIR/api"
+  python3 -m pytest tests/ -q --tb=short || true
 
-echo ""
-echo "═══════════════════════════════════════"
-echo "  Running Unit Tests (Frontend)"
-echo "═══════════════════════════════════════"
-cd "$ROOT_DIR/app"
-pnpm jest --no-cache || true
+  echo ""
+  echo "═══════════════════════════════════════"
+  echo "  Running Unit Tests (Frontend)"
+  echo "═══════════════════════════════════════"
+  cd "$ROOT_DIR/app"
+  pnpm jest --no-cache || true
+fi
 
 echo ""
 echo "═══════════════════════════════════════"
