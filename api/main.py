@@ -69,3 +69,9 @@ app.include_router(api_router)
 
 # Health/ready endpoints (no version prefix — used by load balancers/Docker)
 app.include_router(health.router)
+
+# Test-only endpoints (seed/cleanup) — only in test/development environments
+import os
+if os.getenv("ENVIRONMENT") in ("test", "development"):
+    from app.routers.test_helpers import router as test_router
+    app.include_router(test_router)

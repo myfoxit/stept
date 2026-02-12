@@ -11,6 +11,9 @@ export type TestSeedData = {
   password: string;
 };
 
+// Alias for backwards compat with fixtures
+export type TestData = TestSeedData;
+
 let globalTestData: TestSeedData | null = null;
 
 export function setGlobalTestData(data: TestSeedData) {

@@ -26,3 +26,8 @@ dist-ssr
 
 # Authentication tokens
 .npmrc
+
+# Playwright
+playwright/.auth/
+playwright-report/
+test-results/

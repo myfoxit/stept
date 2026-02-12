@@ -6,7 +6,6 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PORT_CONFIG_FILE="/tmp/playwright-test-ports.json"
 
 # --- 1. Cleanup Function (Traps Signals) ---
-# This ensures that even if you Ctrl+C, the child processes (API/App) are killed.
 cleanup() {
     echo ""
     echo "🧹 Stopping services..."
@@ -19,18 +18,15 @@ trap cleanup EXIT INT TERM
 
 echo "🚀 Starting Production-Grade Test Run..."
 
-# --- 2. Database & Redis Setup ---
-# Ensure your Test DB is ready. 
-# NOTE: We assume Redis is running (via your main docker-compose). 
-# If tests need a separate Redis, use a different DB index (e.g., /1 instead of /0).
+# --- 2. Database Setup ---
 echo "📦 Setting up test database..."
-./scripts/setup-test-db.sh
+"$ROOT_DIR/scripts/setup-test-db.sh"
 
 # --- 3. Dynamic Port Allocation ---
 echo "🔍 Finding available ports..."
-chmod +x ./scripts/find-port.sh
-API_PORT=$(./scripts/find-port.sh 8010) # Start looking from 8010 to avoid 8000
-APP_PORT=$(./scripts/find-port.sh 5180) # Start looking from 5180 to avoid 5173
+chmod +x "$ROOT_DIR/scripts/find-port.sh"
+API_PORT=$("$ROOT_DIR/scripts/find-port.sh" 8010)
+APP_PORT=$("$ROOT_DIR/scripts/find-port.sh" 5180)
 
 echo "   > API Port: $API_PORT"
 echo "   > App Port: $APP_PORT"
@@ -43,17 +39,15 @@ echo "🔧 Starting API server..."
 cd "$ROOT_DIR/api"
 
 # Activate Venv
-if [ -f "venv/bin/activate" ]; then source venv/bin/activate; 
+if [ -f "venv/bin/activate" ]; then source venv/bin/activate;
 elif [ -f ".venv/bin/activate" ]; then source .venv/bin/activate; fi
 
-# ENV VARS: 
-# 1. ENVIRONMENT=test enables the /test endpoints
-# 2. TEST_MODE=true is an extra safety
-# 3. REDIS_URL ensures we don't crash if dev redis is busy (optional: use db 1)
-export ENVIRONMENT=test 
+export ENVIRONMENT=test
 export TEST_MODE=true
-export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/snaprow_test
-export REDIS_URL=redis://localhost:6379/1 
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/ondoki_test
+export REDIS_URL=redis://localhost:6379/1
+export JWT_SECRET=e2e-test-secret
+export ONDOKI_ENCRYPTION_KEY=e2e-test-key
 
 # Start Uvicorn on the dynamic port
 uvicorn main:app --port $API_PORT --host 127.0.0.1 &
@@ -68,30 +62,38 @@ echo "✅ API is up."
 echo "🎨 Starting Frontend..."
 cd "$ROOT_DIR/app"
 
-# CRITICAL FIX: 
-# We must tell Vite where the API is via VITE_API_URL (or whatever your app uses).
-# Without this, Vite uses the .env default (usually 8000), causing the conflict.
 export VITE_API_URL="http://localhost:$API_PORT"
 export VITE_API_BASE_URL="http://localhost:$API_PORT/api/v1"
 export VITE_PORT=$APP_PORT
 
-# Start Vite
-# --host 127.0.0.1 ensures it doesn't try to broadcast on network
 pnpm vite --port $APP_PORT --host 127.0.0.1 &
 APP_PID=$!
 
-# Wait for Frontend
 echo "⏳ Waiting for App ($APP_PORT)..."
 timeout 60s bash -c "until curl -s http://localhost:$APP_PORT > /dev/null; do sleep 1; done" || (echo "❌ App failed to start"; exit 1)
 echo "✅ App is up."
 
-# --- 6. Run Playwright ---
-echo "🎭 Running Tests..."
+# --- 6. Run All Tests ---
+echo ""
+echo "═══════════════════════════════════════"
+echo "  Running Unit Tests (Backend)"
+echo "═══════════════════════════════════════"
+cd "$ROOT_DIR/api"
+python3 -m pytest tests/ -q --tb=short || true
+
+echo ""
+echo "═══════════════════════════════════════"
+echo "  Running Unit Tests (Frontend)"
+echo "═══════════════════════════════════════"
 cd "$ROOT_DIR/app"
+pnpm jest --no-cache || true
 
+echo ""
+echo "═══════════════════════════════════════"
+echo "  Running E2E Tests (Playwright)"
+echo "═══════════════════════════════════════"
+cd "$ROOT_DIR/app"
 export TEST_PORT_CONFIG="$PORT_CONFIG_FILE"
+export PLAYWRIGHT_NO_SERVER=1
 
-# Run tests
 pnpm playwright test "$@"
-
-# Exit code is handled by the trap/set -e
