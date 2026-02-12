@@ -83,5 +83,6 @@ def decrypt(ciphertext: str) -> str:
     try:
         return _fernet().decrypt(token.encode()).decode()
     except (InvalidToken, Exception) as exc:
-        logger.debug("Decryption failed (treating as plaintext): %s", exc)
-        return ciphertext
+        logger.warning("Decryption failed — API key was encrypted with a different key. "
+                       "Please re-save your API key in Settings.")
+        return ""  # Don't leak encrypted ciphertext to external APIs

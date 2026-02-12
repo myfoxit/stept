@@ -54,6 +54,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
       ENVIRONMENT: production
+      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-exX5o2vhMgT48Eho4ShGcD-vx_iKKZQMBGgOfw7dhRM=}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s

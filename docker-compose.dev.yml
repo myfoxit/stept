@@ -13,6 +13,7 @@ services:
       GOTENBERG_URL: http://gotenberg:3000
       LOCAL_STORAGE_PATH: /app/storage/recordings
       WATCHFILES_FORCE_POLLING: "false"
+      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-exX5o2vhMgT48Eho4ShGcD-vx_iKKZQMBGgOfw7dhRM=}
     ports:
       - "8000:8000"
     depends_on:
