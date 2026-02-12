@@ -106,18 +106,32 @@ async def _setup_db():
     # Try to enable pgvector extension (needed for Embedding model's Vector column).
     # If unavailable (plain postgres without pgvector), the Embedding model
     # falls back to a Text column — see app/models.py.
+    _has_pgvector = False
     async with _test_engine.begin() as conn:
         try:
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            _has_pgvector = True
         except Exception:
             pass  # Extension not installed — that's fine for tests
 
+    # If pgvector is not available, exclude the embeddings table
+    # (its VECTOR column type requires the extension)
+    tables_to_create = Base.metadata.sorted_tables
+    if not _has_pgvector:
+        tables_to_create = [t for t in tables_to_create if t.name != "embeddings"]
+
     async with _test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(
+            lambda sync_conn: Base.metadata.drop_all(sync_conn, tables=tables_to_create)
+        )
+        await conn.run_sync(
+            lambda sync_conn: Base.metadata.create_all(sync_conn, tables=tables_to_create)
+        )
     yield
     async with _test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(
+            lambda sync_conn: Base.metadata.drop_all(sync_conn, tables=tables_to_create)
+        )
     await _test_engine.dispose()
 
 
@@ -129,8 +143,16 @@ async def _setup_db():
 async def _clean_tables():
     """Truncate all tables before each test for full isolation."""
     async with _test_engine.begin() as conn:
+        # Query which tables actually exist to avoid errors
+        # (e.g. embeddings table is skipped when pgvector is not installed)
+        result = await conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        ))
+        existing_tables = {row[0] for row in result.fetchall()}
+
         table_names = ", ".join(
             f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
+            if t.name in existing_tables
         )
         if table_names:
             await conn.execute(text(f"TRUNCATE TABLE {table_names} CASCADE"))
