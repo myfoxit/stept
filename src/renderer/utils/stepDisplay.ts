@@ -53,9 +53,31 @@ export function getStepTitle(step: any): string {
     return `Type "${truncated}"`;
   }
 
+  if (step.actionType === 'Keyboard Shortcut' && textTyped) {
+    return `Press ${textTyped}`;
+  }
+
   if (step.actionType === 'Scroll') {
     const direction = (step.scrollDelta || 0) > 0 ? 'down' : 'up';
     return `Scroll ${direction}`;
+  }
+
+  // Double/triple click
+  if (step.actionType === 'Double Click' || step.actionType === 'Triple Click') {
+    if (elementName && !NOISE_ROLES.includes(elementName) && elementName !== role) {
+      return `${step.actionType} "${elementName}"`;
+    }
+    const windowClean = cleanWindowTitle(step.windowTitle || '');
+    return `${step.actionType}${windowClean ? ` in ${windowClean.substring(0, 50)}` : ''}`;
+  }
+
+  // Right click
+  if (step.actionType === 'Right Click') {
+    if (elementName && !NOISE_ROLES.includes(elementName)) {
+      return `Right-click "${elementName}"`;
+    }
+    const windowClean = cleanWindowTitle(step.windowTitle || '');
+    return `Right-click${windowClean ? ` in ${windowClean.substring(0, 50)}` : ''}`;
   }
 
   // Element has a meaningful name

@@ -173,7 +173,7 @@ export class RecordingService extends EventEmitter {
     uIOhook.on('mousedown', (event: any) => {
       if (!this.isRecording || this.isPaused) return;
       if (this.captureArea && !this.isPointInCaptureArea(event.x, event.y)) return;
-      this.handleMouseClick(event);
+      this.handleMouseClickRaw(event);
     });
 
     uIOhook.on('keydown', (event: any) => {
@@ -224,19 +224,55 @@ export class RecordingService extends EventEmitter {
   // Click handler — uses native OS APIs for accurate info
   // ------------------------------------------------------------------
 
-  private async handleMouseClick(event: any): Promise<void> {
-    // Prevent concurrent click processing
-    if (this.clickProcessing) return;
+  private pendingClick: { event: any; timeout: NodeJS.Timeout; count: number } | null = null;
 
-    // Debounce: ignore clicks within 150ms at the same position (±5px)
-    // Catches Mission Control, Exposé, and other system gesture artifacts
+  private handleMouseClickRaw(event: any): void {
     const now = Date.now();
     const dx = Math.abs(event.x - this.lastClickPos.x);
     const dy = Math.abs(event.y - this.lastClickPos.y);
-    if (now - this.lastClickTime < 150 && dx < 5 && dy < 5) return;
+    const timeDiff = now - this.lastClickTime;
+    const sameSpot = dx < 5 && dy < 5;
+    const sameButton = event.button === (this.pendingClick?.event.button ?? event.button);
+
     this.lastClickTime = now;
     this.lastClickPos = { x: event.x, y: event.y };
 
+    // Double-click detection: two clicks within 400ms at same spot, same button
+    if (this.pendingClick && sameSpot && sameButton && timeDiff < 400) {
+      clearTimeout(this.pendingClick.timeout);
+      this.pendingClick.count++;
+      // Fire as double/triple click
+      this.pendingClick.timeout = setTimeout(() => {
+        const pending = this.pendingClick!;
+        this.pendingClick = null;
+        this.handleMouseClick(pending.event, pending.count);
+      }, 80); // Small delay to catch triple-click
+      return;
+    }
+
+    // Fire any pending single click
+    if (this.pendingClick) {
+      clearTimeout(this.pendingClick.timeout);
+      const pending = this.pendingClick;
+      this.pendingClick = null;
+      this.handleMouseClick(pending.event, pending.count);
+    }
+
+    // Queue new click — wait briefly for possible double-click
+    this.pendingClick = {
+      event,
+      count: 1,
+      timeout: setTimeout(() => {
+        const pending = this.pendingClick;
+        this.pendingClick = null;
+        if (pending) this.handleMouseClick(pending.event, pending.count);
+      }, 300), // Wait for possible second click
+    };
+  }
+
+  private async handleMouseClick(event: any, clickCount: number = 1): Promise<void> {
+    // Prevent concurrent click processing
+    if (this.clickProcessing) return;
     this.clickProcessing = true;
 
     try {
@@ -262,16 +298,19 @@ export class RecordingService extends EventEmitter {
         return;
       }
 
-      // Skip system UI (Dock, Mission Control, Notification Center, Spotlight)
-      const systemApps = ['Dock', 'WindowManager', 'Spotlight', 'NotificationCenter', 'SystemUIServer', 'Control Center'];
-      if (systemApps.includes(ownerApp)) {
+      // Skip system UI (Dock, Mission Control, Exposé, Notification Center, Spotlight, etc.)
+      const systemApps = [
+        'Dock', 'WindowManager', 'Spotlight', 'NotificationCenter',
+        'SystemUIServer', 'Control Center', 'Mission Control',
+        'loginwindow', 'ScreenSaverEngine', 'AirPlayUIAgent',
+      ];
+      if (systemApps.includes(ownerApp) || !ownerApp || ownerApp === 'Window Server') {
         this.clickProcessing = false;
         return;
       }
 
-      // Skip clicks on the Ondoki app itself
-      if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' || 
-          windowTitle.includes('Ondoki Desktop') || windowTitle === 'Ondoki') {
+      // Skip if no real window found (happens during Mission Control/Exposé animations)
+      if (windowTitle === 'Unknown Window' && !windowBounds.width) {
         this.clickProcessing = false;
         return;
       }
@@ -307,12 +346,13 @@ export class RecordingService extends EventEmitter {
 
       // Button type
       const buttonTypes: Record<number, string> = { 1: 'Left', 2: 'Right', 3: 'Middle' };
-      const buttonType = buttonTypes[event.button] || 'Unknown';
+      const buttonType = buttonTypes[event.button] || 'Left';
+      const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
 
       // Build clean human-readable description
       const cleanRole = elementRole ? elementRole.replace(/^AX/, '') : '';
       const shortWindowTitle = windowTitle.length > 40 ? windowTitle.substring(0, 40) + '…' : windowTitle;
-      let description = `${buttonType} Click`;
+      let description = clickLabel;
       if (elementName && elementName !== cleanRole) {
         description += ` on "${elementName}"`;
       } else if (cleanRole && !['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter'].includes(cleanRole)) {
@@ -323,7 +363,7 @@ export class RecordingService extends EventEmitter {
       const step: RecordedStep = {
         stepNumber: this.stepCount,
         timestamp: new Date(),
-        actionType: `${buttonType} Click`,
+        actionType: clickLabel,
         windowTitle,
         description,
         screenshotPath,
@@ -403,15 +443,57 @@ export class RecordingService extends EventEmitter {
   // ------------------------------------------------------------------
 
   private handleKeyPress(event: any): void {
-    if (this.isFlushKey(event.keycode)) {
+    const keycode = event.keycode;
+
+    // Ignore pure modifier key presses
+    const modifierCodes = [29, 42, 54, 56, 3675, 3676, 58]; // Ctrl, Shift, ShiftR, Alt, MetaL, MetaR, CapsLock
+    if (modifierCodes.includes(keycode)) return;
+
+    if (this.isFlushKey(keycode)) {
       this.flushTypedText();
       return;
     }
 
-    const char = this.keycodeToChar(event.keycode);
+    // Check if modifier is held — treat as shortcut, not typing
+    const hasCtrl = event.ctrlKey || event.metaKey;
+    const hasAlt = event.altKey;
+
+    if (hasCtrl || hasAlt) {
+      // Record as keyboard shortcut step, not typing
+      this.flushTypedText();
+      const char = this.keycodeToChar(keycode);
+      if (!char) return;
+
+      const mods: string[] = [];
+      if (event.ctrlKey) mods.push('Ctrl');
+      if (event.metaKey) mods.push('Cmd');
+      if (event.altKey) mods.push('Alt');
+      if (event.shiftKey) mods.push('Shift');
+      const combo = [...mods, char.toUpperCase()].join('+');
+
+      const windowInfo = this.screenshotService.getCurrentWindow();
+      const step: RecordedStep = {
+        stepNumber: ++this.stepCount,
+        timestamp: new Date(),
+        actionType: 'Keyboard Shortcut',
+        windowTitle: windowInfo?.title || 'Unknown Window',
+        description: `Pressed ${combo}`,
+        textTyped: combo,
+        globalMousePosition: { x: 0, y: 0 },
+        relativeMousePosition: { x: 0, y: 0 },
+        windowSize: { width: windowInfo?.bounds.width || 0, height: windowInfo?.bounds.height || 0 },
+        screenshotRelativeMousePosition: { x: 0, y: 0 },
+        screenshotSize: { width: 0, height: 0 },
+        ownerApp: windowInfo?.ownerName || undefined,
+      };
+      this.emit('step-recorded', step);
+      return;
+    }
+
+    // Regular typing
+    const char = this.keycodeToChar(keycode);
     if (char) {
       this.currentText += char;
-
       if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
       this.textFlushTimeout = setTimeout(() => this.flushTypedText(), 2000);
     }
@@ -474,17 +556,26 @@ export class RecordingService extends EventEmitter {
     return [UiohookKey.Enter, UiohookKey.Tab, UiohookKey.Escape].includes(keycode);
   }
 
-  private keycodeToChar(keycode: number): string {
-    if (!UiohookKey) return '';
+  // Scancode → character map (uiohook uses hardware scancodes, NOT keycodes)
+  private static readonly SCANCODE_MAP: Record<number, string> = {
+    // Number row
+    2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0',
+    12: '-', 13: '=',
+    // QWERTY row
+    16: 'q', 17: 'w', 18: 'e', 19: 'r', 20: 't', 21: 'y', 22: 'u', 23: 'i', 24: 'o', 25: 'p',
+    26: '[', 27: ']',
+    // ASDF row
+    30: 'a', 31: 's', 32: 'd', 33: 'f', 34: 'g', 35: 'h', 36: 'j', 37: 'k', 38: 'l',
+    39: ';', 40: "'", 41: '`', 43: '\\',
+    // ZXCV row
+    44: 'z', 45: 'x', 46: 'c', 47: 'v', 48: 'b', 49: 'n', 50: 'm',
+    51: ',', 52: '.', 53: '/',
+    // Special
+    57: ' ',
+  };
 
-    if (keycode >= UiohookKey.A && keycode <= UiohookKey.Z) {
-      return String.fromCharCode(keycode - UiohookKey.A + 'a'.charCodeAt(0));
-    }
-    if (keycode >= UiohookKey['0'] && keycode <= UiohookKey['9']) {
-      return String.fromCharCode(keycode - UiohookKey['0'] + '0'.charCodeAt(0));
-    }
-    if (keycode === UiohookKey.Space) return ' ';
-    return '';
+  private keycodeToChar(keycode: number): string {
+    return RecordingService.SCANCODE_MAP[keycode] || '';
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {
@@ -597,6 +688,7 @@ export class RecordingService extends EventEmitter {
     this.hideOverlay();
     if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+    if (this.pendingClick) { clearTimeout(this.pendingClick.timeout); this.pendingClick = null; }
     this.screenshotService.dispose();
     this.removeAllListeners();
   }
