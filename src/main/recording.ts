@@ -255,6 +255,20 @@ export class RecordingService extends EventEmitter {
       const windowBounds = fullInfo?.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
       const windowPID = fullInfo?.window?.ownerPID || 0;
 
+      // Skip clicks on the recording app itself
+      if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' ||
+          windowTitle === 'Ondoki Desktop' || windowTitle.startsWith('Ondoki')) {
+        this.clickProcessing = false;
+        return;
+      }
+
+      // Skip system UI (Dock, Mission Control, Notification Center, Spotlight)
+      const systemApps = ['Dock', 'WindowManager', 'Spotlight', 'NotificationCenter', 'SystemUIServer', 'Control Center'];
+      if (systemApps.includes(ownerApp)) {
+        this.clickProcessing = false;
+        return;
+      }
+
       // Skip clicks on the Ondoki app itself
       if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' || 
           windowTitle.includes('Ondoki Desktop') || windowTitle === 'Ondoki') {
