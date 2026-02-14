@@ -18,15 +18,31 @@ export const useAuth = () => {
     error: null,
   });
 
-  // Listen for auth status changes
+  // Fetch initial auth status on mount
   useEffect(() => {
     if (!window.electronAPI) return;
+    
+    // Pull current status (auto-login may have already completed in main process)
+    window.electronAPI.getAuthStatus().then((status: AuthStatus) => {
+      if (status?.isAuthenticated) {
+        setState(prev => ({
+          ...prev,
+          isAuthenticated: true,
+          user: status.user ?? null,
+          projects: status.projects ?? [],
+          isLoading: false,
+        }));
+      }
+    }).catch(() => {});
+    
+    // Also listen for future changes
     const unsub = window.electronAPI.onAuthStatusChanged?.((status: AuthStatus) => {
       setState(prev => ({
         ...prev,
         isAuthenticated: status.isAuthenticated,
         user: status.user ?? null,
         projects: status.projects ?? [],
+        isLoading: false,
       }));
     });
     return () => { unsub?.(); };
