@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AnnotatedStep, RecordedStep } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
 import { X, Copy, Save, RefreshCw, Loader2, AlertTriangle, FileText, Code2 } from 'lucide-react';
+import { getStepTitle } from '../utils/stepDisplay';
 
 interface GuidePreviewProps {
   steps: any[];
@@ -172,7 +173,7 @@ const GuidePreview: React.FC<GuidePreviewProps> = ({ steps, onClose }) => {
                       <div key={step.stepNumber} className="text-[11px] bg-gray-50 p-1.5 rounded">
                         <span className="font-medium text-gray-600">#{step.stepNumber}</span>
                         <span className="text-gray-400 ml-1 truncate block">
-                          {step.isAnnotated && step.generatedTitle ? step.generatedTitle : step.description}
+                          {getStepTitle(step)}
                         </span>
                       </div>
                     ))}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getStepTitle, getStepSubtitle, isAiAnnotated } from '../utils/stepDisplay';
 import { useAuth } from '../hooks/useAuth';
 import { useRecording } from '../hooks/useRecording';
 import { useElectronAPI } from '../hooks/useElectronAPI';
@@ -281,12 +282,8 @@ const MainWindow: React.FC<MainWindowProps> = () => {
                         {step.stepNumber}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 truncate">
-                          {(step as any).isAnnotated && (step as any).generatedTitle
-                            ? (step as any).generatedTitle
-                            : step.description}
-                        </p>
-                        <p className="text-[11px] text-gray-400 truncate">{step.actionType} — {step.windowTitle}</p>
+                        <p className="text-xs text-gray-700 truncate">{getStepTitle(step)}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{getStepSubtitle(step)}</p>
                       </div>
                     </div>
                   ))}

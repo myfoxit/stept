@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AnnotatedStep, RecordedStep, UploadResult } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
 import { X, Upload, CheckCircle2, AlertTriangle, Cloud, FolderOpen, Copy, ExternalLink, Loader2, Sparkles, Image } from 'lucide-react';
+import { getStepTitle, getStepSubtitle, isAiAnnotated } from '../utils/stepDisplay';
 
 interface ExportDialogProps {
   steps: any[];
@@ -52,10 +53,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ steps, projectId, userId, o
     onClose();
   };
 
-  const getStepDisplayTitle = (step: AnnotatedStep) => {
-    if (step.isAnnotated && step.generatedTitle) return step.generatedTitle;
-    return step.description || `Step ${step.stepNumber}`;
-  };
+  const getStepDisplayTitle = (step: any) => getStepTitle(step);
 
   return (
     <div className="dialog-overlay">
@@ -100,10 +98,10 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ steps, projectId, userId, o
                         <span className="text-[10px] text-gray-300">{new Date(step.timestamp).toLocaleTimeString()}</span>
                       </div>
                       <p className="text-[12px] font-medium text-gray-700 truncate">
-                        {step.isAnnotated && step.generatedTitle && <Sparkles className="h-3 w-3 text-indigo-400 inline mr-1" />}
+                        {isAiAnnotated(step) && <Sparkles className="h-3 w-3 text-indigo-400 inline mr-1" />}
                         {getStepDisplayTitle(step)}
                       </p>
-                      <p className="text-[11px] text-gray-400 truncate">{step.actionType} — {step.windowTitle}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{getStepSubtitle(step)}</p>
                     </div>
                   </div>
                 ))}
