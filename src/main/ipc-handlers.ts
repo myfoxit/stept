@@ -37,7 +37,9 @@ export function setupIpcHandlers(
 
         // Auto-annotate if enabled
         const settings = settingsManager.getSettings();
+        console.log('[IPC] Step recorded. autoAnnotate:', settings.autoAnnotateSteps, 'llmConfigured:', settingsManager.isLlmConfigured());
         if (settings.autoAnnotateSteps && settingsManager.isLlmConfigured()) {
+          console.log('[IPC] Enqueuing step', step.stepNumber, 'for annotation');
           smartAnnotationService.enqueueStep(step);
         }
       });

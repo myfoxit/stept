@@ -77,6 +77,8 @@ export class ChatService extends EventEmitter {
   ): Promise<string> {
     const llmConfig = this.settingsManager.getLlmConfig();
     
+    console.log('[Chat] LLM config:', { provider: llmConfig.provider, model: llmConfig.model, baseUrl: llmConfig.baseUrl, isConfigured: llmConfig.isConfigured });
+
     if (!llmConfig.isConfigured) {
       throw new Error('LLM not configured');
     }
