@@ -72,6 +72,8 @@ export class RecordingService extends EventEmitter {
   private textFlushTimeout?: NodeJS.Timeout;
   private hooksStarted = false;
   private clickProcessing = false; // Prevent concurrent click handling
+  private lastClickTime = 0;
+  private lastClickPos = { x: 0, y: 0 };
 
   constructor() {
     super();
@@ -223,8 +225,18 @@ export class RecordingService extends EventEmitter {
   // ------------------------------------------------------------------
 
   private async handleMouseClick(event: any): Promise<void> {
-    // Prevent concurrent click processing (screenshot + native query takes time)
+    // Prevent concurrent click processing
     if (this.clickProcessing) return;
+
+    // Debounce: ignore clicks within 150ms at the same position (±5px)
+    // Catches Mission Control, Exposé, and other system gesture artifacts
+    const now = Date.now();
+    const dx = Math.abs(event.x - this.lastClickPos.x);
+    const dy = Math.abs(event.y - this.lastClickPos.y);
+    if (now - this.lastClickTime < 150 && dx < 5 && dy < 5) return;
+    this.lastClickTime = now;
+    this.lastClickPos = { x: event.x, y: event.y };
+
     this.clickProcessing = true;
 
     try {
@@ -242,6 +254,13 @@ export class RecordingService extends EventEmitter {
       const ownerApp = fullInfo?.window?.ownerName || '';
       const windowBounds = fullInfo?.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
       const windowPID = fullInfo?.window?.ownerPID || 0;
+
+      // Skip clicks on the Ondoki app itself
+      if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' || 
+          windowTitle.includes('Ondoki Desktop') || windowTitle === 'Ondoki') {
+        this.clickProcessing = false;
+        return;
+      }
 
       // Extract element info (accessibility)
       const elementName = this.formatElementName(fullInfo?.element);

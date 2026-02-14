@@ -100,7 +100,7 @@ export class ChatService extends EventEmitter {
             model: llmConfig.model,
             messages: this.formatMessagesForOpenAI(messages, recordingContext),
             temperature: 0.7,
-            max_tokens: 2000,
+            max_completion_tokens: 2000,
           };
           break;
 
@@ -133,7 +133,7 @@ export class ChatService extends EventEmitter {
             model: llmConfig.model,
             messages: this.formatMessagesForOpenAI(messages, recordingContext),
             temperature: 0.7,
-            max_tokens: 2000,
+            max_completion_tokens: 2000,
           };
           break;
 
@@ -352,7 +352,7 @@ export class ChatService extends EventEmitter {
             model: llmConfig.model,
             messages: visionMessages,
             temperature: 0.7,
-            max_tokens: 1000,
+            max_completion_tokens: 1000,
           };
           break;
 
