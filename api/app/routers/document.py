@@ -1,6 +1,7 @@
 # app/api/document.py
 from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional, List
 from app.database import get_session as get_db
 from app.schemas.document import (
@@ -71,21 +72,78 @@ async def api_create_document(
         page_layout=payload.page_layout or "document",
         project_id=payload.project_id,
         folder_id=payload.folder_id,
-        is_private=payload.is_private if payload.is_private is not None else False,
+        is_private=payload.is_private if payload.is_private is not None else True,
         owner_id=current_user.id,  # Always pass current user, CRUD will use it only if is_private
     )
 
 # Get single document
-@router.get("/{doc_id}", response_model=DocumentRead)
-async def api_get_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/{doc_id}")
+async def api_get_document(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "document not found")
-    return doc
+    
+    # Determine effective permission
+    permission = "edit"  # default for project members / owner
+    if doc.owner_id and doc.owner_id != current_user.id:
+        # Check if user has a specific share permission
+        from app.models import ResourceShare
+        share = await db.scalar(
+            select(ResourceShare).where(
+                ResourceShare.resource_type == "document",
+                ResourceShare.resource_id == doc_id,
+                ResourceShare.shared_with_user_id == current_user.id,
+            )
+        )
+        if share:
+            permission = share.permission
+    
+    # Return as dict to include permission
+    result = {
+        "id": doc.id,
+        "name": doc.name,
+        "content": doc.content,
+        "page_layout": doc.page_layout,
+        "project_id": doc.project_id,
+        "folder_id": doc.folder_id,
+        "position": doc.position,
+        "is_private": doc.is_private,
+        "owner_id": doc.owner_id,
+        "created_at": doc.created_at,
+        "updated_at": doc.updated_at,
+        "permission": permission,
+    }
+    return result
 
 # Update document
 @router.put("/{doc_id}", response_model=DocumentRead)
-async def api_update_document(doc_id: str, payload: DocumentUpdate, db: AsyncSession = Depends(get_db)):
+async def api_update_document(
+    doc_id: str,
+    payload: DocumentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    
+    # Check edit permission: owner, or has edit ResourceShare
+    if doc.owner_id and doc.owner_id != current_user.id:
+        from app.models import ResourceShare
+        share = await db.scalar(
+            select(ResourceShare).where(
+                ResourceShare.resource_type == "document",
+                ResourceShare.resource_id == doc_id,
+                ResourceShare.shared_with_user_id == current_user.id,
+            )
+        )
+        if share and share.permission != "edit":
+            raise HTTPException(403, "View-only access — cannot edit")
+    
     return await update_document(
         db,
         doc_id,

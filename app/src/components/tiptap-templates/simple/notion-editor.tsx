@@ -36,10 +36,10 @@ export interface EditorProviderProps {
   placeholder?: string;
 }
 
-export function NotionEditor({ docId }: { docId: string }) {
+export function NotionEditor({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
   const { data: doc, isLoading: docLoading } = useDocument(docId);
   const saveDocument = useSaveDocument(docId);
-  const editor = useSnapEditor({});
+  const editor = useSnapEditor({ readOnly });
   const queryClient = useQueryClient();
 
   const [title, setTitle] = React.useState<string>('');

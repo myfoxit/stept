@@ -240,8 +240,8 @@ async def test_delete_nonexistent_document(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_document(async_client: AsyncClient):
-    resp = await async_client.get("/api/v1/documents/nonexistent")
+async def test_get_nonexistent_document(async_client: AsyncClient, auth_headers: dict):
+    resp = await async_client.get("/api/v1/documents/nonexistent", headers=auth_headers)
     assert resp.status_code == 404
 
 

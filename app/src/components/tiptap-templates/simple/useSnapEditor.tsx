@@ -24,10 +24,11 @@ import DataTableNode from '@/components/Editor/Nodes/DataTableNode/DataTableNode
 import ProcessRecordingNode from '@/components/Editor/Nodes/ProcessRecordingNode/ProcessRecordingNode';
 import { Pages } from '@/components/tiptap-extensions/pagination';
 
-export function useSnapEditor({}) {
+export function useSnapEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   return useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
+    editable: !readOnly,
     editorProps: {
       attributes: {
         class: 'notion-like-editor',

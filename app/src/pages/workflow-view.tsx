@@ -617,6 +617,7 @@ export function WorkflowView() {
           onClose={() => setShareModalOpen(false)}
           workflowId={workflowId}
           workflowName={typedWorkflow.name || 'Workflow'}
+          isPrivate={(typedWorkflow as any)?.is_private}
         />
 
         <GuidePanel

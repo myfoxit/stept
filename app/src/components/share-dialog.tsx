@@ -34,6 +34,7 @@ interface ShareDialogProps {
   resourceType: 'workflow' | 'document';
   resourceId: string;
   resourceName?: string;
+  isPrivate?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   trigger?: React.ReactNode;
@@ -43,6 +44,7 @@ export function ShareDialog({
   resourceType,
   resourceId,
   resourceName,
+  isPrivate,
   open,
   onOpenChange,
   trigger,
@@ -101,13 +103,17 @@ export function ShareDialog({
   // Access summary
   const summary = React.useMemo(() => {
     const parts: string[] = [];
+    if (isPrivate) {
+      parts.push('Only you can see this (private)');
+    } else {
+      parts.push('Visible to your team');
+    }
     if (settings?.is_public) parts.push('Anyone with the link can view');
     if (settings?.shared_with?.length) {
       parts.push(`Shared with ${settings.shared_with.length} ${settings.shared_with.length === 1 ? 'person' : 'people'}`);
     }
-    if (!parts.length) parts.push('Only project members can access');
     return parts.join(' · ');
-  }, [settings]);
+  }, [settings, isPrivate]);
 
   const dialogContent = (
     <DialogContent className="sm:max-w-md">
@@ -124,6 +130,25 @@ export function ShareDialog({
         </div>
       ) : (
         <div className="space-y-6 pt-2">
+          {/* Visibility status */}
+          <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
+            {isPrivate ? (
+              <>
+                <IconLock className="h-4 w-4 text-amber-500" />
+                <span className="text-sm">
+                  <span className="font-medium">Private</span> — only you can see this
+                </span>
+              </>
+            ) : (
+              <>
+                <IconUsers className="h-4 w-4 text-blue-500" />
+                <span className="text-sm">
+                  <span className="font-medium">Team</span> — visible to all project members
+                </span>
+              </>
+            )}
+          </div>
+
           {/* Public link toggle */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

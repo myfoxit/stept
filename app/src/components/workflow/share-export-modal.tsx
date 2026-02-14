@@ -29,6 +29,7 @@ import {
   IconWorld,
   IconLock,
   IconUserPlus,
+  IconUsers,
 } from '@tabler/icons-react';
 import { exportWorkflow, type ExportFormat } from '@/api/workflows';
 import { useShare } from '@/hooks/use-share';
@@ -38,6 +39,7 @@ interface ShareExportModalProps {
   onClose: () => void;
   workflowId: string;
   workflowName: string;
+  isPrivate?: boolean;
 }
 
 export function ShareExportModal({
@@ -45,6 +47,7 @@ export function ShareExportModal({
   onClose,
   workflowId,
   workflowName,
+  isPrivate,
 }: ShareExportModalProps) {
   const [copied, setCopied] = React.useState(false);
   const [exportingFormat, setExportingFormat] = React.useState<ExportFormat | null>(null);
@@ -166,6 +169,25 @@ export function ShareExportModal({
               </div>
             ) : (
               <>
+                {/* Visibility status */}
+                <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
+                  {isPrivate ? (
+                    <>
+                      <IconLock className="h-4 w-4 text-amber-500" />
+                      <span className="text-sm">
+                        <span className="font-medium">Private</span> — only you can see this
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <IconUsers className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm">
+                        <span className="font-medium">Team</span> — visible to all project members
+                      </span>
+                    </>
+                  )}
+                </div>
+
                 {/* Public link toggle */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

@@ -11,6 +11,21 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ondoki_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,8 +49,10 @@ jobs:
         working-directory: api
         run: python -m pytest tests/ -v --tb=short
         env:
+          DATABASE_URL_TEST: postgresql+asyncpg://postgres:postgres@localhost:5432/ondoki_test
           JWT_SECRET: ci-test-secret
           ONDOKI_ENCRYPTION_KEY: ci-test-key-must-be-32-bytes-pad
+          ENVIRONMENT: test
 
   test-frontend:
     name: Frontend Tests

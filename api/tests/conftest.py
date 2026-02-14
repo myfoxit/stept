@@ -121,17 +121,26 @@ async def _setup_db():
         tables_to_create = [t for t in tables_to_create if t.name != "embeddings"]
 
     async with _test_engine.begin() as conn:
-        await conn.run_sync(
-            lambda sync_conn: Base.metadata.drop_all(sync_conn, tables=tables_to_create)
-        )
+        # Drop all tables safely using CASCADE, one by one
+        result = await conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        ))
+        existing = [row[0] for row in result.fetchall()]
+        for tname in existing:
+            await conn.execute(text(f'DROP TABLE IF EXISTS "{tname}" CASCADE'))
+        
         await conn.run_sync(
             lambda sync_conn: Base.metadata.create_all(sync_conn, tables=tables_to_create)
         )
     yield
     async with _test_engine.begin() as conn:
-        await conn.run_sync(
-            lambda sync_conn: Base.metadata.drop_all(sync_conn, tables=tables_to_create)
-        )
+        result = await conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        ))
+        existing = [row[0] for row in result.fetchall()]
+        if existing:
+            table_list = ", ".join(f'"{t}"' for t in existing)
+            await conn.execute(text(f"DROP TABLE IF EXISTS {table_list} CASCADE"))
     await _test_engine.dispose()
 
 

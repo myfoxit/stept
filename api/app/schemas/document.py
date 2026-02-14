@@ -11,7 +11,7 @@ class DocumentBase(BaseModel):
 class DocumentCreate(DocumentBase):
     project_id: str
     folder_id: Optional[str] = None  # Documents must be in folders
-    is_private: Optional[bool] = False  # NEW
+    is_private: Optional[bool] = True  # Default: private (only owner)
 
 class DocumentUpdate(BaseModel):
     name: Optional[str] = None

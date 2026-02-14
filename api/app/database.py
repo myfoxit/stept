@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 env_path = Path(__file__).resolve().parent / "../.env"
-load_dotenv(env_path)
+load_dotenv(env_path, override=False)  # Don't override env vars already set (e.g. by test conftest)
 
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./dev.db")
 

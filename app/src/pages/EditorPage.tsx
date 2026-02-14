@@ -1,19 +1,20 @@
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { NotionEditor } from '@/components/tiptap-templates/simple/notion-editor';
 import { Button } from '@/components/ui/button';
 import { SiteHeader } from '@/components/site-header';
-import { IconDownload, IconShare } from '@tabler/icons-react';
+import { IconDownload, IconShare, IconEye } from '@tabler/icons-react';
 import {
   PageLayoutSelector,
   type PageLayout,
 } from '@/components/page-layout-selector';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDocument, useUpdateDocumentLayout } from '@/hooks/api/documents';
 import { exportDocument, type DocumentExportFormat } from '@/api/documents';
 import { ExportDialog } from '@/components/export-dialog';
 import { ShareDialog } from '@/components/share-dialog';
 import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
+import { Badge } from '@/components/ui/badge';
 
 export default function EditorPage() {
   const { docId } = useParams<{ docId: string }>();
@@ -23,6 +24,11 @@ export default function EditorPage() {
 
   const [pageLayout, setPageLayout] = useState<PageLayout>('full');
   const updateLayout = useUpdateDocumentLayout(docId!);
+
+  const isReadOnly = useMemo(() => {
+    if (!doc) return false;
+    return (doc as any).permission === 'view';
+  }, [doc]);
 
   // Set chat context when viewing a document
   useEffect(() => {
@@ -46,32 +52,44 @@ export default function EditorPage() {
   }, [pageLayout]);
 
   const handleLayoutChange = (value: PageLayout) => {
+    if (isReadOnly) return;
     setPageLayout(value);
     if (docId) updateLayout.mutate(value);
   };
 
   const handleExport = async (format: DocumentExportFormat) => {
     if (!docId) return;
-    // Pass the current page layout to the export function
     await exportDocument(docId, format, { pageLayout });
   };
 
   return (
     <div>
       <SiteHeader name="Editor">
-        <PageLayoutSelector value={pageLayout} onChange={handleLayoutChange} />
+        {isReadOnly && (
+          <Badge variant="secondary" className="gap-1 text-xs">
+            <IconEye className="h-3 w-3" />
+            View only
+          </Badge>
+        )}
 
-        <ShareDialog
-          resourceType="document"
-          resourceId={docId!}
-          resourceName={doc?.name || 'Document'}
-          trigger={
-            <Button variant="outline" size="sm">
-              <IconShare className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-          }
-        />
+        {!isReadOnly && (
+          <PageLayoutSelector value={pageLayout} onChange={handleLayoutChange} />
+        )}
+
+        {!isReadOnly && (
+          <ShareDialog
+            resourceType="document"
+            resourceId={docId!}
+            resourceName={doc?.name || 'Document'}
+            isPrivate={doc?.is_private}
+            trigger={
+              <Button variant="outline" size="sm">
+                <IconShare className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+            }
+          />
+        )}
         
         <ExportDialog
           onExport={handleExport}
@@ -85,7 +103,7 @@ export default function EditorPage() {
           }
         />
       </SiteHeader>
-      <NotionEditor docId={docId as string} />
+      <NotionEditor docId={docId as string} readOnly={isReadOnly} />
     </div>
   );
 }
