@@ -91,6 +91,7 @@ export class ChatService extends EventEmitter {
       // Prepare request based on provider
       switch (llmConfig.provider.toLowerCase()) {
         case 'openai':
+        case 'azure':
           apiUrl = `${llmConfig.baseUrl || 'https://api.openai.com/v1'}/chat/completions`;
           headers['Authorization'] = `Bearer ${llmConfig.apiKey}`;
           requestBody = {
@@ -98,6 +99,17 @@ export class ChatService extends EventEmitter {
             messages: this.formatMessagesForOpenAI(messages, recordingContext),
             temperature: 0.7,
             max_tokens: 2000,
+          };
+          break;
+
+        case 'anthropic':
+          apiUrl = `${llmConfig.baseUrl || 'https://api.anthropic.com'}/v1/messages`;
+          headers['x-api-key'] = llmConfig.apiKey;
+          headers['anthropic-version'] = '2023-06-01';
+          requestBody = {
+            model: llmConfig.model,
+            max_tokens: 2000,
+            messages: this.formatMessagesForAnthropic(messages, recordingContext),
           };
           break;
 
@@ -143,9 +155,13 @@ export class ChatService extends EventEmitter {
       // Extract response based on provider
       switch (llmConfig.provider.toLowerCase()) {
         case 'openai':
+        case 'azure':
         case 'custom':
           return data.choices?.[0]?.message?.content || 'No response';
-          
+
+        case 'anthropic':
+          return data.content?.[0]?.text || 'No response';
+
         case 'ollama':
           return data.message?.content || 'No response';
           
@@ -222,6 +238,29 @@ export class ChatService extends EventEmitter {
     return formatted;
   }
 
+  private formatMessagesForAnthropic(messages: ChatMessage[], context?: string): Array<{ role: string; content: string }> {
+    // Anthropic doesn't use system role in messages array — it's a top-level param
+    // But for simplicity we filter it out and prepend context to the first user message
+    const filtered = messages.filter(m => m.role !== 'system');
+    const formatted = filtered.map(m => ({ role: m.role, content: m.content }));
+
+    if (context && formatted.length > 0) {
+      const contextPrefix = `Context from screen recording:\n${context}\n\n`;
+      if (formatted[0].role === 'user') {
+        formatted[0] = { ...formatted[0], content: contextPrefix + formatted[0].content };
+      } else {
+        formatted.unshift({ role: 'user', content: contextPrefix + 'Please help me with this recording.' });
+      }
+    }
+
+    // Anthropic requires alternating user/assistant messages starting with user
+    if (formatted.length === 0 || formatted[0].role !== 'user') {
+      formatted.unshift({ role: 'user', content: 'Hello' });
+    }
+
+    return formatted;
+  }
+
   private formatMessagesForOllama(messages: ChatMessage[], context?: string): ChatMessage[] {
     return this.formatMessagesForOpenAI(messages, context);
   }
@@ -246,6 +285,8 @@ export class ChatService extends EventEmitter {
       'claude-3-opus',
       'claude-3-sonnet',
       'claude-3-haiku',
+      'claude-sonnet-4',
+      'claude-opus-4',
     ];
 
     const modelSupportsVision = visionModels.some(model => 
@@ -313,6 +354,23 @@ export class ChatService extends EventEmitter {
           };
           break;
 
+        case 'anthropic':
+          apiUrl = `${llmConfig.baseUrl || 'https://api.anthropic.com'}/v1/messages`;
+          headers['x-api-key'] = llmConfig.apiKey;
+          headers['anthropic-version'] = '2023-06-01';
+          requestBody = {
+            model: llmConfig.model,
+            max_tokens: 1000,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageBase64 } },
+                { type: 'text', text: prompt },
+              ],
+            }],
+          };
+          break;
+
         default:
           throw new Error(`Vision not supported for provider: ${llmConfig.provider}`);
       }
@@ -329,6 +387,11 @@ export class ChatService extends EventEmitter {
       }
 
       const data = await response.json();
+      
+      // Extract based on provider
+      if (llmConfig.provider.toLowerCase() === 'anthropic') {
+        return data.content?.[0]?.text || 'No response';
+      }
       return data.choices?.[0]?.message?.content || 'No response';
       
     } catch (error) {

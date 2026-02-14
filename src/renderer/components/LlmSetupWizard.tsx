@@ -24,9 +24,9 @@ const LlmSetupWizard: React.FC<LlmSetupWizardProps> = ({ onClose, onComplete }) 
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const providers = [
-    { id: 'openai', name: 'OpenAI', description: 'GPT-4, GPT-3.5 Turbo', icon: Bot, defaultModel: 'gpt-4', requiresBaseUrl: false },
-    { id: 'anthropic', name: 'Anthropic', description: 'Claude 3 models', icon: Brain, defaultModel: 'claude-3-sonnet-20240229', requiresBaseUrl: false },
-    { id: 'azure', name: 'Azure OpenAI', description: 'Azure-hosted models', icon: Cloud, defaultModel: 'gpt-4', requiresBaseUrl: true },
+    { id: 'openai', name: 'OpenAI', description: 'GPT-4, GPT-3.5 Turbo', icon: Bot, defaultModel: 'gpt-4o-mini', requiresBaseUrl: false },
+    { id: 'anthropic', name: 'Anthropic', description: 'Claude 3 models', icon: Brain, defaultModel: 'claude-sonnet-4-20250514', requiresBaseUrl: false },
+    { id: 'azure', name: 'Azure OpenAI', description: 'Azure-hosted models', icon: Cloud, defaultModel: 'gpt-4o-mini', requiresBaseUrl: true },
     { id: 'custom', name: 'Custom', description: 'OpenAI-compatible API', icon: Wrench, defaultModel: '', requiresBaseUrl: true },
   ];
 

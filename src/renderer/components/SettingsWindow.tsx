@@ -171,7 +171,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
                     <div>
                       <label className="text-xs font-medium text-gray-500 mb-1 block">Model</label>
                       <input type="text" value={settings.llmModel} onChange={(e) => handleInputChange('llmModel', e.target.value)}
-                        className="input-field" placeholder={settings.llmProvider === 'openai' ? 'gpt-4' : settings.llmProvider === 'anthropic' ? 'claude-3-sonnet-20240229' : 'Model'} />
+                        className="input-field" placeholder={settings.llmProvider === 'openai' ? 'gpt-4o-mini' : settings.llmProvider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'Model'} />
                     </div>
                     {(settings.llmProvider === 'custom' || settings.llmProvider === 'azure') && (
                       <div>
