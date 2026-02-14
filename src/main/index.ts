@@ -4,8 +4,10 @@ import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
 import { AuthService } from './auth';
 
-declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
-declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+// Resolve paths for renderer and preload
+const isDev = process.argv.includes('--development');
+const RENDERER_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
+const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
 class OndokiApp {
   private mainWindow: BrowserWindow | null = null;
@@ -131,12 +133,12 @@ class OndokiApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+        preload: PRELOAD_PATH,
       },
     });
 
     // Load the renderer
-    this.mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+    this.mainWindow.loadFile(RENDERER_PATH);
 
     // Show window when ready
     this.mainWindow.once('ready-to-show', () => {

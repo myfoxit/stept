@@ -21,7 +21,7 @@
     "dev": "npm run build:main && npm run dev:renderer",
     "dev:renderer": "webpack serve --mode development",
     "start": "npm run build && electron .",
-    "dev:electron": "npm run build:main && electron . --development",
+    "dev:electron": "npm run build && electron . --development",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint src/",
