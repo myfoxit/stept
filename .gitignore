@@ -181,3 +181,6 @@ refresh.dat
 # TypeScript build output
 lib/
 types/
+# Native compiled binaries
+native/macos/window-info
+native/windows/*.exe

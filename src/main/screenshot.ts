@@ -1,4 +1,6 @@
 import { screen, desktopCapturer } from 'electron';
+let app: any;
+try { app = require('electron').app; } catch {}
 let screenshotDesktop: any;
 let sharp: any;
 try {
@@ -9,6 +11,8 @@ try {
 }
 import * as path from 'path';
 import * as fs from 'fs';
+import { execFile, execFileSync } from 'child_process';
+import * as os from 'os';
 
 export interface Display {
   id: string;
@@ -29,36 +33,183 @@ export interface Rectangle {
 export interface WindowInfo {
   handle: number;
   title: string;
+  ownerName: string;
   bounds: Rectangle;
   isVisible: boolean;
   processId: number;
 }
 
+export interface ElementInfo {
+  role: string;
+  title: string;
+  value: string;
+  description: string;
+  subrole: string;
+}
+
+export interface PointQueryResult {
+  mousePosition: { x: number; y: number };
+  mousePositionFlipped: { x: number; y: number };
+  scaleFactor: number;
+  display: { scaleFactor: number; isPrimary: boolean; bounds?: Rectangle };
+  window: {
+    handle: number;
+    title: string;
+    ownerName: string;
+    ownerPID: number;
+    bounds: { x: number; y: number; width: number; height: number };
+    isVisible: boolean;
+  } | null;
+  element: ElementInfo | null;
+}
+
 export class ScreenshotService {
-  private tempDir?: string;
+  private nativeBinaryPath: string | null = null;
+  private nativeAvailable = false;
 
   constructor() {
-    // We'll use the system temp directory for screenshots
+    this.initNativeBinary();
   }
+
+  // ------------------------------------------------------------------
+  // Native binary discovery
+  // ------------------------------------------------------------------
+
+  private initNativeBinary(): void {
+    const platform = process.platform;
+
+    if (platform === 'darwin') {
+      // Look for compiled Swift binary in multiple locations
+      const candidates = [
+        // In app bundle (packaged)
+        path.join(app?.isPackaged ? path.dirname(app.getPath('exe')) : '', '..', 'Resources', 'native', 'macos', 'window-info'),
+        // Development: relative to project root
+        path.join(__dirname, '..', '..', 'native', 'macos', 'window-info'),
+        // Development: from src/main/
+        path.join(__dirname, '..', 'native', 'macos', 'window-info'),
+      ];
+
+      for (const candidate of candidates) {
+        try {
+          if (fs.existsSync(candidate)) {
+            fs.accessSync(candidate, fs.constants.X_OK);
+            this.nativeBinaryPath = candidate;
+            this.nativeAvailable = true;
+            console.log('Native window-info binary found at:', candidate);
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Try to compile on-the-fly in development
+      if (!app?.isPackaged) {
+        const srcPath = path.join(__dirname, '..', '..', 'native', 'macos', 'window-info.swift');
+        const outPath = path.join(__dirname, '..', '..', 'native', 'macos', 'window-info');
+        if (fs.existsSync(srcPath)) {
+          try {
+            console.log('Compiling native window-info binary...');
+            execFileSync('swiftc', ['-O', '-o', outPath, srcPath, '-framework', 'AppKit', '-framework', 'CoreGraphics', '-framework', 'ApplicationServices']);
+            this.nativeBinaryPath = outPath;
+            this.nativeAvailable = true;
+            console.log('Native binary compiled successfully');
+          } catch (e) {
+            console.warn('Failed to compile native binary:', (e as Error).message);
+          }
+        }
+      }
+
+      if (!this.nativeAvailable) {
+        console.warn('Native window-info binary not found. Window detection will be limited.');
+      }
+    } else if (platform === 'win32') {
+      // PowerShell script path
+      const candidates = [
+        path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.ps1'),
+        path.join(__dirname, '..', 'native', 'windows', 'window-info.ps1'),
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          this.nativeBinaryPath = candidate;
+          this.nativeAvailable = true;
+          console.log('Native window-info script found at:', candidate);
+          return;
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Native command execution
+  // ------------------------------------------------------------------
+
+  private async execNative(args: string[]): Promise<any> {
+    if (!this.nativeAvailable || !this.nativeBinaryPath) {
+      return null;
+    }
+
+    return new Promise((resolve, reject) => {
+      let cmd: string;
+      let cmdArgs: string[];
+
+      if (process.platform === 'win32') {
+        cmd = 'powershell';
+        cmdArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', this.nativeBinaryPath!, ...args];
+      } else {
+        cmd = this.nativeBinaryPath!;
+        cmdArgs = args;
+      }
+
+      execFile(cmd, cmdArgs, { timeout: 3000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Native exec error:', error.message);
+          resolve(null);
+          return;
+        }
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (e) {
+          console.error('Native JSON parse error:', stdout.substring(0, 200));
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  private execNativeSync(args: string[]): any {
+    if (!this.nativeAvailable || !this.nativeBinaryPath) {
+      return null;
+    }
+
+    try {
+      let result: string;
+      if (process.platform === 'win32') {
+        result = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', this.nativeBinaryPath!, ...args], {
+          timeout: 3000,
+          encoding: 'utf-8',
+        });
+      } else {
+        result = execFileSync(this.nativeBinaryPath!, args, { timeout: 3000, encoding: 'utf-8' });
+      }
+      return JSON.parse(result);
+    } catch (e) {
+      console.error('Native sync exec error:', (e as Error).message);
+      return null;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Display info
+  // ------------------------------------------------------------------
 
   public async getDisplays(): Promise<Display[]> {
     const displays = screen.getAllDisplays();
-    
     return displays.map(display => ({
       id: display.id.toString(),
       name: display.label || `Display ${display.id}`,
-      bounds: {
-        x: display.bounds.x,
-        y: display.bounds.y,
-        width: display.bounds.width,
-        height: display.bounds.height,
-      },
-      workArea: {
-        x: display.workArea.x,
-        y: display.workArea.y,
-        width: display.workArea.width,
-        height: display.workArea.height,
-      },
+      bounds: { ...display.bounds },
+      workArea: { ...display.workArea },
       isPrimary: display.id === screen.getPrimaryDisplay().id,
       scaleFactor: display.scaleFactor,
     }));
@@ -66,206 +217,276 @@ export class ScreenshotService {
 
   public getDisplaysSync(): Display[] {
     const displays = screen.getAllDisplays();
-    
     return displays.map(display => ({
       id: display.id.toString(),
       name: display.label || `Display ${display.id}`,
-      bounds: {
-        x: display.bounds.x,
-        y: display.bounds.y,
-        width: display.bounds.width,
-        height: display.bounds.height,
-      },
-      workArea: {
-        x: display.workArea.x,
-        y: display.workArea.y,
-        width: display.workArea.width,
-        height: display.workArea.height,
-      },
+      bounds: { ...display.bounds },
+      workArea: { ...display.workArea },
       isPrimary: display.id === screen.getPrimaryDisplay().id,
       scaleFactor: display.scaleFactor,
     }));
   }
 
-  public async getWindows(): Promise<WindowInfo[]> {
-    try {
-      // Use desktopCapturer to get window list
-      const sources = await desktopCapturer.getSources({
-        types: ['window'],
-        fetchWindowIcons: false,
-      });
+  /**
+   * Get the scale factor for a given screen point.
+   * On Retina/HiDPI, screenshot pixels = logical pixels * scaleFactor.
+   */
+  public getScaleFactorAtPoint(x: number, y: number): number {
+    const display = screen.getDisplayNearestPoint({ x, y });
+    return display?.scaleFactor ?? 1;
+  }
 
+  // ------------------------------------------------------------------
+  // Window enumeration (native)
+  // ------------------------------------------------------------------
+
+  public async getWindows(): Promise<WindowInfo[]> {
+    // Try native first
+    const nativeResult = await this.execNative(['windows']);
+    if (nativeResult?.windows) {
+      return nativeResult.windows.map((w: any) => ({
+        handle: w.handle,
+        title: w.title,
+        ownerName: w.ownerName,
+        bounds: {
+          x: w.bounds.x,
+          y: w.bounds.y,
+          width: w.bounds.width,
+          height: w.bounds.height,
+        },
+        isVisible: w.isVisible,
+        processId: w.ownerPID,
+      }));
+    }
+
+    // Fallback to desktopCapturer
+    return this.getWindowsFallback();
+  }
+
+  private async getWindowsFallback(): Promise<WindowInfo[]> {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false });
       return sources
         .filter(source => source.name !== '' && !source.name.includes('Electron'))
-        .map(source => {
-          // Parse the display_id which contains window handle info
-          const handle = this.extractWindowHandle(source.display_id);
-          
-          return {
-            handle,
-            title: source.name,
-            bounds: { x: 0, y: 0, width: 0, height: 0 }, // We'll need to get actual bounds
-            isVisible: true,
-            processId: 0, // Would need native code to get this
-          };
-        });
+        .map(source => ({
+          handle: this.extractWindowHandle(source.display_id),
+          title: source.name,
+          ownerName: '',
+          bounds: { x: 0, y: 0, width: 0, height: 0 },
+          isVisible: true,
+          processId: 0,
+        }));
     } catch (error) {
       console.error('Failed to get windows:', error);
       return [];
     }
   }
 
+  // ------------------------------------------------------------------
+  // Window at point (native) — THE CRITICAL FUNCTION
+  // ------------------------------------------------------------------
+
+  /**
+   * Get the window and UI element at a specific screen point.
+   * Uses native OS APIs for accurate results across DPI/multi-monitor.
+   * Coordinates must be in LOGICAL screen coordinates (top-left origin).
+   */
   public async getWindowAtPoint(point: { x: number; y: number }): Promise<WindowInfo> {
-    try {
-      // This is a simplified implementation
-      // In a real implementation, you'd use native APIs to get the window at a point
-      const windows = await this.getWindows();
-      
-      // For now, return a default window info
-      // In production, you'd need platform-specific code to get the actual window
+    const nativeResult: PointQueryResult | null = await this.execNative(['point', point.x.toString(), point.y.toString()]);
+
+    if (nativeResult?.window) {
+      const w = nativeResult.window;
       return {
-        handle: 0,
-        title: 'Unknown Window',
-        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-        isVisible: true,
-        processId: 0,
-      };
-    } catch (error) {
-      console.error('Failed to get window at point:', error);
-      return {
-        handle: 0,
-        title: 'Unknown Window',
-        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-        isVisible: true,
-        processId: 0,
+        handle: w.handle,
+        title: w.title,
+        ownerName: w.ownerName,
+        bounds: {
+          x: w.bounds.x,
+          y: w.bounds.y,
+          width: w.bounds.width,
+          height: w.bounds.height,
+        },
+        isVisible: w.isVisible,
+        processId: w.ownerPID,
       };
     }
+
+    // Fallback
+    return {
+      handle: 0,
+      title: 'Unknown Window',
+      ownerName: '',
+      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      isVisible: true,
+      processId: 0,
+    };
+  }
+
+  /**
+   * Get full point query result including element info and scale factor.
+   */
+  public async getFullInfoAtPoint(point: { x: number; y: number }): Promise<PointQueryResult | null> {
+    return this.execNative(['point', point.x.toString(), point.y.toString()]);
   }
 
   public async getWindowByHandle(handle: number): Promise<WindowInfo | null> {
-    try {
-      // This would need platform-specific implementation
-      // For now, return null to indicate the window couldn't be found
-      return null;
-    } catch (error) {
-      console.error('Failed to get window by handle:', error);
-      return null;
-    }
+    // Get all windows and find by handle
+    const windows = await this.getWindows();
+    return windows.find(w => w.handle === handle) || null;
   }
 
   public getCurrentWindow(): WindowInfo | null {
-    try {
-      // This would need platform-specific implementation
-      // For now, return a default current window
+    // Use native mouse position to get current window
+    const nativeResult = this.execNativeSync(['mouse']);
+    if (nativeResult?.window) {
+      const w = nativeResult.window;
       return {
-        handle: 0,
-        title: 'Current Window',
-        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-        isVisible: true,
-        processId: process.pid,
+        handle: w.handle,
+        title: w.title,
+        ownerName: w.ownerName,
+        bounds: { x: w.bounds.x, y: w.bounds.y, width: w.bounds.width, height: w.bounds.height },
+        isVisible: w.isVisible,
+        processId: w.ownerPID,
       };
-    } catch (error) {
-      console.error('Failed to get current window:', error);
-      return null;
     }
+    return null;
   }
+
+  // ------------------------------------------------------------------
+  // Screenshots with proper DPI handling
+  // ------------------------------------------------------------------
 
   public async takeScreenshot(bounds?: Rectangle): Promise<string> {
     try {
       let screenshot: Buffer;
 
       if (bounds) {
-        // Take screenshot of specific region
         const fullScreenshot = await screenshotDesktop({ format: 'png' });
-        
-        // Crop to the specified bounds using sharp
-        screenshot = await sharp(fullScreenshot)
-          .extract({
-            left: Math.max(0, bounds.x),
-            top: Math.max(0, bounds.y),
-            width: bounds.width,
-            height: bounds.height,
-          })
-          .png()
-          .toBuffer();
+
+        // Get scale factor for the capture region
+        const scale = this.getScaleFactorAtPoint(bounds.x, bounds.y);
+
+        // screenshot-desktop returns physical pixels, bounds are logical
+        const physicalBounds = {
+          left: Math.max(0, Math.round(bounds.x * scale)),
+          top: Math.max(0, Math.round(bounds.y * scale)),
+          width: Math.round(bounds.width * scale),
+          height: Math.round(bounds.height * scale),
+        };
+
+        // Clamp to image dimensions
+        const metadata = await sharp(fullScreenshot).metadata();
+        physicalBounds.width = Math.min(physicalBounds.width, (metadata.width || 3840) - physicalBounds.left);
+        physicalBounds.height = Math.min(physicalBounds.height, (metadata.height || 2160) - physicalBounds.top);
+
+        if (physicalBounds.width > 0 && physicalBounds.height > 0) {
+          screenshot = await sharp(fullScreenshot)
+            .extract(physicalBounds)
+            .png()
+            .toBuffer();
+        } else {
+          screenshot = fullScreenshot;
+        }
       } else {
-        // Take full screenshot
         screenshot = await screenshotDesktop({ format: 'png' });
       }
 
-      // Save to temp file
       const timestamp = Date.now();
       const filename = `screenshot_${timestamp}.png`;
-      const tempPath = path.join(require('os').tmpdir(), 'Ondoki', filename);
-      
+      const tempPath = path.join(os.tmpdir(), 'Ondoki', filename);
       await fs.promises.mkdir(path.dirname(tempPath), { recursive: true });
       await fs.promises.writeFile(tempPath, screenshot);
-      
       return tempPath;
     } catch (error) {
       throw new Error(`Failed to take screenshot: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  /**
+   * Take a screenshot of a region and annotate with a click circle.
+   * 
+   * @param bounds       - Logical screen coordinates of the capture region
+   * @param clickPoint   - Click position RELATIVE to bounds (logical coords)
+   * @param outputDir    - Directory to save the screenshot
+   * @param stepNumber   - Step number for filename
+   * @param scaleFactor  - Optional override; auto-detected if omitted
+   */
   public async takeAnnotatedScreenshot(
     bounds: Rectangle,
     clickPoint: { x: number; y: number },
     outputDir: string,
-    stepNumber: number
+    stepNumber: number,
+    scaleFactor?: number
   ): Promise<string> {
     try {
-      // Take screenshot of the specified region
-      const screenshot = await screenshotDesktop({ format: 'png' });
-      
-      // Crop to bounds and annotate with click point
-      // clickPoint is already relative to the bounds, so we use it directly
-      const circleRadius = 15;
-      const annotatedBuffer = await sharp(screenshot)
-        .extract({
-          left: Math.max(0, bounds.x),
-          top: Math.max(0, bounds.y),
-          width: bounds.width,
-          height: bounds.height,
-        })
+      const fullScreenshot = await screenshotDesktop({ format: 'png' });
+      const scale = scaleFactor ?? this.getScaleFactorAtPoint(bounds.x, bounds.y);
+
+      // Convert logical bounds to physical pixel coordinates
+      const pLeft = Math.max(0, Math.round(bounds.x * scale));
+      const pTop = Math.max(0, Math.round(bounds.y * scale));
+      let pWidth = Math.round(bounds.width * scale);
+      let pHeight = Math.round(bounds.height * scale);
+
+      // Clamp to image size
+      const metadata = await sharp(fullScreenshot).metadata();
+      const imgW = metadata.width || 3840;
+      const imgH = metadata.height || 2160;
+      pWidth = Math.min(pWidth, imgW - pLeft);
+      pHeight = Math.min(pHeight, imgH - pTop);
+
+      if (pWidth <= 0 || pHeight <= 0) {
+        throw new Error(`Invalid crop region: ${pWidth}x${pHeight} at ${pLeft},${pTop} (img ${imgW}x${imgH}, scale ${scale})`);
+      }
+
+      // Click point is in logical coords relative to bounds → convert to physical
+      const pClickX = Math.round(clickPoint.x * scale);
+      const pClickY = Math.round(clickPoint.y * scale);
+
+      // Circle size scales with DPI
+      const circleRadius = Math.round(15 * scale);
+      const circleSize = circleRadius * 2;
+      const strokeWidth = Math.round(3 * scale);
+
+      const circleSvg = Buffer.from(`
+        <svg width="${circleSize}" height="${circleSize}" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="${circleRadius}" cy="${circleRadius}" r="${circleRadius - strokeWidth}" 
+                  stroke="#ef4444" stroke-width="${strokeWidth}" fill="rgba(239,68,68,0.15)"/>
+          <circle cx="${circleRadius}" cy="${circleRadius}" r="${Math.round(3 * scale)}" 
+                  fill="#ef4444" opacity="0.8"/>
+        </svg>
+      `);
+
+      const overlayLeft = Math.max(0, Math.min(pClickX - circleRadius, pWidth - circleSize));
+      const overlayTop = Math.max(0, Math.min(pClickY - circleRadius, pHeight - circleSize));
+
+      const annotatedBuffer = await sharp(fullScreenshot)
+        .extract({ left: pLeft, top: pTop, width: pWidth, height: pHeight })
         .composite([
           {
-            input: await this.createClickCircle(),
-            left: Math.max(0, Math.min(clickPoint.x - circleRadius, bounds.width - (circleRadius * 2))),
-            top: Math.max(0, Math.min(clickPoint.y - circleRadius, bounds.height - (circleRadius * 2))),
-            blend: 'over',
+            input: circleSvg,
+            left: overlayLeft,
+            top: overlayTop,
+            blend: 'over' as any,
           },
         ])
         .png()
         .toBuffer();
 
-      // Save annotated screenshot
       const filename = `step_${stepNumber.toString().padStart(3, '0')}.png`;
       const outputPath = path.join(outputDir, filename);
-      
       await fs.promises.writeFile(outputPath, annotatedBuffer);
       return outputPath;
-      
     } catch (error) {
       throw new Error(`Failed to take annotated screenshot: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  private async createClickCircle(): Promise<Buffer> {
-    // Create a red circle overlay for click annotation
-    const size = 30;
-    const svg = `
-      <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" 
-                stroke="#ef4444" stroke-width="3" fill="none" opacity="0.8"/>
-      </svg>
-    `;
-    
-    return Buffer.from(svg);
-  }
+  // ------------------------------------------------------------------
+  // Utilities
+  // ------------------------------------------------------------------
 
   private extractWindowHandle(displayId: string): number {
-    // Parse window handle from display_id
-    // This is a simplified implementation - the actual format depends on the platform
     try {
       const match = displayId.match(/(\d+)/);
       return match ? parseInt(match[1], 10) : 0;
@@ -274,65 +495,19 @@ export class ScreenshotService {
     }
   }
 
-  // Utility method to get virtual screen bounds (all displays)
   public getVirtualScreenBounds(): Rectangle {
     const displays = screen.getAllDisplays();
-    
-    let minX = Number.MAX_SAFE_INTEGER;
-    let minY = Number.MAX_SAFE_INTEGER;
-    let maxX = Number.MIN_SAFE_INTEGER;
-    let maxY = Number.MIN_SAFE_INTEGER;
-    
-    for (const display of displays) {
-      minX = Math.min(minX, display.bounds.x);
-      minY = Math.min(minY, display.bounds.y);
-      maxX = Math.max(maxX, display.bounds.x + display.bounds.width);
-      maxY = Math.max(maxY, display.bounds.y + display.bounds.height);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const d of displays) {
+      minX = Math.min(minX, d.bounds.x);
+      minY = Math.min(minY, d.bounds.y);
+      maxX = Math.max(maxX, d.bounds.x + d.bounds.width);
+      maxY = Math.max(maxY, d.bounds.y + d.bounds.height);
     }
-    
-    return {
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
-  // Platform-specific window management methods would go here
-  // These would need to be implemented using native modules for each platform
-  
-  // For Windows, you'd use win32 APIs like FindWindowEx, GetWindowRect, etc.
-  // For macOS, you'd use Cocoa/Accessibility APIs
-  // For Linux, you'd use X11 or Wayland APIs
-  
-  // Example placeholder methods:
-  
-  private async getWindowsOnWindows(): Promise<WindowInfo[]> {
-    // Would use native Windows APIs
-    return [];
-  }
-  
-  private async getWindowsOnMac(): Promise<WindowInfo[]> {
-    // Would use native macOS APIs
-    return [];
-  }
-  
-  private async getWindowsOnLinux(): Promise<WindowInfo[]> {
-    // Would use native Linux APIs
-    return [];
-  }
-
-  // Cross-platform window detection
-  public async getWindowsForPlatform(): Promise<WindowInfo[]> {
-    switch (process.platform) {
-      case 'win32':
-        return this.getWindowsOnWindows();
-      case 'darwin':
-        return this.getWindowsOnMac();
-      case 'linux':
-        return this.getWindowsOnLinux();
-      default:
-        return this.getWindows(); // Fallback to desktopCapturer method
-    }
+  public isNativeAvailable(): boolean {
+    return this.nativeAvailable;
   }
 }

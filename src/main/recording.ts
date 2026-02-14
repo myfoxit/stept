@@ -9,7 +9,7 @@ try {
 } catch (e) {
   console.warn('uiohook-napi not available:', (e as Error).message);
 }
-import { ScreenshotService } from './screenshot';
+import { ScreenshotService, PointQueryResult } from './screenshot';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -45,6 +45,9 @@ export interface RecordedStep {
   textTyped?: string;
   scrollDelta?: number;
   elementName?: string;
+  elementRole?: string;
+  elementDescription?: string;
+  ownerApp?: string;
 }
 
 export interface RecordingState {
@@ -67,15 +70,12 @@ export class RecordingService extends EventEmitter {
   private overlayWindow?: BrowserWindow;
   private currentText = '';
   private textFlushTimeout?: NodeJS.Timeout;
-  
-  // Track global hooks state
   private hooksStarted = false;
+  private clickProcessing = false; // Prevent concurrent click handling
 
   constructor() {
     super();
     this.screenshotService = new ScreenshotService();
-    
-    // Set up global input hooks
     this.setupGlobalHooks();
   }
 
@@ -93,22 +93,19 @@ export class RecordingService extends EventEmitter {
       this.isRecording = true;
       this.isPaused = false;
 
-      // Create screenshot folder
       const sessionId = Date.now().toString();
       this.screenshotFolder = path.join(os.tmpdir(), 'Ondoki', sessionId);
       await fs.promises.mkdir(this.screenshotFolder, { recursive: true });
 
-      // Show overlay for area highlighting (except for all-displays mode)
       if (captureArea && captureArea.type !== 'all-displays') {
         await this.showOverlay();
       }
 
-      // Start global input hooks
       this.startGlobalHooks();
-
       this.emitStateChanged();
-      console.log('Recording started:', { captureArea, projectId });
-      
+
+      const nativeStatus = this.screenshotService.isNativeAvailable() ? 'native APIs active' : 'fallback mode';
+      console.log(`Recording started (${nativeStatus}):`, { captureArea, projectId });
     } catch (error) {
       this.isRecording = false;
       throw new Error(`Failed to start recording: ${error instanceof Error ? error.message : String(error)}`);
@@ -116,53 +113,36 @@ export class RecordingService extends EventEmitter {
   }
 
   public async stopRecording(): Promise<void> {
-    if (!this.isRecording) {
-      return;
-    }
+    if (!this.isRecording) return;
 
     try {
-      // Flush any pending text
       this.flushTypedText();
-
-      // Stop global input hooks
       this.stopGlobalHooks();
-
-      // Hide overlay
       await this.hideOverlay();
 
-      // Reset state
       this.isRecording = false;
       this.isPaused = false;
       this.captureArea = undefined;
       this.currentProjectId = undefined;
       this.startTime = undefined;
-      
+
       this.emitStateChanged();
       console.log('Recording stopped');
-      
     } catch (error) {
       throw new Error(`Failed to stop recording: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   public pauseRecording(): void {
-    if (!this.isRecording || this.isPaused) {
-      return;
-    }
-
-    // Flush any pending text before pausing
+    if (!this.isRecording || this.isPaused) return;
     this.flushTypedText();
-    
     this.isPaused = true;
     this.emitStateChanged();
     console.log('Recording paused');
   }
 
   public resumeRecording(): void {
-    if (!this.isRecording || !this.isPaused) {
-      return;
-    }
-
+    if (!this.isRecording || !this.isPaused) return;
     this.isPaused = false;
     this.emitStateChanged();
     console.log('Recording resumed');
@@ -178,44 +158,45 @@ export class RecordingService extends EventEmitter {
     };
   }
 
+  // ------------------------------------------------------------------
+  // Global input hooks
+  // ------------------------------------------------------------------
+
   private setupGlobalHooks(): void {
-    // Mouse event handler
+    if (!uIOhook) {
+      console.warn('uiohook-napi not available — recording will not capture input');
+      return;
+    }
+
     uIOhook.on('mousedown', (event: any) => {
       if (!this.isRecording || this.isPaused) return;
-      
-      // Check if click is within capture area
-      if (this.captureArea && !this.isPointInCaptureArea(event.x, event.y)) {
-        return;
-      }
-
+      if (this.captureArea && !this.isPointInCaptureArea(event.x, event.y)) return;
       this.handleMouseClick(event);
     });
 
-    // Keyboard event handler
     uIOhook.on('keydown', (event: any) => {
       if (!this.isRecording) return;
 
-      // Handle pause key (using F9 as pause toggle)
-      if (event.keycode === UiohookKey.F9) {
-        if (this.isPaused) {
-          this.resumeRecording();
-        } else {
-          this.pauseRecording();
-        }
+      if (event.keycode === UiohookKey?.F9) {
+        if (this.isPaused) this.resumeRecording();
+        else this.pauseRecording();
         return;
       }
 
       if (this.isPaused) return;
-
       this.handleKeyPress(event);
+    });
+
+    // Mouse scroll handler
+    uIOhook.on('wheel', (event: any) => {
+      if (!this.isRecording || this.isPaused) return;
+      if (this.captureArea && !this.isPointInCaptureArea(event.x, event.y)) return;
+      this.handleScroll(event);
     });
   }
 
   private startGlobalHooks(): void {
-    if (this.hooksStarted) {
-      return;
-    }
-
+    if (this.hooksStarted || !uIOhook) return;
     try {
       uIOhook.start();
       this.hooksStarted = true;
@@ -227,10 +208,7 @@ export class RecordingService extends EventEmitter {
   }
 
   private stopGlobalHooks(): void {
-    if (!this.hooksStarted) {
-      return;
-    }
-
+    if (!this.hooksStarted || !uIOhook) return;
     try {
       uIOhook.stop();
       this.hooksStarted = false;
@@ -240,111 +218,170 @@ export class RecordingService extends EventEmitter {
     }
   }
 
+  // ------------------------------------------------------------------
+  // Click handler — uses native OS APIs for accurate info
+  // ------------------------------------------------------------------
+
   private async handleMouseClick(event: any): Promise<void> {
+    // Prevent concurrent click processing (screenshot + native query takes time)
+    if (this.clickProcessing) return;
+    this.clickProcessing = true;
+
     try {
-      // Flush any pending text
       this.flushTypedText();
 
+      // uiohook reports coordinates in LOGICAL screen space (top-left origin)
       const clickPoint = { x: event.x, y: event.y };
-      
-      // Get window information at click point
-      const windowInfo = await this.screenshotService.getWindowAtPoint(clickPoint);
-      
+
+      // Query native OS for full info: window, element, scale factor
+      const fullInfo = await this.screenshotService.getFullInfoAtPoint(clickPoint);
+      const scaleFactor = fullInfo?.scaleFactor ?? this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
+
+      // Extract window info
+      const windowTitle = fullInfo?.window?.title || 'Unknown Window';
+      const ownerApp = fullInfo?.window?.ownerName || '';
+      const windowBounds = fullInfo?.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
+      const windowPID = fullInfo?.window?.ownerPID || 0;
+
+      // Extract element info (accessibility)
+      const elementName = this.formatElementName(fullInfo?.element);
+      const elementRole = fullInfo?.element?.role || '';
+      const elementDescription = fullInfo?.element?.description || fullInfo?.element?.title || '';
+
       // Determine capture region
       const captureRegion = this.getCaptureRegion();
-      
-      // Calculate screenshot relative position (relative to the captured region)
+
+      // Click position relative to capture region (logical coords)
       const screenshotRelative = {
         x: Math.max(0, Math.min(clickPoint.x - captureRegion.x, captureRegion.width - 1)),
         y: Math.max(0, Math.min(clickPoint.y - captureRegion.y, captureRegion.height - 1)),
       };
 
-      // Take screenshot and annotate with click point
+      // Take DPI-aware annotated screenshot
       let screenshotPath: string | undefined;
       try {
         screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
           captureRegion,
           screenshotRelative,
           this.screenshotFolder!,
-          ++this.stepCount
+          ++this.stepCount,
+          scaleFactor
         );
       } catch (error) {
         console.error('Failed to take screenshot:', error);
-        // Continue without screenshot
+        this.stepCount++; // Still increment
       }
 
-      // Determine button type
-      let buttonType = 'Unknown';
-      switch (event.button) {
-        case 1:
-          buttonType = 'Left';
-          break;
-        case 2:
-          buttonType = 'Right';
-          break;
-        case 3:
-          buttonType = 'Middle';
-          break;
-      }
+      // Button type
+      const buttonTypes: Record<number, string> = { 1: 'Left', 2: 'Right', 3: 'Middle' };
+      const buttonType = buttonTypes[event.button] || 'Unknown';
+
+      // Build description
+      let description = `${buttonType} clicked`;
+      if (elementName) description += ` on "${elementName}"`;
+      if (elementRole) description += ` (${elementRole})`;
+      description += ` in ${windowTitle}`;
+      if (ownerApp && ownerApp !== windowTitle) description += ` [${ownerApp}]`;
 
       const step: RecordedStep = {
         stepNumber: this.stepCount,
         timestamp: new Date(),
         actionType: `${buttonType} Click`,
-        windowTitle: windowInfo.title,
-        description: `Clicked at (${clickPoint.x}, ${clickPoint.y}) in ${windowInfo.title}`,
+        windowTitle,
+        description,
         screenshotPath,
         globalMousePosition: clickPoint,
         relativeMousePosition: {
-          x: clickPoint.x - windowInfo.bounds.x,
-          y: clickPoint.y - windowInfo.bounds.y,
+          x: clickPoint.x - windowBounds.x,
+          y: clickPoint.y - windowBounds.y,
         },
         windowSize: {
-          width: windowInfo.bounds.width,
-          height: windowInfo.bounds.height,
+          width: windowBounds.width,
+          height: windowBounds.height,
         },
         screenshotRelativeMousePosition: screenshotRelative,
         screenshotSize: {
           width: captureRegion.width,
           height: captureRegion.height,
         },
+        elementName: elementName || undefined,
+        elementRole: elementRole || undefined,
+        elementDescription: elementDescription || undefined,
+        ownerApp: ownerApp || undefined,
       };
 
       this.emit('step-recorded', step);
-      
     } catch (error) {
       console.error('Error handling mouse click:', error);
+    } finally {
+      this.clickProcessing = false;
     }
   }
 
+  // ------------------------------------------------------------------
+  // Scroll handler
+  // ------------------------------------------------------------------
+
+  private scrollTimeout?: NodeJS.Timeout;
+  private scrollAccumulator = 0;
+
+  private handleScroll(event: any): void {
+    this.scrollAccumulator += event.rotation || 0;
+
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+
+    this.scrollTimeout = setTimeout(async () => {
+      if (Math.abs(this.scrollAccumulator) < 3) {
+        this.scrollAccumulator = 0;
+        return; // Ignore tiny scrolls
+      }
+
+      const fullInfo = await this.screenshotService.getFullInfoAtPoint({ x: event.x, y: event.y });
+      const windowTitle = fullInfo?.window?.title || 'Unknown Window';
+
+      const step: RecordedStep = {
+        stepNumber: ++this.stepCount,
+        timestamp: new Date(),
+        actionType: 'Scroll',
+        windowTitle,
+        description: `Scrolled ${this.scrollAccumulator > 0 ? 'down' : 'up'} in ${windowTitle}`,
+        scrollDelta: this.scrollAccumulator,
+        globalMousePosition: { x: event.x, y: event.y },
+        relativeMousePosition: { x: 0, y: 0 },
+        windowSize: {
+          width: fullInfo?.window?.bounds.width || 0,
+          height: fullInfo?.window?.bounds.height || 0,
+        },
+        screenshotRelativeMousePosition: { x: 0, y: 0 },
+        screenshotSize: { width: 0, height: 0 },
+      };
+
+      this.emit('step-recorded', step);
+      this.scrollAccumulator = 0;
+    }, 500);
+  }
+
+  // ------------------------------------------------------------------
+  // Keyboard handler
+  // ------------------------------------------------------------------
+
   private handleKeyPress(event: any): void {
-    // Handle special keys that should flush text
     if (this.isFlushKey(event.keycode)) {
       this.flushTypedText();
       return;
     }
 
-    // Convert keycode to character
     const char = this.keycodeToChar(event.keycode);
     if (char) {
       this.currentText += char;
-      
-      // Reset text flush timeout
-      if (this.textFlushTimeout) {
-        clearTimeout(this.textFlushTimeout);
-      }
-      
-      // Auto-flush text after 2 seconds of no typing
-      this.textFlushTimeout = setTimeout(() => {
-        this.flushTypedText();
-      }, 2000);
+
+      if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
+      this.textFlushTimeout = setTimeout(() => this.flushTypedText(), 2000);
     }
   }
 
   private flushTypedText(): void {
-    if (!this.currentText) {
-      return;
-    }
+    if (!this.currentText) return;
 
     if (this.textFlushTimeout) {
       clearTimeout(this.textFlushTimeout);
@@ -352,103 +389,92 @@ export class RecordingService extends EventEmitter {
     }
 
     try {
-      // Get current window info
       const windowInfo = this.screenshotService.getCurrentWindow();
-      
+
       const step: RecordedStep = {
         stepNumber: ++this.stepCount,
         timestamp: new Date(),
         actionType: 'Type',
         windowTitle: windowInfo?.title || 'Unknown Window',
-        description: `Typed: ${this.currentText}`,
+        description: `Typed: "${this.currentText}" in ${windowInfo?.title || 'Unknown Window'}`,
         textTyped: this.currentText,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
-        windowSize: { 
-          width: windowInfo?.bounds.width || 0, 
-          height: windowInfo?.bounds.height || 0 
+        windowSize: {
+          width: windowInfo?.bounds.width || 0,
+          height: windowInfo?.bounds.height || 0,
         },
         screenshotRelativeMousePosition: { x: 0, y: 0 },
         screenshotSize: { width: 0, height: 0 },
+        ownerApp: windowInfo?.ownerName || undefined,
       };
 
       this.emit('step-recorded', step);
       this.currentText = '';
-      
     } catch (error) {
       console.error('Error flushing typed text:', error);
       this.currentText = '';
     }
   }
 
+  // ------------------------------------------------------------------
+  // Helpers
+  // ------------------------------------------------------------------
+
+  private formatElementName(element: any): string {
+    if (!element) return '';
+    // Prefer title > description > value > role
+    if (element.title) return element.title;
+    if (element.description) return element.description;
+    if (element.value && element.value.length < 50) return element.value;
+    // Humanize role: "AXButton" → "Button"
+    if (element.role) return element.role.replace(/^AX/, '');
+    return '';
+  }
+
   private isFlushKey(keycode: number): boolean {
-    return [
-      UiohookKey.Enter as number,
-      UiohookKey.Tab as number,
-      UiohookKey.Escape as number,
-    ].includes(keycode);
+    if (!UiohookKey) return false;
+    return [UiohookKey.Enter, UiohookKey.Tab, UiohookKey.Escape].includes(keycode);
   }
 
   private keycodeToChar(keycode: number): string {
-    // Basic character mapping - could be extended
+    if (!UiohookKey) return '';
+
     if (keycode >= UiohookKey.A && keycode <= UiohookKey.Z) {
       return String.fromCharCode(keycode - UiohookKey.A + 'a'.charCodeAt(0));
     }
-    
-    if (keycode >= UiohookKey["0"] && keycode <= UiohookKey["9"]) {
-      return String.fromCharCode(keycode - UiohookKey["0"] + '0'.charCodeAt(0));
+    if (keycode >= UiohookKey['0'] && keycode <= UiohookKey['9']) {
+      return String.fromCharCode(keycode - UiohookKey['0'] + '0'.charCodeAt(0));
     }
-    
-    if (keycode === UiohookKey.Space) {
-      return ' ';
-    }
-    
-    // Add more character mappings as needed
+    if (keycode === UiohookKey.Space) return ' ';
     return '';
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {
-    if (!this.captureArea) {
-      return true;
-    }
-
-    // For "all displays" we allow all points
-    if (this.captureArea.type === 'all-displays') {
-      return true;
-    }
-
-    if (!this.captureArea.bounds) {
-      return true;
-    }
+    if (!this.captureArea) return true;
+    if (this.captureArea.type === 'all-displays') return true;
+    if (!this.captureArea.bounds) return true;
 
     const { bounds } = this.captureArea;
-    return (
-      x >= bounds.x &&
-      x < bounds.x + bounds.width &&
-      y >= bounds.y &&
-      y < bounds.y + bounds.height
-    );
+    return x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height;
   }
 
   private getCaptureRegion(): Rectangle {
-    if (this.captureArea?.bounds) {
-      return this.captureArea.bounds;
-    }
+    if (this.captureArea?.bounds) return this.captureArea.bounds;
 
-    // Default to primary display bounds
     const displays = this.screenshotService.getDisplaysSync();
-    const primaryDisplay = displays.find(d => d.isPrimary) || displays[0];
-    
-    return primaryDisplay?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
+    const primary = displays.find(d => d.isPrimary) || displays[0];
+    return primary?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
   }
 
+  // ------------------------------------------------------------------
+  // Recording overlay
+  // ------------------------------------------------------------------
+
   private async showOverlay(): Promise<void> {
-    if (!this.captureArea?.bounds) {
-      return;
-    }
+    if (!this.captureArea?.bounds) return;
 
     try {
-      // Create overlay window
       this.overlayWindow = new BrowserWindow({
         x: this.captureArea.bounds.x,
         y: this.captureArea.bounds.y,
@@ -463,23 +489,33 @@ export class RecordingService extends EventEmitter {
         movable: false,
         minimizable: false,
         maximizable: false,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-        },
+        hasShadow: false,
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
       });
 
-      // Load overlay HTML
-      await this.overlayWindow.loadURL(`data:text/html,${encodeURIComponent(this.getOverlayHTML())}`);
-      
-      // Show overlay
+      // Make click-through on macOS
+      if (process.platform === 'darwin') {
+        this.overlayWindow.setIgnoreMouseEvents(true);
+      }
+
+      await this.overlayWindow.loadURL(`data:text/html,${encodeURIComponent(`
+        <!DOCTYPE html><html><head><style>
+          body { margin:0; width:100vw; height:100vh;
+                 border:2px solid #ef4444; box-sizing:border-box;
+                 background:transparent; pointer-events:none;
+                 animation:pulse 2s ease-in-out infinite; }
+          @keyframes pulse {
+            0%,100% { border-color:#ef4444; }
+            50% { border-color:#dc2626; box-shadow:inset 0 0 12px rgba(239,68,68,0.15); }
+          }
+        </style></head><body></body></html>
+      `)}`);
+
       this.overlayWindow.show();
-      
-      // Track window movements for window capture
+
       if (this.captureArea.type === 'window' && this.captureArea.windowHandle) {
         this.startWindowTracking();
       }
-      
     } catch (error) {
       console.error('Failed to show overlay:', error);
     }
@@ -493,76 +529,37 @@ export class RecordingService extends EventEmitter {
   }
 
   private startWindowTracking(): void {
-    // Track window position changes for window capture mode
-    // This would need platform-specific implementation
-    // For now, we'll update the overlay position periodically
     const trackingInterval = setInterval(async () => {
       if (!this.isRecording || !this.overlayWindow || !this.captureArea?.windowHandle) {
         clearInterval(trackingInterval);
         return;
       }
-
       try {
         const windowInfo = await this.screenshotService.getWindowByHandle(this.captureArea.windowHandle);
         if (windowInfo && this.overlayWindow) {
-          this.overlayWindow.setBounds(windowInfo.bounds);
+          this.overlayWindow.setBounds({
+            x: windowInfo.bounds.x,
+            y: windowInfo.bounds.y,
+            width: windowInfo.bounds.width,
+            height: windowInfo.bounds.height,
+          });
           this.captureArea.bounds = windowInfo.bounds;
         }
-      } catch (error) {
-        // Window might have been closed
+      } catch {
         clearInterval(trackingInterval);
       }
-    }, 100);
-  }
-
-  private getOverlayHTML(): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            border: 3px solid #ef4444;
-            box-sizing: border-box;
-            background: transparent;
-            pointer-events: none;
-            animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-          }
-          
-          @keyframes pulse-border {
-            0%, 100% {
-              border-color: #ef4444;
-              box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0.1);
-            }
-            50% {
-              border-color: #dc2626;
-              box-shadow: inset 0 0 20px 0 rgba(239, 68, 68, 0.2);
-            }
-          }
-        </style>
-      </head>
-      <body></body>
-      </html>
-    `;
+    }, 200);
   }
 
   private emitStateChanged(): void {
     this.emit('state-changed', this.getState());
   }
 
-  // Cleanup method
   public dispose(): void {
     this.stopGlobalHooks();
     this.hideOverlay();
-    
-    if (this.textFlushTimeout) {
-      clearTimeout(this.textFlushTimeout);
-    }
-    
+    if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
     this.removeAllListeners();
   }
 }
