@@ -20,6 +20,12 @@ export function setupIpcHandlers(
   const guideGenerationService = new GuideGenerationService(chatService);
   const cloudUploadService = new CloudUploadService(() => authService.getAccessToken(), settingsManager);
 
+  // Dispose services on app quit
+  app.on('before-quit', () => {
+    recordingService.dispose();
+    screenshotService.dispose();
+  });
+
   // Recording IPC handlers
   ipcMain.handle('recording:start', async (event, captureArea, projectId) => {
     try {

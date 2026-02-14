@@ -432,11 +432,120 @@ namespace Ondoki.Native
             ));
         }
 
+        static void HandleServe()
+        {
+            // Persistent JSON-RPC mode: read JSON lines from stdin, write responses to stdout
+            string line;
+            while ((line = Console.ReadLine()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                int id = 0;
+                string cmd = "";
+                double argX = 0, argY = 0;
+                bool hasX = false, hasY = false;
+
+                try
+                {
+                    // Simple JSON parsing - extract id, cmd, args.x, args.y
+                    id = ExtractInt(line, "\"id\"");
+                    cmd = ExtractString(line, "\"cmd\"");
+
+                    int argsIdx = line.IndexOf("\"args\"");
+                    if (argsIdx >= 0)
+                    {
+                        string argsSection = line.Substring(argsIdx);
+                        hasX = TryExtractDouble(argsSection, "\"x\"", out argX);
+                        hasY = TryExtractDouble(argsSection, "\"y\"", out argY);
+                    }
+                }
+                catch
+                {
+                    Console.WriteLine("{\"id\":0,\"error\":\"invalid JSON\"}");
+                    Console.Out.Flush();
+                    continue;
+                }
+
+                try
+                {
+                    // Capture output by redirecting to StringWriter
+                    var sw = new System.IO.StringWriter();
+                    var origOut = Console.Out;
+                    Console.SetOut(sw);
+
+                    switch (cmd.ToLower())
+                    {
+                        case "mouse": HandleMouse(); break;
+                        case "windows": HandleWindows(); break;
+                        case "point":
+                            if (hasX && hasY) HandlePoint(argX, argY);
+                            else
+                            {
+                                Console.SetOut(origOut);
+                                Console.WriteLine($"{{\"id\":{id},\"error\":\"point requires args.x and args.y\"}}");
+                                Console.Out.Flush();
+                                continue;
+                            }
+                            break;
+                        default:
+                            Console.SetOut(origOut);
+                            Console.WriteLine($"{{\"id\":{id},\"error\":\"unknown command: {cmd}\"}}");
+                            Console.Out.Flush();
+                            continue;
+                    }
+
+                    Console.SetOut(origOut);
+                    string result = sw.ToString().Trim();
+                    Console.WriteLine($"{{\"id\":{id},\"result\":{result}}}");
+                    Console.Out.Flush();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"{{\"id\":{id},\"error\":\"{ex.Message.Replace("\"", "\\\"")}\"}}");
+                    Console.Out.Flush();
+                }
+            }
+        }
+
+        static int ExtractInt(string json, string key)
+        {
+            int idx = json.IndexOf(key);
+            if (idx < 0) return 0;
+            idx = json.IndexOf(':', idx) + 1;
+            string sub = json.Substring(idx).TrimStart();
+            int end = 0;
+            while (end < sub.Length && (char.IsDigit(sub[end]) || sub[end] == '-')) end++;
+            return int.Parse(sub.Substring(0, end));
+        }
+
+        static string ExtractString(string json, string key)
+        {
+            int idx = json.IndexOf(key);
+            if (idx < 0) return "";
+            idx = json.IndexOf(':', idx) + 1;
+            string sub = json.Substring(idx).TrimStart();
+            if (sub.Length < 2 || sub[0] != '"') return "";
+            int end = sub.IndexOf('"', 1);
+            return sub.Substring(1, end - 1);
+        }
+
+        static bool TryExtractDouble(string json, string key, out double value)
+        {
+            value = 0;
+            int idx = json.IndexOf(key);
+            if (idx < 0) return false;
+            idx = json.IndexOf(':', idx) + 1;
+            string sub = json.Substring(idx).TrimStart();
+            int end = 0;
+            while (end < sub.Length && (char.IsDigit(sub[end]) || sub[end] == '.' || sub[end] == '-')) end++;
+            return double.TryParse(sub.Substring(0, end), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value);
+        }
+
         static int Main(string[] args)
         {
             if (args.Length < 1)
             {
-                Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>");
+                Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>|serve");
                 return 1;
             }
 
@@ -446,6 +555,7 @@ namespace Ondoki.Native
                 {
                     case "mouse": HandleMouse(); break;
                     case "windows": HandleWindows(); break;
+                    case "serve": HandleServe(); break;
                     case "point":
                         if (args.Length < 3 || !double.TryParse(args[1], out double px) || !double.TryParse(args[2], out double py))
                         {

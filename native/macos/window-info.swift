@@ -2,7 +2,8 @@
 // Compiled: swiftc -O -o window-info window-info.swift -framework AppKit -framework CoreGraphics -framework ApplicationServices
 // Usage: window-info mouse          → returns mouse position + window under cursor + element info
 //        window-info windows        → returns all visible windows
-//        window-info window <pid>   → returns specific window info
+//        window-info point <x> <y>  → returns window/element at point
+//        window-info serve          → persistent JSON-RPC mode via stdin/stdout
 // Output: JSON to stdout
 
 import AppKit
@@ -48,7 +49,7 @@ struct ElementInfo: Codable {
 
 struct MouseResult: Codable {
     let mousePosition: Point
-    let mousePositionFlipped: Point  // Screen coords (top-left origin)
+    let mousePositionFlipped: Point
     let display: DisplayInfo
     let scaleFactor: Double
     let window: WindowResult?
@@ -58,6 +59,36 @@ struct MouseResult: Codable {
 struct WindowsResult: Codable {
     let windows: [WindowResult]
     let displays: [DisplayInfo]
+}
+
+// MARK: - JSON-RPC types for serve mode
+
+struct ServeRequest: Codable {
+    let id: Int
+    let cmd: String
+    let args: [String: Double]?
+}
+
+struct ServeResponse: Codable {
+    let id: Int
+    let result: AnyCodable?
+    let error: String?
+}
+
+// Simple wrapper to encode any Codable value
+struct AnyCodable: Codable {
+    let value: Any
+    
+    init(_ value: Any) { self.value = value }
+    
+    init(from decoder: Decoder) throws {
+        fatalError("Not used")
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        // We'll handle encoding differently
+        fatalError("Not used directly")
+    }
 }
 
 // MARK: - Helpers
@@ -108,7 +139,6 @@ func getWindowList() -> [WindowResult] {
         let ownerPID = info[kCGWindowOwnerPID as String] as? Int ?? 0
         let isOnScreen = info[kCGWindowIsOnscreen as String] as? Bool ?? false
         
-        // Skip system UI elements and tiny windows
         if layer != 0 { return nil }
         if ownerName == "Window Server" { return nil }
         if bw < 50 || bh < 50 { return nil }
@@ -127,7 +157,6 @@ func getWindowList() -> [WindowResult] {
 
 func getWindowAtPoint(_ point: CGPoint) -> WindowResult? {
     let windows = getWindowList()
-    // Windows are in front-to-back order, first match wins
     for w in windows {
         let b = w.bounds
         if point.x >= b.x && point.x < b.x + b.width &&
@@ -160,7 +189,6 @@ func getElementAtPoint(_ point: CGPoint, pid: Int) -> ElementInfo? {
             var value: AnyObject?
             AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &value)
             if let str = value as? String {
-                // Truncate long values
                 return String(str.prefix(200))
             }
             return ""
@@ -181,13 +209,11 @@ func getDisplayForPoint(_ point: CGPoint) -> DisplayInfo {
     return displays.first ?? DisplayInfo(id: 0, bounds: Rect(x: 0, y: 0, width: 1920, height: 1080), scaleFactor: 1.0, isPrimary: true)
 }
 
-// MARK: - Commands
+// MARK: - Commands (return JSON Data)
 
-func handleMouse() {
+func buildMouseResult() -> Data? {
     let mouseLocation = NSEvent.mouseLocation
     let screenHeight = NSScreen.main?.frame.height ?? 1080
-    
-    // Convert from AppKit coords (bottom-left origin) to screen coords (top-left origin)
     let flippedY = screenHeight - mouseLocation.y
     let screenPoint = CGPoint(x: mouseLocation.x, y: flippedY)
     
@@ -209,26 +235,19 @@ func handleMouse() {
     )
     
     let encoder = JSONEncoder()
-    encoder.outputFormatting = .prettyPrinted
-    if let data = try? encoder.encode(result), let json = String(data: data, encoding: .utf8) {
-        print(json)
-    }
+    return try? encoder.encode(result)
 }
 
-func handleWindows() {
+func buildWindowsResult() -> Data? {
     let result = WindowsResult(
         windows: getWindowList(),
         displays: getDisplays()
     )
-    
     let encoder = JSONEncoder()
-    encoder.outputFormatting = .prettyPrinted
-    if let data = try? encoder.encode(result), let json = String(data: data, encoding: .utf8) {
-        print(json)
-    }
+    return try? encoder.encode(result)
 }
 
-func handlePointQuery(x: Double, y: Double) {
+func buildPointResult(x: Double, y: Double) -> Data? {
     let point = CGPoint(x: x, y: y)
     let display = getDisplayForPoint(point)
     let window = getWindowAtPoint(point)
@@ -248,9 +267,98 @@ func handlePointQuery(x: Double, y: Double) {
     )
     
     let encoder = JSONEncoder()
-    encoder.outputFormatting = .prettyPrinted
-    if let data = try? encoder.encode(result), let json = String(data: data, encoding: .utf8) {
-        print(json)
+    return try? encoder.encode(result)
+}
+
+// MARK: - Serve mode (persistent JSON-RPC via stdin/stdout)
+
+func handleServe() {
+    // Disable stdout buffering
+    setbuf(stdout, nil)
+    
+    while let line = readLine(strippingNewline: true) {
+        guard !line.isEmpty else { continue }
+        
+        guard let lineData = line.data(using: .utf8),
+              let request = try? JSONDecoder().decode(ServeRequest.self, from: lineData) else {
+            // Write error for unparseable input
+            let errJson = "{\"id\":0,\"error\":\"invalid JSON\"}\n"
+            fputs(errJson, stdout)
+            fflush(stdout)
+            continue
+        }
+        
+        let requestId = request.id
+        var resultData: Data? = nil
+        var errorMsg: String? = nil
+        
+        switch request.cmd {
+        case "mouse":
+            resultData = buildMouseResult()
+        case "windows":
+            resultData = buildWindowsResult()
+        case "point":
+            if let args = request.args, let x = args["x"], let y = args["y"] {
+                resultData = buildPointResult(x: x, y: y)
+            } else {
+                errorMsg = "point requires args.x and args.y"
+            }
+        default:
+            errorMsg = "unknown command: \(request.cmd)"
+        }
+        
+        // Build response
+        var response: String
+        if let err = errorMsg {
+            let escaped = err.replacingOccurrences(of: "\"", with: "\\\"")
+            response = "{\"id\":\(requestId),\"error\":\"\(escaped)\"}"
+        } else if let data = resultData, let resultJson = String(data: data, encoding: .utf8) {
+            response = "{\"id\":\(requestId),\"result\":\(resultJson)}"
+        } else {
+            response = "{\"id\":\(requestId),\"result\":null}"
+        }
+        
+        print(response)
+        fflush(stdout)
+    }
+}
+
+// MARK: - CLI Commands (pretty-printed for human consumption)
+
+func handleMouse() {
+    if let data = buildMouseResult(), let json = String(data: data, encoding: .utf8) {
+        // Pretty-print for CLI
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
+           let prettyStr = String(data: pretty, encoding: .utf8) {
+            print(prettyStr)
+        } else {
+            print(json)
+        }
+    }
+}
+
+func handleWindows() {
+    if let data = buildWindowsResult(), let json = String(data: data, encoding: .utf8) {
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
+           let prettyStr = String(data: pretty, encoding: .utf8) {
+            print(prettyStr)
+        } else {
+            print(json)
+        }
+    }
+}
+
+func handlePointQuery(x: Double, y: Double) {
+    if let data = buildPointResult(x: x, y: y), let json = String(data: data, encoding: .utf8) {
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
+           let prettyStr = String(data: pretty, encoding: .utf8) {
+            print(prettyStr)
+        } else {
+            print(json)
+        }
     }
 }
 
@@ -259,7 +367,7 @@ func handlePointQuery(x: Double, y: Double) {
 let args = CommandLine.arguments
 
 if args.count < 2 {
-    fputs("Usage: window-info mouse|windows|point <x> <y>\n", stderr)
+    fputs("Usage: window-info mouse|windows|point <x> <y>|serve\n", stderr)
     exit(1)
 }
 
@@ -275,6 +383,8 @@ case "point":
         fputs("Usage: window-info point <x> <y>\n", stderr)
         exit(1)
     }
+case "serve":
+    handleServe()
 default:
     fputs("Unknown command: \(args[1])\n", stderr)
     exit(1)

@@ -11,8 +11,9 @@ try {
 }
 import * as path from 'path';
 import * as fs from 'fs';
-import { execFile, execFileSync } from 'child_process';
+import { execFile, execFileSync, ChildProcess, spawn } from 'child_process';
 import * as os from 'os';
+import { createInterface, Interface as ReadlineInterface } from 'readline';
 
 export interface Display {
   id: string;
@@ -63,12 +64,29 @@ export interface PointQueryResult {
   element: ElementInfo | null;
 }
 
+interface PendingRequest {
+  resolve: (value: any) => void;
+  reject: (reason: any) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class ScreenshotService {
   private nativeBinaryPath: string | null = null;
   private nativeAvailable = false;
 
+  // Persistent subprocess state
+  private nativeProcess: ChildProcess | null = null;
+  private nativeRl: ReadlineInterface | null = null;
+  private pendingRequests = new Map<number, PendingRequest>();
+  private nextRequestId = 1;
+  private persistentMode = false;
+  private disposed = false;
+  private restartAttempts = 0;
+  private maxRestartAttempts = 3;
+
   constructor() {
     this.initNativeBinary();
+    this.startPersistentProcess();
   }
 
   // ------------------------------------------------------------------
@@ -79,13 +97,9 @@ export class ScreenshotService {
     const platform = process.platform;
 
     if (platform === 'darwin') {
-      // Look for compiled Swift binary in multiple locations
       const candidates = [
-        // In app bundle (packaged)
         path.join(app?.isPackaged ? path.dirname(app.getPath('exe')) : '', '..', 'Resources', 'native', 'macos', 'window-info'),
-        // Development: relative to project root
         path.join(__dirname, '..', '..', 'native', 'macos', 'window-info'),
-        // Development: from src/main/
         path.join(__dirname, '..', 'native', 'macos', 'window-info'),
       ];
 
@@ -125,11 +139,8 @@ export class ScreenshotService {
       }
     } else if (platform === 'win32') {
       const candidates = [
-        // Packaged app
         path.join(app?.isPackaged ? path.dirname(app.getPath('exe')) : '', '..', 'Resources', 'native', 'windows', 'window-info.exe'),
-        // Dev: dotnet publish output
         path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'window-info.exe'),
-        // Dev: simple csc output
         path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.exe'),
       ];
       for (const candidate of candidates) {
@@ -147,6 +158,81 @@ export class ScreenshotService {
   }
 
   // ------------------------------------------------------------------
+  // Persistent native subprocess
+  // ------------------------------------------------------------------
+
+  private startPersistentProcess(): void {
+    if (!this.nativeAvailable || !this.nativeBinaryPath || this.disposed) {
+      return;
+    }
+
+    try {
+      this.nativeProcess = spawn(this.nativeBinaryPath, ['serve'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      this.persistentMode = true;
+      this.restartAttempts = 0;
+
+      this.nativeRl = createInterface({ input: this.nativeProcess.stdout! });
+
+      this.nativeRl.on('line', (line: string) => {
+        try {
+          const response = JSON.parse(line);
+          const pending = this.pendingRequests.get(response.id);
+          if (pending) {
+            this.pendingRequests.delete(response.id);
+            clearTimeout(pending.timer);
+            if (response.error) {
+              pending.resolve(null); // Treat errors as null like the old code
+            } else {
+              pending.resolve(response.result);
+            }
+          }
+        } catch (e) {
+          // Ignore unparseable lines
+        }
+      });
+
+      this.nativeProcess.stderr?.on('data', (data: Buffer) => {
+        // Log stderr but don't treat as fatal
+        console.warn('Native subprocess stderr:', data.toString().trim());
+      });
+
+      this.nativeProcess.on('exit', (code, signal) => {
+        console.warn(`Native subprocess exited (code=${code}, signal=${signal})`);
+        this.persistentMode = false;
+        this.nativeProcess = null;
+        this.nativeRl = null;
+
+        // Reject all pending requests
+        for (const [id, pending] of this.pendingRequests) {
+          clearTimeout(pending.timer);
+          pending.resolve(null);
+        }
+        this.pendingRequests.clear();
+
+        // Auto-restart if not disposed
+        if (!this.disposed && this.restartAttempts < this.maxRestartAttempts) {
+          this.restartAttempts++;
+          console.log(`Restarting native subprocess (attempt ${this.restartAttempts}/${this.maxRestartAttempts})...`);
+          setTimeout(() => this.startPersistentProcess(), 100);
+        }
+      });
+
+      this.nativeProcess.on('error', (err) => {
+        console.error('Native subprocess error:', err.message);
+        this.persistentMode = false;
+      });
+
+      console.log('Native subprocess started in persistent serve mode');
+    } catch (e) {
+      console.warn('Failed to start persistent native subprocess:', (e as Error).message);
+      this.persistentMode = false;
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Native command execution
   // ------------------------------------------------------------------
 
@@ -155,11 +241,50 @@ export class ScreenshotService {
       return null;
     }
 
-    return new Promise((resolve, reject) => {
-      const cmd = this.nativeBinaryPath!;
-      const cmdArgs = args;
+    // Try persistent mode first
+    if (this.persistentMode && this.nativeProcess?.stdin?.writable) {
+      return this.execNativePersistent(args);
+    }
 
-      execFile(cmd, cmdArgs, { timeout: 3000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    // Fallback to one-shot execFile
+    return this.execNativeOneShot(args);
+  }
+
+  private execNativePersistent(args: string[]): Promise<any> {
+    return new Promise((resolve) => {
+      const id = this.nextRequestId++;
+      const cmd = args[0];
+      let requestArgs: Record<string, number> | undefined;
+
+      if (cmd === 'point' && args.length >= 3) {
+        requestArgs = { x: parseFloat(args[1]), y: parseFloat(args[2]) };
+      }
+
+      const request = JSON.stringify({ id, cmd, args: requestArgs });
+
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        console.warn(`Native request ${id} (${cmd}) timed out, falling back to one-shot`);
+        // Fallback to one-shot on timeout
+        this.execNativeOneShot(args).then(resolve);
+      }, 3000);
+
+      this.pendingRequests.set(id, { resolve, reject: () => resolve(null), timer });
+
+      try {
+        this.nativeProcess!.stdin!.write(request + '\n');
+      } catch (e) {
+        this.pendingRequests.delete(id);
+        clearTimeout(timer);
+        console.warn('Failed to write to native subprocess, falling back to one-shot');
+        this.execNativeOneShot(args).then(resolve);
+      }
+    });
+  }
+
+  private execNativeOneShot(args: string[]): Promise<any> {
+    return new Promise((resolve) => {
+      execFile(this.nativeBinaryPath!, args, { timeout: 3000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
         if (error) {
           console.error('Native exec error:', error.message);
           resolve(null);
@@ -187,6 +312,38 @@ export class ScreenshotService {
       console.error('Native sync exec error:', (e as Error).message);
       return null;
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Disposal
+  // ------------------------------------------------------------------
+
+  public dispose(): void {
+    this.disposed = true;
+    
+    // Reject all pending requests
+    for (const [id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timer);
+      pending.resolve(null);
+    }
+    this.pendingRequests.clear();
+
+    // Kill the subprocess
+    if (this.nativeProcess) {
+      try {
+        this.nativeProcess.stdin?.end();
+        this.nativeProcess.kill();
+      } catch {}
+      this.nativeProcess = null;
+    }
+
+    if (this.nativeRl) {
+      this.nativeRl.close();
+      this.nativeRl = null;
+    }
+
+    this.persistentMode = false;
+    console.log('ScreenshotService disposed');
   }
 
   // ------------------------------------------------------------------
@@ -219,7 +376,6 @@ export class ScreenshotService {
 
   /**
    * Get the scale factor for a given screen point.
-   * On Retina/HiDPI, screenshot pixels = logical pixels * scaleFactor.
    */
   public getScaleFactorAtPoint(x: number, y: number): number {
     const display = screen.getDisplayNearestPoint({ x, y });
@@ -231,7 +387,6 @@ export class ScreenshotService {
   // ------------------------------------------------------------------
 
   public async getWindows(): Promise<WindowInfo[]> {
-    // Try native first
     const nativeResult = await this.execNative(['windows']);
     if (nativeResult?.windows) {
       return nativeResult.windows.map((w: any) => ({
@@ -249,7 +404,6 @@ export class ScreenshotService {
       }));
     }
 
-    // Fallback to desktopCapturer
     return this.getWindowsFallback();
   }
 
@@ -276,11 +430,6 @@ export class ScreenshotService {
   // Window at point (native) — THE CRITICAL FUNCTION
   // ------------------------------------------------------------------
 
-  /**
-   * Get the window and UI element at a specific screen point.
-   * Uses native OS APIs for accurate results across DPI/multi-monitor.
-   * Coordinates must be in LOGICAL screen coordinates (top-left origin).
-   */
   public async getWindowAtPoint(point: { x: number; y: number }): Promise<WindowInfo> {
     const nativeResult: PointQueryResult | null = await this.execNative(['point', point.x.toString(), point.y.toString()]);
 
@@ -301,7 +450,6 @@ export class ScreenshotService {
       };
     }
 
-    // Fallback
     return {
       handle: 0,
       title: 'Unknown Window',
@@ -312,21 +460,16 @@ export class ScreenshotService {
     };
   }
 
-  /**
-   * Get full point query result including element info and scale factor.
-   */
   public async getFullInfoAtPoint(point: { x: number; y: number }): Promise<PointQueryResult | null> {
     return this.execNative(['point', point.x.toString(), point.y.toString()]);
   }
 
   public async getWindowByHandle(handle: number): Promise<WindowInfo | null> {
-    // Get all windows and find by handle
     const windows = await this.getWindows();
     return windows.find(w => w.handle === handle) || null;
   }
 
   public getCurrentWindow(): WindowInfo | null {
-    // Use native mouse position to get current window
     const nativeResult = this.execNativeSync(['mouse']);
     if (nativeResult?.window) {
       const w = nativeResult.window;
@@ -343,20 +486,71 @@ export class ScreenshotService {
   }
 
   // ------------------------------------------------------------------
-  // Screenshots with proper DPI handling
+  // Screenshots — Electron desktopCapturer (primary) + fallback
   // ------------------------------------------------------------------
+
+  /**
+   * Take a screenshot using Electron's desktopCapturer (no external process).
+   * Returns a PNG buffer of the specified display or the display nearest the given point.
+   */
+  private async takeScreenshotNative(point?: { x: number; y: number }): Promise<Buffer> {
+    const targetDisplay = point
+      ? screen.getDisplayNearestPoint(point)
+      : screen.getPrimaryDisplay();
+
+    const physWidth = Math.round(targetDisplay.size.width * targetDisplay.scaleFactor);
+    const physHeight = Math.round(targetDisplay.size.height * targetDisplay.scaleFactor);
+
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: physWidth, height: physHeight },
+    });
+
+    // Match by display ID — desktopCapturer source.display_id corresponds to Electron display.id
+    const displayIdStr = targetDisplay.id.toString();
+    let source = sources.find(s => s.display_id === displayIdStr);
+
+    // Fallback: if only one source (single monitor), just use it
+    if (!source && sources.length === 1) {
+      source = sources[0];
+    }
+
+    // Fallback: match by name containing display id
+    if (!source) {
+      source = sources.find(s => s.name.includes(displayIdStr));
+    }
+
+    if (!source) {
+      throw new Error(`No desktopCapturer source found for display ${displayIdStr}`);
+    }
+
+    return source.thumbnail.toPNG();
+  }
+
+  /**
+   * Take a full screenshot, preferring desktopCapturer, falling back to screenshot-desktop.
+   */
+  private async captureScreen(point?: { x: number; y: number }): Promise<Buffer> {
+    try {
+      return await this.takeScreenshotNative(point);
+    } catch (e) {
+      console.warn('desktopCapturer failed, falling back to screenshot-desktop:', (e as Error).message);
+      if (screenshotDesktop) {
+        return await screenshotDesktop({ format: 'png' });
+      }
+      throw e;
+    }
+  }
 
   public async takeScreenshot(bounds?: Rectangle): Promise<string> {
     try {
       let screenshot: Buffer;
 
       if (bounds) {
-        const fullScreenshot = await screenshotDesktop({ format: 'png' });
+        const fullScreenshot = await this.captureScreen({ x: bounds.x, y: bounds.y });
 
-        // Get scale factor for the capture region
         const scale = this.getScaleFactorAtPoint(bounds.x, bounds.y);
 
-        // screenshot-desktop returns physical pixels, bounds are logical
         const physicalBounds = {
           left: Math.max(0, Math.round(bounds.x * scale)),
           top: Math.max(0, Math.round(bounds.y * scale)),
@@ -364,7 +558,12 @@ export class ScreenshotService {
           height: Math.round(bounds.height * scale),
         };
 
-        // Clamp to image dimensions
+        // For desktopCapturer, the screenshot is relative to the display, not absolute
+        // Adjust physical bounds to be relative to the display origin
+        const targetDisplay = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y });
+        physicalBounds.left = Math.max(0, Math.round((bounds.x - targetDisplay.bounds.x) * scale));
+        physicalBounds.top = Math.max(0, Math.round((bounds.y - targetDisplay.bounds.y) * scale));
+
         const metadata = await sharp(fullScreenshot).metadata();
         physicalBounds.width = Math.min(physicalBounds.width, (metadata.width || 3840) - physicalBounds.left);
         physicalBounds.height = Math.min(physicalBounds.height, (metadata.height || 2160) - physicalBounds.top);
@@ -378,7 +577,7 @@ export class ScreenshotService {
           screenshot = fullScreenshot;
         }
       } else {
-        screenshot = await screenshotDesktop({ format: 'png' });
+        screenshot = await this.captureScreen();
       }
 
       const timestamp = Date.now();
@@ -392,15 +591,6 @@ export class ScreenshotService {
     }
   }
 
-  /**
-   * Take a screenshot of a region and annotate with a click circle.
-   * 
-   * @param bounds       - Logical screen coordinates of the capture region
-   * @param clickPoint   - Click position RELATIVE to bounds (logical coords)
-   * @param outputDir    - Directory to save the screenshot
-   * @param stepNumber   - Step number for filename
-   * @param scaleFactor  - Optional override; auto-detected if omitted
-   */
   public async takeAnnotatedScreenshot(
     bounds: Rectangle,
     clickPoint: { x: number; y: number },
@@ -409,16 +599,16 @@ export class ScreenshotService {
     scaleFactor?: number
   ): Promise<string> {
     try {
-      const fullScreenshot = await screenshotDesktop({ format: 'png' });
+      const fullScreenshot = await this.captureScreen({ x: bounds.x, y: bounds.y });
       const scale = scaleFactor ?? this.getScaleFactorAtPoint(bounds.x, bounds.y);
 
-      // Convert logical bounds to physical pixel coordinates
-      const pLeft = Math.max(0, Math.round(bounds.x * scale));
-      const pTop = Math.max(0, Math.round(bounds.y * scale));
+      // For desktopCapturer, coordinates are relative to the display
+      const targetDisplay = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y });
+      const pLeft = Math.max(0, Math.round((bounds.x - targetDisplay.bounds.x) * scale));
+      const pTop = Math.max(0, Math.round((bounds.y - targetDisplay.bounds.y) * scale));
       let pWidth = Math.round(bounds.width * scale);
       let pHeight = Math.round(bounds.height * scale);
 
-      // Clamp to image size
       const metadata = await sharp(fullScreenshot).metadata();
       const imgW = metadata.width || 3840;
       const imgH = metadata.height || 2160;
@@ -429,11 +619,9 @@ export class ScreenshotService {
         throw new Error(`Invalid crop region: ${pWidth}x${pHeight} at ${pLeft},${pTop} (img ${imgW}x${imgH}, scale ${scale})`);
       }
 
-      // Click point is in logical coords relative to bounds → convert to physical
       const pClickX = Math.round(clickPoint.x * scale);
       const pClickY = Math.round(clickPoint.y * scale);
 
-      // Circle size scales with DPI
       const circleRadius = Math.round(15 * scale);
       const circleSize = circleRadius * 2;
       const strokeWidth = Math.round(3 * scale);

@@ -560,6 +560,7 @@ export class RecordingService extends EventEmitter {
     this.hideOverlay();
     if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+    this.screenshotService.dispose();
     this.removeAllListeners();
   }
 }
