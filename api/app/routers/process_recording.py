@@ -743,6 +743,64 @@ async def export_workflow_pdf(
     )
 
 
+@router.get("/workflow/{session_id}/export/confluence")
+async def export_workflow_confluence(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    authorization: Optional[str] = Header(None)
+):
+    """Export workflow as Confluence Storage Format"""
+    from app.workflow_export import generate_confluence_storage
+    
+    stmt = select(ProcessRecordingSession).options(
+        selectinload(ProcessRecordingSession.steps),
+        selectinload(ProcessRecordingSession.files)
+    ).where(ProcessRecordingSession.id == session_id)
+    
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    
+    workflow_dict = {"id": session.id, "name": session.name, "created_at": session.created_at}
+    steps_list = [{"step_number": s.step_number, "step_type": s.step_type, "description": s.description, "content": s.content, "window_title": s.window_title, "text_typed": s.text_typed, "key_pressed": s.key_pressed} for s in session.steps]
+    files_dict = {f.step_number: f.file_path for f in session.files}
+    
+    confluence = generate_confluence_storage(workflow_dict, steps_list, files_dict, image_base_url="/api/v1/process-recording")
+    filename = f"{session.name or 'workflow'}_confluence.xml".replace(" ", "_")
+    
+    return Response(content=confluence, media_type="application/xml", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@router.get("/workflow/{session_id}/export/notion")
+async def export_workflow_notion(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    authorization: Optional[str] = Header(None)
+):
+    """Export workflow as Notion-compatible Markdown"""
+    from app.workflow_export import generate_notion_markdown
+    
+    stmt = select(ProcessRecordingSession).options(
+        selectinload(ProcessRecordingSession.steps),
+        selectinload(ProcessRecordingSession.files)
+    ).where(ProcessRecordingSession.id == session_id)
+    
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    
+    workflow_dict = {"id": session.id, "name": session.name, "created_at": session.created_at}
+    steps_list = [{"step_number": s.step_number, "step_type": s.step_type, "description": s.description, "content": s.content, "window_title": s.window_title, "text_typed": s.text_typed, "key_pressed": s.key_pressed} for s in session.steps]
+    files_dict = {f.step_number: f.file_path for f in session.files}
+    
+    notion_md = generate_notion_markdown(workflow_dict, steps_list, files_dict, image_base_url="/api/v1/process-recording")
+    filename = f"{session.name or 'workflow'}_notion.md".replace(" ", "_")
+    
+    return Response(content=notion_md, media_type="text/markdown", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @router.get("/workflow/{session_id}/export/docx")
 async def export_workflow_docx(
     session_id: str,
@@ -805,6 +863,48 @@ async def export_workflow_docx(
             "Content-Disposition": f'attachment; filename="{filename}"',
         }
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SHARING ENDPOINTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/workflow/{session_id}/share")
+async def share_workflow(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a public share link for a workflow."""
+    import uuid
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    
+    if not session.share_token:
+        session.share_token = uuid.uuid4().hex
+    session.is_public = True
+    await db.commit()
+    
+    return {"share_token": session.share_token, "is_public": True}
+
+
+@router.delete("/workflow/{session_id}/share")
+async def unshare_workflow(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove public share link for a workflow."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    
+    session.share_token = None
+    session.is_public = False
+    await db.commit()
+    
+    return {"is_public": False}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

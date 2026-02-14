@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -39,11 +40,10 @@ api_router = APIRouter(prefix=settings.API_V1_STR)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestIdMiddleware)
+_cors_origin = os.getenv("CORS_ORIGIN_REGEX", r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$")
 app.add_middleware(
     CORSMiddleware,
-    # Wildcard + credentials do not work.
-    # Reflect any http/https origin – change to a stricter regex or an explicit list in production.
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$",
+    allow_origin_regex=_cors_origin,
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,  # ← enable cookies
@@ -67,11 +67,14 @@ api_router.include_router(auth_providers.router, prefix="/auth/providers", tags=
 # Mount the versioned router on the main app
 app.include_router(api_router)
 
+# Public endpoints (no auth required) — mounted outside versioned router
+from app.routers.public import router as public_router
+app.include_router(public_router, prefix="/api/v1/public", tags=["public"])
+
 # Health/ready endpoints (no version prefix — used by load balancers/Docker)
 app.include_router(health.router)
 
 # Test-only endpoints (seed/cleanup) — only in test/development environments
-import os
 if os.getenv("ENVIRONMENT") in ("test", "development"):
     from app.routers.test_helpers import router as test_router
     app.include_router(test_router)

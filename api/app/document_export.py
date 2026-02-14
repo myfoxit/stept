@@ -276,6 +276,169 @@ def tiptap_to_html(content: Any, page_layout: str = "document") -> str:
     return ""
 
 
+def generate_document_confluence(doc: Any, page_layout: str = "document") -> str:
+    """Generate Confluence Storage Format export of a document."""
+    if not doc.content:
+        return ""
+
+    def convert_node(node: Dict[str, Any]) -> str:
+        node_type = node.get("type", "")
+
+        if node_type == "doc":
+            return "".join(convert_node(c) for c in node.get("content", []))
+
+        if node_type == "text":
+            text = html_module.escape(node.get("text", ""))
+            for mark in node.get("marks", []):
+                mt = mark.get("type", "")
+                if mt == "bold":
+                    text = f"<strong>{text}</strong>"
+                elif mt == "italic":
+                    text = f"<em>{text}</em>"
+                elif mt == "code":
+                    text = f"<code>{text}</code>"
+                elif mt == "link":
+                    href = mark.get("attrs", {}).get("href", "")
+                    text = f'<a href="{href}">{text}</a>'
+            return text
+
+        if node_type == "heading":
+            level = node.get("attrs", {}).get("level", 1)
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<h{level}>{content}</h{level}>"
+
+        if node_type == "paragraph":
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<p>{content}</p>" if content else "<p></p>"
+
+        if node_type == "bulletList":
+            items = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<ul>{items}</ul>"
+
+        if node_type == "orderedList":
+            items = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<ol>{items}</ol>"
+
+        if node_type == "listItem":
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<li>{content}</li>"
+
+        if node_type == "codeBlock":
+            lang = node.get("attrs", {}).get("language", "")
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f'<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">{lang}</ac:parameter><ac:plain-text-body><![CDATA[{content}]]></ac:plain-text-body></ac:structured-macro>'
+
+        if node_type == "blockquote":
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<blockquote>{content}</blockquote>"
+
+        if node_type == "horizontalRule":
+            return "<hr/>"
+
+        if node_type == "image":
+            src = node.get("attrs", {}).get("src", "")
+            return f'<ac:image><ri:url ri:value="{src}"/></ac:image>'
+
+        if node_type == "table":
+            rows = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<table>{rows}</table>"
+
+        if node_type in ("tableRow", "tableCell", "tableHeader"):
+            tag = {"tableRow": "tr", "tableCell": "td", "tableHeader": "th"}[node_type]
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<{tag}>{content}</{tag}>"
+
+        return "".join(convert_node(c) for c in node.get("content", []))
+
+    if isinstance(doc.content, dict):
+        return convert_node(doc.content)
+    return ""
+
+
+def generate_document_notion_markdown(doc: Any, page_layout: str = "document") -> str:
+    """Generate Notion-compatible Markdown export of a document."""
+    if not doc.content:
+        return ""
+
+    def convert_node(node: Dict[str, Any], list_depth: int = 0, ordered_counter: Optional[int] = None) -> str:
+        node_type = node.get("type", "")
+
+        if node_type == "doc":
+            return "".join(convert_node(c) for c in node.get("content", []))
+
+        if node_type == "text":
+            text = node.get("text", "")
+            for mark in node.get("marks", []):
+                mt = mark.get("type", "")
+                if mt == "bold":
+                    text = f"**{text}**"
+                elif mt == "italic":
+                    text = f"*{text}*"
+                elif mt == "code":
+                    text = f"`{text}`"
+                elif mt == "link":
+                    href = mark.get("attrs", {}).get("href", "")
+                    text = f"[{text}]({href})"
+            return text
+
+        if node_type == "heading":
+            level = node.get("attrs", {}).get("level", 1)
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"\n{'#' * level} {content}\n\n"
+
+        if node_type == "paragraph":
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"{content}\n\n"
+
+        if node_type == "bulletList":
+            result = ""
+            for child in node.get("content", []):
+                result += convert_node(child, list_depth + 1)
+            return result
+
+        if node_type == "orderedList":
+            counter = 1
+            result = ""
+            for child in node.get("content", []):
+                result += convert_node(child, list_depth + 1, counter)
+                counter += 1
+            return result
+
+        if node_type == "listItem":
+            indent = "  " * (list_depth - 1)
+            prefix = f"{indent}{ordered_counter}. " if ordered_counter else f"{indent}- "
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"{prefix}{content.strip()}\n"
+
+        if node_type == "codeBlock":
+            lang = node.get("attrs", {}).get("language", "")
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"\n```{lang}\n{content}\n```\n\n"
+
+        if node_type == "blockquote":
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            lines = content.strip().split("\n")
+            quoted = "\n".join(f"> {line}" for line in lines)
+            return f"\n> 💡 {quoted.lstrip('> ')}\n\n"
+
+        if node_type == "horizontalRule":
+            return "\n---\n\n"
+
+        if node_type == "image":
+            src = node.get("attrs", {}).get("src", "")
+            alt = node.get("attrs", {}).get("alt", "")
+            return f"![{alt}]({src})\n\n"
+
+        result = ""
+        for child in node.get("content", []):
+            result += convert_node(child, list_depth, ordered_counter)
+        return result
+
+    if isinstance(doc.content, dict):
+        return convert_node(doc.content).strip()
+    return ""
+
+
 def generate_document_markdown(doc: Any, page_layout: str = "document") -> str:
     """Generate Markdown export of a document."""
     lines = []

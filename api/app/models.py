@@ -194,6 +194,10 @@ class Document(Base):
     is_private = Column(Boolean, nullable=False, default=False, index=True)  # True = only owner can see
     owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # Owner for private documents
     
+    # Public sharing fields
+    share_token = Column(String(64), nullable=True, unique=True, index=True)
+    is_public = Column(Boolean, nullable=False, default=False)
+    
     # Relationships
     project = relationship("Project", backref="documents")
     folder = relationship("Folder", back_populates="documents")
@@ -255,6 +259,10 @@ class ProcessRecordingSession(Base):
     # NEW: Privacy settings
     is_private = Column(Boolean, nullable=False, default=False, index=True)  # True = only owner can see
     owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # Owner for private workflows
+    
+    # Public sharing fields
+    share_token = Column(String(64), nullable=True, unique=True, index=True)
+    is_public = Column(Boolean, nullable=False, default=False)
     
     # AI auto-processing fields
     generated_title = Column(String, nullable=True)

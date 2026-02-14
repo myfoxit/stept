@@ -20,6 +20,10 @@ import { PAGE_FORMATS } from '@/components/tiptap-extensions/pagination';
 
 
 import { IconInputCheck } from '@tabler/icons-react';
+import { AICommandPanel, AI_COMMANDS, type AICommandDef } from '@/components/tiptap-extensions/ai-commands';
+import type { AICommand } from '@/api/inlineAI';
+import { listWorkflows } from '@/api/workflows';
+import type { ProcessRecordingSession } from '@/types/openapi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
 
@@ -84,6 +88,46 @@ export function NotionEditor({ docId }: { docId: string }) {
   useDocumentAutoSave(editor, save, 1000, isInitialized ? [title] : []);
 
   const { data: containers = [] } = useAllTextContainer();
+  // AI Command Panel state
+  const [activeAICommand, setActiveAICommand] = React.useState<AICommandDef | null>(null);
+  const [aiCoords, setAiCoords] = React.useState({ x: 0, y: 0 });
+
+  // Workflow picker state
+  const [showWorkflowPicker, setShowWorkflowPicker] = React.useState(false);
+  const [availableWorkflows, setAvailableWorkflows] = React.useState<ProcessRecordingSession[]>([]);
+
+  // Listen for AI command events from slash menu
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const cmd = AI_COMMANDS.find((c) => c.command === detail.command);
+      if (cmd && editor) {
+        // Get cursor coordinates
+        const { from } = editor.state.selection;
+        const coords = editor.view.coordsAtPos(from);
+        setAiCoords({ x: coords.left, y: coords.bottom });
+        setActiveAICommand(cmd);
+      }
+    };
+    window.addEventListener('ondoki:ai-command', handler);
+    return () => window.removeEventListener('ondoki:ai-command', handler);
+  }, [editor]);
+
+  // Listen for workflow insert events from slash menu
+  useEffect(() => {
+    const handler = async () => {
+      try {
+        const workflows = await listWorkflows(50, 0);
+        setAvailableWorkflows(workflows);
+        setShowWorkflowPicker(true);
+      } catch (err) {
+        console.error('Failed to fetch workflows:', err);
+      }
+    };
+    window.addEventListener('ondoki:insert-workflow', handler);
+    return () => window.removeEventListener('ondoki:insert-workflow', handler);
+  }, [editor]);
+
   const [selectedId, setId] = React.useState<string | null>(null);
   const containerData = useTextContainer(selectedId);
 
@@ -225,6 +269,49 @@ export function NotionEditor({ docId }: { docId: string }) {
           <SlashDropdownMenu config={slashMenuConfig} />
           <NotionToolbarFloating />
         </EditorContent>
+
+        {/* AI Command Panel */}
+        {activeAICommand && editor && (
+          <AICommandPanel
+            editor={editor}
+            command={activeAICommand}
+            coords={aiCoords}
+            onClose={() => setActiveAICommand(null)}
+          />
+        )}
+
+        {/* Workflow Picker Modal */}
+        {showWorkflowPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowWorkflowPicker(false)}>
+            <div className="bg-background rounded-lg shadow-xl p-4 w-96 max-h-96 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-sm font-semibold mb-3">Insert Workflow</h3>
+              {availableWorkflows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No workflows found.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {availableWorkflows.map((wf) => (
+                    <li key={wf.session_id}>
+                      <button
+                        className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent"
+                        onClick={() => {
+                          if (editor) {
+                            editor.chain().focus().insertContent({
+                              type: 'process-recording-node',
+                              attrs: { sessionId: wf.session_id },
+                            }).run();
+                          }
+                          setShowWorkflowPicker(false);
+                        }}
+                      >
+                        {wf.title || wf.name || 'Untitled Workflow'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </EditorContext.Provider>
     </div>
   );

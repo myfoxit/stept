@@ -408,6 +408,129 @@ def _generate_pdf_reportlab(
     return buffer.getvalue()
 
 
+def generate_confluence_storage(
+    workflow: Dict[str, Any],
+    steps: List[Dict[str, Any]],
+    files: Dict[int, str],
+    image_base_url: Optional[str] = None,
+) -> str:
+    """Generate Confluence Storage Format (XML-based) export of a workflow."""
+    title = workflow.get("name") or "Untitled Workflow"
+    created_at = workflow.get("created_at")
+    if isinstance(created_at, datetime):
+        created_at = created_at.strftime("%Y-%m-%d %H:%M")
+
+    total_steps = len([s for s in steps if s.get("step_type") in ("screenshot", "capture", "gif", "video", None)])
+
+    parts = []
+    parts.append(f"<h1>{title}</h1>")
+    parts.append(f'<ac:structured-macro ac:name="panel"><ac:rich-text-body>')
+    parts.append(f"<p><strong>Created:</strong> {created_at or 'Unknown'} &bull; <strong>Steps:</strong> {total_steps}</p>")
+    parts.append("</ac:rich-text-body></ac:structured-macro>")
+    parts.append("<hr/>")
+
+    visible_index = 0
+    for step in sorted(steps, key=lambda s: s.get("step_number", 0)):
+        step_type = step.get("step_type") or "screenshot"
+        step_number = step.get("step_number", 0)
+
+        if step_type == "header":
+            content = step.get("content") or step.get("description") or "Header"
+            parts.append(f"<h2>{content}</h2>")
+        elif step_type == "tip":
+            content = step.get("content") or step.get("description") or ""
+            parts.append(f'<ac:structured-macro ac:name="tip"><ac:rich-text-body><p>{content}</p></ac:rich-text-body></ac:structured-macro>')
+        elif step_type == "alert":
+            content = step.get("content") or step.get("description") or ""
+            parts.append(f'<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>{content}</p></ac:rich-text-body></ac:structured-macro>')
+        else:
+            visible_index += 1
+            description = step.get("description") or step.get("window_title") or f"Step {visible_index}"
+            parts.append(f'<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">Step {visible_index}: {description}</ac:parameter><ac:rich-text-body>')
+
+            if step_number in files and image_base_url:
+                img_url = f"{image_base_url}/session/{workflow['id']}/image/{step_number}"
+                parts.append(f'<p><ac:image><ri:url ri:value="{img_url}"/></ac:image></p>')
+            elif step_number in files:
+                filename = os.path.basename(files[step_number])
+                parts.append(f'<p><ac:image><ri:attachment ri:filename="{filename}"/></ac:image></p>')
+
+            if step.get("text_typed"):
+                parts.append(f"<p><strong>Text entered:</strong> <code>{step['text_typed']}</code></p>")
+            if step.get("key_pressed"):
+                parts.append(f"<p><strong>Key pressed:</strong> <code>{step['key_pressed']}</code></p>")
+
+            parts.append("</ac:rich-text-body></ac:structured-macro>")
+
+    return "\n".join(parts)
+
+
+def generate_notion_markdown(
+    workflow: Dict[str, Any],
+    steps: List[Dict[str, Any]],
+    files: Dict[int, str],
+    image_base_url: Optional[str] = None,
+) -> str:
+    """Generate Notion-compatible Markdown export of a workflow."""
+    title = workflow.get("name") or "Untitled Workflow"
+    created_at = workflow.get("created_at")
+    if isinstance(created_at, datetime):
+        created_at = created_at.strftime("%Y-%m-%d %H:%M")
+
+    total_steps = len([s for s in steps if s.get("step_type") in ("screenshot", "capture", "gif", "video", None)])
+
+    lines = []
+    lines.append(f"# {title}")
+    lines.append("")
+    lines.append(f"> 📋 **Created:** {created_at or 'Unknown'} • **Steps:** {total_steps}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    visible_index = 0
+    for step in sorted(steps, key=lambda s: s.get("step_number", 0)):
+        step_type = step.get("step_type") or "screenshot"
+        step_number = step.get("step_number", 0)
+
+        if step_type == "header":
+            content = step.get("content") or step.get("description") or "Header"
+            lines.append(f"## {content}")
+            lines.append("")
+        elif step_type == "tip":
+            content = step.get("content") or step.get("description") or ""
+            lines.append(f"> 💡 **Tip:** {content}")
+            lines.append("")
+        elif step_type == "alert":
+            content = step.get("content") or step.get("description") or ""
+            lines.append(f"> ⚠️ **Alert:** {content}")
+            lines.append("")
+        else:
+            visible_index += 1
+            description = step.get("description") or step.get("window_title") or f"Step {visible_index}"
+
+            lines.append(f"<details><summary><strong>Step {visible_index}:</strong> {description}</summary>")
+            lines.append("")
+
+            if step_number in files and image_base_url:
+                img_url = f"{image_base_url}/session/{workflow['id']}/image/{step_number}"
+                lines.append(f"![Step {visible_index}]({img_url})")
+                lines.append("")
+
+            if step.get("text_typed"):
+                lines.append(f"**Text entered:** `{step['text_typed']}`")
+                lines.append("")
+            if step.get("key_pressed"):
+                lines.append(f"**Key pressed:** `{step['key_pressed']}`")
+                lines.append("")
+
+            lines.append("</details>")
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 def generate_docx(
     workflow: Dict[str, Any],
     steps: List[Dict[str, Any]],

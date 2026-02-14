@@ -149,6 +149,46 @@ async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# SHARING ENDPOINTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/{doc_id}/share")
+async def share_document(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a public share link for a document."""
+    import uuid
+    from app.models import Document as DocumentModel
+    doc = await db.get(DocumentModel, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    if not doc.share_token:
+        doc.share_token = uuid.uuid4().hex
+    doc.is_public = True
+    await db.commit()
+    return {"share_token": doc.share_token, "is_public": True}
+
+
+@router.delete("/{doc_id}/share")
+async def unshare_document(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove public share link for a document."""
+    from app.models import Document as DocumentModel
+    doc = await db.get(DocumentModel, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    doc.share_token = None
+    doc.is_public = False
+    await db.commit()
+    return {"is_public": False}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # EXPORT ENDPOINTS
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -232,6 +272,52 @@ async def export_document_pdf(
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
         }
+    )
+
+
+@router.get("/{doc_id}/export/confluence")
+async def export_document_confluence(
+    doc_id: str,
+    page_layout: str = Query(default="document"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export document as Confluence Storage Format"""
+    from app.document_export import generate_document_confluence
+    
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    confluence = generate_document_confluence(doc, page_layout=page_layout)
+    filename = f"{doc.name or 'document'}_confluence.xml".replace(" ", "_")
+    
+    return Response(
+        content=confluence,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{doc_id}/export/notion")
+async def export_document_notion(
+    doc_id: str,
+    page_layout: str = Query(default="document"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export document as Notion-compatible Markdown"""
+    from app.document_export import generate_document_notion_markdown
+    
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    
+    notion_md = generate_document_notion_markdown(doc, page_layout=page_layout)
+    filename = f"{doc.name or 'document'}_notion.md".replace(" ", "_")
+    
+    return Response(
+        content=notion_md,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

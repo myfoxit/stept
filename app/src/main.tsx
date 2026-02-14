@@ -19,6 +19,8 @@ import { WorkflowView } from '@/pages/workflow-view';
 import { DocumentGalleryPage } from '@/pages/document-gallery';
 import { ChatProvider } from '@/components/Chat/ChatContext';
 import { ChatPanel } from '@/components/Chat/ChatPanel';
+import { PublicWorkflowPage } from '@/pages/public-workflow';
+import { PublicDocumentPage } from '@/pages/public-document';
 
 const queryClient = new QueryClient();
 
@@ -53,6 +55,8 @@ createRoot(document.getElementById('root')!).render(
                 </Route>
                 <Route path="login" element={<LoginPage />} />
                 <Route path="/join-project" element={<JoinProjectPage />} />
+                <Route path="/public/workflow/:token" element={<PublicWorkflowPage />} />
+                <Route path="/public/document/:token" element={<PublicDocumentPage />} />
                
                 <Route path="*" element={<p>Page not found</p>} />
               </Routes>

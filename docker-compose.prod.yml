@@ -1,24 +1,38 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: ondoki-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - ondoki-network
+    depends_on:
+      - frontend
+      - backend
+
   db:
     image: pgvector/pgvector:pg16
     container_name: ondoki-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-ondoki}
-    ports:             
-      - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - ondoki-network
-
 
   redis:
     image: redis:7-alpine
@@ -27,7 +41,6 @@ services:
     networks:
       - ondoki-network
 
- 
   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: ondoki-gotenberg
@@ -38,9 +51,8 @@ services:
     networks:
       - ondoki-network
 
-
   backend:
-    build: ./api
+    image: ghcr.io/myfoxit/ondoki-web-api:latest
     container_name: ondoki-backend
     restart: unless-stopped
     depends_on:
@@ -49,12 +61,14 @@ services:
       redis:
         condition: service_started
     environment:
-    
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ondoki}
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
       ENVIRONMENT: production
-      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:?ONDOKI_ENCRYPTION_KEY must be set}
+      JWT_SECRET: ${JWT_SECRET}
+      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY}
+    volumes:
+      - file-storage:/app/storage
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -64,20 +78,20 @@ services:
     networks:
       - ondoki-network
 
-
   frontend:
-    build: ./app
+    image: ghcr.io/myfoxit/ondoki-web-app:latest
     container_name: ondoki-frontend
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "80:80" 
     networks:
       - ondoki-network
 
 volumes:
   db-data:
+  caddy-data:
+  caddy-config:
+  file-storage:
 
 networks:
   ondoki-network:
