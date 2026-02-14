@@ -253,10 +253,10 @@ export class RecordingService extends EventEmitter {
       // Determine capture region
       const captureRegion = this.getCaptureRegion();
       
-      // Calculate relative positions
+      // Calculate screenshot relative position (relative to the captured region)
       const screenshotRelative = {
-        x: clickPoint.x - captureRegion.x,
-        y: clickPoint.y - captureRegion.y,
+        x: Math.max(0, Math.min(clickPoint.x - captureRegion.x, captureRegion.width - 1)),
+        y: Math.max(0, Math.min(clickPoint.y - captureRegion.y, captureRegion.height - 1)),
       };
 
       // Take screenshot and annotate with click point

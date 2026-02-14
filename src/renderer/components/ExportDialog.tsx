@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AnnotatedStep, RecordedStep, UploadResult } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
+import { X, Upload, Check, AlertCircle, Cloud, Download, Eye } from 'lucide-react';
 
 interface ExportDialogProps {
   steps: any[];

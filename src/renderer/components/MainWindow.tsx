@@ -9,23 +9,19 @@ import ExportDialog from './ExportDialog';
 import SettingsWindow from './SettingsWindow';
 import LlmSetupWizard from './LlmSetupWizard';
 import GuidePreview from './GuidePreview';
-
-// Icons (using emoji for now, but you could use a proper icon library)
-const Icons = {
-  Play: () => <span className="text-lg">▶️</span>,
-  Stop: () => <span className="text-lg">⏹️</span>,
-  Pause: () => <span className="text-lg">⏸️</span>,
-  Resume: () => <span className="text-lg">▶️</span>,
-  Settings: () => <span className="text-lg">⚙️</span>,
-  Chat: () => <span className="text-lg">💬</span>,
-  Ai: () => <span className="text-lg">✨</span>,
-  Check: () => <span className="text-lg">✅</span>,
-  Upload: () => <span className="text-lg">☁️</span>,
-  Mic: () => <span className="text-lg">🎤</span>,
-  Delete: () => <span className="text-lg">🗑️</span>,
-  Logo: () => <span className="text-4xl font-bold text-indigo-600">O</span>,
-  Equalizer: () => <span className="text-5xl">📊</span>,
-};
+import { 
+  Play, 
+  Square, 
+  Pause, 
+  Settings as SettingsIcon, 
+  MessageCircle, 
+  Sparkles, 
+  Check, 
+  Cloud, 
+  Mic, 
+  Trash2, 
+  Circle 
+} from 'lucide-react';
 
 interface MainWindowProps {}
 
@@ -193,207 +189,279 @@ const MainWindow: React.FC<MainWindowProps> = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
-      <div className="flex-1 p-6">
-        <div className="max-w-md mx-auto">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4">
-            {/* Top toolbar */}
-            <div className="flex justify-end items-center mb-6 space-x-2">
-              <span className={`text-sm ${aiStatus.className}`}>
-                {aiStatus.text}
-              </span>
-              
-              {isAuthenticated && (
-                <button
-                  onClick={() => setShowChatWindow(true)}
-                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                  title="Open Chat"
-                >
-                  <Icons.Chat />
-                </button>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="border-b border-border bg-card">
+        <div className="flex h-16 items-center justify-between px-6">
+          <div className="flex items-center space-x-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <Circle className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <h1 className="text-lg font-semibold">Ondoki Desktop</h1>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            {/* Auth status */}
+            <div className="flex items-center space-x-2">
+              {settings?.llmApiKey ? (
+                <div className="flex items-center space-x-1 text-green-600">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-small">AI Ready</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 text-muted-foreground">
+                  <div className="h-2 w-2 rounded-full bg-gray-400" />
+                  <span className="text-small">AI Not Configured</span>
+                </div>
               )}
-              
-              <button
-                onClick={() => setShowLlmSetup(true)}
-                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                title="AI Setup"
-              >
-                <Icons.Ai />
-              </button>
-              
-              <button
-                onClick={() => setShowSettingsWindow(true)}
-                className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                title="Settings"
-              >
-                <Icons.Settings />
-              </button>
             </div>
 
-            {/* Logo */}
-            <div className="flex justify-center mb-8">
-              <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100">
-                <Icons.Logo />
-              </div>
-            </div>
-
-            {/* Login Panel */}
-            {!isAuthenticated && (
-              <div className="text-center">
-                <button
-                  onClick={handleLogin}
-                  disabled={authLoading}
-                  className="btn-primary w-full h-12 text-lg mb-8"
-                  style={{ borderRadius: '24px' }}
-                >
-                  {authLoading ? 'Signing In...' : 'Sign In'}
-                </button>
-                
-                <p className="text-xs text-gray-400">
-                  version {appVersion}
-                </p>
-              </div>
-            )}
-
-            {/* User Panel */}
+            {/* Action buttons */}
             {isAuthenticated && (
-              <div className="space-y-4">
-                {/* Greeting */}
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <button
+                onClick={() => setShowChatWindow(true)}
+                className="btn-ghost"
+                title="Open Chat"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </button>
+            )}
+            
+            <button
+              onClick={() => setShowLlmSetup(true)}
+              className="btn-ghost"
+              title="AI Setup"
+            >
+              <Sparkles className="h-4 w-4" />
+            </button>
+            
+            <button
+              onClick={() => setShowSettingsWindow(true)}
+              className="btn-ghost"
+              title="Settings"
+            >
+              <SettingsIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-6">
+        <div className="mx-auto max-w-md">
+          <div className="card">
+            <div className="card-header">
+              {!isAuthenticated ? (
+                <div className="space-y-4 text-center">
+                  <h2 className="text-2xl font-semibold">Welcome to Ondoki</h2>
+                  <p className="text-muted-foreground">
+                    Sign in to start creating guided tutorials
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold">
                     Hello{user ? `, ${user.name || user.email}` : ''}!
                   </h2>
+                  <p className="text-muted-foreground">Ready to record a new guide?</p>
                 </div>
+              )}
+            </div>
 
-                {/* Project selector */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select project
-                  </label>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => setSelectedProjectId(e.target.value)}
-                    className="input-field"
-                    disabled={!hasProjects}
-                  >
-                    {hasProjects ? (
-                      projects.map((project: Project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">No projects available</option>
-                    )}
-                  </select>
-                </div>
-
-                {/* Voice transcription toggle */}
-                <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <Icons.Mic />
-                    <span className="text-sm font-medium text-gray-700">
-                      Voice transcription
-                    </span>
-                  </div>
+            <div className="card-content space-y-4">
+              {!isAuthenticated ? (
+                <div className="space-y-4">
                   <button
-                    type="button"
-                    className={`toggle-switch ${voiceTranscription ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                    onClick={() => setVoiceTranscription(!voiceTranscription)}
-                    data-enabled={voiceTranscription}
+                    onClick={handleLogin}
+                    disabled={authLoading}
+                    className="btn-primary w-full h-12 text-base"
                   >
-                    <span className="toggle-switch-thumb" />
+                    {authLoading ? 'Signing In...' : 'Sign In'}
                   </button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    version {appVersion}
+                  </p>
                 </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Project selector */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Select project
+                    </label>
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="input-field"
+                      disabled={!hasProjects}
+                    >
+                      {hasProjects ? (
+                        projects.map((project: Project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">No projects available</option>
+                      )}
+                    </select>
+                  </div>
 
-                {/* Recording controls */}
-                {recordingState.isRecording ? (
-                  <div className="space-y-4">
-                    {/* Status */}
-                    <div className="text-center">
-                      <div className="flex items-center justify-center space-x-2 mb-2">
-                        {!recordingState.isPaused && (
-                          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                        )}
-                        <span className="font-medium">
-                          {recordingState.isPaused ? 'Capture paused' : 'Capturing...'}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {formattedDuration} • {recordingState.stepCount} steps
+                  {/* Voice transcription toggle */}
+                  <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                    <div className="flex items-center space-x-3">
+                      <Mic className="h-4 w-4 text-muted-foreground" />
+                      <div className="space-y-0.5">
+                        <div className="text-sm font-medium">Voice transcription</div>
+                        <div className="text-xs text-muted-foreground">
+                          Capture voice annotations during recording
+                        </div>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      className={`toggle-switch ${voiceTranscription ? 'bg-primary' : 'bg-input'}`}
+                      onClick={() => setVoiceTranscription(!voiceTranscription)}
+                      data-enabled={voiceTranscription}
+                    >
+                      <span className="toggle-switch-thumb" />
+                    </button>
+                  </div>
 
-                    {/* Control buttons */}
-                    <div className="flex space-x-3 justify-center">
+                  {/* Recording controls */}
+                  {recordingState.isRecording ? (
+                    <div className="space-y-4">
+                      {/* Recording status */}
+                      <div className="rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-center justify-center space-x-2 mb-3">
+                          {!recordingState.isPaused && (
+                            <div className="h-3 w-3 animate-pulse rounded-full bg-destructive" />
+                          )}
+                          <span className="font-medium">
+                            {recordingState.isPaused ? 'Capture paused' : 'Recording...'}
+                          </span>
+                        </div>
+                        <div className="text-center text-sm text-muted-foreground">
+                          {formattedDuration} • {recordingState.stepCount} steps captured
+                        </div>
+                      </div>
+
+                      {/* Control buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={togglePause}
+                          disabled={recordingLoading}
+                          className="btn-secondary flex flex-1 items-center justify-center gap-2"
+                        >
+                          {recordingState.isPaused ? (
+                            <Play className="h-4 w-4" />
+                          ) : (
+                            <Pause className="h-4 w-4" />
+                          )}
+                          {recordingState.isPaused ? 'Resume' : 'Pause'}
+                        </button>
+                        
+                        <button
+                          onClick={handleDeleteRecording}
+                          disabled={recordingLoading}
+                          className="btn-destructive flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
+                      </div>
+
+                      {/* Complete recording */}
                       <button
-                        onClick={togglePause}
+                        onClick={handleCompleteRecording}
                         disabled={recordingLoading}
-                        className="btn-secondary flex items-center space-x-2"
+                        className="btn-primary w-full h-12 flex items-center justify-center gap-2"
                       >
-                        {recordingState.isPaused ? <Icons.Resume /> : <Icons.Pause />}
-                        <span>{recordingState.isPaused ? 'Resume' : 'Pause'}</span>
-                      </button>
-                      
-                      <button
-                        onClick={handleDeleteRecording}
-                        disabled={recordingLoading}
-                        className="btn-secondary flex items-center space-x-2 text-red-600"
-                      >
-                        <Icons.Delete />
-                        <span>Delete</span>
+                        <Check className="h-4 w-4" />
+                        Complete Recording
                       </button>
                     </div>
-
-                    {/* Complete button */}
-                    <button
-                      onClick={handleCompleteRecording}
-                      disabled={recordingLoading}
-                      className="btn-primary w-full h-12 flex items-center justify-center space-x-2"
-                    >
-                      <Icons.Check />
-                      <span>Complete Capture</span>
-                    </button>
-                  </div>
-                ) : (
-                  // Start recording
-                  <div className="space-y-4">
-                    <button
-                      onClick={handleStartRecording}
-                      disabled={!hasProjects || !selectedProjectId}
-                      className="btn-primary w-full h-12 flex items-center justify-center space-x-2"
-                    >
-                      <Icons.Play />
-                      <span>Start Capture</span>
-                    </button>
-
-                    {/* Generate Guide button (if steps exist) */}
-                    {steps.length > 0 && (
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Start recording */}
                       <button
-                        onClick={handleGenerateGuide}
-                        className="btn-secondary w-full h-10 flex items-center justify-center space-x-2"
+                        onClick={handleStartRecording}
+                        disabled={!hasProjects || !selectedProjectId}
+                        className="btn-primary w-full h-12 flex items-center justify-center gap-2"
                       >
-                        <Icons.Ai />
-                        <span>Generate Guide</span>
+                        <Play className="h-4 w-4" />
+                        Start Recording
                       </button>
-                    )}
-                  </div>
-                )}
 
-                {/* Logout button */}
-                <div className="pt-4 text-center">
-                  <button
-                    onClick={handleLogout}
-                    className="btn-secondary px-6 py-2"
-                    style={{ borderRadius: '20px' }}
-                  >
-                    Sign Out
-                  </button>
+                      {/* Generate guide (if steps exist) */}
+                      {steps.length > 0 && (
+                        <button
+                          onClick={handleGenerateGuide}
+                          className="btn-secondary w-full flex items-center justify-center gap-2"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Generate Guide
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Logout */}
+                  <div className="flex justify-center pt-4">
+                    <button
+                      onClick={handleLogout}
+                      className="btn-ghost text-muted-foreground"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Steps preview (if any) */}
+          {steps.length > 0 && (
+            <div className="mt-6 card">
+              <div className="card-header">
+                <h3 className="text-lg font-medium">Recent Recording</h3>
+                <p className="text-small">{steps.length} steps captured</p>
+              </div>
+              <div className="card-content">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {steps.slice(-3).map((step, index) => (
+                    <div key={step.stepNumber} className="flex items-start gap-3 p-2 rounded-md bg-muted/50">
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-primary text-xs text-primary-foreground">
+                        {step.stepNumber}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{step.actionType}</p>
+                        <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+                      </div>
+                      {step.screenshotPath && (
+                        <div className="h-8 w-8 flex-shrink-0 rounded bg-secondary" />
+                      )}
+                    </div>
+                  ))}
+                  {steps.length > 3 && (
+                    <p className="text-center text-xs text-muted-foreground">
+                      ... and {steps.length - 3} more steps
+                    </p>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Status Bar */}
+      <div className="border-t border-border bg-muted/30 px-6 py-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div>
+            {isAuthenticated ? `Connected as ${user?.email}` : 'Not authenticated'}
           </div>
+          <div>v{appVersion}</div>
         </div>
       </div>
 

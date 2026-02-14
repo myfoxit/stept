@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Display, WindowInfo, CaptureArea } from '../../main/preload';
 import { useRecording } from '../hooks/useRecording';
+import { Search, RefreshCw, Monitor, Smartphone, Play, X } from 'lucide-react';
 
 interface CaptureSelectorProps {
   onSelect: (captureArea: CaptureArea) => void;
@@ -60,11 +61,11 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
 
   if (isLoading) {
     return (
-      <div className="dialog-overlay">
-        <div className="dialog-content max-w-2xl">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+        <div className="bg-card rounded-lg border shadow-lg max-w-md w-full">
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p>Loading capture options...</p>
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+            <p className="text-foreground">Loading capture options...</p>
           </div>
         </div>
       </div>
@@ -72,59 +73,66 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
   }
 
   return (
-    <div className="dialog-overlay">
-      <div className="dialog-content max-w-5xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="bg-card rounded-lg border shadow-lg max-w-5xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Select Capture Area</h2>
-          <div className="flex items-center space-x-4">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div>
+            <h2 className="text-xl font-semibold">Select Capture Area</h2>
+            <p className="text-small mt-1">Choose what you want to record</p>
+          </div>
+          
+          <div className="flex items-center space-x-3">
             {/* Search */}
-            <div className="flex items-center space-x-2">
-              <span className="text-gray-400">🔍</span>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search for windows"
+                placeholder="Search windows..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-field w-64"
+                className="input-field pl-10 w-64"
               />
             </div>
             
             {/* Refresh */}
             <button
               onClick={handleRefresh}
-              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              className="btn-ghost"
               title="Refresh windows"
             >
-              🔄
+              <RefreshCw className="h-4 w-4" />
             </button>
-            
-            {/* Start capture (all displays) */}
+
+            {/* Close */}
             <button
-              onClick={handleAllDisplaysSelect}
-              className="btn-primary"
+              onClick={onCancel}
+              className="btn-ghost h-8 w-8 p-0"
             >
-              Start Capture
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-96 overflow-y-auto scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-8">
             {/* Screens section */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Screens</h3>
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <Monitor className="h-5 w-5" />
+                Displays
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* All Displays */}
                 <div
                   onClick={handleAllDisplaysSelect}
-                  className="capture-card"
+                  className="card cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50 group"
                 >
-                  <div className="flex flex-col items-center p-6">
-                    <div className="text-6xl mb-4">🖥️</div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Entire Screen</h4>
-                    <p className="text-sm text-gray-600 text-center">Capture all displays</p>
+                  <div className="card-content flex flex-col items-center p-6">
+                    <Monitor className="h-12 w-12 mb-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <h4 className="font-semibold mb-1">Entire Screen</h4>
+                    <p className="text-small text-center">Capture all displays</p>
                   </div>
                 </div>
 
@@ -133,14 +141,20 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
                   <div
                     key={display.id}
                     onClick={() => handleDisplaySelect(display)}
-                    className="capture-card"
+                    className="card cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50 group"
                   >
-                    <div className="flex flex-col items-center p-6">
-                      <div className="text-6xl mb-4">📺</div>
-                      <h4 className="font-semibold text-gray-900 mb-1">{display.name}</h4>
-                      <p className="text-sm text-gray-600 text-center">
+                    <div className="card-content flex flex-col items-center p-6">
+                      <Smartphone className="h-12 w-12 mb-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <h4 className="font-semibold mb-1">{display.name}</h4>
+                      <p className="text-small text-center">
                         {display.bounds.width} × {display.bounds.height}
-                        {display.isPrimary && ' (Primary)'}
+                        {display.isPrimary && (
+                          <span className="ml-1">
+                            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                              Primary
+                            </span>
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -148,15 +162,23 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
               </div>
             </div>
 
-            <hr className="border-gray-200" />
+            {/* Separator */}
+            <div className="border-t" />
 
             {/* Applications section */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Applications</h3>
+              <h3 className="text-lg font-medium mb-4">Applications</h3>
               
               {filteredWindows.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  {searchTerm ? 'No windows found matching your search.' : 'No visible windows found.'}
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Smartphone className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h4 className="text-base font-medium mb-2">No windows found</h4>
+                  <p className="text-small max-w-sm">
+                    {searchTerm 
+                      ? 'Try adjusting your search or refreshing the list.' 
+                      : 'No visible application windows are currently available.'
+                    }
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -164,24 +186,23 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
                     <div
                       key={window.handle}
                       onClick={() => handleWindowSelect(window)}
-                      className="capture-card"
+                      className="card cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50 group"
                     >
-                      <div className="p-4">
+                      <div className="card-content p-4">
                         {/* Window thumbnail area */}
-                        <div className="h-32 bg-gray-100 border border-gray-200 rounded mb-3 flex items-center justify-center">
-                          {/* Placeholder for window thumbnail */}
-                          <span className="text-4xl">🪟</span>
+                        <div className="h-32 bg-muted rounded-md border mb-3 flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+                          <Smartphone className="h-8 w-8 text-muted-foreground" />
                         </div>
                         
                         {/* Window info */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-1 truncate" title={window.title}>
+                        <div className="space-y-1">
+                          <h4 className="font-medium truncate" title={window.title}>
                             {window.title}
                           </h4>
-                          <p className="text-sm text-gray-600">
-                            PID: {window.processId}
+                          <p className="text-small">
+                            Process ID: {window.processId}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             {window.bounds.width} × {window.bounds.height}
                           </p>
                         </div>
@@ -195,13 +216,27 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end p-6 border-t border-gray-200">
-          <button
-            onClick={onCancel}
-            className="btn-secondary"
-          >
-            Cancel
-          </button>
+        <div className="flex items-center justify-between p-6 border-t">
+          <p className="text-small text-muted-foreground">
+            Click on a display or window to start recording
+          </p>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={onCancel}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            
+            <button
+              onClick={handleAllDisplaysSelect}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Play className="h-4 w-4" />
+              Record Full Screen
+            </button>
+          </div>
         </div>
       </div>
     </div>

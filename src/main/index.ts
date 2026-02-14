@@ -147,8 +147,20 @@ class OndokiApp {
     
     // Load the renderer
     console.log('Loading renderer from:', RENDERER_PATH);
-    this.mainWindow.loadFile(RENDERER_PATH).then(() => {
+    this.mainWindow.loadFile(RENDERER_PATH).then(async () => {
       console.log('Renderer loaded successfully');
+      
+      // Try auto-login after renderer is loaded
+      try {
+        const success = await this.authService.tryAutoLogin();
+        if (success && this.mainWindow) {
+          const status = await this.authService.getStatus();
+          this.mainWindow.webContents.send('auth-status-changed', status);
+          console.log('Auto-login successful, notified renderer');
+        }
+      } catch (error) {
+        console.error('Auto-login failed:', error);
+      }
     }).catch((err: Error) => {
       console.error('Failed to load renderer:', err);
     });

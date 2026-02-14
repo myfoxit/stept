@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnnotatedStep, RecordedStep } from '../../main/preload';
 import { useChat, useMessageFormatting } from '../hooks/useChat';
+import { X, Send, MessageCircle, RotateCcw, Check } from 'lucide-react';
 
 interface ChatWindowProps {
   steps: any[];
@@ -74,39 +75,42 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[600px] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="bg-card rounded-lg border shadow-lg w-full max-w-2xl h-[600px] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">
-            <span className="text-2xl">💬</span>
+            <MessageCircle className="h-5 w-5" />
             <div>
-              <h2 className="font-semibold text-gray-900">Ondoki Chat</h2>
+              <h2 className="font-semibold">Ondoki Chat</h2>
               {includeRecordingContext && steps.length > 0 && (
-                <p className="text-xs text-indigo-600">
-                  Including {steps.length} recorded steps
-                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Check className="h-3 w-3 text-green-600" />
+                  <span className="text-xs text-green-600">
+                    Including {steps.length} recorded steps
+                  </span>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             {/* Include recording context toggle */}
             <label className="flex items-center space-x-2 text-sm">
               <input
                 type="checkbox"
                 checked={includeRecordingContext}
                 onChange={toggleRecordingContext}
-                className="rounded text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
               />
-              <span className="text-gray-700">Include recording</span>
+              <span className="text-foreground">Include recording</span>
             </label>
 
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 p-1"
+              className="btn-ghost h-8 w-8 p-0"
             >
-              ✕
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -114,10 +118,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
           {messages.length === 0 && (
-            <div className="text-center text-gray-500 py-8">
-              <div className="text-4xl mb-4">💬</div>
-              <p>Start a conversation!</p>
-              <p className="text-sm text-gray-400 mt-2">
+            <div className="flex flex-col items-center justify-center text-center py-12">
+              <MessageCircle className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
+              <p className="text-small max-w-sm">
                 Ask questions about your recording or get help with your workflow.
               </p>
             </div>
@@ -129,10 +133,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
                   message.role === 'user'
-                    ? 'bg-indigo-600 text-white rounded-br-sm'
-                    : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
                 }`}
               >
                 <div className={`text-sm whitespace-pre-wrap ${
@@ -140,9 +144,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
                 }`}>
                   {message.content}
                 </div>
-                <div className={`text-xs mt-1 opacity-70 ${
-                  message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'
-                }`}>
+                <div className="text-xs mt-1 opacity-70">
                   {formatTimestamp(message.timestamp || new Date())}
                 </div>
               </div>
@@ -152,26 +154,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
           {/* Streaming indicator */}
           {isStreaming && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-sm px-4 py-2 max-w-xs lg:max-w-md">
-                <div className="flex items-center space-x-1">
+              <div className="bg-muted text-muted-foreground rounded-lg px-3 py-2 max-w-xs lg:max-w-md">
+                <div className="flex items-center space-x-2">
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
-                  <span className="text-xs text-gray-500 ml-2">AI is typing...</span>
+                  <span className="text-xs">AI is typing...</span>
                 </div>
               </div>
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
               <div className="flex items-center space-x-2">
-                <span className="text-red-500">⚠️</span>
+                <div className="h-4 w-4 rounded-full bg-destructive flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-red-800">Error</p>
-                  <p className="text-xs text-red-600">{error}</p>
+                  <p className="text-sm font-medium text-destructive">Error</p>
+                  <p className="text-xs text-destructive/80">{error}</p>
                 </div>
               </div>
             </div>
@@ -181,7 +183,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
         </div>
 
         {/* Input area */}
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t p-4">
           <div className="flex space-x-2">
             <div className="flex-1 relative">
               <textarea
@@ -190,7 +192,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                className="input-field resize-none"
                 rows={1}
                 style={{
                   minHeight: '40px',
@@ -202,7 +204,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
               
               {/* Character limit indicator */}
               {inputValue.length > 500 && (
-                <div className="absolute bottom-1 right-1 text-xs text-gray-400">
+                <div className="absolute bottom-1 right-1 text-xs text-muted-foreground">
                   {inputValue.length}/1000
                 </div>
               )}
@@ -211,28 +213,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || isLoading}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white p-2 rounded-lg transition-colors w-10 h-10 flex items-center justify-center"
+              className="btn-primary h-10 w-10 p-0"
               title="Send message (Enter)"
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
               ) : (
-                <span>📤</span>
+                <Send className="h-4 w-4" />
               )}
             </button>
           </div>
 
           {/* Quick actions */}
           {messages.length > 0 && (
-            <div className="flex justify-between items-center mt-2">
+            <div className="flex justify-between items-center mt-3">
               <button
                 onClick={clearChat}
-                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                className="btn-ghost text-xs h-auto p-1"
               >
+                <RotateCcw className="h-3 w-3 mr-1" />
                 Clear chat
               </button>
               
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 Press Enter to send, Shift+Enter for new line
               </div>
             </div>

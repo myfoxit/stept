@@ -218,6 +218,8 @@ export class ScreenshotService {
       const screenshot = await screenshotDesktop({ format: 'png' });
       
       // Crop to bounds and annotate with click point
+      // clickPoint is already relative to the bounds, so we use it directly
+      const circleRadius = 15;
       const annotatedBuffer = await sharp(screenshot)
         .extract({
           left: Math.max(0, bounds.x),
@@ -228,8 +230,8 @@ export class ScreenshotService {
         .composite([
           {
             input: await this.createClickCircle(),
-            left: Math.max(0, clickPoint.x - 15),
-            top: Math.max(0, clickPoint.y - 15),
+            left: Math.max(0, Math.min(clickPoint.x - circleRadius, bounds.width - (circleRadius * 2))),
+            top: Math.max(0, Math.min(clickPoint.y - circleRadius, bounds.height - (circleRadius * 2))),
             blend: 'over',
           },
         ])
