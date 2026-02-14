@@ -122,11 +122,11 @@ class OndokiApp {
 
     console.log('Creating main window...');
     this.mainWindow = new BrowserWindow({
-      width: 1200,
-      height: 800,
+      width: 480,
+      height: 680,
       center: true,
-      minWidth: 800,
-      minHeight: 600,
+      minWidth: 400,
+      minHeight: 500,
       show: true,
       backgroundColor: '#f8fafc',
       icon: this.getAppIcon(),
