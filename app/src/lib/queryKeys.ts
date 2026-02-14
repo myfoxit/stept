@@ -21,4 +21,6 @@ export const queryKeys = {
   documentLinks: (docId: string) => ['documentLinks', docId] as const,
   documentsByTableRow: (tableId: string, rowId: number) =>
     ['documentsByTableRow', tableId, rowId] as const,
+  shareSettings: (resourceType: string, resourceId: string) =>
+    ['share', resourceType, resourceId] as const,
 };

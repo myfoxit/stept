@@ -869,23 +869,63 @@ async def export_workflow_docx(
 # SHARING ENDPOINTS
 # ──────────────────────────────────────────────────────────────────────────────
 
+@router.get("/workflow/{session_id}/share")
+async def get_workflow_share_settings(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get share settings for a workflow."""
+    from app.models import ResourceShare
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    # Get shared users
+    stmt = select(ResourceShare).where(
+        ResourceShare.resource_type == "workflow",
+        ResourceShare.resource_id == session_id,
+    )
+    result = await db.execute(stmt)
+    shares = result.scalars().all()
+
+    shared_with = []
+    for s in shares:
+        user_name = None
+        if s.shared_with_user_id:
+            u = await db.get(User, s.shared_with_user_id)
+            if u:
+                user_name = u.name
+        shared_with.append({
+            "id": s.id,
+            "email": s.shared_with_email,
+            "permission": s.permission,
+            "user_name": user_name,
+        })
+
+    return {
+        "is_public": session.is_public,
+        "share_token": session.share_token,
+        "public_url": f"/public/workflow/{session.share_token}" if session.share_token else None,
+        "shared_with": shared_with,
+    }
+
+
 @router.post("/workflow/{session_id}/share")
 async def share_workflow(
     session_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate a public share link for a workflow."""
+    """Generate a public share link for a workflow (legacy compat)."""
     import uuid
     session = await db.get(ProcessRecordingSession, session_id)
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
-    
     if not session.share_token:
         session.share_token = uuid.uuid4().hex
     session.is_public = True
     await db.commit()
-    
     return {"share_token": session.share_token, "is_public": True}
 
 
@@ -895,16 +935,145 @@ async def unshare_workflow(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Remove public share link for a workflow."""
+    """Remove public share link for a workflow (legacy compat)."""
     session = await db.get(ProcessRecordingSession, session_id)
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
-    
     session.share_token = None
     session.is_public = False
     await db.commit()
-    
     return {"is_public": False}
+
+
+@router.post("/workflow/{session_id}/share/public")
+async def enable_workflow_public_link(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Enable public link sharing for a workflow."""
+    import uuid
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    if not session.share_token:
+        session.share_token = uuid.uuid4().hex
+    session.is_public = True
+    await db.commit()
+    return {
+        "is_public": True,
+        "share_token": session.share_token,
+        "public_url": f"/public/workflow/{session.share_token}",
+    }
+
+
+@router.delete("/workflow/{session_id}/share/public")
+async def disable_workflow_public_link(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Disable public link sharing for a workflow."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    session.share_token = None
+    session.is_public = False
+    await db.commit()
+    return {"is_public": False, "share_token": None, "public_url": None}
+
+
+@router.post("/workflow/{session_id}/share/invite")
+async def invite_to_workflow(
+    session_id: str,
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Invite a user by email to access this workflow."""
+    from app.models import ResourceShare
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    email = body.get("email", "").strip().lower()
+    permission = body.get("permission", "view")
+    if not email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email is required")
+    if permission not in ("view", "edit"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Permission must be 'view' or 'edit'")
+
+    # Check if already shared
+    existing = await db.execute(
+        select(ResourceShare).where(
+            ResourceShare.resource_type == "workflow",
+            ResourceShare.resource_id == session_id,
+            ResourceShare.shared_with_email == email,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status.HTTP_409_CONFLICT, "Already shared with this email")
+
+    # Check if email matches an existing user
+    user_result = await db.execute(select(User).where(User.email == email))
+    existing_user = user_result.scalar_one_or_none()
+
+    share = ResourceShare(
+        resource_type="workflow",
+        resource_id=session_id,
+        shared_with_email=email,
+        shared_with_user_id=existing_user.id if existing_user else None,
+        permission=permission,
+        shared_by=current_user.id,
+    )
+    db.add(share)
+    await db.commit()
+    await db.refresh(share)
+
+    return {
+        "id": share.id,
+        "email": share.shared_with_email,
+        "permission": share.permission,
+        "user_name": existing_user.name if existing_user else None,
+    }
+
+
+@router.delete("/workflow/{session_id}/share/invite/{share_id}")
+async def remove_workflow_invite(
+    session_id: str,
+    share_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a user's access to this workflow."""
+    from app.models import ResourceShare
+    share = await db.get(ResourceShare, share_id)
+    if not share or share.resource_id != session_id or share.resource_type != "workflow":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share not found")
+    await db.delete(share)
+    await db.commit()
+    return {"status": "removed"}
+
+
+@router.patch("/workflow/{session_id}/share/invite/{share_id}")
+async def update_workflow_invite(
+    session_id: str,
+    share_id: str,
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a user's permission on this workflow."""
+    from app.models import ResourceShare
+    share = await db.get(ResourceShare, share_id)
+    if not share or share.resource_id != session_id or share.resource_type != "workflow":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share not found")
+    permission = body.get("permission", "view")
+    if permission not in ("view", "edit"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Permission must be 'view' or 'edit'")
+    share.permission = permission
+    await db.commit()
+    return {"id": share.id, "permission": share.permission}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

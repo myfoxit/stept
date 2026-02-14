@@ -1,7 +1,7 @@
 from typing import Any
 
 from sqlalchemy import (
-    Column, Integer, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint
+    Column, Integer, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint, Index
 )
 from sqlalchemy.orm import relationship, backref
 from .database import Base
@@ -395,6 +395,26 @@ project_members = Table(
     Column('invited_by', String(16), ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
     UniqueConstraint('user_id', 'project_id', name='_project_member_unique'),
 )
+
+
+class ResourceShare(Base):
+    __tablename__ = "resource_shares"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    resource_type = Column(String(20), nullable=False)  # "workflow" or "document"
+    resource_id = Column(String(16), nullable=False)
+    shared_with_email = Column(String(255), nullable=False)
+    shared_with_user_id = Column(String(16), ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    permission = Column(String(10), nullable=False, default="view")  # "view" or "edit"
+    shared_by = Column(String(16), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    shared_by_user = relationship("User", foreign_keys=[shared_by], backref="shared_resources")
+    shared_with_user = relationship("User", foreign_keys=[shared_with_user_id], backref="received_shares")
+
+    __table_args__ = (
+        UniqueConstraint('resource_type', 'resource_id', 'shared_with_email', name='_resource_share_unique'),
+    )
 
 
 class Embedding(Base):

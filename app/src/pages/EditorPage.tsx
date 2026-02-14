@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { NotionEditor } from '@/components/tiptap-templates/simple/notion-editor';
 import { Button } from '@/components/ui/button';
 import { SiteHeader } from '@/components/site-header';
-import { IconDownload } from '@tabler/icons-react';
+import { IconDownload, IconShare } from '@tabler/icons-react';
 import {
   PageLayoutSelector,
   type PageLayout,
@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { useDocument, useUpdateDocumentLayout } from '@/hooks/api/documents';
 import { exportDocument, type DocumentExportFormat } from '@/api/documents';
 import { ExportDialog } from '@/components/export-dialog';
+import { ShareDialog } from '@/components/share-dialog';
 import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
 
@@ -59,6 +60,18 @@ export default function EditorPage() {
     <div>
       <SiteHeader name="Editor">
         <PageLayoutSelector value={pageLayout} onChange={handleLayoutChange} />
+
+        <ShareDialog
+          resourceType="document"
+          resourceId={docId!}
+          resourceName={doc?.name || 'Document'}
+          trigger={
+            <Button variant="outline" size="sm">
+              <IconShare className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+          }
+        />
         
         <ExportDialog
           onExport={handleExport}

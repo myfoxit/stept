@@ -1,12 +1,15 @@
 """Public endpoints that don't require authentication."""
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session as get_db
-from app.models import ProcessRecordingSession, Document
+from app.models import ProcessRecordingSession, Document, User
 from app.middleware.rate_limit import RateLimiter
+from app.security import get_current_user_optional
+from app.services.access import can_access_resource
 
 # Rate limit: 60 requests per minute for public endpoints
 _public_limiter = RateLimiter(limit=60, window=60)
@@ -14,30 +17,21 @@ _public_limiter = RateLimiter(limit=60, window=60)
 router = APIRouter()
 
 
-@router.get("/workflow/{share_token}")
-async def get_public_workflow(
-    share_token: str,
-    db: AsyncSession = Depends(get_db),
-    _rl=Depends(_public_limiter),
-):
-    """Get a publicly shared workflow (no auth required)."""
+async def _load_workflow_by_token(share_token: str, db: AsyncSession):
+    """Load a workflow by share_token (public link)."""
     stmt = (
         select(ProcessRecordingSession)
         .options(
             selectinload(ProcessRecordingSession.steps),
             selectinload(ProcessRecordingSession.files),
         )
-        .where(
-            ProcessRecordingSession.share_token == share_token,
-            ProcessRecordingSession.is_public == True,
-        )
+        .where(ProcessRecordingSession.share_token == share_token)
     )
     result = await db.execute(stmt)
-    session = result.scalar_one_or_none()
+    return result.scalar_one_or_none()
 
-    if not session:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
 
+def _serialize_workflow(session, permission: str = "view"):
     steps_data = []
     for step in sorted(session.steps, key=lambda s: s.step_number):
         step_dict = {
@@ -67,7 +61,39 @@ async def get_public_workflow(
         "steps": steps_data,
         "files": files_data,
         "total_steps": len([s for s in steps_data if s.get("step_type") in ("screenshot", "capture", "gif", "video", None)]),
+        "permission": permission,
     }
+
+
+@router.get("/workflow/{share_token}")
+async def get_public_workflow(
+    share_token: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    _rl=Depends(_public_limiter),
+):
+    """Get a publicly shared workflow (no auth required, optional auth for extra access)."""
+    session = await _load_workflow_by_token(share_token, db)
+
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+
+    # Check access: public OR user has resource share
+    if session.is_public:
+        permission = "view"
+        if current_user and session.project_id:
+            allowed, perm = await can_access_resource("workflow", session.id, current_user, db)
+            if allowed:
+                permission = perm
+        return _serialize_workflow(session, permission)
+
+    # Not public — check if authenticated user has access via ResourceShare
+    if current_user:
+        allowed, permission = await can_access_resource("workflow", session.id, current_user, db)
+        if allowed:
+            return _serialize_workflow(session, permission)
+
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
 
 
 @router.get("/workflow/{share_token}/image/{step_number}")
@@ -75,6 +101,7 @@ async def get_public_workflow_image(
     share_token: str,
     step_number: int,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     _rl=Depends(_public_limiter),
 ):
     """Get an image from a publicly shared workflow (no auth required)."""
@@ -84,16 +111,21 @@ async def get_public_workflow_image(
     stmt = (
         select(ProcessRecordingSession)
         .options(selectinload(ProcessRecordingSession.files))
-        .where(
-            ProcessRecordingSession.share_token == share_token,
-            ProcessRecordingSession.is_public == True,
-        )
+        .where(ProcessRecordingSession.share_token == share_token)
     )
     result = await db.execute(stmt)
     session = result.scalar_one_or_none()
 
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+
+    # Check access
+    if not session.is_public:
+        if not current_user:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+        allowed, _ = await can_access_resource("workflow", session.id, current_user, db)
+        if not allowed:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
 
     file_record = next((f for f in session.files if f.step_number == step_number), None)
     if not file_record:
@@ -113,17 +145,29 @@ async def get_public_workflow_image(
 async def get_public_document(
     share_token: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     _rl=Depends(_public_limiter),
 ):
-    """Get a publicly shared document (no auth required)."""
-    stmt = select(Document).where(
-        Document.share_token == share_token,
-        Document.is_public == True,
-    )
+    """Get a publicly shared document (no auth required, optional auth for extra access)."""
+    stmt = select(Document).where(Document.share_token == share_token)
     result = await db.execute(stmt)
     doc = result.scalar_one_or_none()
 
     if not doc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
+
+    # Check access
+    if doc.is_public:
+        permission = "view"
+        if current_user:
+            allowed, perm = await can_access_resource("document", doc.id, current_user, db)
+            if allowed:
+                permission = perm
+    elif current_user:
+        allowed, permission = await can_access_resource("document", doc.id, current_user, db)
+        if not allowed:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
+    else:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
 
     return {
@@ -133,4 +177,5 @@ async def get_public_document(
         "page_layout": doc.page_layout,
         "created_at": doc.created_at,
         "updated_at": doc.updated_at,
+        "permission": permission,
     }

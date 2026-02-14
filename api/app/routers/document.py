@@ -152,13 +152,55 @@ async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 # SHARING ENDPOINTS
 # ──────────────────────────────────────────────────────────────────────────────
 
+@router.get("/{doc_id}/share")
+async def get_document_share_settings(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get share settings for a document."""
+    from app.models import Document as DocumentModel, ResourceShare
+    from sqlalchemy import select as sel
+    doc = await db.get(DocumentModel, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    stmt = sel(ResourceShare).where(
+        ResourceShare.resource_type == "document",
+        ResourceShare.resource_id == doc_id,
+    )
+    result = await db.execute(stmt)
+    shares = result.scalars().all()
+
+    shared_with = []
+    for s in shares:
+        user_name = None
+        if s.shared_with_user_id:
+            u = await db.get(User, s.shared_with_user_id)
+            if u:
+                user_name = u.name
+        shared_with.append({
+            "id": s.id,
+            "email": s.shared_with_email,
+            "permission": s.permission,
+            "user_name": user_name,
+        })
+
+    return {
+        "is_public": doc.is_public,
+        "share_token": doc.share_token,
+        "public_url": f"/public/document/{doc.share_token}" if doc.share_token else None,
+        "shared_with": shared_with,
+    }
+
+
 @router.post("/{doc_id}/share")
 async def share_document(
     doc_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate a public share link for a document."""
+    """Generate a public share link for a document (legacy compat)."""
     import uuid
     from app.models import Document as DocumentModel
     doc = await db.get(DocumentModel, doc_id)
@@ -177,7 +219,7 @@ async def unshare_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Remove public share link for a document."""
+    """Remove public share link for a document (legacy compat)."""
     from app.models import Document as DocumentModel
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
@@ -186,6 +228,138 @@ async def unshare_document(
     doc.is_public = False
     await db.commit()
     return {"is_public": False}
+
+
+@router.post("/{doc_id}/share/public")
+async def enable_document_public_link(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Enable public link sharing for a document."""
+    import uuid
+    from app.models import Document as DocumentModel
+    doc = await db.get(DocumentModel, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    if not doc.share_token:
+        doc.share_token = uuid.uuid4().hex
+    doc.is_public = True
+    await db.commit()
+    return {
+        "is_public": True,
+        "share_token": doc.share_token,
+        "public_url": f"/public/document/{doc.share_token}",
+    }
+
+
+@router.delete("/{doc_id}/share/public")
+async def disable_document_public_link(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Disable public link sharing for a document."""
+    from app.models import Document as DocumentModel
+    doc = await db.get(DocumentModel, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    doc.share_token = None
+    doc.is_public = False
+    await db.commit()
+    return {"is_public": False, "share_token": None, "public_url": None}
+
+
+@router.post("/{doc_id}/share/invite")
+async def invite_to_document(
+    doc_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Invite a user by email to access this document."""
+    from app.models import Document as DocumentModel, ResourceShare
+    from sqlalchemy import select as sel
+    doc = await db.get(DocumentModel, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    email = body.get("email", "").strip().lower()
+    permission = body.get("permission", "view")
+    if not email:
+        raise HTTPException(400, "Email is required")
+    if permission not in ("view", "edit"):
+        raise HTTPException(400, "Permission must be 'view' or 'edit'")
+
+    existing = await db.execute(
+        sel(ResourceShare).where(
+            ResourceShare.resource_type == "document",
+            ResourceShare.resource_id == doc_id,
+            ResourceShare.shared_with_email == email,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "Already shared with this email")
+
+    user_result = await db.execute(sel(User).where(User.email == email))
+    existing_user = user_result.scalar_one_or_none()
+
+    share = ResourceShare(
+        resource_type="document",
+        resource_id=doc_id,
+        shared_with_email=email,
+        shared_with_user_id=existing_user.id if existing_user else None,
+        permission=permission,
+        shared_by=current_user.id,
+    )
+    db.add(share)
+    await db.commit()
+    await db.refresh(share)
+
+    return {
+        "id": share.id,
+        "email": share.shared_with_email,
+        "permission": share.permission,
+        "user_name": existing_user.name if existing_user else None,
+    }
+
+
+@router.delete("/{doc_id}/share/invite/{share_id}")
+async def remove_document_invite(
+    doc_id: str,
+    share_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a user's access to this document."""
+    from app.models import ResourceShare
+    share = await db.get(ResourceShare, share_id)
+    if not share or share.resource_id != doc_id or share.resource_type != "document":
+        raise HTTPException(404, "Share not found")
+    await db.delete(share)
+    await db.commit()
+    return {"status": "removed"}
+
+
+@router.patch("/{doc_id}/share/invite/{share_id}")
+async def update_document_invite(
+    doc_id: str,
+    share_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a user's permission on this document."""
+    from app.models import ResourceShare
+    share = await db.get(ResourceShare, share_id)
+    if not share or share.resource_id != doc_id or share.resource_type != "document":
+        raise HTTPException(404, "Share not found")
+    permission = body.get("permission", "view")
+    if permission not in ("view", "edit"):
+        raise HTTPException(400, "Permission must be 'view' or 'edit'")
+    share.permission = permission
+    await db.commit()
+    return {"id": share.id, "permission": share.permission}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
