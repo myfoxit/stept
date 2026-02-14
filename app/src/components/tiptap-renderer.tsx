@@ -3,6 +3,7 @@
  * Lightweight — no TipTap editor dependency, works for public pages.
  */
 import React from 'react';
+import { getApiBaseUrl } from '@/lib/apiClient';
 
 interface TipTapNode {
   type: string;
@@ -56,8 +57,146 @@ function renderMarks(text: string, marks?: Array<{ type: string; attrs?: Record<
   return node;
 }
 
-function renderNode(node: TipTapNode, index: number): React.ReactNode {
-  const children = node.content?.map((child, i) => renderNode(child, i));
+// ---------------------------------------------------------------------------
+// Embedded Workflow component — fetches workflow data + renders inline
+// ---------------------------------------------------------------------------
+
+interface WorkflowStep {
+  step_number: number;
+  step_type?: string;
+  description?: string;
+  window_title?: string;
+  generated_title?: string;
+  generated_description?: string;
+  text_typed?: string;
+  key_pressed?: string;
+}
+
+interface WorkflowData {
+  id: string;
+  name?: string;
+  steps: WorkflowStep[];
+  total_steps: number;
+  guide_markdown?: string;
+}
+
+function EmbeddedWorkflow({ sessionId, documentShareToken }: { sessionId: string; documentShareToken?: string }) {
+  const [data, setData] = React.useState<WorkflowData | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+  const [currentStep, setCurrentStep] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!sessionId || !documentShareToken) {
+      setLoading(false);
+      setError(true);
+      return;
+    }
+    const baseUrl = getApiBaseUrl().replace('/api/v1', '');
+    fetch(`${baseUrl}/api/v1/public/document/${documentShareToken}/embedded-workflow/${sessionId}`)
+      .then(res => {
+        if (!res.ok) throw new Error('not found');
+        return res.json();
+      })
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
+  }, [sessionId, documentShareToken]);
+
+  if (loading) {
+    return (
+      <div className="border rounded-lg p-6 bg-muted/30 mb-4 animate-pulse">
+        <div className="h-4 bg-muted rounded w-1/3 mb-3"></div>
+        <div className="h-48 bg-muted rounded"></div>
+      </div>
+    );
+  }
+
+  if (error || !data || data.steps.length === 0) {
+    return (
+      <div className="border rounded-lg p-4 bg-muted/20 mb-4 text-center text-muted-foreground text-sm">
+        <p>This workflow is not available.</p>
+      </div>
+    );
+  }
+
+  const baseUrl = getApiBaseUrl().replace('/api/v1', '');
+  const step = data.steps[currentStep];
+  const imageUrl = `${baseUrl}/api/v1/public/document/${documentShareToken}/embedded-workflow/${sessionId}/image/${step.step_number}`;
+  const screenshotSteps = data.steps.filter(s =>
+    !s.step_type || ['screenshot', 'capture', 'gif', 'video'].includes(s.step_type)
+  );
+
+  return (
+    <div className="border rounded-lg overflow-hidden bg-white dark:bg-zinc-900 shadow-sm mb-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950 dark:to-indigo-950 px-4 py-3 border-b flex items-center justify-between">
+        <div>
+          <h4 className="font-semibold text-sm">{data.name || 'Workflow'}</h4>
+          <p className="text-xs text-muted-foreground">{data.total_steps} steps</p>
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div className="p-4 space-y-3">
+        <div className="flex items-center gap-2 pb-2 border-b">
+          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-900 text-xs font-semibold text-violet-700 dark:text-violet-300">
+            {currentStep + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {step.generated_title || step.description || 'Step ' + step.step_number}
+            </p>
+            {step.window_title && (
+              <p className="text-xs text-muted-foreground truncate">{step.window_title}</p>
+            )}
+          </div>
+        </div>
+
+        {step.generated_description && (
+          <p className="text-sm text-muted-foreground">{step.generated_description}</p>
+        )}
+
+        <img
+          src={imageUrl}
+          alt={`Step ${step.step_number}`}
+          className="w-full rounded-lg border"
+          loading="lazy"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+
+        {/* Navigation */}
+        {data.steps.length > 1 && (
+          <div className="flex items-center justify-between pt-2 border-t">
+            <button
+              onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+              disabled={currentStep === 0}
+              className="px-3 py-1.5 text-xs font-medium rounded-md border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← Previous
+            </button>
+            <span className="text-xs text-muted-foreground">
+              {currentStep + 1} / {data.steps.length}
+            </span>
+            <button
+              onClick={() => setCurrentStep(Math.min(data.steps.length - 1, currentStep + 1))}
+              disabled={currentStep === data.steps.length - 1}
+              className="px-3 py-1.5 text-xs font-medium rounded-md border bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Node renderer
+// ---------------------------------------------------------------------------
+
+function renderNode(node: TipTapNode, index: number, ctx?: { documentShareToken?: string }): React.ReactNode {
+  const children = node.content?.map((child, i) => renderNode(child, i, ctx));
 
   switch (node.type) {
     case 'doc':
@@ -156,11 +295,12 @@ function renderNode(node: TipTapNode, index: number): React.ReactNode {
       return <React.Fragment key={index}>{renderMarks(node.text || '', node.marks)}</React.Fragment>;
 
     case 'process-recording-node':
-      // Embedded workflow — show a link/placeholder
       return (
-        <div key={index} className="border rounded-lg p-4 bg-muted/30 mb-3">
-          <p className="text-sm text-muted-foreground">📋 Embedded workflow</p>
-        </div>
+        <EmbeddedWorkflow
+          key={index}
+          sessionId={node.attrs?.sessionId}
+          documentShareToken={ctx?.documentShareToken}
+        />
       );
 
     default:
@@ -172,12 +312,18 @@ function renderNode(node: TipTapNode, index: number): React.ReactNode {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 interface TipTapRendererProps {
   content: any; // TipTap JSON (string or object)
   className?: string;
+  /** Share token of the parent document — needed to load embedded workflows */
+  documentShareToken?: string;
 }
 
-export function TipTapRenderer({ content, className }: TipTapRendererProps) {
+export function TipTapRenderer({ content, className, documentShareToken }: TipTapRendererProps) {
   const doc = React.useMemo(() => {
     if (!content) return null;
     if (typeof content === 'string') {
@@ -197,7 +343,7 @@ export function TipTapRenderer({ content, className }: TipTapRendererProps) {
 
   return (
     <div className={`prose dark:prose-invert max-w-none ${className || ''}`}>
-      {renderNode(doc, 0)}
+      {renderNode(doc, 0, { documentShareToken })}
     </div>
   );
 }

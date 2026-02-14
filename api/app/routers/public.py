@@ -180,3 +180,83 @@ async def get_public_document(
         "updated_at": doc.updated_at,
         "permission": permission,
     }
+
+
+@router.get("/document/{share_token}/embedded-workflow/{session_id}")
+async def get_embedded_workflow(
+    share_token: str,
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    _rl=Depends(_public_limiter),
+):
+    """Get a workflow embedded in a public document.
+    
+    Access rule: if the document is public, its embedded workflows are
+    readable too — same as Notion. No need to separately share the workflow.
+    """
+    # Verify the document is actually public
+    stmt = select(Document).where(Document.share_token == share_token)
+    result = await db.execute(stmt)
+    doc = result.scalar_one_or_none()
+    if not doc or not doc.is_public:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
+
+    # Load the workflow by session_id
+    stmt = (
+        select(ProcessRecordingSession)
+        .options(
+            selectinload(ProcessRecordingSession.steps),
+            selectinload(ProcessRecordingSession.files),
+        )
+        .where(ProcessRecordingSession.id == session_id)
+    )
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    return _serialize_workflow(session, "view")
+
+
+@router.get("/document/{share_token}/embedded-workflow/{session_id}/image/{step_number}")
+async def get_embedded_workflow_image(
+    share_token: str,
+    session_id: str,
+    step_number: int,
+    db: AsyncSession = Depends(get_db),
+    _rl=Depends(_public_limiter),
+):
+    """Get an image from a workflow embedded in a public document."""
+    from fastapi.responses import FileResponse
+    import os
+
+    # Verify the document is actually public
+    stmt = select(Document).where(Document.share_token == share_token)
+    result = await db.execute(stmt)
+    doc = result.scalar_one_or_none()
+    if not doc or not doc.is_public:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
+
+    # Load workflow
+    stmt = (
+        select(ProcessRecordingSession)
+        .options(selectinload(ProcessRecordingSession.files))
+        .where(ProcessRecordingSession.id == session_id)
+    )
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    file_record = next((f for f in session.files if f.step_number == step_number), None)
+    if not file_record:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+
+    file_path = file_record.file_path
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(session.storage_path or "", file_path)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image file not found")
+
+    return FileResponse(file_path, media_type=file_record.mime_type or "image/png")
