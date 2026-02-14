@@ -276,12 +276,16 @@ export class RecordingService extends EventEmitter {
       const buttonTypes: Record<number, string> = { 1: 'Left', 2: 'Right', 3: 'Middle' };
       const buttonType = buttonTypes[event.button] || 'Unknown';
 
-      // Build description
-      let description = `${buttonType} clicked`;
-      if (elementName) description += ` on "${elementName}"`;
-      if (elementRole) description += ` (${elementRole})`;
-      description += ` in ${windowTitle}`;
-      if (ownerApp && ownerApp !== windowTitle) description += ` [${ownerApp}]`;
+      // Build clean human-readable description
+      const cleanRole = elementRole ? elementRole.replace(/^AX/, '') : '';
+      const shortWindowTitle = windowTitle.length > 40 ? windowTitle.substring(0, 40) + '…' : windowTitle;
+      let description = `${buttonType} Click`;
+      if (elementName && elementName !== cleanRole) {
+        description += ` on "${elementName}"`;
+      } else if (cleanRole && !['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter'].includes(cleanRole)) {
+        description += ` on ${cleanRole}`;
+      }
+      description += ` in ${shortWindowTitle}`;
 
       const step: RecordedStep = {
         stepNumber: this.stepCount,

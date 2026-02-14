@@ -281,8 +281,12 @@ const MainWindow: React.FC<MainWindowProps> = () => {
                         {step.stepNumber}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 truncate">{step.actionType}</p>
-                        <p className="text-[11px] text-gray-400 truncate">{step.description}</p>
+                        <p className="text-xs text-gray-700 truncate">
+                          {(step as any).isAnnotated && (step as any).generatedTitle
+                            ? (step as any).generatedTitle
+                            : step.description}
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">{step.actionType} — {step.windowTitle}</p>
                       </div>
                     </div>
                   ))}
