@@ -231,13 +231,26 @@ class OndokiApp {
     }
   }
 
-  private handleProtocolUrl(url: string): void {
+  private async handleProtocolUrl(url: string): Promise<void> {
     console.log('Handling protocol URL:', url);
     
+    // Handle auth callback directly in main process
+    if (url.startsWith('ondoki://auth/callback')) {
+      try {
+        const success = await this.authService.handleCallback(url);
+        console.log('Auth callback result:', success);
+        
+        if (success && this.mainWindow) {
+          // Notify renderer of auth status change
+          const status = await this.authService.getStatus();
+          this.mainWindow.webContents.send('auth-status-changed', status);
+        }
+      } catch (error) {
+        console.error('Auth callback error:', error);
+      }
+    }
+    
     if (this.mainWindow) {
-      // Send the protocol URL to the renderer process
-      this.mainWindow.webContents.send('protocol-url', url);
-      
       // Bring the window to front
       if (this.mainWindow.isMinimized()) {
         this.mainWindow.restore();
