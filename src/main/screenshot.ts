@@ -1,6 +1,12 @@
 import { screen, desktopCapturer } from 'electron';
-import screenshotDesktop from 'screenshot-desktop';
-import sharp from 'sharp';
+let screenshotDesktop: any;
+let sharp: any;
+try {
+  screenshotDesktop = require('screenshot-desktop');
+  sharp = require('sharp');
+} catch (e) {
+  console.warn('screenshot-desktop or sharp not available:', (e as Error).message);
+}
 import * as path from 'path';
 import * as fs from 'fs';
 

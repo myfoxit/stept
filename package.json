@@ -20,8 +20,8 @@
     "build:renderer": "webpack --mode production",
     "dev": "npm run build:main && npm run dev:renderer",
     "dev:renderer": "webpack serve --mode development",
-    "start": "npm run build && electron .",
-    "dev:electron": "npm run build && electron . --development",
+    "start": "npm run build && electron . --no-sandbox",
+    "dev:electron": "npm run build && electron . --development --no-sandbox",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint src/",
@@ -69,7 +69,7 @@
     "webpack-dev-server": "^5.0.4"
   },
   "dependencies": {
-    "electron-store": "^10.0.0",
+    "electron-store": "^8.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "screenshot-desktop": "^1.12.7",

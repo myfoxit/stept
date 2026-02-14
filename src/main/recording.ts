@@ -1,6 +1,14 @@
 import { EventEmitter } from 'events';
 import { BrowserWindow } from 'electron';
-import { uIOhook, UiohookKey, UiohookMouseEvent, UiohookKeyboardEvent } from 'uiohook-napi';
+let uIOhook: any;
+let UiohookKey: any;
+try {
+  const mod = require('uiohook-napi');
+  uIOhook = mod.uIOhook;
+  UiohookKey = mod.UiohookKey;
+} catch (e) {
+  console.warn('uiohook-napi not available:', (e as Error).message);
+}
 import { ScreenshotService } from './screenshot';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -172,7 +180,7 @@ export class RecordingService extends EventEmitter {
 
   private setupGlobalHooks(): void {
     // Mouse event handler
-    uIOhook.on('mousedown', (event: UiohookMouseEvent) => {
+    uIOhook.on('mousedown', (event: any) => {
       if (!this.isRecording || this.isPaused) return;
       
       // Check if click is within capture area
@@ -184,7 +192,7 @@ export class RecordingService extends EventEmitter {
     });
 
     // Keyboard event handler
-    uIOhook.on('keydown', (event: UiohookKeyboardEvent) => {
+    uIOhook.on('keydown', (event: any) => {
       if (!this.isRecording) return;
 
       // Handle pause key (using F9 as pause toggle)
@@ -232,7 +240,7 @@ export class RecordingService extends EventEmitter {
     }
   }
 
-  private async handleMouseClick(event: UiohookMouseEvent): Promise<void> {
+  private async handleMouseClick(event: any): Promise<void> {
     try {
       // Flush any pending text
       this.flushTypedText();
@@ -309,7 +317,7 @@ export class RecordingService extends EventEmitter {
     }
   }
 
-  private handleKeyPress(event: UiohookKeyboardEvent): void {
+  private handleKeyPress(event: any): void {
     // Handle special keys that should flush text
     if (this.isFlushKey(event.keycode)) {
       this.flushTypedText();
