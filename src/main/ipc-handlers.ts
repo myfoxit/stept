@@ -208,7 +208,7 @@ export function setupIpcHandlers(
   // Cloud upload IPC handlers
   ipcMain.handle('cloud:upload', async (event, steps, projectId, userId) => {
     try {
-      return await cloudUploadService.uploadRecording(steps, projectId, userId);
+      return await cloudUploadService.uploadRecording(steps, userId, projectId);
     } catch (error) {
       throw new Error(`Failed to upload recording: ${error instanceof Error ? error.message : String(error)}`);
     }
