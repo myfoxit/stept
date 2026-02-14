@@ -124,19 +124,25 @@ export class ScreenshotService {
         console.warn('Native window-info binary not found. Window detection will be limited.');
       }
     } else if (platform === 'win32') {
-      // PowerShell script path
       const candidates = [
-        path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.ps1'),
-        path.join(__dirname, '..', 'native', 'windows', 'window-info.ps1'),
+        // Packaged app
+        path.join(app?.isPackaged ? path.dirname(app.getPath('exe')) : '', '..', 'Resources', 'native', 'windows', 'window-info.exe'),
+        // Dev: dotnet publish output
+        path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'window-info.exe'),
+        // Dev: simple csc output
+        path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.exe'),
       ];
       for (const candidate of candidates) {
-        if (fs.existsSync(candidate)) {
-          this.nativeBinaryPath = candidate;
-          this.nativeAvailable = true;
-          console.log('Native window-info script found at:', candidate);
-          return;
-        }
+        try {
+          if (fs.existsSync(candidate)) {
+            this.nativeBinaryPath = candidate;
+            this.nativeAvailable = true;
+            console.log('Native window-info.exe found at:', candidate);
+            return;
+          }
+        } catch { continue; }
       }
+      console.warn('Native window-info.exe not found. Build with: cd native/windows && dotnet publish -c Release -r win-x64 --self-contained');
     }
   }
 
@@ -150,16 +156,8 @@ export class ScreenshotService {
     }
 
     return new Promise((resolve, reject) => {
-      let cmd: string;
-      let cmdArgs: string[];
-
-      if (process.platform === 'win32') {
-        cmd = 'powershell';
-        cmdArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', this.nativeBinaryPath!, ...args];
-      } else {
-        cmd = this.nativeBinaryPath!;
-        cmdArgs = args;
-      }
+      const cmd = this.nativeBinaryPath!;
+      const cmdArgs = args;
 
       execFile(cmd, cmdArgs, { timeout: 3000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
         if (error) {
@@ -183,15 +181,7 @@ export class ScreenshotService {
     }
 
     try {
-      let result: string;
-      if (process.platform === 'win32') {
-        result = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', this.nativeBinaryPath!, ...args], {
-          timeout: 3000,
-          encoding: 'utf-8',
-        });
-      } else {
-        result = execFileSync(this.nativeBinaryPath!, args, { timeout: 3000, encoding: 'utf-8' });
-      }
+      const result = execFileSync(this.nativeBinaryPath!, args, { timeout: 3000, encoding: 'utf-8' });
       return JSON.parse(result);
     } catch (e) {
       console.error('Native sync exec error:', (e as Error).message);
