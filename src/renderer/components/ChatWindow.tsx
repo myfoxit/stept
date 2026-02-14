@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnnotatedStep, RecordedStep } from '../../main/preload';
 import { useChat, useMessageFormatting } from '../hooks/useChat';
-import { X, Send, MessageCircle, RotateCcw, Check } from 'lucide-react';
+import { X, Send, MessageCircle, RotateCcw, Check, Loader2 } from 'lucide-react';
 
 interface ChatWindowProps {
   steps: any[];
@@ -9,235 +9,114 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
-  const {
-    messages,
-    isLoading,
-    isStreaming,
-    error,
-    includeRecordingContext,
-    sendMessage,
-    toggleRecordingContext,
-    clearChat,
-  } = useChat();
-  
+  const { messages, isLoading, isStreaming, error, includeRecordingContext, sendMessage, toggleRecordingContext, clearChat } = useChat();
   const { formatTimestamp, isCodeMessage } = useMessageFormatting();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // Focus input when window opens
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  // Handle message send
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
-
     const message = inputValue.trim();
     setInputValue('');
-
     try {
       const recordingSteps = includeRecordingContext ? steps.map(step => ({
-        stepNumber: step.stepNumber,
-        timestamp: step.timestamp,
-        actionType: step.actionType,
-        windowTitle: step.windowTitle,
-        description: step.description,
-        screenshotPath: step.screenshotPath,
-        globalMousePosition: step.globalMousePosition,
-        relativeMousePosition: step.relativeMousePosition,
-        windowSize: step.windowSize,
-        screenshotRelativeMousePosition: step.screenshotRelativeMousePosition,
-        screenshotSize: step.screenshotSize,
-        textTyped: step.textTyped,
-        scrollDelta: step.scrollDelta,
+        stepNumber: step.stepNumber, timestamp: step.timestamp, actionType: step.actionType,
+        windowTitle: step.windowTitle, description: step.description, screenshotPath: step.screenshotPath,
+        globalMousePosition: step.globalMousePosition, relativeMousePosition: step.relativeMousePosition,
+        windowSize: step.windowSize, screenshotRelativeMousePosition: step.screenshotRelativeMousePosition,
+        screenshotSize: step.screenshotSize, textTyped: step.textTyped, scrollDelta: step.scrollDelta,
         elementName: step.elementName,
       })) : undefined;
-
       await sendMessage(message, recordingSteps);
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    }
+    } catch (error) { console.error('Failed to send message:', error); }
   };
 
-  // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <div className="bg-card rounded-lg border shadow-lg w-full max-w-2xl h-[600px] flex flex-col">
+    <div className="dialog-overlay">
+      <div className="bg-white rounded-lg shadow-xl border w-full max-w-lg h-[500px] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center space-x-3">
-            <MessageCircle className="h-5 w-5" />
-            <div>
-              <h2 className="font-semibold">Ondoki Chat</h2>
-              {includeRecordingContext && steps.length > 0 && (
-                <div className="flex items-center gap-1 mt-1">
-                  <Check className="h-3 w-3 text-green-600" />
-                  <span className="text-xs text-green-600">
-                    Including {steps.length} recorded steps
-                  </span>
-                </div>
-              )}
-            </div>
+        <div className="px-3 py-2.5 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-4 w-4 text-gray-400" />
+            <span className="text-[13px] font-semibold text-gray-800">Chat</span>
+            {includeRecordingContext && steps.length > 0 && (
+              <span className="text-[11px] text-green-500 flex items-center gap-0.5">
+                <Check className="h-3 w-3" />{steps.length} steps
+              </span>
+            )}
           </div>
-
-          <div className="flex items-center space-x-3">
-            {/* Include recording context toggle */}
-            <label className="flex items-center space-x-2 text-sm">
-              <input
-                type="checkbox"
-                checked={includeRecordingContext}
-                onChange={toggleRecordingContext}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
-              />
-              <span className="text-foreground">Include recording</span>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer">
+              <input type="checkbox" checked={includeRecordingContext} onChange={toggleRecordingContext}
+                className="h-3 w-3 rounded border-gray-300 text-indigo-500" />
+              Recording
             </label>
-
-            <button
-              onClick={onClose}
-              className="btn-ghost h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <button onClick={onClose} className="btn-icon"><X className="h-3.5 w-3.5" /></button>
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 scrollbar-thin">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center text-center py-12">
-              <MessageCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
-              <p className="text-small max-w-sm">
-                Ask questions about your recording or get help with your workflow.
-              </p>
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <MessageCircle className="h-8 w-8 text-gray-200 mb-2" />
+              <p className="text-xs text-gray-400">Ask about your recording or workflow</p>
             </div>
           )}
-
           {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                <div className={`text-sm whitespace-pre-wrap ${
-                  isCodeMessage(message.content) ? 'font-mono text-xs' : ''
-                }`}>
+            <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] px-2.5 py-1.5 rounded-lg text-[13px] ${
+                message.role === 'user'
+                  ? 'bg-indigo-500 text-white rounded-br-sm'
+                  : 'bg-gray-100 text-gray-700 rounded-bl-sm'
+              }`}>
+                <div className={`whitespace-pre-wrap ${isCodeMessage(message.content) ? 'font-mono text-xs' : ''}`}>
                   {message.content}
                 </div>
-                <div className="text-xs mt-1 opacity-70">
-                  {formatTimestamp(message.timestamp || new Date())}
-                </div>
+                <div className="text-[10px] mt-0.5 opacity-60">{formatTimestamp(message.timestamp || new Date())}</div>
               </div>
             </div>
           ))}
-
-          {/* Streaming indicator */}
           {isStreaming && (
             <div className="flex justify-start">
-              <div className="bg-muted text-muted-foreground rounded-lg px-3 py-2 max-w-xs lg:max-w-md">
-                <div className="flex items-center space-x-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-                  <span className="text-xs">AI is typing...</span>
-                </div>
+              <div className="bg-gray-100 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                <span className="text-[11px] text-gray-400">Typing...</span>
               </div>
             </div>
           )}
-
           {error && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <div className="h-4 w-4 rounded-full bg-destructive flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-destructive">Error</p>
-                  <p className="text-xs text-destructive/80">{error}</p>
-                </div>
-              </div>
-            </div>
+            <div className="bg-red-50 border border-red-200 rounded-md p-2 text-xs text-red-600">{error}</div>
           )}
-
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <div className="border-t p-4">
-          <div className="flex space-x-2">
-            <div className="flex-1 relative">
-              <textarea
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
-                className="input-field resize-none"
-                rows={1}
-                style={{
-                  minHeight: '40px',
-                  maxHeight: '100px',
-                  overflow: 'auto',
-                }}
-                disabled={isLoading}
-              />
-              
-              {/* Character limit indicator */}
-              {inputValue.length > 500 && (
-                <div className="absolute bottom-1 right-1 text-xs text-muted-foreground">
-                  {inputValue.length}/1000
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              className="btn-primary h-10 w-10 p-0"
-              title="Send message (Enter)"
-            >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+        {/* Input */}
+        <div className="border-t px-3 py-2">
+          <div className="flex gap-1.5">
+            <textarea ref={inputRef} value={inputValue} onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown} placeholder="Type a message..." rows={1}
+              className="input-field flex-1 resize-none py-1.5" style={{ minHeight: '32px', maxHeight: '80px' }}
+              disabled={isLoading} />
+            <button onClick={handleSendMessage} disabled={!inputValue.trim() || isLoading}
+              className="btn-primary h-8 w-8 p-0 flex-shrink-0">
+              {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             </button>
           </div>
-
-          {/* Quick actions */}
           {messages.length > 0 && (
-            <div className="flex justify-between items-center mt-3">
-              <button
-                onClick={clearChat}
-                className="btn-ghost text-xs h-auto p-1"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Clear chat
+            <div className="flex justify-between items-center mt-1.5">
+              <button onClick={clearChat} className="text-[11px] text-gray-400 hover:text-gray-600 flex items-center gap-0.5">
+                <RotateCcw className="h-3 w-3" /> Clear
               </button>
-              
-              <div className="text-xs text-muted-foreground">
-                Press Enter to send, Shift+Enter for new line
-              </div>
+              <span className="text-[11px] text-gray-300">Enter to send</span>
             </div>
           )}
         </div>

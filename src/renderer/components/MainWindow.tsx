@@ -9,34 +9,37 @@ import ExportDialog from './ExportDialog';
 import SettingsWindow from './SettingsWindow';
 import LlmSetupWizard from './LlmSetupWizard';
 import GuidePreview from './GuidePreview';
-import { 
-  Play, 
-  Square, 
-  Pause, 
-  Settings as SettingsIcon, 
-  MessageCircle, 
-  Sparkles, 
-  Check, 
-  Cloud, 
-  Mic, 
-  Trash2, 
-  Circle 
+import {
+  Play,
+  Square,
+  Pause,
+  Settings as SettingsIcon,
+  MessageCircle,
+  Sparkles,
+  Check,
+  Mic,
+  Trash2,
+  Circle,
+  LogOut,
+  LogIn,
+  ChevronDown,
+  FileText,
 } from 'lucide-react';
 
 interface MainWindowProps {}
 
 const MainWindow: React.FC<MainWindowProps> = () => {
   const electronAPI = useElectronAPI();
-  const { 
-    isAuthenticated, 
-    user, 
-    projects, 
-    hasProjects, 
+  const {
+    isAuthenticated,
+    user,
+    projects,
+    hasProjects,
     isLoading: authLoading,
     login,
-    logout
+    logout,
   } = useAuth();
-  
+
   const {
     recordingState,
     steps,
@@ -45,10 +48,9 @@ const MainWindow: React.FC<MainWindowProps> = () => {
     stopRecording,
     togglePause,
     clearSteps,
-    formattedDuration
+    formattedDuration,
   } = useRecording();
 
-  // Local state
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [voiceTranscription, setVoiceTranscription] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -60,21 +62,16 @@ const MainWindow: React.FC<MainWindowProps> = () => {
   const [showGuidePreview, setShowGuidePreview] = useState(false);
   const [appVersion, setAppVersion] = useState('');
 
-  // Load settings and app version
   useEffect(() => {
     const loadInitialData = async () => {
       if (!electronAPI) return;
-
       try {
         const [settingsData, version] = await Promise.all([
           electronAPI.getSettings(),
           electronAPI.getAppVersion(),
         ]);
-        
         setSettings(settingsData);
         setAppVersion(version);
-
-        // Check if LLM setup is needed
         if (isAuthenticated && !settingsData.llmApiKey) {
           setTimeout(() => setShowLlmSetup(true), 1000);
         }
@@ -82,435 +79,257 @@ const MainWindow: React.FC<MainWindowProps> = () => {
         console.error('Failed to load initial data:', error);
       }
     };
-
     loadInitialData();
   }, [electronAPI, isAuthenticated]);
 
-  // Set default project when projects load
   useEffect(() => {
     if (hasProjects && !selectedProjectId) {
       setSelectedProjectId(projects[0].id);
     }
   }, [hasProjects, projects, selectedProjectId]);
 
-  // Handle login
   const handleLogin = async () => {
-    try {
-      await login();
-    } catch (error) {
-      console.error('Login failed:', error);
-    }
+    try { await login(); } catch (error) { console.error('Login failed:', error); }
   };
 
-  // Handle logout
   const handleLogout = async () => {
-    try {
-      await logout();
-      setSelectedProjectId('');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+    try { await logout(); setSelectedProjectId(''); } catch (error) { console.error('Logout failed:', error); }
   };
 
-  // Handle start recording
   const handleStartRecording = () => {
-    if (!selectedProjectId) {
-      alert('Please select a project first');
-      return;
-    }
+    if (!selectedProjectId) { alert('Please select a project first'); return; }
     setShowCaptureSelector(true);
   };
 
-  // Handle capture selection
   const handleCaptureSelected = async (captureArea: any) => {
     setShowCaptureSelector(false);
-    try {
-      await startRecording(captureArea, selectedProjectId);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      alert('Failed to start recording: ' + (error as Error).message);
-    }
+    try { await startRecording(captureArea, selectedProjectId); }
+    catch (error) { console.error('Failed to start recording:', error); alert('Failed to start recording: ' + (error as Error).message); }
   };
 
-  // Handle complete recording
   const handleCompleteRecording = async () => {
-    try {
-      await stopRecording();
-      if (steps.length > 0) {
-        setShowExportDialog(true);
-      }
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
-    }
+    try { await stopRecording(); if (steps.length > 0) setShowExportDialog(true); }
+    catch (error) { console.error('Failed to stop recording:', error); }
   };
 
-  // Handle delete recording
   const handleDeleteRecording = async () => {
     if (confirm('Are you sure you want to delete this recording?')) {
-      try {
-        await stopRecording();
-        clearSteps();
-      } catch (error) {
-        console.error('Failed to delete recording:', error);
-      }
+      try { await stopRecording(); clearSteps(); }
+      catch (error) { console.error('Failed to delete recording:', error); }
     }
   };
 
-  // Handle generate guide
   const handleGenerateGuide = () => {
-    if (steps.length === 0) {
-      alert('No steps recorded. Record some steps first.');
-      return;
-    }
-
+    if (steps.length === 0) { alert('No steps recorded. Record some steps first.'); return; }
     if (!settings?.llmApiKey) {
-      if (confirm('No AI provider configured. Would you like to set one up now?')) {
-        setShowLlmSetup(true);
-      }
+      if (confirm('No AI provider configured. Would you like to set one up now?')) setShowLlmSetup(true);
       return;
     }
-
     setShowGuidePreview(true);
   };
 
-  // AI Status
-  const getAiStatus = () => {
-    if (!settings?.llmApiKey) {
-      return { text: '⚪ AI Not Configured', className: 'ai-status not-configured' };
-    }
-    return { text: '🟢 AI Ready', className: 'ai-status ready' };
-  };
-
-  const aiStatus = getAiStatus();
-
-  // Render loading state
   if (authLoading) {
-    return <div className="h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="h-screen flex items-center justify-center text-gray-400 text-[13px]">
+        Loading...
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center space-x-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Circle className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <h1 className="text-lg font-semibold">Ondoki Desktop</h1>
+      <header className="h-11 flex-shrink-0 border-b bg-white flex items-center justify-between px-3">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded bg-indigo-500 flex items-center justify-center">
+            <Circle className="h-3 w-3 text-white" />
+          </div>
+          <span className="text-[13px] font-semibold text-gray-800">Ondoki</span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {/* AI status dot */}
+          <div className="flex items-center gap-1.5 mr-2">
+            <div className={`h-1.5 w-1.5 rounded-full ${settings?.llmApiKey ? 'bg-green-400' : 'bg-gray-300'}`} />
+            <span className="text-[11px] text-gray-400">{settings?.llmApiKey ? 'AI' : 'No AI'}</span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            {/* Auth status */}
-            <div className="flex items-center space-x-2">
-              {settings?.llmApiKey ? (
-                <div className="flex items-center space-x-1 text-green-600">
-                  <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-small">AI Ready</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 text-muted-foreground">
-                  <div className="h-2 w-2 rounded-full bg-gray-400" />
-                  <span className="text-small">AI Not Configured</span>
-                </div>
-              )}
-            </div>
-
-            {/* Action buttons */}
-            {isAuthenticated && (
-              <button
-                onClick={() => setShowChatWindow(true)}
-                className="btn-ghost"
-                title="Open Chat"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </button>
-            )}
-            
-            <button
-              onClick={() => setShowLlmSetup(true)}
-              className="btn-ghost"
-              title="AI Setup"
-            >
-              <Sparkles className="h-4 w-4" />
+          {isAuthenticated && (
+            <button onClick={() => setShowChatWindow(true)} className="btn-icon" title="Chat">
+              <MessageCircle className="h-3.5 w-3.5" />
             </button>
-            
-            <button
-              onClick={() => setShowSettingsWindow(true)}
-              className="btn-ghost"
-              title="Settings"
-            >
-              <SettingsIcon className="h-4 w-4" />
-            </button>
-          </div>
+          )}
+          <button onClick={() => setShowLlmSetup(true)} className="btn-icon" title="AI Setup">
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => setShowSettingsWindow(true)} className="btn-icon" title="Settings">
+            <SettingsIcon className="h-3.5 w-3.5" />
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-6">
-        <div className="mx-auto max-w-md">
-          <div className="card">
-            <div className="card-header">
-              {!isAuthenticated ? (
-                <div className="space-y-4 text-center">
-                  <h2 className="text-2xl font-semibold">Welcome to Ondoki</h2>
-                  <p className="text-muted-foreground">
-                    Sign in to start creating guided tutorials
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">
-                    Hello{user ? `, ${user.name || user.email}` : ''}!
-                  </h2>
-                  <p className="text-muted-foreground">Ready to record a new guide?</p>
-                </div>
-              )}
-            </div>
-
-            <div className="card-content space-y-4">
-              {!isAuthenticated ? (
-                <div className="space-y-4">
-                  <button
-                    onClick={handleLogin}
-                    disabled={authLoading}
-                    className="btn-primary w-full h-12 text-base"
-                  >
-                    {authLoading ? 'Signing In...' : 'Sign In'}
-                  </button>
-                  <p className="text-center text-xs text-muted-foreground">
-                    version {appVersion}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Project selector */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Select project
-                    </label>
-                    <select
-                      value={selectedProjectId}
-                      onChange={(e) => setSelectedProjectId(e.target.value)}
-                      className="input-field"
-                      disabled={!hasProjects}
-                    >
-                      {hasProjects ? (
-                        projects.map((project: Project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">No projects available</option>
-                      )}
-                    </select>
-                  </div>
-
-                  {/* Voice transcription toggle */}
-                  <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                    <div className="flex items-center space-x-3">
-                      <Mic className="h-4 w-4 text-muted-foreground" />
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Voice transcription</div>
-                        <div className="text-xs text-muted-foreground">
-                          Capture voice annotations during recording
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`toggle-switch ${voiceTranscription ? 'bg-primary' : 'bg-input'}`}
-                      onClick={() => setVoiceTranscription(!voiceTranscription)}
-                      data-enabled={voiceTranscription}
-                    >
-                      <span className="toggle-switch-thumb" />
-                    </button>
-                  </div>
-
-                  {/* Recording controls */}
-                  {recordingState.isRecording ? (
-                    <div className="space-y-4">
-                      {/* Recording status */}
-                      <div className="rounded-lg border border-border bg-card p-4">
-                        <div className="flex items-center justify-center space-x-2 mb-3">
-                          {!recordingState.isPaused && (
-                            <div className="h-3 w-3 animate-pulse rounded-full bg-destructive" />
-                          )}
-                          <span className="font-medium">
-                            {recordingState.isPaused ? 'Capture paused' : 'Recording...'}
-                          </span>
-                        </div>
-                        <div className="text-center text-sm text-muted-foreground">
-                          {formattedDuration} • {recordingState.stepCount} steps captured
-                        </div>
-                      </div>
-
-                      {/* Control buttons */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={togglePause}
-                          disabled={recordingLoading}
-                          className="btn-secondary flex flex-1 items-center justify-center gap-2"
-                        >
-                          {recordingState.isPaused ? (
-                            <Play className="h-4 w-4" />
-                          ) : (
-                            <Pause className="h-4 w-4" />
-                          )}
-                          {recordingState.isPaused ? 'Resume' : 'Pause'}
-                        </button>
-                        
-                        <button
-                          onClick={handleDeleteRecording}
-                          disabled={recordingLoading}
-                          className="btn-destructive flex items-center justify-center gap-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </button>
-                      </div>
-
-                      {/* Complete recording */}
-                      <button
-                        onClick={handleCompleteRecording}
-                        disabled={recordingLoading}
-                        className="btn-primary w-full h-12 flex items-center justify-center gap-2"
-                      >
-                        <Check className="h-4 w-4" />
-                        Complete Recording
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Start recording */}
-                      <button
-                        onClick={handleStartRecording}
-                        disabled={!hasProjects || !selectedProjectId}
-                        className="btn-primary w-full h-12 flex items-center justify-center gap-2"
-                      >
-                        <Play className="h-4 w-4" />
-                        Start Recording
-                      </button>
-
-                      {/* Generate guide (if steps exist) */}
-                      {steps.length > 0 && (
-                        <button
-                          onClick={handleGenerateGuide}
-                          className="btn-secondary w-full flex items-center justify-center gap-2"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                          Generate Guide
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Logout */}
-                  <div className="flex justify-center pt-4">
-                    <button
-                      onClick={handleLogout}
-                      className="btn-ghost text-muted-foreground"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
+      <main className="flex-1 overflow-y-auto">
+        {!isAuthenticated ? (
+          /* Login */
+          <div className="flex items-center justify-center h-full p-4">
+            <div className="card p-4 w-full max-w-xs space-y-3">
+              <div className="text-center space-y-1">
+                <h2 className="text-[15px] font-semibold text-gray-800">Welcome to Ondoki</h2>
+                <p className="text-xs text-gray-400">Sign in to start creating guides</p>
+              </div>
+              <button onClick={handleLogin} disabled={authLoading} className="btn-primary w-full h-9">
+                <LogIn className="h-3.5 w-3.5 mr-1.5" />
+                {authLoading ? 'Signing In...' : 'Sign In'}
+              </button>
+              <p className="text-center text-[11px] text-gray-300">v{appVersion}</p>
             </div>
           </div>
+        ) : (
+          <div className="p-3 space-y-2.5 max-w-md mx-auto">
+            {/* Project selector row */}
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="input-field flex-1"
+                disabled={!hasProjects}
+              >
+                {hasProjects ? (
+                  projects.map((project: Project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))
+                ) : (
+                  <option value="">No projects</option>
+                )}
+              </select>
 
-          {/* Steps preview (if any) */}
-          {steps.length > 0 && (
-            <div className="mt-6 card">
-              <div className="card-header">
-                <h3 className="text-lg font-medium">Recent Recording</h3>
-                <p className="text-small">{steps.length} steps captured</p>
+              {/* Voice toggle */}
+              <button
+                onClick={() => setVoiceTranscription(!voiceTranscription)}
+                className={`btn-icon flex-shrink-0 ${voiceTranscription ? 'text-indigo-500 bg-indigo-50' : ''}`}
+                title={voiceTranscription ? 'Voice transcription on' : 'Voice transcription off'}
+              >
+                <Mic className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Recording controls */}
+            {recordingState.isRecording ? (
+              <div className="card p-3 space-y-2.5">
+                {/* Status bar */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {!recordingState.isPaused && (
+                      <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                    )}
+                    <span className="text-[13px] font-medium text-gray-700">
+                      {recordingState.isPaused ? 'Paused' : 'Recording'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <span>{formattedDuration}</span>
+                    <span>{recordingState.stepCount} steps</span>
+                  </div>
+                </div>
+
+                {/* Control buttons */}
+                <div className="flex gap-1.5">
+                  <button onClick={togglePause} disabled={recordingLoading} className="btn-secondary flex-1 gap-1.5">
+                    {recordingState.isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                    {recordingState.isPaused ? 'Resume' : 'Pause'}
+                  </button>
+                  <button onClick={handleDeleteRecording} disabled={recordingLoading} className="btn-ghost btn-sm">
+                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                  </button>
+                  <button onClick={handleCompleteRecording} disabled={recordingLoading} className="btn-primary gap-1.5">
+                    <Check className="h-3.5 w-3.5" />
+                    Done
+                  </button>
+                </div>
               </div>
-              <div className="card-content">
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {steps.slice(-3).map((step, index) => (
-                    <div key={step.stepNumber} className="flex items-start gap-3 p-2 rounded-md bg-muted/50">
-                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-primary text-xs text-primary-foreground">
+            ) : (
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleStartRecording}
+                  disabled={!hasProjects || !selectedProjectId}
+                  className="btn-primary flex-1 h-9 gap-1.5"
+                >
+                  <Play className="h-3.5 w-3.5" />
+                  Start Recording
+                </button>
+                {steps.length > 0 && (
+                  <button onClick={handleGenerateGuide} className="btn-secondary h-9 gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Guide
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Steps list */}
+            {steps.length > 0 && !recordingState.isRecording && (
+              <div className="card">
+                <div className="px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">{steps.length} steps recorded</span>
+                  <FileText className="h-3 w-3 text-gray-300" />
+                </div>
+                <div className="max-h-40 overflow-y-auto scrollbar-thin">
+                  {steps.slice(-5).map((step) => (
+                    <div key={step.stepNumber} className="flex items-center gap-2.5 px-3 py-1.5 border-b last:border-0">
+                      <div className="h-5 w-5 rounded bg-gray-100 text-[10px] font-medium text-gray-500 flex items-center justify-center flex-shrink-0">
                         {step.stepNumber}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{step.actionType}</p>
-                        <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+                        <p className="text-xs text-gray-700 truncate">{step.actionType}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{step.description}</p>
                       </div>
-                      {step.screenshotPath && (
-                        <div className="h-8 w-8 flex-shrink-0 rounded bg-secondary" />
-                      )}
                     </div>
                   ))}
-                  {steps.length > 3 && (
-                    <p className="text-center text-xs text-muted-foreground">
-                      ... and {steps.length - 3} more steps
+                  {steps.length > 5 && (
+                    <p className="text-center text-[11px] text-gray-300 py-1">
+                      +{steps.length - 5} more
                     </p>
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Sign out */}
+            <div className="flex justify-center pt-1">
+              <button onClick={handleLogout} className="btn-ghost text-xs text-gray-400 gap-1">
+                <LogOut className="h-3 w-3" />
+                Sign Out
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
-      {/* Status Bar */}
-      <div className="border-t border-border bg-muted/30 px-6 py-2">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div>
-            {isAuthenticated ? `Connected as ${user?.email}` : 'Not authenticated'}
-          </div>
-          <div>v{appVersion}</div>
-        </div>
+      {/* Status bar */}
+      <div className="h-7 flex-shrink-0 border-t bg-white px-3 flex items-center justify-between text-[11px] text-gray-400">
+        <span>{isAuthenticated ? user?.email : 'Not signed in'}</span>
+        <span>v{appVersion}</span>
       </div>
 
-      {/* Dialogs/Modals */}
+      {/* Modals */}
       {showCaptureSelector && (
-        <CaptureSelector
-          onSelect={handleCaptureSelected}
-          onCancel={() => setShowCaptureSelector(false)}
-        />
+        <CaptureSelector onSelect={handleCaptureSelected} onCancel={() => setShowCaptureSelector(false)} />
       )}
-      
       {showChatWindow && (
-        <ChatWindow
-          steps={steps}
-          onClose={() => setShowChatWindow(false)}
-        />
+        <ChatWindow steps={steps} onClose={() => setShowChatWindow(false)} />
       )}
-      
       {showExportDialog && (
-        <ExportDialog
-          steps={steps}
-          projectId={selectedProjectId}
-          userId={user?.id}
-          onClose={() => setShowExportDialog(false)}
-        />
+        <ExportDialog steps={steps} projectId={selectedProjectId} userId={user?.id} onClose={() => setShowExportDialog(false)} />
       )}
-      
       {showSettingsWindow && (
-        <SettingsWindow
-          onClose={() => setShowSettingsWindow(false)}
-          onSettingsChange={(newSettings) => setSettings(newSettings)}
-        />
+        <SettingsWindow onClose={() => setShowSettingsWindow(false)} onSettingsChange={(newSettings) => setSettings(newSettings)} />
       )}
-      
       {showLlmSetup && (
-        <LlmSetupWizard
-          onClose={() => setShowLlmSetup(false)}
-          onComplete={(newSettings) => {
-            setSettings(newSettings);
-            setShowLlmSetup(false);
-          }}
-        />
+        <LlmSetupWizard onClose={() => setShowLlmSetup(false)} onComplete={(newSettings) => { setSettings(newSettings); setShowLlmSetup(false); }} />
       )}
-      
       {showGuidePreview && (
-        <GuidePreview
-          steps={steps}
-          onClose={() => setShowGuidePreview(false)}
-        />
+        <GuidePreview steps={steps} onClose={() => setShowGuidePreview(false)} />
       )}
     </div>
   );
