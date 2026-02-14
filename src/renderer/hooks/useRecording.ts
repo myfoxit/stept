@@ -1,304 +1,136 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RecordingState, RecordedStep, AnnotatedStep, CaptureArea, Display, WindowInfo } from '../../main/preload';
-import { useElectronAPI } from './useElectronAPI';
+import { RecordedStep, Display, WindowInfo, RecordingState } from '../../main/preload';
 
-interface RecordingHookState {
-  recordingState: RecordingState;
-  steps: AnnotatedStep[];
-  isLoading: boolean;
-  error: string | null;
-  displays: Display[];
-  windows: WindowInfo[];
-}
+export type { RecordedStep };
+export type { RecordingState };
 
-/**
- * Custom hook for recording state management
- */
 export const useRecording = () => {
-  const electronAPI = useElectronAPI();
-  const [state, setState] = useState<RecordingHookState>({
-    recordingState: {
-      isRecording: false,
-      isPaused: false,
-      stepCount: 0,
-    },
-    steps: [],
-    isLoading: false,
-    error: null,
-    displays: [],
-    windows: [],
+  const [recordingState, setRecordingState] = useState<RecordingState>({
+    isRecording: false,
+    isPaused: false,
+    stepCount: 0,
   });
+  const [steps, setSteps] = useState<RecordedStep[]>([]);
+  const [displays, setDisplays] = useState<Display[]>([]);
+  const [windows, setWindows] = useState<WindowInfo[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [duration, setDuration] = useState(0);
 
-  // Initialize recording state
-  const initializeRecording = useCallback(async () => {
-    if (!electronAPI) return;
-
-    try {
-      const recordingState = await electronAPI.getRecordingState();
-      setState(prev => ({
-        ...prev,
-        recordingState,
-        error: null,
-      }));
-    } catch (error) {
-      console.error('Failed to initialize recording state:', error);
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to initialize recording',
-      }));
-    }
-  }, [electronAPI]);
-
-  // Listen for recording state changes
+  // Timer for recording duration
   useEffect(() => {
-    if (!electronAPI) return;
+    if (!recordingState.isRecording || recordingState.isPaused) return;
+    const interval = setInterval(() => {
+      setDuration(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [recordingState.isRecording, recordingState.isPaused]);
 
-    const unsubscribeStateChange = electronAPI.onRecordingStateChanged((recordingState: RecordingState) => {
-      setState(prev => ({
-        ...prev,
-        recordingState,
-        error: null,
-      }));
+  // Listen for steps from main process
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    const unsubStep = window.electronAPI.onStepRecorded((step: RecordedStep) => {
+      setSteps(prev => [...prev, step]);
+      setRecordingState(prev => ({ ...prev, stepCount: prev.stepCount + 1 }));
     });
 
-    const unsubscribeStepRecorded = electronAPI.onStepRecorded((step: RecordedStep) => {
-      // Convert RecordedStep to AnnotatedStep
-      const annotatedStep: AnnotatedStep = {
-        ...step,
-        isAnnotated: false,
-      };
-
-      setState(prev => ({
-        ...prev,
-        steps: [...prev.steps, annotatedStep],
-      }));
-
-      // Trigger smart annotation in the background
-      if (electronAPI.annotateStep) {
-        electronAPI.annotateStep(step).catch(error => {
-          console.warn('Smart annotation failed for step:', error);
-        });
-      }
+    const unsubState = window.electronAPI.onRecordingStateChanged((state: RecordingState) => {
+      setRecordingState(state);
     });
 
     return () => {
-      unsubscribeStateChange();
-      unsubscribeStepRecorded();
+      unsubStep?.();
+      unsubState?.();
     };
-  }, [electronAPI]);
+  }, []);
 
-  // Load displays and windows for capture area selection
   const loadCaptureOptions = useCallback(async () => {
-    if (!electronAPI) return;
-
+    if (!window.electronAPI) return;
+    setIsLoading(true);
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      const [displays, windows] = await Promise.all([
-        electronAPI.getDisplays(),
-        electronAPI.getWindows(),
+      const [d, w] = await Promise.all([
+        window.electronAPI.getDisplays(),
+        window.electronAPI.getWindows(),
       ]);
-
-      setState(prev => ({
-        ...prev,
-        displays,
-        windows: windows.filter(w => w.isVisible && w.title.trim() !== ''),
-        isLoading: false,
-      }));
-    } catch (error) {
-      console.error('Failed to load capture options:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to load capture options',
-      }));
+      setDisplays(d || []);
+      setWindows(w || []);
+    } catch (e) {
+      console.error('Failed to load capture options:', e);
+    } finally {
+      setIsLoading(false);
     }
-  }, [electronAPI]);
+  }, []);
 
-  // Start recording
-  const startRecording = useCallback(async (captureArea: CaptureArea, projectId?: string) => {
-    if (!electronAPI) {
-      throw new Error('Electron API not available');
-    }
-
+  const startRecording = useCallback(async (captureArea?: any, projectId?: string) => {
+    if (!window.electronAPI) return;
+    setIsLoading(true);
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null, steps: [] }));
-      await electronAPI.startRecording(captureArea, projectId);
-      setState(prev => ({ ...prev, isLoading: false }));
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to start recording';
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-      }));
-      throw new Error(errorMessage);
+      await window.electronAPI.startRecording(captureArea, projectId);
+      setSteps([]);
+      setDuration(0);
+      setRecordingState({ isRecording: true, isPaused: false, stepCount: 0 });
+    } catch (e) {
+      console.error('Failed to start recording:', e);
+    } finally {
+      setIsLoading(false);
     }
-  }, [electronAPI]);
+  }, []);
 
-  // Stop recording
   const stopRecording = useCallback(async () => {
-    if (!electronAPI) {
-      throw new Error('Electron API not available');
-    }
-
+    if (!window.electronAPI) return;
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-      await electronAPI.stopRecording();
-      setState(prev => ({ ...prev, isLoading: false }));
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to stop recording';
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-      }));
-      throw new Error(errorMessage);
+      await window.electronAPI.stopRecording();
+      setRecordingState(prev => ({ ...prev, isRecording: false, isPaused: false }));
+    } catch (e) {
+      console.error('Failed to stop recording:', e);
     }
-  }, [electronAPI]);
+  }, []);
 
-  // Pause recording
-  const pauseRecording = useCallback(async () => {
-    if (!electronAPI) {
-      throw new Error('Electron API not available');
-    }
-
-    try {
-      await electronAPI.pauseRecording();
-    } catch (error) {
-      console.error('Failed to pause recording:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to pause recording');
-    }
-  }, [electronAPI]);
-
-  // Resume recording
-  const resumeRecording = useCallback(async () => {
-    if (!electronAPI) {
-      throw new Error('Electron API not available');
-    }
-
-    try {
-      await electronAPI.resumeRecording();
-    } catch (error) {
-      console.error('Failed to resume recording:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to resume recording');
-    }
-  }, [electronAPI]);
-
-  // Toggle pause/resume
   const togglePause = useCallback(async () => {
-    if (state.recordingState.isPaused) {
-      await resumeRecording();
-    } else {
-      await pauseRecording();
-    }
-  }, [state.recordingState.isPaused, pauseRecording, resumeRecording]);
-
-  // Take screenshot
-  const takeScreenshot = useCallback(async () => {
-    if (!electronAPI) {
-      throw new Error('Electron API not available');
-    }
-
+    if (!window.electronAPI) return;
     try {
-      const screenshotPath = await electronAPI.takeScreenshot();
-      return screenshotPath;
-    } catch (error) {
-      console.error('Failed to take screenshot:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to take screenshot');
+      if (recordingState.isPaused) {
+        await window.electronAPI.resumeRecording();
+      } else {
+        await window.electronAPI.pauseRecording();
+      }
+      setRecordingState(prev => ({ ...prev, isPaused: !prev.isPaused }));
+    } catch (e) {
+      console.error('Failed to toggle pause:', e);
     }
-  }, [electronAPI]);
+  }, [recordingState.isPaused]);
 
-  // Clear recorded steps
   const clearSteps = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      steps: [],
-    }));
+    setSteps([]);
+    setRecordingState(prev => ({ ...prev, stepCount: 0 }));
+    setDuration(0);
   }, []);
 
-  // Update a step (when annotation completes)
-  const updateStep = useCallback((stepNumber: number, updates: Partial<AnnotatedStep>) => {
-    setState(prev => ({
-      ...prev,
-      steps: prev.steps.map(step =>
-        step.stepNumber === stepNumber
-          ? { ...step, ...updates }
-          : step
-      ),
-    }));
+  const formatDuration = useCallback((seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
   }, []);
 
-  // Derived state for convenience
-  const { isRecording, isPaused, stepCount } = state.recordingState;
-  const hasSteps = state.steps.length > 0;
-  const isIdle = !isRecording && !isPaused;
-
-  // Recording duration calculation
-  const recordingDuration = state.recordingState.startTime
-    ? Date.now() - new Date(state.recordingState.startTime).getTime()
-    : 0;
-
-  // Format duration as mm:ss
-  const formatDuration = useCallback((milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }, []);
-
-  const formattedDuration = formatDuration(recordingDuration);
+  const formattedDuration = formatDuration(duration);
 
   return {
-    // State
-    recordingState: state.recordingState,
-    steps: state.steps,
-    isLoading: state.isLoading,
-    error: state.error,
-    displays: state.displays,
-    windows: state.windows,
-
-    // Derived state
-    isRecording,
-    isPaused,
-    isIdle,
-    stepCount,
-    hasSteps,
-    recordingDuration,
+    recordingState,
+    steps,
+    displays,
+    windows,
+    isLoading,
+    duration,
     formattedDuration,
-
-    // Actions
-    initializeRecording,
-    loadCaptureOptions,
     startRecording,
     stopRecording,
-    pauseRecording,
-    resumeRecording,
     togglePause,
-    takeScreenshot,
     clearSteps,
-    updateStep,
+    formatDuration,
+    loadCaptureOptions,
   };
-};
-
-/**
- * Helper hook to get capture area description
- */
-export const useCaptureAreaDescription = (captureArea: CaptureArea | undefined): string => {
-  if (!captureArea) return '';
-  
-  switch (captureArea.type) {
-    case 'all-displays':
-      return 'All displays';
-    case 'single-display':
-      return captureArea.displayName || 'Selected display';
-    case 'window':
-      return captureArea.windowTitle || 'Selected window';
-    default:
-      return 'Screen';
-  }
 };
 
 export default useRecording;

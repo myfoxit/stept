@@ -120,16 +120,17 @@ class OndokiApp {
   private createMainWindow(): void {
     const windowState = this.settingsManager.getWindowState();
 
+    console.log('Creating main window...');
     this.mainWindow = new BrowserWindow({
-      width: windowState?.width ?? 1200,
-      height: windowState?.height ?? 800,
-      x: windowState?.x,
-      y: windowState?.y,
+      width: 1200,
+      height: 800,
+      center: true,
       minWidth: 800,
       minHeight: 600,
-      show: false,
+      show: true,
+      backgroundColor: '#f8fafc',
       icon: this.getAppIcon(),
-      titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+      // titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -137,8 +138,20 @@ class OndokiApp {
       },
     });
 
+    // Force show window
+    this.mainWindow.show();
+    this.mainWindow.focus();
+    console.log('Window bounds:', JSON.stringify(this.mainWindow.getBounds()));
+    console.log('Window visible:', this.mainWindow.isVisible());
+    console.log('Window minimized:', this.mainWindow.isMinimized());
+    
     // Load the renderer
-    this.mainWindow.loadFile(RENDERER_PATH);
+    console.log('Loading renderer from:', RENDERER_PATH);
+    this.mainWindow.loadFile(RENDERER_PATH).then(() => {
+      console.log('Renderer loaded successfully');
+    }).catch((err: Error) => {
+      console.error('Failed to load renderer:', err);
+    });
 
     // Show window when ready
     this.mainWindow.once('ready-to-show', () => {
@@ -150,8 +163,8 @@ class OndokiApp {
         }
 
         // Open DevTools in development
-        if (process.env.NODE_ENV === 'development') {
-          this.mainWindow.webContents.openDevTools();
+        if (isDev) {
+          this.mainWindow.webContents.openDevTools({ mode: 'detach' });
         }
       }
     });

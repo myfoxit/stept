@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { AnnotatedStep, UploadResult } from '../../main/preload';
+import { AnnotatedStep, RecordedStep, UploadResult } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
 
 interface ExportDialogProps {
-  steps: AnnotatedStep[];
+  steps: any[];
   projectId?: string;
   userId?: string;
   onClose: () => void;

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { AnnotatedStep } from '../../main/preload';
+import { AnnotatedStep, RecordedStep } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
 
 interface GuidePreviewProps {
-  steps: AnnotatedStep[];
+  steps: any[];
   onClose: () => void;
 }
 

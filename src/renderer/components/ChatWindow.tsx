@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AnnotatedStep } from '../../main/preload';
+import { AnnotatedStep, RecordedStep } from '../../main/preload';
 import { useChat, useMessageFormatting } from '../hooks/useChat';
 
 interface ChatWindowProps {
-  steps: AnnotatedStep[];
+  steps: any[];
   onClose: () => void;
 }
 
