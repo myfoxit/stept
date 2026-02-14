@@ -5,6 +5,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
+import { TipTapRenderer } from '@/components/tiptap-renderer';
 
 async function fetchPublicDocument(token: string) {
   const baseUrl = getApiBaseUrl();
@@ -64,17 +65,11 @@ export function PublicDocumentPage() {
     );
   }
 
-  // For now render as simple HTML - content is TipTap JSON
-  // A more advanced version would use a read-only TipTap editor
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">{doc.name || 'Untitled Document'}</h1>
-        <div className="prose dark:prose-invert max-w-none">
-          <p className="text-muted-foreground text-sm">
-            This is a shared document. For the best viewing experience, sign up for Ondoki.
-          </p>
-        </div>
+        <TipTapRenderer content={doc.content} />
         <div className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>
             Made with{' '}
