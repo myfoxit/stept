@@ -31,9 +31,20 @@ export function setupIpcHandlers(
     try {
       await recordingService.startRecording(captureArea, projectId);
       
-      // Forward events to renderer
+      // Forward events to renderer + auto-annotate
       recordingService.on('step-recorded', (step) => {
         event.sender.send('step-recorded', step);
+
+        // Auto-annotate if enabled
+        const settings = settingsManager.getSettings();
+        if (settings.autoAnnotateSteps && settingsManager.isLlmConfigured()) {
+          smartAnnotationService.enqueueStep(step);
+        }
+      });
+
+      // Forward annotation results to renderer
+      smartAnnotationService.on('step-annotated', (annotatedStep) => {
+        event.sender.send('step-annotated', annotatedStep);
       });
       
       recordingService.on('state-changed', (state) => {

@@ -36,6 +36,7 @@ export interface ElectronAPI {
 
   // Event listeners
   onStepRecorded: (callback: (step: RecordedStep) => void) => () => void;
+  onStepAnnotated: (callback: (step: any) => void) => () => void;
   onRecordingStateChanged: (callback: (state: RecordingState) => void) => () => void;
   onAuthStatusChanged: (callback: (status: AuthStatus) => void) => () => void;
   onProtocolUrl: (callback: (url: string) => void) => () => void;
@@ -205,6 +206,12 @@ const electronAPI: ElectronAPI = {
     const handler = (_event: IpcRendererEvent, step: RecordedStep) => callback(step);
     ipcRenderer.on('step-recorded', handler);
     return () => ipcRenderer.removeListener('step-recorded', handler);
+  },
+
+  onStepAnnotated: (callback: (step: any) => void) => {
+    const handler = (_event: IpcRendererEvent, step: any) => callback(step);
+    ipcRenderer.on('step-annotated', handler);
+    return () => ipcRenderer.removeListener('step-annotated', handler);
   },
 
   onRecordingStateChanged: (callback: (state: RecordingState) => void) => {
