@@ -21,6 +21,7 @@ import { ChatProvider } from '@/components/Chat/ChatContext';
 import { ChatPanel } from '@/components/Chat/ChatPanel';
 import { PublicWorkflowPage } from '@/pages/public-workflow';
 import { PublicDocumentPage } from '@/pages/public-document';
+import { SharedWithMePage } from '@/pages/shared-with-me';
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/workflow/:workflowId" element={<WorkflowView />} />
                   <Route path="/workflow/:workflowId/edit" element={<WorkflowView />} />
                   <Route path="documents/:type" element={<DocumentGalleryPage />} />
+                  <Route path="/shared" element={<SharedWithMePage />} />
                   <Route
                     path="/text-container/:containerId?"
                     element={<TextContainerEditor />}

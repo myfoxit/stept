@@ -3,7 +3,7 @@ from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 
-from app.models import User, Session
+from app.models import User, Session, Project, ResourceShare, project_members
 from app.security import (
     hash_password, verify_password, _hash, normalize_email, utc_now_naive
 )
@@ -59,8 +59,32 @@ async def register(db: AsyncSession, *, email: str, password: str, name: Optiona
     db.add(user)
     await db.flush()  # Flush to get user.id
     
-    # If this is the first user, grant them admin role on first project created
-    # (This logic would be in project creation, not here)
+    # Auto-create default workspace project
+    default_project = Project(
+        id=secrets.token_hex(8),
+        name="My Workspace",
+        owner_id=user.id,
+        user_id=user.id,
+    )
+    db.add(default_project)
+    await db.flush()
+    
+    # Add user as owner in project_members
+    await db.execute(
+        project_members.insert().values(
+            user_id=user.id,
+            project_id=default_project.id,
+            role="owner",
+        )
+    )
+    
+    # Resolve any pending ResourceShares for this email
+    await db.execute(
+        update(ResourceShare)
+        .where(func.lower(ResourceShare.shared_with_email) == norm)
+        .where(ResourceShare.shared_with_user_id.is_(None))
+        .values(shared_with_user_id=user.id)
+    )
     
     # send verification mail
     send_verification_email(user.email, user.verification_tok)
@@ -75,6 +99,15 @@ async def authenticate(db: AsyncSession, *, email: str, password: str, user_agen
     user: Optional[User] = await db.scalar(select(User).where(User.normalized_email == norm))
     if not user or not verify_password(password, user.hashed_password):
         return None
+    
+    # Resolve any pending ResourceShares for this user's email
+    await db.execute(
+        update(ResourceShare)
+        .where(func.lower(ResourceShare.shared_with_email) == norm)
+        .where(ResourceShare.shared_with_user_id.is_(None))
+        .values(shared_with_user_id=user.id)
+    )
+    
     # create a new session and return its opaque token
     session_token = await _create_session(db, user, user_agent=user_agent, ip_address=ip_address)
     await db.commit()  # Single commit

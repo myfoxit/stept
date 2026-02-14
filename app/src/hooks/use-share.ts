@@ -8,11 +8,14 @@ import {
   inviteUser,
   removeInvite,
   updateInvitePermission,
+  getSharedWithMe,
   type ShareSettings,
+  type SharedWithMeResponse,
 } from '@/api/sharing';
 
 const shareKeys = {
   settings: (type: string, id: string) => ['share', type, id] as const,
+  sharedWithMe: ['shared-with-me'] as const,
 };
 
 export function useShare(resourceType: 'workflow' | 'document', resourceId: string) {
@@ -64,5 +67,19 @@ export function useShare(resourceType: 'workflow' | 'document', resourceId: stri
     isInviting: inviteMutation.isPending,
     remove: removeMutation.mutateAsync,
     updatePermission: updatePermissionMutation.mutateAsync,
+  };
+}
+
+/** Hook to fetch all resources shared with the current user */
+export function useSharedWithMe() {
+  const query = useQuery<SharedWithMeResponse>({
+    queryKey: shareKeys.sharedWithMe,
+    queryFn: getSharedWithMe,
+  });
+
+  return {
+    items: query.data?.items ?? [],
+    isLoading: query.isLoading,
+    error: query.error,
   };
 }

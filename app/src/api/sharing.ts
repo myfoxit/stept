@@ -81,3 +81,33 @@ export async function updateInvitePermission(
   const base = getBasePath(resourceType, resourceId);
   await apiClient.patch(`${base}/invite/${shareId}`, { permission });
 }
+
+// ── "Shared with me" ──
+
+export interface SharedResource {
+  id: string;
+  name: string;
+  created_at: string | null;
+  updated_at: string | null;
+  total_steps?: number;
+}
+
+export interface SharedWithMeItem {
+  id: string;
+  resource_type: 'document' | 'workflow';
+  resource_id: string;
+  permission: 'view' | 'edit';
+  shared_by_name: string;
+  shared_at: string | null;
+  resource: SharedResource;
+}
+
+export interface SharedWithMeResponse {
+  items: SharedWithMeItem[];
+}
+
+/** Get all resources shared with the current user */
+export async function getSharedWithMe(): Promise<SharedWithMeResponse> {
+  const { data } = await apiClient.get('/shared-with-me');
+  return data;
+}

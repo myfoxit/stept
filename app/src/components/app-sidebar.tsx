@@ -17,6 +17,7 @@ import {
   IconPencil,
   IconTrash,
   IconDotsVertical,
+  IconShare,
 } from '@tabler/icons-react';
 
 import { NavMain } from '@/components/nav-main';
@@ -68,6 +69,11 @@ const data = {
       title: 'Projects',
       url: '#',
       icon: IconFolder,
+    },
+    {
+      title: 'Shared with me',
+      url: '/shared',
+      icon: IconShare,
     },
     {
       title: 'Team',
