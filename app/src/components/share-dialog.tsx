@@ -145,8 +145,8 @@ export function ShareDialog({
               />
             </div>
 
-            {settings?.is_public && publicUrl && (
-              <div className="flex gap-2">
+            {publicUrl && (
+              <div className={`flex gap-2 transition-opacity ${!settings?.is_public ? 'opacity-40' : ''}`}>
                 <Input
                   value={publicUrl}
                   readOnly
@@ -158,6 +158,7 @@ export function ShareDialog({
                   size="icon"
                   onClick={handleCopy}
                   className="shrink-0"
+                  disabled={!settings?.is_public}
                 >
                   {copied ? (
                     <IconCheck className="h-4 w-4 text-green-500" />

@@ -939,7 +939,6 @@ async def unshare_workflow(
     session = await db.get(ProcessRecordingSession, session_id)
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
-    session.share_token = None
     session.is_public = False
     await db.commit()
     return {"is_public": False}
@@ -977,10 +976,10 @@ async def disable_workflow_public_link(
     session = await db.get(ProcessRecordingSession, session_id)
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
-    session.share_token = None
+    # Keep the token so re-enabling gives the same URL
     session.is_public = False
     await db.commit()
-    return {"is_public": False, "share_token": None, "public_url": None}
+    return {"is_public": False, "share_token": session.share_token, "public_url": f"/public/workflow/{session.share_token}" if session.share_token else None}
 
 
 @router.post("/workflow/{session_id}/share/invite")

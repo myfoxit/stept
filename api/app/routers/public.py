@@ -93,7 +93,8 @@ async def get_public_workflow(
         if allowed:
             return _serialize_workflow(session, permission)
 
-    raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+    # Resource exists but not accessible — return 403 so frontend can show "Request Access"
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "access_denied")
 
 
 @router.get("/workflow/{share_token}/image/{step_number}")
@@ -166,9 +167,9 @@ async def get_public_document(
     elif current_user:
         allowed, permission = await can_access_resource("document", doc.id, current_user, db)
         if not allowed:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "access_denied")
     else:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "access_denied")
 
     return {
         "id": doc.id,

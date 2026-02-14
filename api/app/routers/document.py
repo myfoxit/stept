@@ -224,7 +224,7 @@ async def unshare_document(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
-    doc.share_token = None
+    doc.is_public = False
     doc.is_public = False
     await db.commit()
     return {"is_public": False}
@@ -264,10 +264,10 @@ async def disable_document_public_link(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
-    doc.share_token = None
+    # Keep the token so re-enabling gives the same URL
     doc.is_public = False
     await db.commit()
-    return {"is_public": False, "share_token": None, "public_url": None}
+    return {"is_public": False, "share_token": doc.share_token, "public_url": f"/public/document/{doc.share_token}" if doc.share_token else None}
 
 
 @router.post("/{doc_id}/share/invite")
