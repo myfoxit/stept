@@ -1134,6 +1134,13 @@ async def process_recording_with_ai(
             required_role=ProjectRole.MEMBER,
         )
 
+    # Check if async Celery processing is available
+    from app.tasks import is_celery_available
+    if is_celery_available():
+        from app.tasks.ai_tasks import process_recording_task
+        task = process_recording_task.delay(session_id)
+        return {"status": "queued", "task_id": task.id}
+
     try:
         result = await auto_processor.process_recording(session_id, db)
 
@@ -1177,6 +1184,13 @@ async def generate_guide_endpoint(
             required_role=ProjectRole.MEMBER,
         )
 
+    # Check if async Celery processing is available
+    from app.tasks import is_celery_available
+    if is_celery_available():
+        from app.tasks.ai_tasks import generate_guide_task
+        task = generate_guide_task.delay(session_id)
+        return {"status": "queued", "task_id": task.id}
+
     try:
         guide_md = await auto_processor.generate_guide(session_id, db)
 
@@ -1195,6 +1209,16 @@ async def generate_guide_endpoint(
             status.HTTP_502_BAD_GATEWAY,
             detail=f"Guide generation failed: {exc}",
         )
+
+
+
+@router.get("/workflow/{session_id}/task-status/{task_id}")
+async def get_task_status(session_id: str, task_id: str, current_user: User = Depends(get_current_user)):
+    from app.tasks import celery_app, is_celery_available
+    if not is_celery_available():
+        raise HTTPException(404, "Async processing not configured")
+    result = celery_app.AsyncResult(task_id)
+    return {"task_id": task_id, "status": result.state, "result": result.result if result.ready() else None}
 
 
 @router.get("/workflow/{session_id}/generate-guide/stream")
