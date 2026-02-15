@@ -80,7 +80,7 @@ async def _keyword_fallback(
         score = keyword_similarity(query, text)
         if score > 0.15:
             name = wf.name or wf.generated_title or "Untitled Workflow"
-            snippet = text[:1000].strip()
+            snippet = text[:4000].strip()
             results.append({
                 "source_type": "workflow",
                 "source_id": wf.id,
@@ -124,7 +124,7 @@ async def _keyword_fallback(
         if score > 0.15:
             title = doc.name or "Untitled"
             # Include content snippet for LLM context
-            snippet = text[:1000].strip()
+            snippet = text[:4000].strip()
             results.append({
                 "source_type": "document",
                 "source_id": doc.id,
@@ -231,7 +231,7 @@ async def _semantic_search(
                 doc = await db.get(Document, doc_id)
                 if doc and doc.content:
                     from app.document_export import tiptap_to_markdown
-                    snippet = tiptap_to_markdown(doc.content)[:1000].strip()
+                    snippet = tiptap_to_markdown(doc.content)[:4000].strip()
             except Exception:
                 pass
             results.append({
@@ -253,7 +253,7 @@ async def _semantic_search(
                 wf = await db.get(ProcessRecordingSession, source_id)
                 if wf:
                     from app.services.embeddings import workflow_text
-                    snippet = workflow_text(wf)[:1000].strip()
+                    snippet = workflow_text(wf)[:4000].strip()
             except Exception:
                 pass
             results.append({
