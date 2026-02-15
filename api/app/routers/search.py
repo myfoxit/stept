@@ -361,7 +361,7 @@ async def _keyword_search(
             s_text = step_text(step)
             if s_text.strip():
                 s_score = keyword_similarity(query, s_text)
-                if s_score > 0.05:
+                if s_score > 0.15:
                     step_scores.append({
                         "step_id": step.id,
                         "step_number": step.step_number,
@@ -372,7 +372,7 @@ async def _keyword_search(
         best_step_score = max((s["score"] for s in step_scores), default=0.0)
         overall_score = max(wf_score, best_step_score)
 
-        if overall_score > 0.05:
+        if overall_score > 0.15:
             scored_results.append({
                 "type": "recording",
                 "recording_id": wf.id,
@@ -460,11 +460,12 @@ async def _search_documents_keyword(
     limit: int,
     db: AsyncSession,
 ) -> list[dict]:
-    """Search documents by name and content (ILIKE)."""
+    """Search documents by name and extracted text content."""
     from app.services.embeddings import keyword_similarity
 
-    search_term = f"%{query}%"
+    query_lower = query.lower()
 
+    # Load project documents (filter by access)
     doc_conditions = [
         Document.project_id == project_id,
         or_(
@@ -474,31 +475,44 @@ async def _search_documents_keyword(
                 Document.owner_id == user_id,
             ),
         ),
-        or_(
-            Document.name.ilike(search_term),
-            func.cast(Document.content, sa.Text).ilike(search_term),
-        ),
     ]
 
-    stmt = select(Document).where(and_(*doc_conditions)).limit(limit)
+    stmt = select(Document).where(and_(*doc_conditions))
     result = await db.execute(stmt)
     docs = result.scalars().all()
 
     scored: list[dict] = []
     for doc in docs:
-        # Score using keyword_similarity for consistent ranking
-        doc_text = (doc.name or "") + " " + _extract_tiptap_text(doc.content)
-        score = keyword_similarity(query, doc_text)
-        preview = _extract_tiptap_text(doc.content)[:200] if doc.content else ""
+        name = doc.name or ""
+        text_content = _extract_tiptap_text(doc.content)
+        full_text = f"{name} {text_content}"
+
+        # Quick check: does the query even appear in the extracted text?
+        name_match = query_lower in name.lower()
+        content_match = query_lower in text_content.lower()
+
+        if not name_match and not content_match:
+            # Also try keyword_similarity for partial/fuzzy matching
+            score = keyword_similarity(query, full_text)
+            if score < 0.15:
+                continue
+        else:
+            score = keyword_similarity(query, full_text)
+            # Boost exact name matches
+            if name_match:
+                score = max(score, 0.5)
+
+        preview = text_content[:200] if text_content else ""
         scored.append({
             "type": "document",
             "id": doc.id,
-            "name": doc.name,
+            "name": name,
             "preview": preview,
-            "score": round(max(score, 0.1), 4),  # min 0.1 since ILIKE matched
+            "score": round(score, 4),
         })
 
-    return scored
+    scored.sort(key=lambda r: r["score"], reverse=True)
+    return scored[:limit]
 
 
 @router.get("/unified")
@@ -542,7 +556,7 @@ async def unified_search(
             s_text = step_text(step)
             if s_text.strip():
                 s_score = keyword_similarity(q, s_text)
-                if s_score > 0.05:
+                if s_score > 0.15:
                     step_scores.append({
                         "step_id": step.id,
                         "step_number": step.step_number,
@@ -553,7 +567,7 @@ async def unified_search(
         best_step_score = max((s["score"] for s in step_scores), default=0.0)
         overall_score = max(wf_score, best_step_score)
 
-        if overall_score > 0.05:
+        if overall_score > 0.15:
             all_results.append({
                 "type": "workflow",
                 "id": wf.id,

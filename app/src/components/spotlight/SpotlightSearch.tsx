@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useProject } from '@/providers/project-provider';
+import { useChat } from '@/components/Chat/ChatContext';
 import {
   unifiedSearch,
   unifiedSemanticSearch,
@@ -40,6 +41,7 @@ interface SpotlightSearchProps {
 export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   const navigate = useNavigate();
   const { selectedProject, selectedProjectId } = useProject();
+  const { openPanel, sendMessage } = useChat();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -120,10 +122,11 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   };
 
   const handleAskAI = () => {
+    const q = query;
     onOpenChange(false);
-    // TODO: open chat panel with the query pre-filled
-    // For now navigate to a chat route or trigger chat panel open
-    navigate(`/chat?q=${encodeURIComponent(query)}`);
+    openPanel();
+    // Small delay to let the panel open before sending
+    setTimeout(() => sendMessage(q), 100);
   };
 
   const workflows = results.filter((r) => r.type === 'workflow');
