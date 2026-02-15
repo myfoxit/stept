@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class Tool:
     """Wrapper for a single AI tool."""
 
-    __slots__ = ("name", "description", "parameters", "execute_fn")
+    __slots__ = ("name", "description", "parameters", "execute_fn", "requires_confirmation")
 
     def __init__(
         self,
@@ -35,11 +35,13 @@ class Tool:
         description: str,
         parameters: dict,
         execute_fn: Callable[..., Awaitable[dict]],
+        requires_confirmation: bool = False,
     ):
         self.name = name
         self.description = description
         self.parameters = parameters
         self.execute_fn = execute_fn
+        self.requires_confirmation = requires_confirmation
 
     def to_openai_function(self) -> dict:
         """Return OpenAI function-calling format."""
@@ -100,6 +102,7 @@ class ToolRegistry:
                         description=mod.description,
                         parameters=mod.parameters,
                         execute_fn=mod.execute,
+                        requires_confirmation=getattr(mod, "requires_confirmation", False),
                     )
                     self.register(tool)
                 else:

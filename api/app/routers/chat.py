@@ -235,6 +235,13 @@ async def _execute_tool_calls(
         tool = tool_registry.get(tool_name)
         if not tool:
             result = {"error": f"Unknown tool: {tool_name}"}
+        elif tool.requires_confirmation:
+            result = {
+                "pending_confirmation": True,
+                "action": tool_name,
+                "params": args,
+                "message": f"I'd like to {tool_name.replace('_', ' ')} with these parameters. Please confirm.",
+            }
         else:
             try:
                 # Open a short-lived DB session for this single tool call

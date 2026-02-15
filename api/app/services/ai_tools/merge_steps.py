@@ -15,6 +15,8 @@ from app.models import ProcessRecordingSession, ProcessRecordingStep
 
 logger = logging.getLogger(__name__)
 
+requires_confirmation = True
+
 name = "merge_steps"
 description = (
     "Merge redundant or duplicate steps in a workflow. "

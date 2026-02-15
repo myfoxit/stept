@@ -12,6 +12,8 @@ from sqlalchemy import select
 
 from app.models import Folder, project_members
 
+requires_confirmation = True
+
 name = "create_folder"
 description = (
     "Create a new folder in the user's project. "

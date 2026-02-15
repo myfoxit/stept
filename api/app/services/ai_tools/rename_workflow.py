@@ -12,6 +12,8 @@ from sqlalchemy import select, or_
 
 from app.models import ProcessRecordingSession
 
+requires_confirmation = True
+
 name = "rename_workflow"
 description = (
     "Rename a workflow (process recording). "

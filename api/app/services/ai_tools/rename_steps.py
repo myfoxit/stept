@@ -13,6 +13,8 @@ from sqlalchemy.orm import selectinload
 
 from app.models import ProcessRecordingSession, ProcessRecordingStep
 
+requires_confirmation = True
+
 name = "rename_steps"
 description = (
     "Rename individual steps inside a workflow. "

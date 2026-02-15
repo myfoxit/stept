@@ -12,6 +12,8 @@ from sqlalchemy import select
 
 from app.models import Document, Folder, project_members
 
+requires_confirmation = True
+
 name = "create_page"
 description = (
     "Create a new page/document in the user's project. "
