@@ -23,6 +23,7 @@ import { SpotlightProvider } from '@/components/spotlight/SpotlightProvider';
 import { PublicWorkflowPage } from '@/pages/public-workflow';
 import { PublicDocumentPage } from '@/pages/public-document';
 import { SharedWithMePage } from '@/pages/shared-with-me';
+import { ContextLinksPage } from '@/pages/context-links';
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/workflow/:workflowId/edit" element={<WorkflowView />} />
                   <Route path="documents/:type" element={<DocumentGalleryPage />} />
                   <Route path="/shared" element={<SharedWithMePage />} />
+                  <Route path="/context-links" element={<ContextLinksPage />} />
                   <Route
                     path="/text-container/:containerId?"
                     element={<TextContainerEditor />}

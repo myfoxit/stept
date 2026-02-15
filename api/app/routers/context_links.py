@@ -107,14 +107,25 @@ async def list_context_links(
 
 @router.get("/context-links/match")
 async def match_context_links(
-    project_id: str = Query(...),
     url: Optional[str] = Query(None),
     app_name: Optional[str] = Query(None),
+    window_title: Optional[str] = Query(None),
+    project_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Match context links against a URL and/or app name. Called by the extension."""
-    q = select(ContextLink).where(ContextLink.project_id == project_id)
+    """Match context links against a URL, app name, and/or window title."""
+    from app.models import project_members
+
+    # If no project_id, get all user's projects
+    if project_id:
+        q = select(ContextLink).where(ContextLink.project_id == project_id)
+    else:
+        user_projects = select(project_members.c.project_id).where(
+            project_members.c.user_id == current_user.id
+        )
+        q = select(ContextLink).where(ContextLink.project_id.in_(user_projects))
+
     result = await db.execute(q)
     links: list[ContextLink] = list(result.scalars().all())
 
@@ -126,7 +137,7 @@ async def match_context_links(
             matched.append(link)
         elif link.match_type == "app_name" and app_name and app_name == link.match_value:
             matched.append(link)
-        elif link.match_type == "window_title" and app_name and link.match_value.lower() in app_name.lower():
+        elif link.match_type == "window_title" and window_title and link.match_value.lower() in window_title.lower():
             matched.append(link)
 
     # Sort by priority desc
@@ -151,7 +162,7 @@ async def match_context_links(
             )
             doc = r.scalar_one_or_none()
             if doc:
-                resource_name = doc.title or "Untitled Document"
+                resource_name = doc.name or "Untitled Document"
 
         out.append(
             ContextMatchOut(
