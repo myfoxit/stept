@@ -19,6 +19,7 @@ import { WorkflowView } from '@/pages/workflow-view';
 import { DocumentGalleryPage } from '@/pages/document-gallery';
 import { ChatProvider } from '@/components/Chat/ChatContext';
 import { ChatPanel } from '@/components/Chat/ChatPanel';
+import { SpotlightProvider } from '@/components/spotlight/SpotlightProvider';
 import { PublicWorkflowPage } from '@/pages/public-workflow';
 import { PublicDocumentPage } from '@/pages/public-document';
 import { SharedWithMePage } from '@/pages/shared-with-me';
@@ -32,6 +33,7 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <ProjectProvider>
           <ChatProvider>
+            <SpotlightProvider>
             <BrowserRouter>
               <Routes>
                 <Route
@@ -64,6 +66,7 @@ createRoot(document.getElementById('root')!).render(
               </Routes>
               <ChatPanel />
             </BrowserRouter>
+          </SpotlightProvider>
           </ChatProvider>
         </ProjectProvider>
       </AuthProvider>
