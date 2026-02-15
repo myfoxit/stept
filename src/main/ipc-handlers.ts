@@ -1,4 +1,4 @@
-import { ipcMain, shell, app, WebContents, BrowserWindow } from 'electron';
+import { ipcMain, shell, app, WebContents, BrowserWindow, Notification } from 'electron';
 import { AuthService } from './auth';
 import { SettingsManager } from './settings';
 import { RecordingService } from './recording';
@@ -249,6 +249,23 @@ export function setupIpcHandlers(
       for (const w of windows) {
         w.webContents.send('context:matches', matches, ctx);
       }
+
+      // Show native notification so user sees matches even when Ondoki is in background
+      if (Notification.isSupported() && matches.length > 0) {
+        const title = matches.length === 1
+          ? `📋 ${matches[0].resource_name}`
+          : `📋 ${matches.length} context suggestions`;
+        const body = matches
+          .slice(0, 3)
+          .map((m: any) => m.note ? `${m.resource_name}: ${m.note}` : m.resource_name)
+          .join('\n');
+        const notif = new Notification({ title, body, silent: true });
+        notif.on('click', () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) { win.show(); win.focus(); }
+        });
+        notif.show();
+      }
     });
     contextWatcher.on('no-matches', (ctx) => {
       const windows = BrowserWindow.getAllWindows();
@@ -278,7 +295,7 @@ export function setupIpcHandlers(
     if (!token) return { error: 'Not authenticated' };
 
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
-    const res = await fetch(`${apiBase}/api/context-links`, {
+    const res = await fetch(`${apiBase}/context-links`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -298,7 +315,7 @@ export function setupIpcHandlers(
 
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
     const params = projectId ? `?project_id=${projectId}` : '';
-    const res = await fetch(`${apiBase}/api/context-links${params}`, {
+    const res = await fetch(`${apiBase}/context-links${params}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
 
@@ -312,7 +329,7 @@ export function setupIpcHandlers(
     if (!token) return { error: 'Not authenticated' };
 
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
-    const res = await fetch(`${apiBase}/api/context-links/${linkId}`, {
+    const res = await fetch(`${apiBase}/context-links/${linkId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` },
     });

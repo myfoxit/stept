@@ -153,7 +153,7 @@ export class ContextWatcherService extends EventEmitter {
     if (ctx.windowTitle) params.set('window_title', ctx.windowTitle);
     if (this.projectId) params.set('project_id', this.projectId);
 
-    const url = `${this.apiBaseUrl}/api/context-links/match?${params}`;
+    const url = `${this.apiBaseUrl}/context-links/match?${params}`;
 
     const res = await fetch(url, {
       headers: { 'Authorization': `Bearer ${this.accessToken}` },
