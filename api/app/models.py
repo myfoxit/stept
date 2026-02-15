@@ -445,8 +445,8 @@ class Embedding(Base):
     __tablename__ = "embeddings"
 
     id = Column(String(16), primary_key=True, default=gen_suffix)
-    source_type = Column(String(20), nullable=False, index=True)  # workflow | step | document
-    source_id = Column(String(16), nullable=False, index=True)
+    source_type = Column(String(20), nullable=False, index=True)  # workflow | step | document | document_chunk
+    source_id = Column(String(64), nullable=False, index=True)
     content_hash = Column(String(64), nullable=False)  # SHA-256 to skip re-embedding
     embedding = Column(Vector(1536), nullable=False) if Vector else Column(Text, nullable=False)
     metadata_ = Column("metadata", JSON, nullable=True)
