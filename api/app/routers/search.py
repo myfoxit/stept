@@ -463,6 +463,28 @@ async def _search_documents_keyword(
     """Search documents by name and extracted text content."""
     from app.services.embeddings import keyword_similarity
 
+    # Try tsvector search first (faster, better ranking)
+    try:
+        from sqlalchemy import text as sa_text
+        ts_stmt = sa_text("""
+            SELECT id, name, search_text, ts_rank(search_tsv, plainto_tsquery('english', :q)) as rank
+            FROM documents
+            WHERE project_id = :project_id
+              AND search_tsv @@ plainto_tsquery('english', :q)
+              AND (is_private = false OR owner_id = :user_id)
+            ORDER BY rank DESC
+            LIMIT :limit
+        """)
+        ts_result = await db.execute(ts_stmt, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})
+        ts_rows = ts_result.fetchall()
+        if ts_rows:
+            return [
+                {"type": "document", "id": row.id, "name": row.name, "preview": (row.search_text or "")[:200], "score": round(float(row.rank), 4)}
+                for row in ts_rows
+            ]
+    except Exception:
+        pass  # Fall through to existing search
+
     query_lower = query.lower()
 
     # Load project documents (filter by access)

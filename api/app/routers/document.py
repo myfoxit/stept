@@ -22,6 +22,7 @@ from app.crud.document import (
 )
 from app.security import get_current_user
 from app.models import User
+from app.services.search_indexer import update_document_search
 
 router = APIRouter()
 
@@ -65,7 +66,7 @@ async def api_create_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return await create_document(
+    doc = await create_document(
         db, 
         name=payload.name, 
         content=payload.content,
@@ -75,6 +76,9 @@ async def api_create_document(
         is_private=payload.is_private if payload.is_private is not None else True,
         owner_id=current_user.id,  # Always pass current user, CRUD will use it only if is_private
     )
+    await update_document_search(db, doc.id, doc.name, doc.content)
+    await db.commit()
+    return doc
 
 # Get single document
 @router.get("/{doc_id}")
@@ -144,7 +148,7 @@ async def api_update_document(
         if share and share.permission != "edit":
             raise HTTPException(403, "View-only access — cannot edit")
     
-    return await update_document(
+    updated = await update_document(
         db,
         doc_id,
         name=payload.name,
@@ -152,6 +156,9 @@ async def api_update_document(
         page_layout=payload.page_layout,
         folder_id=payload.folder_id,
     )
+    await update_document_search(db, updated.id, updated.name, updated.content)
+    await db.commit()
+    return updated
 
 # Move document
 @router.put("/{doc_id}/move", response_model=DocumentRead)

@@ -198,6 +198,9 @@ class Document(Base):
     share_token = Column(String(64), nullable=True, unique=True, index=True)
     is_public = Column(Boolean, nullable=False, default=False)
     
+    # Full-text search
+    search_text = Column(String, nullable=True)  # Extracted plain text from TipTap JSON
+    
     # Relationships
     project = relationship("Project", backref="documents")
     folder = relationship("Folder", back_populates="documents")
