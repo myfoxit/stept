@@ -42,6 +42,9 @@ import { SiteHeader } from '@/components/site-header';
 import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
 import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
+import { CommentButton } from '@/components/Comments/CommentButton';
+import { CommentPanel } from '@/components/Comments/CommentPanel';
+import { useAuth } from '@/providers/auth-provider';
 
 export function WorkflowView() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -50,6 +53,11 @@ export function WorkflowView() {
   const { data: workflow, isLoading } = useWorkflow(workflowId || '');
   const { setContext } = useChat();
   const { selectedProjectId } = useProject();
+  const { user } = useAuth();
+
+  // Comments state
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [commentCount, setCommentCount] = React.useState(0);
   
   // NEW: Derive edit mode from URL
   const isEditMode = location.pathname.endsWith('/edit');
@@ -556,7 +564,9 @@ export function WorkflowView() {
         />
 
         <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-          <WorkflowHeader
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <WorkflowHeader
             workflow={typedWorkflow}
             stepCount={stepCount}
             durationLabel={durationLabel}
@@ -567,6 +577,11 @@ export function WorkflowView() {
             // NEW: allow editing title from header
             onUpdateTitle={handleUpdateTitle}
           />
+            </div>
+            {selectedProjectId && workflowId && (
+              <CommentButton count={commentCount} onClick={() => setCommentsOpen(true)} />
+            )}
+          </div>
 
           {selectedProjectId && workflowId && (
             <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
@@ -631,6 +646,18 @@ export function WorkflowView() {
           recordingId={workflowId!}
           existingGuide={(typedWorkflow as any)?.guide_markdown}
         />
+
+        {selectedProjectId && workflowId && user && (
+          <CommentPanel
+            open={commentsOpen}
+            onOpenChange={setCommentsOpen}
+            projectId={selectedProjectId}
+            resourceType="workflow"
+            resourceId={workflowId}
+            currentUserId={user.id}
+            onCountChange={setCommentCount}
+          />
+        )}
       </div>
     </div>
   );

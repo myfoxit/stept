@@ -16,12 +16,19 @@ import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
 import { Badge } from '@/components/ui/badge';
 import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
+import { CommentButton } from '@/components/Comments/CommentButton';
+import { CommentPanel } from '@/components/Comments/CommentPanel';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function EditorPage() {
   const { docId } = useParams<{ docId: string }>();
   const { data: doc } = useDocument(docId!);
   const { setContext } = useChat();
   const { selectedProjectId } = useProject();
+  const { user } = useAuth();
+
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
 
   const [pageLayout, setPageLayout] = useState<PageLayout>('full');
   const updateLayout = useUpdateDocumentLayout(docId!);
@@ -103,6 +110,10 @@ export default function EditorPage() {
             </Button>
           }
         />
+
+        {selectedProjectId && docId && (
+          <CommentButton count={commentCount} onClick={() => setCommentsOpen(true)} />
+        )}
       </SiteHeader>
       {selectedProjectId && docId && (
         <div className="mx-auto max-w-4xl px-4 pt-4">
@@ -110,6 +121,18 @@ export default function EditorPage() {
         </div>
       )}
       <NotionEditor docId={docId as string} readOnly={isReadOnly} />
+
+      {selectedProjectId && docId && user && (
+        <CommentPanel
+          open={commentsOpen}
+          onOpenChange={setCommentsOpen}
+          projectId={selectedProjectId}
+          resourceType="document"
+          resourceId={docId}
+          currentUserId={user.id}
+          onCountChange={setCommentCount}
+        />
+      )}
     </div>
   );
 }
