@@ -80,10 +80,12 @@ async def _keyword_fallback(
         score = keyword_similarity(query, text)
         if score > 0.15:
             name = wf.name or wf.generated_title or "Untitled Workflow"
+            snippet = text[:1000].strip()
             results.append({
                 "source_type": "workflow",
                 "source_id": wf.id,
                 "title": name,
+                "snippet": snippet,
                 "citation": f'[Source: Workflow "{name}"]',
                 "similarity": round(score, 4),
             })
@@ -121,10 +123,13 @@ async def _keyword_fallback(
         score = keyword_similarity(query, text)
         if score > 0.15:
             title = doc.name or "Untitled"
+            # Include content snippet for LLM context
+            snippet = text[:1000].strip()
             results.append({
                 "source_type": "document",
                 "source_id": doc.id,
                 "title": title,
+                "snippet": snippet,
                 "citation": f'[Source: Document "{title}"]',
                 "similarity": round(score, 4),
             })
@@ -202,6 +207,10 @@ async def _semantic_search(
     seen_workflows: set[str] = set()
     results: list[dict] = []
 
+    # Pre-fetch documents and workflows for snippets
+    from app.models import Document, ProcessRecordingSession
+    from sqlalchemy import select
+
     for source_type, source_id, metadata, distance in rows:
         if len(results) >= 5:
             break
@@ -216,10 +225,20 @@ async def _semantic_search(
             seen_docs.add(doc_id)
             title = meta.get("title", "Untitled")
             chunk_info = f", Chunk {meta.get('chunk_index', 0) + 1}" if source_type == "document_chunk" else ""
+            # Fetch content snippet
+            snippet = ""
+            try:
+                doc = await db.get(Document, doc_id)
+                if doc and doc.content:
+                    from app.document_export import tiptap_to_markdown
+                    snippet = tiptap_to_markdown(doc.content)[:1000].strip()
+            except Exception:
+                pass
             results.append({
                 "source_type": "document",
                 "source_id": doc_id,
                 "title": title,
+                "snippet": snippet,
                 "citation": f'[Source: Document "{title}"{chunk_info}]',
                 "similarity": score,
             })
@@ -229,10 +248,19 @@ async def _semantic_search(
                 continue
             seen_workflows.add(source_id)
             wf_name = meta.get("name") or meta.get("generated_title") or "Untitled Workflow"
+            snippet = ""
+            try:
+                wf = await db.get(ProcessRecordingSession, source_id)
+                if wf:
+                    from app.services.embeddings import workflow_text
+                    snippet = workflow_text(wf)[:1000].strip()
+            except Exception:
+                pass
             results.append({
                 "source_type": "workflow",
                 "source_id": source_id,
                 "title": wf_name,
+                "snippet": snippet,
                 "citation": f'[Source: Workflow "{wf_name}"]',
                 "similarity": score,
             })
