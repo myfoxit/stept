@@ -194,9 +194,9 @@ def _build_system_prompt_with_tools() -> str:
         "could contain course assignments, project specs, or anything else. READ the actual content "
         "returned by rag_search and use it to answer the user's question.\n"
         "- NEVER dismiss rag_search results just because the title seems unrelated. The content is what matters.\n"
-        "- When rag_search returns results, USE the source citations in your response. "
-        "Format citations exactly as provided, e.g. [Source: Document \"Setup Guide\"] or "
-        "[Source: Workflow \"Deploy to Production\", Step 3].\n"
+        "- When rag_search returns results, USE the source citations in your response exactly as provided. "
+        "They are markdown links that the user can click to open the document. "
+        "Example: [📝 Setup Guide](/editor/abc123) or [📄 Deploy to Production](/workflow/def456).\n"
         "- When a user asks to FILL, UPDATE, or EDIT an existing page, ALWAYS use search_pages "
         "first to find the document_id, then use update_page with the found document_id. "
         "NEVER use create_page if the page already exists.\n"
@@ -208,7 +208,9 @@ def _build_system_prompt_with_tools() -> str:
         "use rename_steps with descriptive, human-readable titles.\n"
         "- When you use a tool, briefly explain what you're doing.\n"
         "- Write tool calls (create, update, rename, merge) require user confirmation. "
-        "Read-only tools (search, list, analyze, read, rag_search) execute immediately.\n\n"
+        "Read-only tools (search, list, analyze, read, rag_search, read_document) execute immediately.\n"
+        "- When a user asks to 'show me', 'pull up', 'read', or 'get' a specific document, use read_document "
+        "to retrieve the full content. Use document_id if known, or name_query for partial name match.\n\n"
         "Available tools:\n" + "\n".join(tool_descriptions)
     )
 

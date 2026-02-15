@@ -85,8 +85,9 @@ async def _keyword_fallback(
                 "source_type": "workflow",
                 "source_id": wf.id,
                 "title": name,
+                "link": f"/workflow/{wf.id}",
                 "snippet": snippet,
-                "citation": f'[Source: Workflow "{name}"]',
+                "citation": f'[📄 {name}](/workflow/{wf.id})',
                 "similarity": round(score, 4),
             })
 
@@ -129,8 +130,9 @@ async def _keyword_fallback(
                 "source_type": "document",
                 "source_id": doc.id,
                 "title": title,
+                "link": f"/editor/{doc.id}",
                 "snippet": snippet,
-                "citation": f'[Source: Document "{title}"]',
+                "citation": f'[📝 {title}](/editor/{doc.id})',
                 "similarity": round(score, 4),
             })
 
@@ -250,8 +252,9 @@ async def _semantic_search(
                 "source_type": "document",
                 "source_id": doc_id,
                 "title": title,
+                "link": f"/editor/{doc_id}",
                 "snippet": snippet,
-                "citation": f'[Source: Document "{title}"]',
+                "citation": f'[📝 {title}](/editor/{doc_id})',
                 "similarity": score,
             })
 
@@ -273,8 +276,9 @@ async def _semantic_search(
                 "source_type": "workflow",
                 "source_id": source_id,
                 "title": wf_name,
+                "link": f"/workflow/{source_id}",
                 "snippet": snippet,
-                "citation": f'[Source: Workflow "{wf_name}"]',
+                "citation": f'[📄 {wf_name}](/workflow/{source_id})',
                 "similarity": score,
             })
 
@@ -290,8 +294,9 @@ async def _semantic_search(
                 "source_type": "step",
                 "source_id": source_id,
                 "title": f"{wf_name} — Step {step_num}",
+                "link": f"/workflow/{wf_id}",
                 "snippet": snippet,
-                "citation": f'[Source: Workflow "{wf_name}", Step {step_num}]',
+                "citation": f'[📄 {wf_name}, Step {step_num}](/workflow/{wf_id})',
                 "similarity": score,
             })
 

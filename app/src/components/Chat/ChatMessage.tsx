@@ -360,9 +360,25 @@ function renderContent(content: string): React.ReactNode {
 }
 
 function renderInline(text: string): React.ReactNode {
-  // Bold: **text**
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  // Markdown links: [text](url), bold: **text**, code: `text`
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`)/g);
   return parts.map((seg, i) => {
+    // Markdown link
+    const linkMatch = seg.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      const [, linkText, url] = linkMatch;
+      const isInternal = url.startsWith('/');
+      return (
+        <a
+          key={i}
+          href={url}
+          className="text-primary underline hover:text-primary/80"
+          {...(isInternal ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+        >
+          {linkText}
+        </a>
+      );
+    }
     if (seg.startsWith('**') && seg.endsWith('**')) {
       return (
         <strong key={i} className="font-semibold">
