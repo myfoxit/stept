@@ -3,7 +3,7 @@
 # Setup test database in your Docker PostgreSQL container
 
 CONTAINER_NAME="ondoki-db"
-DB_USER="postgres"
+DB_USER="ondoki"
 DB_PASSWORD="postgres"
 TEST_DB_NAME="ondoki_test"
 
