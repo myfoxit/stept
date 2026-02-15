@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import MainWindow from './components/MainWindow';
 import { ContextSuggestions } from './components/ContextSuggestions';
+import { AddContextNoteDialog } from './components/AddContextNoteDialog';
 import { Loader2, Circle } from 'lucide-react';
+import useAuth from './hooks/useAuth';
 
 const App: React.FC = () => {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAddContext, setShowAddContext] = useState(false);
+  const auth = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -17,6 +21,11 @@ const App: React.FC = () => {
       setReady(true);
     }, 200);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const unsub = window.electronAPI?.onShowAddContextNote?.(() => setShowAddContext(true));
+    return () => { unsub?.(); };
   }, []);
 
   if (!ready) {
@@ -47,6 +56,11 @@ const App: React.FC = () => {
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <MainWindow />
       <ContextSuggestions />
+      <AddContextNoteDialog
+        isOpen={showAddContext}
+        onClose={() => setShowAddContext(false)}
+        projects={auth.projects || []}
+      />
     </div>
   );
 };

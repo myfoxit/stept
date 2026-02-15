@@ -97,7 +97,7 @@ export class ContextWatcherService extends EventEmitter {
     }
   }
 
-  private async getActiveContext(): Promise<ActiveContext | null> {
+  public async getActiveContext(): Promise<ActiveContext | null> {
     try {
       const { stdout } = await execFileAsync(this.nativeBinaryPath, ['mouse'], { timeout: 2000 });
       const info = JSON.parse(stdout);
@@ -149,7 +149,8 @@ export class ContextWatcherService extends EventEmitter {
   private async queryMatches(ctx: ActiveContext): Promise<ContextMatch[]> {
     const params = new URLSearchParams();
     if (ctx.url) params.set('url', ctx.url);
-    params.set('app_name', ctx.appName);
+    if (ctx.appName) params.set('app_name', ctx.appName);
+    if (ctx.windowTitle) params.set('window_title', ctx.windowTitle);
     if (this.projectId) params.set('project_id', this.projectId);
 
     const url = `${this.apiBaseUrl}/api/context-links/match?${params}`;

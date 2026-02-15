@@ -44,8 +44,13 @@ export interface ElectronAPI {
   // Context watcher
   contextStart: (projectId: string) => Promise<any>;
   contextStop: () => Promise<any>;
+  contextGetActive: () => Promise<{ windowTitle: string; appName: string; url?: string } | null>;
+  contextAddLink: (data: { project_id: string; match_type: string; match_value: string; resource_type: string; resource_id: string; note?: string }) => Promise<any>;
+  contextListLinks: (projectId?: string) => Promise<any[]>;
+  contextDeleteLink: (linkId: string) => Promise<any>;
   onContextMatches: (callback: (matches: any[], ctx: any) => void) => () => void;
   onContextNoMatches: (callback: (ctx: any) => void) => () => void;
+  onShowAddContextNote: (callback: () => void) => () => void;
 
   // Utility
   openExternal: (url: string) => Promise<void>;
@@ -241,6 +246,10 @@ const electronAPI: ElectronAPI = {
   // Context watcher
   contextStart: (projectId: string) => ipcRenderer.invoke('context:start', projectId),
   contextStop: () => ipcRenderer.invoke('context:stop'),
+  contextGetActive: () => ipcRenderer.invoke('context:get-active'),
+  contextAddLink: (data) => ipcRenderer.invoke('context:add-link', data),
+  contextListLinks: (projectId?: string) => ipcRenderer.invoke('context:list-links', projectId),
+  contextDeleteLink: (linkId: string) => ipcRenderer.invoke('context:delete-link', linkId),
   onContextMatches: (callback: (matches: any[], ctx: any) => void) => {
     const handler = (_event: IpcRendererEvent, matches: any[], ctx: any) => callback(matches, ctx);
     ipcRenderer.on('context:matches', handler);
@@ -250,6 +259,11 @@ const electronAPI: ElectronAPI = {
     const handler = (_event: IpcRendererEvent, ctx: any) => callback(ctx);
     ipcRenderer.on('context:no-matches', handler);
     return () => ipcRenderer.removeListener('context:no-matches', handler);
+  },
+  onShowAddContextNote: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('show-add-context-note', handler);
+    return () => ipcRenderer.removeListener('show-add-context-note', handler);
   },
 
   // Utility

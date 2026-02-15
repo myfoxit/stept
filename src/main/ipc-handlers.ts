@@ -261,6 +261,66 @@ export function setupIpcHandlers(
     return { success: true };
   });
 
+  ipcMain.handle('context:get-active', async () => {
+    return await contextWatcher.getActiveContext();
+  });
+
+  ipcMain.handle('context:add-link', async (event, data: {
+    project_id: string;
+    match_type: string;
+    match_value: string;
+    resource_type: string;
+    resource_id: string;
+    note?: string;
+  }) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { error: 'Not authenticated' };
+
+    const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
+    const res = await fetch(`${apiBase}/api/context-links`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) return { error: `API error: ${res.status}` };
+    return await res.json();
+  });
+
+  ipcMain.handle('context:list-links', async (event, projectId?: string) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { error: 'Not authenticated' };
+
+    const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
+    const params = projectId ? `?project_id=${projectId}` : '';
+    const res = await fetch(`${apiBase}/api/context-links${params}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+
+    if (!res.ok) return [];
+    return await res.json();
+  });
+
+  ipcMain.handle('context:delete-link', async (event, linkId: string) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { error: 'Not authenticated' };
+
+    const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
+    const res = await fetch(`${apiBase}/api/context-links/${linkId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+
+    if (!res.ok) return { error: `API error: ${res.status}` };
+    return { ok: true };
+  });
+
   ipcMain.handle('context:stop', async () => {
     contextWatcher.stop();
     return { success: true };
