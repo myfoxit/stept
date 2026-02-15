@@ -206,7 +206,24 @@ class Document(Base):
     # Relationships
     project = relationship("Project", backref="documents")
     folder = relationship("Folder", back_populates="documents")
+    version = Column(Integer, nullable=False, default=1)
+    locked_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    locked_at = Column(DateTime, nullable=True)
+
     owner = relationship("User", foreign_keys=[owner_id], backref="private_documents")
+
+
+class DocumentVersion(Base):
+    __tablename__ = "document_versions"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    document_id = Column(String(16), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    content = Column(JSON, nullable=False)
+    name = Column(String, nullable=True)
+    byte_size = Column(Integer, nullable=True)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
 
 class TextContainer(Base):
     __tablename__ = "text_container"

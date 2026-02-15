@@ -33,9 +33,14 @@ export const createDocument = async (payload: {
 /** Update / save an existing document */
 export const saveDocument = async (
   docId: string,
-  content: any
+  content: any,
+  version?: number
 ): Promise<DocumentRead> => {
-  const { data } = await apiClient.put(`/documents/${docId}`, content);
+  const payload = { ...content };
+  if (version !== undefined) {
+    payload.version = version;
+  }
+  const { data } = await apiClient.put(`/documents/${docId}`, payload);
   return data;
 };
 

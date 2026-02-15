@@ -27,10 +27,16 @@ export const useDocument = (docId: string) =>
 export const useSaveDocument = (docId: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (content: any) => saveDocument(docId, content),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
-  
+    mutationFn: (payload: any) => {
+      const { version, ...content } = payload;
+      return saveDocument(docId, content, version);
+    },
+    onSuccess: (data) => {
+      // Update cache with new version from server
+      qc.setQueryData(queryKeys.document(docId), (old: any) => ({
+        ...old,
+        ...data,
+      }));
       qc.invalidateQueries({ queryKey: ['documents'] });
     },
   });

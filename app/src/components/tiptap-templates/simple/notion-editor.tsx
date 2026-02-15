@@ -26,6 +26,7 @@ import { listWorkflows } from '@/api/workflows';
 import type { ProcessRecordingSession } from '@/types/openapi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface NotionEditorProps {
   room: string;
@@ -46,6 +47,7 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [currentDocId, setCurrentDocId] = React.useState<string>(docId);
   const [contentInitialized, setContentInitialized] = React.useState(false);
+  const [docVersion, setDocVersion] = React.useState<number | undefined>(undefined);
   // Keep a stable layout; initialize from current DOM attr to avoid fallback flicker
   const [layout, setLayout] = React.useState<string>(() => {
     return document.documentElement.getAttribute('data-page-layout') || 'document';
@@ -65,6 +67,7 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
   useEffect(() => {
     if (!isInitialized && !docLoading && doc) {
       setTitle(doc.name ?? '');
+      setDocVersion((doc as any).version);
       setIsInitialized(true);
     }
   }, [isInitialized, docLoading, doc]);
@@ -73,15 +76,25 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
     (content: unknown) => {
       if (!isInitialized) return;
       saveDocument.mutate(
-        { name: title, content, page_layout: layout || 'document' },
+        { name: title, content, page_layout: layout || 'document', version: docVersion },
         {
-          onSuccess: () => {
+          onSuccess: (data: any) => {
+            if (data?.version) setDocVersion(data.version);
             queryClient.invalidateQueries({ queryKey: ['documents'] });
+          },
+          onError: (err: any) => {
+            if (err?.response?.status === 409) {
+              // Conflict — someone else modified the document
+              import('sonner').then(({ toast }) => {
+                toast.error('Document was modified by someone else. Reloading...');
+              });
+              queryClient.invalidateQueries({ queryKey: queryKeys.document(docId) });
+            }
           },
         }
       );
     },
-    [saveDocument, title, queryClient, isInitialized, layout]
+    [saveDocument, title, queryClient, isInitialized, layout, docVersion, docId]
   );
 
   // Pass title as dependency

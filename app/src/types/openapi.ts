@@ -74,6 +74,7 @@ export interface DocumentRead {
   position?: number;
   is_private?: boolean;
   owner_id?: string | null;
+  version?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -92,6 +93,7 @@ export interface DocumentUpdate {
   content?: Record<string, any>;
   page_layout?: string;
   is_private?: boolean;
+  version?: number;
 }
 
 export interface DocumentLinkCreate {

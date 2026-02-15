@@ -19,6 +19,7 @@ class DocumentUpdate(BaseModel):
     page_layout: Optional[str] = None
     folder_id: Optional[str] = None
     is_private: Optional[bool] = None  # NEW
+    version: Optional[int] = None  # Optimistic concurrency
 
 class DocumentMove(BaseModel):
     parent_id: Optional[str] = None  # This is actually the folder_id
@@ -44,6 +45,7 @@ class DocumentRead(DocumentBase):
     linked_row_id: Optional[int] = None
     is_private: bool = False  # NEW
     owner_id: Optional[str] = None  # NEW
+    version: int = 1
     created_at: datetime
     updated_at: datetime
     

@@ -1,7 +1,7 @@
 # app/api/document.py
 from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import Optional, List
 from app.database import get_session as get_db
 from app.schemas.document import (
@@ -127,6 +127,7 @@ async def api_get_document(
         "position": doc.position,
         "is_private": doc.is_private,
         "owner_id": doc.owner_id,
+        "version": doc.version if hasattr(doc, 'version') else 1,
         "created_at": doc.created_at,
         "updated_at": doc.updated_at,
         "permission": permission,
@@ -141,6 +142,11 @@ async def api_update_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    import json
+    from datetime import datetime, timedelta
+    from app.models import DocumentVersion
+    from app.utils import gen_suffix
+
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "document not found")
@@ -159,6 +165,68 @@ async def api_update_document(
         )
         if share and share.permission != "edit":
             raise HTTPException(403, "View-only access — cannot edit")
+
+    # --- Optimistic concurrency ---
+    if payload.version is not None and payload.version != doc.version:
+        raise HTTPException(409, detail="Document was modified. Please reload.")
+    
+    # --- Content validation ---
+    if payload.content is not None:
+        content_json = json.dumps(payload.content)
+        if len(content_json) > 10 * 1024 * 1024:
+            raise HTTPException(422, "Content exceeds 10MB limit")
+        if not isinstance(payload.content, dict) or payload.content.get("type") != "doc" or not isinstance(payload.content.get("content"), list):
+            raise HTTPException(422, "Invalid document content: must have type 'doc' with content array")
+
+    # --- Auto-version on content save ---
+    if payload.content is not None and doc.content:
+        # Throttle: only create version if last version is >30s old
+        last_ver = (await db.execute(
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == doc_id)
+            .order_by(DocumentVersion.version_number.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        
+        should_version = True
+        if last_ver and last_ver.created_at:
+            from datetime import timezone
+            last_time = last_ver.created_at.replace(tzinfo=None) if last_ver.created_at.tzinfo else last_ver.created_at
+            if (datetime.utcnow() - last_time).total_seconds() < 30:
+                should_version = False
+        
+        if should_version:
+            old_content_json = json.dumps(doc.content)
+            ver = DocumentVersion(
+                id=gen_suffix(16),
+                document_id=doc_id,
+                version_number=doc.version,
+                content=doc.content,
+                name=doc.name,
+                byte_size=len(old_content_json.encode("utf-8")),
+                created_by=current_user.id,
+            )
+            db.add(ver)
+            
+            # Prune: keep max 100 versions
+            count_result = await db.execute(
+                select(func.count()).select_from(DocumentVersion).where(DocumentVersion.document_id == doc_id)
+            )
+            total = count_result.scalar() or 0
+            if total > 100:
+                old_versions = (await db.execute(
+                    select(DocumentVersion.id)
+                    .where(DocumentVersion.document_id == doc_id)
+                    .order_by(DocumentVersion.version_number.asc())
+                    .limit(total - 100)
+                )).scalars().all()
+                if old_versions:
+                    from sqlalchemy import delete as sa_delete
+                    await db.execute(
+                        sa_delete(DocumentVersion).where(DocumentVersion.id.in_(old_versions))
+                    )
+        
+        doc.version = (doc.version or 1) + 1
     
     updated = await update_document(
         db,
@@ -221,6 +289,142 @@ async def api_duplicate_document(
         raise HTTPException(404, str(e))
 
 
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# VERSION HISTORY ENDPOINTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{doc_id}/versions")
+async def api_list_versions(
+    doc_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List document versions (without content)."""
+    from app.models import DocumentVersion
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user)
+    
+    result = await db.execute(
+        select(
+            DocumentVersion.id,
+            DocumentVersion.version_number,
+            DocumentVersion.name,
+            DocumentVersion.byte_size,
+            DocumentVersion.created_by,
+            DocumentVersion.created_at,
+        )
+        .where(DocumentVersion.document_id == doc_id)
+        .order_by(DocumentVersion.version_number.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = result.all()
+    return [
+        {
+            "id": r.id,
+            "version_number": r.version_number,
+            "name": r.name,
+            "byte_size": r.byte_size,
+            "created_by": r.created_by,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/{doc_id}/versions/{version_id}")
+async def api_get_version(
+    doc_id: str,
+    version_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a specific version including content."""
+    from app.models import DocumentVersion
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user)
+    
+    ver = await db.scalar(
+        select(DocumentVersion).where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == doc_id,
+        )
+    )
+    if not ver:
+        raise HTTPException(404, "version not found")
+    return {
+        "id": ver.id,
+        "version_number": ver.version_number,
+        "name": ver.name,
+        "byte_size": ver.byte_size,
+        "content": ver.content,
+        "created_by": ver.created_by,
+        "created_at": ver.created_at,
+    }
+
+
+@router.post("/{doc_id}/restore/{version_id}")
+async def api_restore_version(
+    doc_id: str,
+    version_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore document content from a version. Creates a version of current content first."""
+    import json
+    from app.models import DocumentVersion
+    from app.utils import gen_suffix
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
+    
+    ver = await db.scalar(
+        select(DocumentVersion).where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == doc_id,
+        )
+    )
+    if not ver:
+        raise HTTPException(404, "version not found")
+    
+    # Save current content as a version first
+    old_content_json = json.dumps(doc.content)
+    snapshot = DocumentVersion(
+        id=gen_suffix(16),
+        document_id=doc_id,
+        version_number=doc.version,
+        content=doc.content,
+        name=doc.name,
+        byte_size=len(old_content_json.encode("utf-8")),
+        created_by=current_user.id,
+    )
+    db.add(snapshot)
+    
+    # Restore
+    doc.content = ver.content
+    doc.name = ver.name or doc.name
+    doc.version = (doc.version or 1) + 1
+    
+    await update_document_search(db, doc.id, doc.name, doc.content)
+    await db.commit()
+    await db.refresh(doc)
+    
+    return {
+        "id": doc.id,
+        "version": doc.version,
+        "name": doc.name,
+        "message": f"Restored from version {ver.version_number}",
+    }
 
 
 # Delete document
