@@ -4,13 +4,11 @@ import {
   IconFileText,
   IconListDetails,
   IconSettings,
-  IconPlus,
   IconBrain,
   IconAbc,
-  IconRobot,
+  IconSparkles,
   IconLoader2,
   IconArrowRight,
-  IconSparkles,
 } from '@tabler/icons-react';
 import {
   CommandDialog,
@@ -29,15 +27,10 @@ import {
   unifiedSearch,
   unifiedSemanticSearch,
   type UnifiedSearchResult,
-  type UnifiedSearchResponse,
 } from '@/api/spotlight';
-import { streamChatCompletion, type ToolCallEvent, type ToolResultEvent } from '@/api/chat';
-import { SpotlightActions, type ActionCard } from './SpotlightActions';
 
-// Question-like patterns that trigger semantic/AI search
+// Question-like patterns that trigger parallel semantic search
 const QUESTION_WORDS = /^(how|what|why|when|where|who|which|can|does|is|are|do|should|could|would)\b/i;
-
-type SearchMode = 'idle' | 'keyword' | 'semantic' | 'ai';
 
 interface SpotlightSearchProps {
   open: boolean;
@@ -49,27 +42,17 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   const { selectedProject, selectedProjectId } = useProject();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
-  const [searchMode, setSearchMode] = useState<SearchMode>('idle');
-  const [searchType, setSearchType] = useState<'keyword' | 'semantic'>('keyword');
   const [isSearching, setIsSearching] = useState(false);
-
-  // AI state
-  const [aiResponse, setAiResponse] = useState('');
-  const [aiThinking, setAiThinking] = useState(false);
-  const [aiActions, setAiActions] = useState<ActionCard[]>([]);
+  const [searchType, setSearchType] = useState<'keyword' | 'semantic'>('keyword');
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const abortRef = useRef<AbortController>();
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setQuery('');
       setResults([]);
-      setSearchMode('idle');
-      setAiResponse('');
-      setAiThinking(false);
-      setAiActions([]);
+      setSearchType('keyword');
     }
   }, [open]);
 
@@ -83,40 +66,32 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
 
     if (!query.trim() || !selectedProjectId) {
       setResults([]);
-      setSearchMode('idle');
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
-      setSearchMode('keyword');
 
       try {
-        // Fire keyword search
+        // Always do keyword search
         const kwResults = await unifiedSearch(query, selectedProjectId);
         setResults(kwResults.results);
-        setSearchType(kwResults.search_type);
+        setSearchType('keyword');
 
-        // Also fire semantic search in parallel if query looks like a question
+        // Also fire semantic search in parallel for question-like queries
         if (isQuestionLike(query)) {
-          setSearchMode('semantic');
           try {
             const semResults = await unifiedSemanticSearch(query, selectedProjectId);
             if (semResults.results.length > 0) {
-              // Merge: prefer semantic results but keep unique keyword results
+              // Merge: prefer semantic, keep unique keyword results
               const semIds = new Set(semResults.results.map((r) => r.id));
               const uniqueKw = kwResults.results.filter((r) => !semIds.has(r.id));
               setResults([...semResults.results, ...uniqueKw]);
               setSearchType('semantic');
             }
           } catch {
-            // Semantic search failed, keyword results are still shown
+            // Semantic failed — keyword results still shown
           }
-        }
-
-        // Auto-trigger AI if no results and query looks like natural language
-        if (kwResults.total_results === 0 && isQuestionLike(query)) {
-          triggerAI(query);
         }
       } catch (err) {
         console.error('Search failed:', err);
@@ -129,62 +104,6 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, selectedProjectId, isQuestionLike]);
-
-  const triggerAI = useCallback(
-    (q: string) => {
-      if (aiThinking) return;
-      setSearchMode('ai');
-      setAiThinking(true);
-      setAiResponse('');
-      setAiActions([]);
-
-      // Cancel any previous AI request
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      const pendingActions: ActionCard[] = [];
-
-      streamChatCompletion(
-        {
-          messages: [{ role: 'user', content: q }],
-          context: { project_id: selectedProjectId || undefined },
-          stream: true,
-        },
-        (text) => setAiResponse((prev) => prev + text),
-        () => {
-          setAiThinking(false);
-          if (pendingActions.length > 0) {
-            setAiActions([...pendingActions]);
-          }
-        },
-        (error) => {
-          console.error('AI error:', error);
-          setAiThinking(false);
-        },
-        controller.signal,
-        (toolCall: ToolCallEvent) => {
-          // Parse tool call into action card
-          try {
-            const params = JSON.parse(toolCall.arguments);
-            const label =
-              toolCall.name === 'create_page'
-                ? `Create page "${params.title || params.name || 'Untitled'}"`
-                : `${toolCall.name}(${Object.keys(params).join(', ')})`;
-            pendingActions.push({
-              id: toolCall.id,
-              action: toolCall.name,
-              label,
-              params,
-            });
-          } catch {
-            // skip malformed
-          }
-        },
-      );
-    },
-    [selectedProjectId, aiThinking],
-  );
 
   const handleSelect = (result: UnifiedSearchResult) => {
     onOpenChange(false);
@@ -200,20 +119,17 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
     navigate(`/workflow/${workflowId}#step-${stepNumber}`);
   };
 
+  const handleAskAI = () => {
+    onOpenChange(false);
+    // TODO: open chat panel with the query pre-filled
+    // For now navigate to a chat route or trigger chat panel open
+    navigate(`/chat?q=${encodeURIComponent(query)}`);
+  };
+
   const workflows = results.filter((r) => r.type === 'workflow');
   const documents = results.filter((r) => r.type === 'document');
-
-  const modeIcon =
-    searchMode === 'semantic' ? (
-      <IconBrain className="h-3 w-3" />
-    ) : searchMode === 'ai' ? (
-      <IconRobot className="h-3 w-3" />
-    ) : (
-      <IconAbc className="h-3 w-3" />
-    );
-
-  const modeLabel =
-    searchMode === 'semantic' ? 'Semantic' : searchMode === 'ai' ? 'AI' : 'Keyword';
+  const hasQuery = query.trim().length > 0;
+  const hasResults = results.length > 0;
 
   return (
     <CommandDialog
@@ -231,22 +147,23 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       />
 
       {/* Search mode indicator */}
-      {searchMode !== 'idle' && (
+      {hasQuery && (
         <div className="flex items-center gap-2 border-b px-3 py-1.5">
           <Badge variant="outline" className="gap-1 text-xs">
-            {modeIcon}
-            {modeLabel}
+            {searchType === 'semantic' ? (
+              <IconBrain className="h-3 w-3" />
+            ) : (
+              <IconAbc className="h-3 w-3" />
+            )}
+            {searchType === 'semantic' ? 'Semantic' : 'Keyword'}
           </Badge>
           {isSearching && <IconLoader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-          {searchType === 'semantic' && (
-            <span className="text-xs text-muted-foreground">🧠 Semantic results</span>
-          )}
         </div>
       )}
 
       <CommandList className="max-h-[400px]">
         {/* Idle state: Quick Actions */}
-        {searchMode === 'idle' && (
+        {!hasQuery && (
           <CommandGroup heading="Quick Actions">
             <CommandItem
               onSelect={() => {
@@ -261,7 +178,6 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
             <CommandItem
               onSelect={() => {
                 onOpenChange(false);
-                // Navigate to workflow recording or creation
               }}
             >
               <IconListDetails className="mr-2 h-4 w-4" />
@@ -281,16 +197,10 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
           </CommandGroup>
         )}
 
-        {/* Search Results */}
-        {searchMode !== 'idle' && results.length === 0 && !aiThinking && !aiResponse && (
+        {/* No results */}
+        {hasQuery && !isSearching && !hasResults && (
           <CommandEmpty>
-            No results found.{' '}
-            <button
-              className="text-primary underline"
-              onClick={() => triggerAI(query)}
-            >
-              Ask AI →
-            </button>
+            No results for "{query}"
           </CommandEmpty>
         )}
 
@@ -302,9 +212,11 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
                 <CommandItem onSelect={() => handleSelect(wf)}>
                   <IconListDetails className="mr-2 h-4 w-4 shrink-0" />
                   <span className="flex-1 truncate">{wf.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {Math.round(wf.score * 100)}%
-                  </span>
+                  {wf.score > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {Math.round(wf.score * 100)}%
+                    </span>
+                  )}
                 </CommandItem>
                 {wf.matching_steps?.slice(0, 2).map((step) => (
                   <CommandItem
@@ -322,7 +234,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
           </CommandGroup>
         )}
 
-        {/* Documents */}
+        {/* Documents / Pages */}
         {documents.length > 0 && (
           <CommandGroup heading={`Pages (${documents.length})`}>
             {documents.map((doc) => (
@@ -336,46 +248,19 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
                     </span>
                   )}
                 </div>
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {Math.round(doc.score * 100)}%
-                </span>
+                {doc.score > 0 && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {Math.round(doc.score * 100)}%
+                  </span>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>
         )}
-
-        {/* AI Response */}
-        {(aiThinking || aiResponse) && (
-          <>
-            <CommandSeparator />
-            <CommandGroup heading="🤖 AI">
-              {aiThinking && !aiResponse && (
-                <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
-                  <IconLoader2 className="h-4 w-4 animate-spin" />
-                  Thinking...
-                </div>
-              )}
-              {aiResponse && (
-                <div className="whitespace-pre-wrap px-2 py-3 text-sm">
-                  {aiResponse}
-                </div>
-              )}
-              {aiActions.length > 0 && (
-                <SpotlightActions
-                  actions={aiActions}
-                  projectId={selectedProjectId || undefined}
-                  onActionComplete={() => {
-                    // Could refresh results or close
-                  }}
-                />
-              )}
-            </CommandGroup>
-          </>
-        )}
       </CommandList>
 
-      {/* Footer */}
-      {searchMode !== 'idle' && searchMode !== 'ai' && !aiThinking && (
+      {/* Footer: result count + Ask AI suggestion */}
+      {hasQuery && !isSearching && (
         <div className="flex items-center justify-between border-t px-3 py-2">
           <span className="text-xs text-muted-foreground">
             {results.length} result{results.length !== 1 ? 's' : ''}
@@ -384,10 +269,10 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
             variant="ghost"
             size="sm"
             className="h-7 gap-1 text-xs"
-            onClick={() => triggerAI(query)}
+            onClick={handleAskAI}
           >
             <IconSparkles className="h-3 w-3" />
-            Ask AI →
+            Ask AI
           </Button>
         </div>
       )}
