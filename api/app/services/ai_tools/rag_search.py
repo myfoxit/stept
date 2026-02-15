@@ -46,8 +46,103 @@ async def execute(
 
     from app.services.embeddings import generate_embedding, has_embedding_api
 
-    if not has_embedding_api():
-        return {"error": "Semantic search is not available. No embedding API configured."}
+    if has_embedding_api():
+        return await _semantic_search(db, query, project_id)
+    else:
+        return await _keyword_fallback(db, query, user_id, project_id)
+
+
+async def _keyword_fallback(
+    db: AsyncSession,
+    query: str,
+    user_id: str,
+    project_id: Optional[str],
+) -> dict:
+    """Keyword-based fallback when no embedding API is available."""
+    from sqlalchemy import select, and_
+    from app.models import ProcessRecordingSession, Document
+    from app.services.embeddings import keyword_similarity
+
+    results: list[dict] = []
+
+    # Search workflows
+    wf_filters = [ProcessRecordingSession.user_id == user_id]
+    if project_id:
+        wf_filters.append(ProcessRecordingSession.project_id == project_id)
+    wf_stmt = select(ProcessRecordingSession).where(and_(*wf_filters))
+    wf_rows = (await db.execute(wf_stmt)).scalars().all()
+
+    from app.services.embeddings import workflow_text
+    for wf in wf_rows:
+        text = workflow_text(wf)
+        if not text.strip():
+            continue
+        score = keyword_similarity(query, text)
+        if score > 0.05:
+            name = wf.name or wf.generated_title or "Untitled Workflow"
+            results.append({
+                "source_type": "workflow",
+                "source_id": wf.id,
+                "title": name,
+                "citation": f'[Source: Workflow "{name}"]',
+                "similarity": round(score, 4),
+            })
+
+    # Search documents
+    doc_filters = [Document.user_id == user_id]
+    if project_id:
+        doc_filters.append(Document.project_id == project_id)
+    doc_stmt = select(Document).where(and_(*doc_filters))
+    doc_rows = (await db.execute(doc_stmt)).scalars().all()
+
+    from app.document_export import tiptap_to_markdown
+    for doc in doc_rows:
+        text_parts = [doc.title or ""]
+        if doc.content:
+            try:
+                text_parts.append(tiptap_to_markdown(doc.content))
+            except Exception:
+                pass
+        text = "\n".join(text_parts)
+        if not text.strip():
+            continue
+        score = keyword_similarity(query, text)
+        if score > 0.05:
+            title = doc.title or "Untitled"
+            results.append({
+                "source_type": "document",
+                "source_id": doc.id,
+                "title": title,
+                "citation": f'[Source: Document "{title}"]',
+                "similarity": round(score, 4),
+            })
+
+    # Sort by score, take top 5
+    results.sort(key=lambda r: r["similarity"], reverse=True)
+    results = results[:5]
+
+    if not results:
+        return {
+            "success": True,
+            "count": 0,
+            "results": [],
+            "message": f"No results found for '{query}'.",
+        }
+
+    return {
+        "success": True,
+        "count": len(results),
+        "results": results,
+        "message": f"Found {len(results)} result(s) for '{query}' (keyword search).",
+    }
+
+
+async def _semantic_search(
+    db: AsyncSession,
+    query: str,
+    project_id: Optional[str],
+) -> dict:
+    from app.services.embeddings import generate_embedding
 
     query_vector = await generate_embedding(query)
     if query_vector is None:

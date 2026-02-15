@@ -41,8 +41,8 @@ def _get_openai_config() -> tuple[str | None, str]:
     provider = _provider()
     api_key = _api_key()
 
-    # Only use OpenAI embeddings when provider is openai-compatible
-    if provider in ("openai",) and api_key:
+    # Use OpenAI-compatible embeddings for providers that support it
+    if provider in ("openai", "azure", "openrouter", "together", "anyscale", "deepinfra", "fireworks") and api_key:
         return api_key, _base_url()
     # For other providers (anthropic, ollama) or no key: no embeddings
     return None, ""
