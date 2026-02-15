@@ -41,6 +41,7 @@ import { useUpdateWorkflow } from '@/hooks/api/workflows';
 import { SiteHeader } from '@/components/site-header';
 import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
+import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
 
 export function WorkflowView() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -566,6 +567,10 @@ export function WorkflowView() {
             // NEW: allow editing title from header
             onUpdateTitle={handleUpdateTitle}
           />
+
+          {selectedProjectId && workflowId && (
+            <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
+          )}
 
           {isEditMode ? (
             <InsertStepMenu index={0} onInsert={handleInsertStep} stepNumber={1} />

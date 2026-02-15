@@ -15,6 +15,7 @@ import { ShareDialog } from '@/components/share-dialog';
 import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
 import { Badge } from '@/components/ui/badge';
+import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
 
 export default function EditorPage() {
   const { docId } = useParams<{ docId: string }>();
@@ -103,6 +104,11 @@ export default function EditorPage() {
           }
         />
       </SiteHeader>
+      {selectedProjectId && docId && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <ContextLinkPanel projectId={selectedProjectId} resourceType="document" resourceId={docId} />
+        </div>
+      )}
       <NotionEditor docId={docId as string} readOnly={isReadOnly} />
     </div>
   );
