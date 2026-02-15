@@ -132,6 +132,18 @@ def tiptap_to_markdown(content: Any) -> str:
         if node_type == "pageBreak":
             return "\n\n---\n*[Page Break]*\n---\n\n"
         
+        if node_type == "taskList":
+            for child in node.get("content", []):
+                result += convert_node(child, list_depth + 1)
+            return result
+        
+        if node_type == "taskItem":
+            indent = "  " * (list_depth - 1)
+            checked = node.get("attrs", {}).get("checked", False)
+            checkbox = "[x]" if checked else "[ ]"
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"{indent}- {checkbox} {content.strip()}\n"
+        
         if node_type == "table":
             rows = node.get("content", [])
             if not rows:
@@ -147,6 +159,16 @@ def tiptap_to_markdown(content: Any) -> str:
                 if i == 0:
                     table_md.append("| " + " | ".join(["---"] * len(cell_texts)) + " |")
             return "\n" + "\n".join(table_md) + "\n\n"
+        
+        if node_type == "process-recording-node":
+            session_id = node.get("attrs", {}).get("sessionId", "unknown")
+            return f"\n[Embedded Workflow Recording: {session_id}]\n\n"
+        
+        if node_type == "dataTable":
+            table_name = node.get("attrs", {}).get("tableName", "")
+            table_id = node.get("attrs", {}).get("tableId", "unknown")
+            label = table_name or table_id
+            return f"\n[Embedded Data Table: {label}]\n\n"
         
         for child in node.get("content", []):
             result += convert_node(child, list_depth, ordered_counter)
@@ -256,6 +278,26 @@ def tiptap_nodes_to_html(nodes: List[Dict], page_layout: str = "document") -> st
             content = "".join(convert_node(c) for c in node.get("content", []))
             return f"<th>{content}</th>"
         
+        if node_type == "taskList":
+            items = "".join(convert_node(c) for c in node.get("content", []))
+            return f'<ul style="list-style: none; padding-left: 0;">{items}</ul>'
+        
+        if node_type == "taskItem":
+            checked = node.get("attrs", {}).get("checked", False)
+            checkbox = "☑" if checked else "☐"
+            content = "".join(convert_node(c) for c in node.get("content", []))
+            return f"<li>{checkbox} {content}</li>"
+        
+        if node_type == "process-recording-node":
+            session_id = node.get("attrs", {}).get("sessionId", "unknown")
+            return f'<div class="embedded-node">[Embedded Workflow Recording: {html_module.escape(str(session_id))}]</div>'
+        
+        if node_type == "dataTable":
+            table_name = node.get("attrs", {}).get("tableName", "")
+            table_id = node.get("attrs", {}).get("tableId", "unknown")
+            label = table_name or table_id
+            return f'<div class="embedded-node">[Embedded Data Table: {html_module.escape(str(label))}]</div>'
+        
         return "".join(convert_node(c) for c in node.get("content", []))
     
     return "".join(convert_node(node) for node in nodes)
@@ -348,6 +390,16 @@ def generate_document_confluence(doc: Any, page_layout: str = "document") -> str
             content = "".join(convert_node(c) for c in node.get("content", []))
             return f"<{tag}>{content}</{tag}>"
 
+        if node_type == "process-recording-node":
+            session_id = node.get("attrs", {}).get("sessionId", "unknown")
+            return f"<p><em>[Embedded Workflow Recording: {html_module.escape(str(session_id))}]</em></p>"
+
+        if node_type == "dataTable":
+            table_name = node.get("attrs", {}).get("tableName", "")
+            table_id = node.get("attrs", {}).get("tableId", "unknown")
+            label = table_name or table_id
+            return f"<p><em>[Embedded Data Table: {html_module.escape(str(label))}]</em></p>"
+
         return "".join(convert_node(c) for c in node.get("content", []))
 
     if isinstance(doc.content, dict):
@@ -428,6 +480,16 @@ def generate_document_notion_markdown(doc: Any, page_layout: str = "document") -
             src = node.get("attrs", {}).get("src", "")
             alt = node.get("attrs", {}).get("alt", "")
             return f"![{alt}]({src})\n\n"
+
+        if node_type == "process-recording-node":
+            session_id = node.get("attrs", {}).get("sessionId", "unknown")
+            return f"\n[Embedded Workflow Recording: {session_id}]\n\n"
+
+        if node_type == "dataTable":
+            table_name = node.get("attrs", {}).get("tableName", "")
+            table_id = node.get("attrs", {}).get("tableId", "unknown")
+            label = table_name or table_id
+            return f"\n[Embedded Data Table: {label}]\n\n"
 
         result = ""
         for child in node.get("content", []):
@@ -752,3 +814,28 @@ def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
             p = word_doc.add_paragraph()
             p.add_run(f"[Image: {src}]").italic = True
             set_paragraph_spacing(p)
+        
+        elif node_type == "process-recording-node":
+            session_id = node.get("attrs", {}).get("sessionId", "unknown")
+            p = word_doc.add_paragraph()
+            p.add_run(f"[Embedded Workflow Recording: {session_id}]").italic = True
+            set_paragraph_spacing(p)
+        
+        elif node_type == "dataTable":
+            table_name = node.get("attrs", {}).get("tableName", "")
+            table_id = node.get("attrs", {}).get("tableId", "unknown")
+            label = table_name or table_id
+            p = word_doc.add_paragraph()
+            p.add_run(f"[Embedded Data Table: {label}]").italic = True
+            set_paragraph_spacing(p)
+        
+        elif node_type == "taskList":
+            for item in node.get("content", []):
+                if item.get("type") == "taskItem":
+                    checked = item.get("attrs", {}).get("checked", False)
+                    checkbox = "☑" if checked else "☐"
+                    for child in item.get("content", []):
+                        text = extract_text_from_node(child)
+                        p = word_doc.add_paragraph(f"{checkbox} {text}", style='List Bullet')
+                        p.paragraph_format.space_before = Pt(0)
+                        p.paragraph_format.space_after = Pt(2)
