@@ -575,6 +575,51 @@ async def list_tools(
     }
 
 
+# ---------------------------------------------------------------------------
+# Action confirmation endpoint (for Spotlight AI suggestions)
+# ---------------------------------------------------------------------------
+
+class ConfirmActionRequest(BaseModel):
+    action: str = Field(..., description="Tool name to execute, e.g. 'create_page'")
+    params: dict = Field(default_factory=dict, description="Tool parameters")
+    project_id: Optional[str] = None
+
+
+@router.post("/confirm-action")
+async def confirm_action(
+    body: ConfirmActionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Execute a confirmed AI action (tool call).
+    Called when the user clicks 'Confirm' on an AI suggestion in Spotlight.
+    """
+    tool = tool_registry.get(body.action)
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown action: {body.action}",
+        )
+
+    try:
+        result = await tool.execute(
+            db=db,
+            user_id=current_user.id,
+            project_id=body.project_id,
+            **body.params,
+        )
+        await db.commit()
+        return {"status": "success", "result": result}
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Confirm action %s failed: %s", body.action, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Action failed: {exc}",
+        )
+
+
 @router.get("/usage")
 async def get_usage(
     days: int = Query(default=30, le=365),
