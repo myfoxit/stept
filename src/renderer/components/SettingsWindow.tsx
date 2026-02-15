@@ -13,6 +13,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
   const [settings, setSettings] = useState<Settings>({
     cloudEndpoint: '', chatApiUrl: '', apiKey: '', llmProvider: 'openai',
     llmApiKey: '', llmModel: '', llmBaseUrl: '', autoAnnotateSteps: true, autoGenerateGuide: false,
+    frontendUrl: 'http://localhost:5173',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
