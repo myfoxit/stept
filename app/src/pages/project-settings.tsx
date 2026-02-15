@@ -51,6 +51,7 @@ import { useProjectMembers, useRemoveProjectMember, useUpdateMemberRole } from '
 import { SiteHeader } from '@/components/site-header';
 import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } from '@/api/chat';
 import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWizard';
+import { AiUsageCard } from '@/components/Settings/AiUsageCard';
 import { ProviderLogin } from '@/components/Settings/ProviderLogin';
 
 const roleIcons = {
@@ -397,6 +398,8 @@ export function ProjectSettingsPage() {
           onClose={() => setWizardOpen(false)}
           onConfigSaved={refreshAiConfig}
         />
+
+        {aiConfig?.configured && <AiUsageCard />}
         
         {/* Invite Dialog */}
         <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
