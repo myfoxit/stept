@@ -23,6 +23,7 @@ import {
   IconList,
   IconSearch,
 } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -80,9 +81,86 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallEvent }) {
   );
 }
 
+function PendingConfirmationCard({
+  result,
+}: {
+  result: ToolResultEvent;
+}) {
+  const [confirming, setConfirming] = React.useState(false);
+  const [confirmed, setConfirmed] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const parsedResult = React.useMemo(() => {
+    try {
+      return typeof result.result === 'string' ? JSON.parse(result.result) : result.result;
+    } catch {
+      return {};
+    }
+  }, [result]);
+
+  if (!parsedResult.pending_confirmation) return null;
+
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      const { confirmAction } = await import('@/api/spotlight');
+      await confirmAction(parsedResult.action, parsedResult.params);
+      setConfirmed(true);
+    } catch (e: any) {
+      setError(e.message || 'Failed to execute action');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  if (confirmed) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm dark:border-green-800 dark:bg-green-900/30">
+        <IconCheck className="h-4 w-4 text-green-600" />
+        <span className="text-green-700 dark:text-green-400">Done!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/30">
+      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+        {parsedResult.message}
+      </p>
+      <div className="mt-2 flex gap-2">
+        <Button
+          size="sm"
+          onClick={handleConfirm}
+          disabled={confirming}
+          className="h-7 text-xs"
+        >
+          {confirming ? <IconLoader2 className="mr-1 h-3 w-3 animate-spin" /> : <IconCheck className="mr-1 h-3 w-3" />}
+          Confirm
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setConfirmed(true)}
+          className="h-7 text-xs"
+        >
+          <IconX className="mr-1 h-3 w-3" />
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 function ToolResultCard({ result }: { result: ToolResultEvent }) {
   const data = result.result;
   const isError = result.status === 'error' || !!data.error;
+
+  // Check for pending confirmation
+  const parsed = (() => { try { return typeof data === 'string' ? JSON.parse(data) : data; } catch { return null; } })();
+  if (parsed?.pending_confirmation) {
+    return <PendingConfirmationCard result={result} />;
+  }
 
   if (isError) {
     return (
