@@ -15,13 +15,17 @@ from app.utils import gen_suffix
 from app.core.config import settings
 
 # Get storage configuration from settings
-STORAGE_TYPE = os.getenv("STORAGE_TYPE", "local")
+STORAGE_TYPE = os.getenv("STORAGE_BACKEND", os.getenv("STORAGE_TYPE", "local"))
 # Use absolute path for local storage
 LOCAL_STORAGE_PATH = os.path.abspath(os.getenv("LOCAL_STORAGE_PATH", "./storage/recordings"))
 S3_BUCKET = os.getenv("S3_BUCKET", "")
 S3_PREFIX = os.getenv("S3_PREFIX", "recordings")
 S3_REGION = os.getenv("S3_REGION", None)
 S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", None)
+GCS_BUCKET = os.getenv("STORAGE_GCS_BUCKET", "")
+GCS_CREDENTIALS_FILE = os.getenv("STORAGE_GCS_CREDENTIALS_FILE", "")
+AZURE_CONTAINER = os.getenv("STORAGE_AZURE_CONTAINER", "")
+AZURE_CONNECTION_STRING = os.getenv("STORAGE_AZURE_CONNECTION_STRING", "")
 
 # Ensure the storage directory exists
 if STORAGE_TYPE == "local":
@@ -141,6 +145,89 @@ class S3StorageBackend(StorageBackend):
         )
 
 
+class GCSStorageBackend(StorageBackend):
+    def __init__(self, bucket: str, prefix: str = "recordings", credentials_file: Optional[str] = None):
+        self.bucket_name = bucket
+        self.prefix = prefix.strip("/")
+        try:
+            from google.cloud import storage as gcs_storage
+            if credentials_file:
+                self._client = gcs_storage.Client.from_service_account_json(credentials_file)
+            else:
+                self._client = gcs_storage.Client()
+            self._bucket = self._client.bucket(bucket)
+        except ImportError:
+            raise RuntimeError("google-cloud-storage is required for GCS backend. Install with: pip install google-cloud-storage")
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize GCS client: {e}")
+
+    async def ensure_session_path(self, session_id: str) -> str:
+        return f"{self.prefix}/{session_id}"
+
+    async def save_metadata(self, session_path: str, metadata_obj: Any) -> None:
+        key = f"{session_path}/metadata.json"
+        blob = self._bucket.blob(key)
+        body = json.dumps(metadata_obj, indent=2)
+        await asyncio.to_thread(blob.upload_from_string, body, content_type="application/json")
+
+    async def save_file(self, session_path: str, filename: str, data: bytes, mime_type: str) -> str:
+        safe_name = os.path.basename(filename)
+        key = f"{session_path}/{safe_name}"
+        blob = self._bucket.blob(key)
+        await asyncio.to_thread(blob.upload_from_string, data, content_type=mime_type or "application/octet-stream")
+        return key
+
+    async def get_download_url(self, session_path: str, stored_relative_path: str, expires_in: int = 3600) -> Optional[str]:
+        from datetime import timedelta
+        key = stored_relative_path if stored_relative_path.startswith(self.prefix) else f"{session_path}/{stored_relative_path}"
+        blob = self._bucket.blob(key)
+        return await asyncio.to_thread(blob.generate_signed_url, expiration=timedelta(seconds=expires_in))
+
+
+class AzureBlobStorageBackend(StorageBackend):
+    def __init__(self, container: str, connection_string: str, prefix: str = "recordings"):
+        self.container_name = container
+        self.prefix = prefix.strip("/")
+        try:
+            from azure.storage.blob import BlobServiceClient
+            self._service = BlobServiceClient.from_connection_string(connection_string)
+            self._container = self._service.get_container_client(container)
+        except ImportError:
+            raise RuntimeError("azure-storage-blob is required for Azure backend. Install with: pip install azure-storage-blob")
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize Azure Blob client: {e}")
+
+    async def ensure_session_path(self, session_id: str) -> str:
+        return f"{self.prefix}/{session_id}"
+
+    async def save_metadata(self, session_path: str, metadata_obj: Any) -> None:
+        key = f"{session_path}/metadata.json"
+        body = json.dumps(metadata_obj, indent=2).encode("utf-8")
+        blob = self._container.get_blob_client(key)
+        await asyncio.to_thread(blob.upload_blob, body, overwrite=True, content_type="application/json")
+
+    async def save_file(self, session_path: str, filename: str, data: bytes, mime_type: str) -> str:
+        safe_name = os.path.basename(filename)
+        key = f"{session_path}/{safe_name}"
+        blob = self._container.get_blob_client(key)
+        await asyncio.to_thread(blob.upload_blob, data, overwrite=True, content_type=mime_type or "application/octet-stream")
+        return key
+
+    async def get_download_url(self, session_path: str, stored_relative_path: str, expires_in: int = 3600) -> Optional[str]:
+        from datetime import datetime, timedelta, timezone
+        from azure.storage.blob import generate_blob_sas, BlobSasPermissions
+        key = stored_relative_path if stored_relative_path.startswith(self.prefix) else f"{session_path}/{stored_relative_path}"
+        sas_token = generate_blob_sas(
+            account_name=self._service.account_name,
+            container_name=self.container_name,
+            blob_name=key,
+            account_key=self._service.credential.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+        )
+        return f"{self._container.url}/{key}?{sas_token}"
+
+
 def get_storage_backend(force_type: Optional[str] = None) -> StorageBackend:
     stype = (force_type or STORAGE_TYPE).lower()
     if stype == "s3":
@@ -150,6 +237,10 @@ def get_storage_backend(force_type: Optional[str] = None) -> StorageBackend:
             region=S3_REGION,
             endpoint_url=S3_ENDPOINT_URL,
         )
+    elif stype == "gcs":
+        return GCSStorageBackend(bucket=GCS_BUCKET, prefix=S3_PREFIX, credentials_file=GCS_CREDENTIALS_FILE or None)
+    elif stype == "azure":
+        return AzureBlobStorageBackend(container=AZURE_CONTAINER, connection_string=AZURE_CONNECTION_STRING, prefix=S3_PREFIX)
     # default: local
     return LocalStorageBackend(LOCAL_STORAGE_PATH)
 
