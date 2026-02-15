@@ -32,6 +32,8 @@ export const useAuth = () => {
           projects: status.projects ?? [],
           isLoading: false,
         }));
+        // Auto-start context watcher
+        window.electronAPI.contextStart?.('');
       }
     }).catch(() => {});
     
@@ -81,6 +83,8 @@ export const useAuth = () => {
           projects: status?.projects ?? [],
           isLoading: false,
         }));
+        // Auto-start context watcher
+        window.electronAPI.contextStart?.('');
       } else {
         setState(prev => ({ ...prev, isLoading: false }));
       }

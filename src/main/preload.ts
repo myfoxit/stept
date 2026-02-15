@@ -41,6 +41,12 @@ export interface ElectronAPI {
   onAuthStatusChanged: (callback: (status: AuthStatus) => void) => () => void;
   onProtocolUrl: (callback: (url: string) => void) => () => void;
 
+  // Context watcher
+  contextStart: (projectId: string) => Promise<any>;
+  contextStop: () => Promise<any>;
+  onContextMatches: (callback: (matches: any[], ctx: any) => void) => () => void;
+  onContextNoMatches: (callback: (ctx: any) => void) => () => void;
+
   // Utility
   openExternal: (url: string) => Promise<void>;
   showItemInFolder: (path: string) => Promise<void>;
@@ -230,6 +236,20 @@ const electronAPI: ElectronAPI = {
     const handler = (_event: IpcRendererEvent, url: string) => callback(url);
     ipcRenderer.on('protocol-url', handler);
     return () => ipcRenderer.removeListener('protocol-url', handler);
+  },
+
+  // Context watcher
+  contextStart: (projectId: string) => ipcRenderer.invoke('context:start', projectId),
+  contextStop: () => ipcRenderer.invoke('context:stop'),
+  onContextMatches: (callback: (matches: any[], ctx: any) => void) => {
+    const handler = (_event: IpcRendererEvent, matches: any[], ctx: any) => callback(matches, ctx);
+    ipcRenderer.on('context:matches', handler);
+    return () => ipcRenderer.removeListener('context:matches', handler);
+  },
+  onContextNoMatches: (callback: (ctx: any) => void) => {
+    const handler = (_event: IpcRendererEvent, ctx: any) => callback(ctx);
+    ipcRenderer.on('context:no-matches', handler);
+    return () => ipcRenderer.removeListener('context:no-matches', handler);
   },
 
   // Utility

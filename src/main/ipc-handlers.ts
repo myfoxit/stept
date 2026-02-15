@@ -1,4 +1,4 @@
-import { ipcMain, shell, app, WebContents } from 'electron';
+import { ipcMain, shell, app, WebContents, BrowserWindow } from 'electron';
 import { AuthService } from './auth';
 import { SettingsManager } from './settings';
 import { RecordingService } from './recording';
@@ -7,6 +7,7 @@ import { ChatService } from './chat';
 import { SmartAnnotationService } from './smart-annotation';
 import { GuideGenerationService } from './guide-generation';
 import { CloudUploadService } from './cloud-upload';
+import { ContextWatcherService } from './context-watcher';
 
 export function setupIpcHandlers(
   authService: AuthService,
@@ -19,6 +20,7 @@ export function setupIpcHandlers(
   const smartAnnotationService = new SmartAnnotationService(chatService);
   const guideGenerationService = new GuideGenerationService(chatService);
   const cloudUploadService = new CloudUploadService(() => authService.getAccessToken(), settingsManager);
+  const contextWatcher = new ContextWatcherService();
 
   // Dispose services on app quit
   app.on('before-quit', () => {
@@ -231,6 +233,37 @@ export function setupIpcHandlers(
     } catch (error) {
       throw new Error(`Failed to upload recording: ${error instanceof Error ? error.message : String(error)}`);
     }
+  });
+
+  // Context watcher IPC handlers
+  ipcMain.handle('context:start', async (event, projectId: string) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { error: 'Not authenticated' };
+
+    contextWatcher.configure(settings.chatApiUrl || settings.cloudEndpoint, token, projectId);
+
+    contextWatcher.removeAllListeners();
+    contextWatcher.on('matches', (matches, ctx) => {
+      const windows = BrowserWindow.getAllWindows();
+      for (const w of windows) {
+        w.webContents.send('context:matches', matches, ctx);
+      }
+    });
+    contextWatcher.on('no-matches', (ctx) => {
+      const windows = BrowserWindow.getAllWindows();
+      for (const w of windows) {
+        w.webContents.send('context:no-matches', ctx);
+      }
+    });
+
+    contextWatcher.start();
+    return { success: true };
+  });
+
+  ipcMain.handle('context:stop', async () => {
+    contextWatcher.stop();
+    return { success: true };
   });
 
   // Utility IPC handlers

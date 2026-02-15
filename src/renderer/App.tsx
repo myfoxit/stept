@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import MainWindow from './components/MainWindow';
+import { ContextSuggestions } from './components/ContextSuggestions';
 import { Loader2, Circle } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -45,6 +46,7 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <MainWindow />
+      <ContextSuggestions />
     </div>
   );
 };
