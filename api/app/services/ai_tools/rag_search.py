@@ -80,7 +80,7 @@ async def _keyword_fallback(
         score = keyword_similarity(query, text)
         if score > 0.15:
             name = wf.name or wf.generated_title or "Untitled Workflow"
-            snippet = text[:4000].strip()
+            snippet = text.strip()
             results.append({
                 "source_type": "workflow",
                 "source_id": wf.id,
@@ -124,7 +124,7 @@ async def _keyword_fallback(
         if score > 0.15:
             title = doc.name or "Untitled"
             # Include content snippet for LLM context
-            snippet = text[:4000].strip()
+            snippet = text.strip()
             results.append({
                 "source_type": "document",
                 "source_id": doc.id,
@@ -137,6 +137,18 @@ async def _keyword_fallback(
     # Sort by score, take top 5
     results.sort(key=lambda r: r["similarity"], reverse=True)
     results = results[:5]
+
+    # Cap total snippet size to ~20k chars (~5k tokens) to control costs
+    total_chars = 0
+    MAX_TOTAL_CHARS = 20000
+    for r in results:
+        snippet = r.get("snippet", "")
+        remaining = MAX_TOTAL_CHARS - total_chars
+        if remaining <= 0:
+            r["snippet"] = "[Content truncated — token budget reached]"
+        elif len(snippet) > remaining:
+            r["snippet"] = snippet[:remaining] + "\n...[truncated]"
+        total_chars += len(r.get("snippet", ""))
 
     if not results:
         return {
@@ -224,23 +236,22 @@ async def _semantic_search(
                 continue
             seen_docs.add(doc_id)
             title = meta.get("title", "Untitled")
-            chunk_info = f", Chunk {meta.get('chunk_index', 0) + 1}" if source_type == "document_chunk" else ""
-            # Use stored chunk_text from metadata; fall back to fetching
-            snippet = meta.get("chunk_text", "")
-            if not snippet:
-                try:
-                    doc = await db.get(Document, doc_id)
-                    if doc and doc.content:
-                        from app.document_export import tiptap_to_markdown
-                        snippet = tiptap_to_markdown(doc.content)[:4000].strip()
-                except Exception:
-                    pass
+            # Always fetch full document content — chunks are just for finding,
+            # the LLM needs complete context to answer properly
+            snippet = ""
+            try:
+                doc = await db.get(Document, doc_id)
+                if doc and doc.content:
+                    from app.document_export import tiptap_to_markdown
+                    snippet = tiptap_to_markdown(doc.content).strip()
+            except Exception:
+                snippet = meta.get("chunk_text", "")
             results.append({
                 "source_type": "document",
                 "source_id": doc_id,
                 "title": title,
                 "snippet": snippet,
-                "citation": f'[Source: Document "{title}"{chunk_info}]',
+                "citation": f'[Source: Document "{title}"]',
                 "similarity": score,
             })
 
@@ -255,7 +266,7 @@ async def _semantic_search(
                     wf = await db.get(ProcessRecordingSession, source_id)
                     if wf:
                         from app.services.embeddings import workflow_text
-                        snippet = workflow_text(wf)[:4000].strip()
+                        snippet = workflow_text(wf).strip()
                 except Exception:
                     pass
             results.append({
@@ -283,6 +294,18 @@ async def _semantic_search(
                 "citation": f'[Source: Workflow "{wf_name}", Step {step_num}]',
                 "similarity": score,
             })
+
+    # Cap total snippet size to ~20k chars (~5k tokens) to control costs
+    total_chars = 0
+    MAX_TOTAL_CHARS = 20000
+    for r in results:
+        snippet = r.get("snippet", "")
+        remaining = MAX_TOTAL_CHARS - total_chars
+        if remaining <= 0:
+            r["snippet"] = "[Content truncated — token budget reached]"
+        elif len(snippet) > remaining:
+            r["snippet"] = snippet[:remaining] + "\n...[truncated]"
+        total_chars += len(r.get("snippet", ""))
 
     return {
         "success": True,
