@@ -621,6 +621,15 @@ async def push_to_git(db: AsyncSession, config: GitSyncConfig) -> dict:
             md = tiptap_to_markdown(doc.content)
 
             sha = existing_files.get(file_path)
+            
+            # If no SHA found but file might exist, try fetching it directly
+            if not sha:
+                try:
+                    existing = await provider.get_file(file_path)
+                    sha = existing.get("sha")
+                except httpx.HTTPStatusError:
+                    pass  # File doesn't exist yet, will create
+            
             await provider.create_or_update_file(file_path, md, message, sha=sha)
             pushed += 1
 
@@ -633,6 +642,7 @@ async def push_to_git(db: AsyncSession, config: GitSyncConfig) -> dict:
 
     except Exception as e:
         logger.exception("Git push failed")
+        await db.rollback()
         config.last_sync_status = "error"
         config.last_sync_error = str(e)[:500]
         await db.commit()
@@ -763,6 +773,7 @@ async def pull_from_git(db: AsyncSession, config: GitSyncConfig) -> dict:
 
     except Exception as e:
         logger.exception("Git pull failed")
+        await db.rollback()
         config.last_sync_status = "error"
         config.last_sync_error = str(e)[:500]
         await db.commit()
