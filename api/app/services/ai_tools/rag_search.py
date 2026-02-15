@@ -109,7 +109,7 @@ async def _keyword_fallback(
 
     from app.document_export import tiptap_to_markdown
     for doc in doc_rows:
-        text_parts = [doc.title or ""]
+        text_parts = [doc.name or ""]
         if doc.content:
             try:
                 text_parts.append(tiptap_to_markdown(doc.content))
@@ -120,7 +120,7 @@ async def _keyword_fallback(
             continue
         score = keyword_similarity(query, text)
         if score > 0.05:
-            title = doc.title or "Untitled"
+            title = doc.name or "Untitled"
             results.append({
                 "source_type": "document",
                 "source_id": doc.id,
