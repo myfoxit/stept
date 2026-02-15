@@ -214,19 +214,20 @@ class OndokiApp {
   private badgeTrayIcon: Electron.NativeImage | null = null;
 
   private createTray(): void {
-    // 32x32 white circle template image for macOS menu bar
-    const trayIcon = nativeImage.createFromDataURL(
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAJRJREFUWEft1rENwCAMBVBYJRuwSjZhDTZhlWzAKhQpUpTCn2AwTuEG6fTvbGOI0HxFzfzUAfh3BW6S7iO2Z+AvJelU4C7pIOli5B5AWj6IOl1aLACAtQIpA8ByhdwCuXMb+xvgDKQBXkEa4BWkAUagAo1z/gcwbsB4C8azYPwciJ+E8aMofhjHr6P/dz0cLwCvvEIhS8Z5nwAAAABJRU5ErkJggg=='
-    );
+    // Use actual app icon for tray
+    const iconPath = path.join(__dirname, '..', '..', 'electron-icons', 'macos');
+    const icon16 = nativeImage.createFromPath(path.join(iconPath, '16x16.png'));
+    
+    // Create template version (macOS auto-adjusts for dark/light menu bar)
+    const trayIcon = icon16.resize({ width: 16, height: 16 });
     trayIcon.setTemplateImage(true);
     this.normalTrayIcon = trayIcon;
 
-    // Badge icon (colored, non-template) for when matches are found
-    const badgeIcon = nativeImage.createFromDataURL(
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAJRJREFUWEft1rENwCAMBVBYJRuwSjZhDTZhlWzAKhQpUpTCn2AwTuEG6fTvbGOI0HxFzfzUAfh3BW6S7iO2Z+AvJelU4C7pIOli5B5AWj6IOl1aLACAtQIpA8ByhdwCuXMb+xvgDKQBXkEa4BWkAUagAo1z/gcwbsB4C8azYPwciJ+E8aMofhjHr6P/dz0cLwCvvEIhS8Z5nwAAAABJRU5ErkJggg=='
-    );
-    badgeIcon.setTemplateImage(false);
-    this.badgeTrayIcon = badgeIcon;
+    // Badge icon: same icon but NOT template (renders in color = stands out)
+    const badgeBase = nativeImage.createFromPath(path.join(iconPath, '16x16.png'));
+    const badge = badgeBase.resize({ width: 16, height: 16 });
+    badge.setTemplateImage(false);
+    this.badgeTrayIcon = badge;
 
     this.tray = new Tray(trayIcon);
     this.tray.setToolTip('Ondoki');
@@ -237,6 +238,8 @@ class OndokiApp {
       if (this.badgeTrayIcon) {
         this.tray?.setImage(this.badgeTrayIcon);
       }
+      // Show match count next to tray icon
+      this.tray?.setTitle(` ${matches.length}`);
       const contextLabel = ctx.url
         ? `${ctx.appName} — ${new URL(ctx.url).hostname}`
         : ctx.appName;
@@ -247,6 +250,7 @@ class OndokiApp {
       if (this.normalTrayIcon) {
         this.tray?.setImage(this.normalTrayIcon);
       }
+      this.tray?.setTitle('');
       this.updateTrayMenu();
     });
   }
