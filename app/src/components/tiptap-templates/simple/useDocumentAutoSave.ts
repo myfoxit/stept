@@ -1,36 +1,195 @@
 import { Editor } from '@tiptap/core';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'validation-error' | 'conflict';
+
+const MAX_CONTENT_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_RETRIES = 5;
+const MAX_BACKOFF = 30000; // 30s
+
+function getLocalStorageKey(docId: string) {
+  return `ondoki:autosave:${docId}`;
+}
+
+export interface LocalRecovery {
+  content: unknown;
+  timestamp: number;
+}
+
+function saveToLocalStorage(docId: string, content: unknown) {
+  try {
+    localStorage.setItem(
+      getLocalStorageKey(docId),
+      JSON.stringify({ content, timestamp: Date.now() } satisfies LocalRecovery)
+    );
+  } catch {
+    // localStorage full or unavailable — ignore
+  }
+}
+
+function loadFromLocalStorage(docId: string): LocalRecovery | null {
+  try {
+    const raw = localStorage.getItem(getLocalStorageKey(docId));
+    if (!raw) return null;
+    return JSON.parse(raw) as LocalRecovery;
+  } catch {
+    return null;
+  }
+}
+
+function clearLocalStorage(docId: string) {
+  try {
+    localStorage.removeItem(getLocalStorageKey(docId));
+  } catch {
+    // ignore
+  }
+}
+
+/** Validate content before sending to server */
+function validateContent(json: unknown): string | null {
+  try {
+    const serialized = JSON.stringify(json);
+    if (serialized.length > MAX_CONTENT_SIZE) {
+      return `Content too large (${(serialized.length / 1024 / 1024).toFixed(1)}MB). Maximum is 5MB.`;
+    }
+    // Verify it round-trips (valid JSON)
+    JSON.parse(serialized);
+    return null;
+  } catch {
+    return 'Content is not valid JSON.';
+  }
+}
+
+export interface UseDocumentAutoSaveOptions {
+  docId: string;
+  onConflict?: () => void;
+}
 
 export function useDocumentAutoSave(
   editor: Editor | null,
-  onSave: (json: unknown) => void,
-  delay = 1000,
-  dependencies: any[] = []
+  onSave: (json: unknown) => Promise<any>,
+  delay = 3000,
+  dependencies: any[] = [],
+  options?: UseDocumentAutoSaveOptions
 ) {
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
 
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const lastSavedContentRef = useRef<string>(''); // NEW: Track last saved content
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
-  // Register editor listeners once
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const lastSavedContentRef = useRef<string>('');
+  const retryCountRef = useRef(0);
+  const backoffRef = useRef(1000);
+
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasLocalRecovery, setHasLocalRecovery] = useState(false);
+  const [localRecovery, setLocalRecovery] = useState<LocalRecovery | null>(null);
+
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Check for local recovery on mount
+  useEffect(() => {
+    if (!options?.docId) return;
+    const recovery = loadFromLocalStorage(options.docId);
+    if (recovery) {
+      setLocalRecovery(recovery);
+      setHasLocalRecovery(true);
+    }
+  }, [options?.docId]);
+
+  const restoreFromLocal = useCallback(() => {
+    if (!editor || !localRecovery || !options?.docId) return;
+    editor.commands.setContent(localRecovery.content as any, false);
+    setHasLocalRecovery(false);
+    setLocalRecovery(null);
+    clearLocalStorage(options.docId);
+  }, [editor, localRecovery, options?.docId]);
+
+  const dismissRecovery = useCallback(() => {
+    if (options?.docId) clearLocalStorage(options.docId);
+    setHasLocalRecovery(false);
+    setLocalRecovery(null);
+  }, [options?.docId]);
+
+  const performSave = useCallback(
+    async (json: unknown) => {
+      // Validate content
+      const validationError = validateContent(json);
+      if (validationError) {
+        setSaveStatus('validation-error');
+        setErrorMessage(validationError);
+        return;
+      }
+
+      setSaveStatus('saving');
+      setErrorMessage(null);
+
+      try {
+        await onSaveRef.current(json);
+        setSaveStatus('saved');
+        retryCountRef.current = 0;
+        backoffRef.current = 1000;
+
+        // Clear localStorage on successful save
+        if (optionsRef.current?.docId) {
+          clearLocalStorage(optionsRef.current.docId);
+        }
+
+        // Reset to idle after 2s
+        clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (err: any) {
+        const status = err?.response?.status ?? err?.status;
+        if (status === 409) {
+          setSaveStatus('conflict');
+          setErrorMessage('This document was modified elsewhere. Reload to get the latest version.');
+          optionsRef.current?.onConflict?.();
+          return;
+        }
+
+        // Save to localStorage as fallback
+        if (optionsRef.current?.docId) {
+          saveToLocalStorage(optionsRef.current.docId, json);
+        }
+
+        retryCountRef.current++;
+        if (retryCountRef.current >= MAX_RETRIES) {
+          setSaveStatus('error');
+          setErrorMessage('Failed to save after multiple attempts. Your changes are backed up locally.');
+          return;
+        }
+
+        // Exponential backoff retry
+        const retryDelay = Math.min(backoffRef.current, MAX_BACKOFF);
+        backoffRef.current = backoffRef.current * 2;
+        setSaveStatus('error');
+        setErrorMessage(`Save failed. Retrying in ${Math.round(retryDelay / 1000)}s...`);
+
+        timeoutRef.current = setTimeout(() => {
+          performSave(json);
+        }, retryDelay);
+      }
+    },
+    []
+  );
+
+  // Register editor listeners
   useEffect(() => {
     if (!editor) return;
 
     const handleChange = () => {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
-        // Store current selection before save
         const { from, to } = editor.state.selection;
         const currentContent = JSON.stringify(editor.getJSON());
 
-        // Only save if content actually changed
         if (currentContent !== lastSavedContentRef.current) {
           lastSavedContentRef.current = currentContent;
-          onSaveRef.current(editor.getJSON());
+          performSave(editor.getJSON());
 
-          // Ensure cursor position is maintained after save
-          // This prevents any async state updates from moving the cursor
           requestAnimationFrame(() => {
             if (editor && !editor.isDestroyed) {
               editor.commands.setTextSelection({ from, to });
@@ -41,31 +200,26 @@ export function useDocumentAutoSave(
     };
 
     editor.on('update', handleChange);
-
-    // Initial save
     lastSavedContentRef.current = JSON.stringify(editor.getJSON());
-    handleChange();
 
     return () => {
       clearTimeout(timeoutRef.current);
+      clearTimeout(savedTimerRef.current);
       editor.off('update', handleChange);
     };
-  }, [editor, delay]);
+  }, [editor, delay, performSave]);
 
-  // Save immediately when external dependencies change (e.g., title)
+  // Save on dependency changes (e.g. title)
   useEffect(() => {
-    if (!editor || dependencies.length === 0) return; // Don't save on mount with empty deps
+    if (!editor || dependencies.length === 0) return;
 
-    // Store current selection before save
     const { from, to } = editor.state.selection;
     const currentContent = JSON.stringify(editor.getJSON());
 
-    // Only save if content is different or deps changed
     if (currentContent !== lastSavedContentRef.current || dependencies.length > 0) {
       lastSavedContentRef.current = currentContent;
-      onSaveRef.current(editor.getJSON());
+      performSave(editor.getJSON());
 
-      // Restore cursor position
       requestAnimationFrame(() => {
         if (editor && !editor.isDestroyed) {
           editor.commands.setTextSelection({ from, to });
@@ -74,4 +228,13 @@ export function useDocumentAutoSave(
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);
+
+  return {
+    saveStatus,
+    errorMessage,
+    hasLocalRecovery,
+    localRecovery,
+    restoreFromLocal,
+    dismissRecovery,
+  };
 }

@@ -12,7 +12,7 @@ import { DragContextMenu } from '@/components/tiptap-ui/drag-context-menu';
 import '@/components/tiptap-templates/simple/notion-like-editor.scss';
 import { MobileToolbar } from './notion-like-editor-mobile-toolbar';
 import { NotionToolbarFloating } from './notion-like-editor-toolbar-floating';
-import { useCallback, useEffect, useLayoutEffect } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useSnapEditor } from './useSnapEditor';
 import { useDocumentAutoSave } from './useDocumentAutoSave';
 import type { PageLayout } from '@/components/page-layout-selector';
@@ -73,32 +73,42 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
   }, [isInitialized, docLoading, doc]);
 
   const save = useCallback(
-    (content: unknown) => {
-      if (!isInitialized) return;
-      saveDocument.mutate(
-        { name: title, content, page_layout: layout || 'document', version: docVersion },
-        {
-          onSuccess: (data: any) => {
-            if (data?.version) setDocVersion(data.version);
-            queryClient.invalidateQueries({ queryKey: ['documents'] });
-          },
-          onError: (err: any) => {
-            if (err?.response?.status === 409) {
-              // Conflict — someone else modified the document
-              import('sonner').then(({ toast }) => {
-                toast.error('Document was modified by someone else. Reloading...');
-              });
-              queryClient.invalidateQueries({ queryKey: queryKeys.document(docId) });
-            }
-          },
-        }
-      );
+    (content: unknown): Promise<any> => {
+      if (!isInitialized) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        saveDocument.mutate(
+          { name: title, content, page_layout: layout || 'document', version: docVersion },
+          {
+            onSuccess: (data: any) => {
+              if (data?.version) setDocVersion(data.version);
+              resolve(data);
+            },
+            onError: (err: any) => {
+              reject(err);
+            },
+          }
+        );
+      });
     },
-    [saveDocument, title, queryClient, isInitialized, layout, docVersion, docId]
+    [saveDocument, title, isInitialized, layout, docVersion]
   );
 
+  const handleConflict = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.document(docId) });
+  }, [queryClient, docId]);
+
+  const reloadDocument = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.document(docId) });
+    setContentInitialized(false);
+    setIsInitialized(false);
+  }, [queryClient, docId]);
+
   // Pass title as dependency
-  useDocumentAutoSave(editor, save, 1000, isInitialized ? [title] : []);
+  const { saveStatus, errorMessage, hasLocalRecovery, restoreFromLocal, dismissRecovery } =
+    useDocumentAutoSave(editor, save, 3000, isInitialized ? [title] : [], {
+      docId,
+      onConflict: handleConflict,
+    });
 
   const { data: containers = [] } = useAllTextContainer();
   // AI Command Panel state
@@ -262,6 +272,59 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
       className={`notion-like-editor-wrapper layout-${layout}`} 
       style={combinedCssVars as React.CSSProperties}
     >
+      {/* Save status indicator */}
+      <div className="flex items-center justify-end px-4 py-1 text-xs min-h-[24px]">
+        {saveStatus === 'saving' && (
+          <span className="text-muted-foreground animate-pulse">Saving...</span>
+        )}
+        {saveStatus === 'saved' && (
+          <span className="text-green-600 dark:text-green-400">Saved ✓</span>
+        )}
+        {(saveStatus === 'error' || saveStatus === 'validation-error') && (
+          <span className="text-red-500" title={errorMessage ?? undefined}>
+            {errorMessage ?? 'Error'}
+          </span>
+        )}
+      </div>
+
+      {/* Conflict banner */}
+      {saveStatus === 'conflict' && (
+        <div className="mx-4 mb-2 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 flex items-center justify-between text-sm">
+          <span className="text-amber-800 dark:text-amber-200">
+            This document was modified elsewhere. Reload to get the latest version.
+          </span>
+          <button
+            onClick={reloadDocument}
+            className="ml-3 px-3 py-1 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 shrink-0"
+          >
+            Reload
+          </button>
+        </div>
+      )}
+
+      {/* Local recovery banner */}
+      {hasLocalRecovery && (
+        <div className="mx-4 mb-2 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 flex items-center justify-between text-sm">
+          <span className="text-blue-800 dark:text-blue-200">
+            Unsaved changes found. Restore?
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={restoreFromLocal}
+              className="px-3 py-1 rounded-md bg-blue-600 text-white text-xs font-medium hover:bg-blue-700"
+            >
+              Restore
+            </button>
+            <button
+              onClick={dismissRecovery}
+              className="px-3 py-1 rounded-md bg-transparent border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <input
         type="text"
         className="notion-page-title"
