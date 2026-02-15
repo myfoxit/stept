@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy import (
     Column, Integer, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint, Index, Float
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import relationship, backref
 from .database import Base
 from app.utils import gen_suffix
@@ -200,6 +201,7 @@ class Document(Base):
     
     # Full-text search
     search_text = Column(String, nullable=True)  # Extracted plain text from TipTap JSON
+    search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
     
     # Relationships
     project = relationship("Project", backref="documents")
@@ -275,6 +277,7 @@ class ProcessRecordingSession(Base):
     difficulty = Column(String, nullable=True)  # easy, medium, advanced
     is_processed = Column(Boolean, nullable=False, default=False)
     guide_markdown = Column(Text, nullable=True)
+    search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
     
     # Relationships
     user = relationship("User", back_populates="recording_sessions", foreign_keys=[user_id])

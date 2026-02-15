@@ -29,10 +29,10 @@ async def update_document_search(db: AsyncSession, doc_id: str, name: str, conte
     await db.execute(
         sa_text(
             "UPDATE documents SET search_text = :text, "
-            "search_tsv = to_tsvector('english', :text) "
+            "search_tsv = to_tsvector('english', :tsv_text) "
             "WHERE id = :id"
         ),
-        {"text": full_text, "id": doc_id},
+        {"text": full_text, "tsv_text": full_text, "id": doc_id},
     )
 
 
