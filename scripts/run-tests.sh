@@ -57,7 +57,7 @@ $COMPOSE run -d --name ondoki-backend-test \
     -e JWT_SECRET=e2e-test-secret \
     -e ONDOKI_ENCRYPTION_KEY=e2e-test-key-32bytes-long-enough \
     backend \
-    uvicorn app.main:app --port 8000 --host 0.0.0.0
+    uvicorn main:app --port 8000 --host 0.0.0.0
 
 echo "⏳ Waiting for API ($API_PORT)..."
 timeout 30s bash -c "until curl -s http://localhost:$API_PORT/health > /dev/null 2>&1; do sleep 1; done" || {
