@@ -2,13 +2,8 @@
 
 import * as React from 'react';
 import {
-  IconCamera,
-  IconFileAi,
-  IconFileDescription,
-  IconFolder,
   IconHelp,
   IconPlus,
-  IconSearch,
   IconSettings,
   IconTableFilled,
   IconUsers,
@@ -68,11 +63,6 @@ const data = {
   },
   navMain: [
     {
-      title: 'Projects',
-      url: '#',
-      icon: IconFolder,
-    },
-    {
       title: 'Shared with me',
       url: '/shared',
       icon: IconShare,
@@ -84,73 +74,20 @@ const data = {
     },
     {
       title: 'Team',
-      url: '#',
+      url: '/team',
       icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: 'Capture',
-      icon: IconCamera,
-      isActive: true,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Proposal',
-      icon: IconFileDescription,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Prompts',
-      icon: IconFileAi,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
     },
   ],
   navSecondary: [
     {
       title: 'Settings',
-      url: '#',
+      url: 'settings',
       icon: IconSettings,
     },
     {
       title: 'Get Help',
-      url: '#',
+      url: 'https://docs.ondoki.com',
       icon: IconHelp,
-    },
-    {
-      title: 'Search',
-      url: '#',
-      icon: IconSearch,
     },
   ],
 };
@@ -541,7 +478,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </DialogContent>
         </Dialog>
 
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavSecondary items={data.navSecondary} projectId={selectedProjectId} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

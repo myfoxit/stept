@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { type Icon } from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
 
 import {
   SidebarGroup,
@@ -13,6 +14,7 @@ import {
 
 export function NavSecondary({
   items,
+  projectId,
   ...props
 }: {
   items: {
@@ -20,21 +22,63 @@ export function NavSecondary({
     url: string;
     icon: Icon;
   }[];
+  projectId?: string | null;
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <a href={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            // External links
+            if (item.url.startsWith('http')) {
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            }
+
+            // Settings → dynamic project settings URL
+            if (item.url === 'settings') {
+              const settingsUrl = projectId
+                ? `/projects/${projectId}/settings`
+                : '#';
+              return (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild={!!projectId}>
+                    {projectId ? (
+                      <Link to={settingsUrl}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    ) : (
+                      <>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            }
+
+            // Default internal links
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild>
+                  <Link to={item.url}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

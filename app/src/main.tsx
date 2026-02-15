@@ -24,6 +24,7 @@ import { PublicWorkflowPage } from '@/pages/public-workflow';
 import { PublicDocumentPage } from '@/pages/public-document';
 import { SharedWithMePage } from '@/pages/shared-with-me';
 import { ContextLinksPage } from '@/pages/context-links';
+import { TeamPage } from '@/pages/team';
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="documents/:type" element={<DocumentGalleryPage />} />
                   <Route path="/shared" element={<SharedWithMePage />} />
                   <Route path="/context-links" element={<ContextLinksPage />} />
+                  <Route path="/team" element={<TeamPage />} />
                   <Route
                     path="/text-container/:containerId?"
                     element={<TextContainerEditor />}
