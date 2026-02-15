@@ -450,3 +450,35 @@ class LLMUsage(Base):
     estimated_cost_usd = Column(Float, nullable=True)
     endpoint = Column(String(50), nullable=True)  # chat, inline, annotation, guide
     created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
+class ContextLink(Base):
+    """Links a URL pattern or app name to a workflow or document."""
+    __tablename__ = "context_links"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # What to match
+    match_type = Column(String(20), nullable=False)  # 'url_pattern', 'url_exact', 'app_name', 'window_title'
+    match_value = Column(String(500), nullable=False)
+
+    # What to surface
+    resource_type = Column(String(20), nullable=False)  # 'workflow', 'document'
+    resource_id = Column(String(16), nullable=False)
+
+    # User-added context
+    note = Column(Text, nullable=True)
+    priority = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project", backref="context_links")
+    creator = relationship("User", backref="context_links")
+
+    __table_args__ = (
+        Index('idx_context_links_match', 'project_id', 'match_type', 'match_value'),
+    )
