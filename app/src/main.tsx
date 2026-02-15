@@ -33,8 +33,8 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <ProjectProvider>
           <ChatProvider>
-            <SpotlightProvider>
             <BrowserRouter>
+            <SpotlightProvider>
               <Routes>
                 <Route
                   element={
@@ -65,8 +65,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="*" element={<p>Page not found</p>} />
               </Routes>
               <ChatPanel />
-            </BrowserRouter>
-          </SpotlightProvider>
+            </SpotlightProvider>
+          </BrowserRouter>
           </ChatProvider>
         </ProjectProvider>
       </AuthProvider>
