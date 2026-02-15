@@ -5,11 +5,14 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/apiClient';
 import { IconLoader2, IconAlertTriangle } from '@tabler/icons-react';
 import { useMe } from '@/hooks/api/auth';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 export function JoinProjectPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: currentUser, isLoading: authLoading } = useMe();
+  const queryClient = useQueryClient();
   const [isJoining, setIsJoining] = useState(false);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +55,15 @@ export function JoinProjectPage() {
         toast.info('You\'re already a member of this project.');
       } else {
         toast.success('You\'ve joined the project!');
+      }
+
+      // Invalidate projects cache so sidebar picks up the new project
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+
+      // Auto-select the joined project
+      const projectId = response.data.project_id;
+      if (projectId) {
+        localStorage.setItem('selectedProjectId', projectId);
       }
 
       setJoined(true);
