@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import or_, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -475,7 +476,7 @@ async def _search_documents_keyword(
         ),
         or_(
             Document.name.ilike(search_term),
-            func.cast(Document.content, _text_type()).ilike(search_term),
+            func.cast(Document.content, sa.Text).ilike(search_term),
         ),
     ]
 

@@ -222,6 +222,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       title="Spotlight Search"
       description="Search workflows, pages, or ask AI"
       showCloseButton={false}
+      shouldFilter={false}
     >
       <CommandInput
         placeholder="Search workflows, pages, or ask AI..."
