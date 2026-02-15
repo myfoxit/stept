@@ -26,6 +26,7 @@ class JoinProjectRequest(BaseModel):
     token: str
 
 class InviteRequest(BaseModel):
+    email: str
     role: str = "viewer"
 
 class ProjectPublicInfo(BaseModel):
@@ -174,12 +175,13 @@ async def api_create_invite_link(
     invite_data = {
         "project_id": project_id,
         "role": request.role,
+        "email": request.email.lower().strip(),
         "invited_by": current_user.id,
         "expires_at": (datetime.utcnow() + timedelta(days=7)).isoformat(),
         "token": secrets.token_urlsafe(32)
     }
     
-    # In production, store this in database or cache
+    # TODO: send invite email to request.email
     # For now, return encoded token
     token = base64.urlsafe_b64encode(json.dumps(invite_data).encode()).decode()
     
@@ -207,7 +209,7 @@ async def api_join_project_with_token(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Join a project using an invite token."""
+    """Join a project using an invite token. Only the invited email can join."""
     try:
         # Decode token
         invite_data = json.loads(base64.urlsafe_b64decode(request.token.encode()).decode())
@@ -216,6 +218,11 @@ async def api_join_project_with_token(
         expires_at = datetime.fromisoformat(invite_data["expires_at"])
         if datetime.utcnow() > expires_at:
             raise HTTPException(status_code=400, detail="Invite link has expired")
+        
+        # Validate email matches the invited email
+        invited_email = invite_data.get("email", "").lower().strip()
+        if invited_email and current_user.email.lower().strip() != invited_email:
+            raise HTTPException(status_code=403, detail="This invite was sent to a different email address")
         
         # Check if user is already a member
         members = await get_project_members(db, invite_data["project_id"])

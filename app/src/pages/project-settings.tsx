@@ -80,6 +80,7 @@ export function ProjectSettingsPage() {
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<string>('viewer');
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -122,16 +123,19 @@ export function ProjectSettingsPage() {
   const canManageMembers = currentUserMember?.role === 'owner' || currentUserMember?.role === 'admin';
   
   const generateInviteLink = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error('Please enter an email address');
+      return;
+    }
     try {
-      // Call backend to generate secure invite token
       const response = await apiClient.post(`/projects/${projectId}/invite`, {
+        email: inviteEmail.trim(),
         role: inviteRole
       });
       
       const baseUrl = window.location.origin;
       const link = `${baseUrl}/join-project?token=${response.data.token}`;
       setInviteLink(link);
-      setInviteDialogOpen(true);
     } catch (error) {
       toast.error('Failed to generate invite link');
     }
@@ -399,19 +403,33 @@ export function ProjectSettingsPage() {
         {aiConfig?.configured && <AiUsageCard />}
         
         {/* Invite Dialog */}
-        <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
+          setInviteDialogOpen(open);
+          if (!open) { setInviteLink(''); setInviteEmail(''); setLinkCopied(false); }
+        }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Invite Members</DialogTitle>
+              <DialogTitle>Invite Member</DialogTitle>
               <DialogDescription>
-                Share this link to invite people to your project.
+                Enter the email address of the person you want to invite. Only this email will be able to join.
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="role">Default Role</Label>
-                <Select value={inviteRole} onValueChange={setInviteRole}>
+                <Label htmlFor="invite-email">Email</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="colleague@company.com"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  disabled={!!inviteLink}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select value={inviteRole} onValueChange={setInviteRole} disabled={!!inviteLink}>
                   <SelectTrigger id="role">
                     <SelectValue />
                   </SelectTrigger>
