@@ -78,7 +78,7 @@ async def _keyword_fallback(
         if not text.strip():
             continue
         score = keyword_similarity(query, text)
-        if score > 0.05:
+        if score > 0.15:
             name = wf.name or wf.generated_title or "Untitled Workflow"
             results.append({
                 "source_type": "workflow",
@@ -119,7 +119,7 @@ async def _keyword_fallback(
         if not text.strip():
             continue
         score = keyword_similarity(query, text)
-        if score > 0.05:
+        if score > 0.15:
             title = doc.name or "Untitled"
             results.append({
                 "source_type": "document",
