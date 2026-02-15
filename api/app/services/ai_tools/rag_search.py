@@ -88,10 +88,22 @@ async def _keyword_fallback(
                 "similarity": round(score, 4),
             })
 
-    # Search documents
-    doc_filters = [Document.user_id == user_id]
+    # Search documents (documents belong to projects, not users directly)
+    doc_filters = []
     if project_id:
         doc_filters.append(Document.project_id == project_id)
+    else:
+        # Find all projects the user is a member of
+        from app.models import Project, project_members
+        from sqlalchemy import select as sa_select
+        proj_stmt = sa_select(project_members.c.project_id).where(
+            project_members.c.user_id == user_id
+        )
+        proj_ids = [row[0] for row in (await db.execute(proj_stmt)).all()]
+        if proj_ids:
+            doc_filters.append(Document.project_id.in_(proj_ids))
+        else:
+            doc_filters.append(Document.project_id == "__none__")  # no results
     doc_stmt = select(Document).where(and_(*doc_filters))
     doc_rows = (await db.execute(doc_stmt)).scalars().all()
 
