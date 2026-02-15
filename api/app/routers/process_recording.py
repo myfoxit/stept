@@ -180,6 +180,8 @@ async def finalize_upload_session(
 @router.get("/session/{session_id}/status")  # removed response_model to allow extra fields
 async def get_session_status_endpoint(
     session_id: str,
+    step_offset: int = Query(default=0, ge=0),
+    step_limit: int = Query(default=0, ge=0, description="0 means all steps (backward compat)"),
     db: AsyncSession = Depends(get_db),
     authorization: Optional[str] = Header(None)
 ):
@@ -198,9 +200,41 @@ async def get_session_status_endpoint(
                 "icon_color": session.icon_color,
                 "title": session.name or "Untitled workflow",
             })
+
+        # Apply step pagination if requested
+        if step_limit > 0 and "metadata" in base:
+            all_steps = base["metadata"]
+            base["total_steps"] = len(all_steps)
+            base["step_offset"] = step_offset
+            base["step_limit"] = step_limit
+            base["metadata"] = all_steps[step_offset:step_offset + step_limit]
+
         return base
     except ValueError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get("/workflow/{session_id}/summary")
+async def get_workflow_summary(session_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(404, "Workflow not found")
+    if session.project_id:
+        await check_project_permission(db=db, user_id=current_user.id, project_id=session.project_id, required_role=ProjectRole.VIEWER)
+    # Count steps without loading them
+    from sqlalchemy import func as sqlfunc
+    step_count = await db.scalar(select(sqlfunc.count(ProcessRecordingStep.id)).where(ProcessRecordingStep.session_id == session_id))
+    return {
+        "id": session.id, "name": session.name, "status": session.status,
+        "created_at": session.created_at, "updated_at": session.updated_at,
+        "summary": session.summary, "tags": session.tags,
+        "generated_title": session.generated_title,
+        "is_processed": session.is_processed,
+        "total_steps": step_count,
+        "guide_markdown": session.guide_markdown,
+        "estimated_time": session.estimated_time, "difficulty": session.difficulty,
+    }
+
 
 @router.get("/session/{session_id}/image/{step_number}")
 async def get_image(
