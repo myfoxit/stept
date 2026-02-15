@@ -80,21 +80,20 @@ async def get_current_user(
             detail="NO_SESSION"
         )
 
-    try:
-        # Support comma-separated JWT secrets for rotation
-        jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
-        if not jwt_secrets:
-            jwt_secrets = [settings.JWT_SECRET]
+    # Support comma-separated JWT secrets for rotation
+    jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
+    if not jwt_secrets:
+        jwt_secrets = [settings.JWT_SECRET]
 
-        payload = None
-        for secret in jwt_secrets:
-            try:
-                payload = jwt.decode(credentials, secret, algorithms=["HS256"])
-                break
-            except jwt.InvalidTokenError:
-                continue
-        if payload is None:
-            raise HTTPException(status_code=401, detail="INVALID_TOKEN")
+    payload = None
+    for secret in jwt_secrets:
+        try:
+            payload = jwt.decode(credentials, secret, algorithms=["HS256"])
+            break
+        except jwt.InvalidTokenError:
+            continue
+    if payload is None:
+        raise HTTPException(status_code=401, detail="INVALID_TOKEN")
 
     user_id = payload.get("sub")
     token_type = payload.get("type")
