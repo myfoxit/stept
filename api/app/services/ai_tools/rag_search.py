@@ -47,7 +47,7 @@ async def execute(
     from app.services.embeddings import generate_embedding, has_embedding_api
 
     if has_embedding_api():
-        return await _semantic_search(db, query, project_id)
+        return await _semantic_search(db, query, user_id, project_id)
     else:
         return await _keyword_fallback(db, query, user_id, project_id)
 
@@ -140,13 +140,15 @@ async def _keyword_fallback(
 async def _semantic_search(
     db: AsyncSession,
     query: str,
+    user_id: str,
     project_id: Optional[str],
 ) -> dict:
     from app.services.embeddings import generate_embedding
 
     query_vector = await generate_embedding(query)
     if query_vector is None:
-        return {"error": "Failed to generate query embedding."}
+        # Semantic failed — fall back to keyword
+        return await _keyword_fallback(db, query, user_id, project_id)
 
     from sqlalchemy import text as sa_text
 

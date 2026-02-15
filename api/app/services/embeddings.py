@@ -35,16 +35,18 @@ MAX_BATCH_SIZE = 100  # OpenAI batch limit per request
 # ---------------------------------------------------------------------------
 
 def _get_openai_config() -> tuple[str | None, str]:
-    """Return (api_key, base_url) suitable for OpenAI embeddings."""
+    """Return (api_key, base_url) suitable for OpenAI-compatible embeddings."""
     from app.services.llm import _api_key, _base_url, _provider
 
     provider = _provider()
     api_key = _api_key()
 
-    # Use OpenAI-compatible embeddings for providers that support it
-    if provider in ("openai", "azure", "openrouter", "together", "anyscale", "deepinfra", "fireworks") and api_key:
+    # Most providers support the /v1/embeddings endpoint (OpenAI-compatible)
+    # Only skip for providers that definitely don't (anthropic, ollama without embeddings)
+    if provider == "anthropic":
+        return None, ""
+    if api_key:
         return api_key, _base_url()
-    # For other providers (anthropic, ollama) or no key: no embeddings
     return None, ""
 
 
@@ -103,7 +105,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]] | None:
             all_embeddings.extend(batch_embeddings)
 
         except Exception as exc:
-            logger.error("Embedding API call failed: %s", exc)
+            logger.error("Embedding API call failed (%s): %s", url, exc)
             return None
 
     return all_embeddings
