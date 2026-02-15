@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -66,6 +66,7 @@ api_router.include_router(shared.router, tags=["shared"])
 api_router.include_router(context_links.router, tags=["context-links"])
 api_router.include_router(comments.router, tags=["comments"])
 api_router.include_router(git_sync.router, tags=["git-sync"])
+api_router.include_router(mcp_keys.router, tags=["mcp"])
 
 
 # Mount the versioned router on the main app
@@ -77,6 +78,10 @@ app.include_router(public_router, prefix="/api/v1/public", tags=["public"])
 
 # Health/ready endpoints (no version prefix — used by load balancers/Docker)
 app.include_router(health.router)
+
+# MCP (Model Context Protocol) server — mounted outside versioned API
+from app.mcp_server import mcp as mcp_server
+app.mount("/mcp", mcp_server.streamable_http_app())
 
 # Test-only endpoints (seed/cleanup) — only in test/development environments
 if os.getenv("ENVIRONMENT") in ("test", "development"):

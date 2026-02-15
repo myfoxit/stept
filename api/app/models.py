@@ -528,3 +528,21 @@ class ContextLink(Base):
     __table_args__ = (
         Index('idx_context_links_match', 'project_id', 'match_type', 'match_value'),
     )
+
+
+class McpApiKey(Base):
+    """API keys for MCP (Model Context Protocol) access."""
+    __tablename__ = "mcp_api_keys"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    key_hash = Column(String(64), nullable=False, unique=True, index=True)  # SHA-256
+    key_prefix = Column(String(12), nullable=False)  # first 8 chars for display
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    last_used_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    project = relationship("Project", backref="mcp_api_keys")
+    creator = relationship("User", backref="mcp_api_keys")
