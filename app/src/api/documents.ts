@@ -163,6 +163,33 @@ export interface ExportOptions {
   pageLayout?: string;
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// DOCUMENT LOCKING
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface DocumentLockStatus {
+  locked: boolean;
+  locked_by: string | null;
+  locked_by_name: string | null;
+  locked_at: string | null;
+  is_mine: boolean;
+}
+
+export const getDocumentLock = async (docId: string): Promise<DocumentLockStatus> => {
+  const { data } = await apiClient.get(`/documents/${docId}/lock`);
+  return data;
+};
+
+export const acquireDocumentLock = async (docId: string, force = false): Promise<DocumentLockStatus> => {
+  const { data } = await apiClient.post(`/documents/${docId}/lock`, null, { params: force ? { force: true } : {} });
+  return data;
+};
+
+export const releaseDocumentLock = async (docId: string): Promise<{ locked: boolean }> => {
+  const { data } = await apiClient.post(`/documents/${docId}/unlock`);
+  return data;
+};
+
 export async function exportDocument(
   docId: string,
   format: DocumentExportFormat,

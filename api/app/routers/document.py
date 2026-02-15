@@ -205,6 +205,13 @@ async def api_update_document(
         if share and share.permission != "edit":
             raise HTTPException(403, "View-only access — cannot edit")
 
+    # --- Document locking check ---
+    if doc.locked_by and doc.locked_by != current_user.id:
+        from datetime import datetime, timedelta
+        lock_expired = doc.locked_at and (datetime.utcnow() - doc.locked_at.replace(tzinfo=None)) > timedelta(minutes=30)
+        if not lock_expired:
+            raise HTTPException(423, detail="Document is locked by another user")
+
     # --- Optimistic concurrency ---
     if payload.version is not None and payload.version != doc.version:
         raise HTTPException(409, detail="Document was modified. Please reload.")
@@ -328,6 +335,116 @@ async def api_duplicate_document(
         raise HTTPException(404, str(e))
 
 
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DOCUMENT LOCKING ENDPOINTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+LOCK_TIMEOUT_MINUTES = 30
+
+
+def _is_lock_expired(doc) -> bool:
+    if not doc.locked_at:
+        return True
+    from datetime import datetime, timedelta
+    lock_time = doc.locked_at.replace(tzinfo=None) if doc.locked_at.tzinfo else doc.locked_at
+    return (datetime.utcnow() - lock_time) > timedelta(minutes=LOCK_TIMEOUT_MINUTES)
+
+
+@router.get("/{doc_id}/lock")
+async def api_get_lock_status(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the current lock status of a document."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user)
+
+    locked = bool(doc.locked_by) and not _is_lock_expired(doc)
+    locked_by_name = None
+    if locked and doc.locked_by:
+        locker = await db.get(User, doc.locked_by)
+        locked_by_name = locker.name if locker else None
+
+    return {
+        "locked": locked,
+        "locked_by": doc.locked_by if locked else None,
+        "locked_by_name": locked_by_name,
+        "locked_at": doc.locked_at if locked else None,
+        "is_mine": locked and doc.locked_by == current_user.id,
+    }
+
+
+@router.post("/{doc_id}/lock")
+async def api_acquire_lock(
+    doc_id: str,
+    force: bool = Query(False, description="Force-acquire lock (admin only)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Acquire an editing lock on a document. Returns 409 if already locked by someone else."""
+    from datetime import datetime
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
+
+    # Already locked by current user — refresh
+    if doc.locked_by == current_user.id:
+        doc.locked_at = datetime.utcnow()
+        await db.commit()
+        return {"locked": True, "locked_by": current_user.id, "locked_at": doc.locked_at}
+
+    # Locked by someone else and not expired
+    if doc.locked_by and not _is_lock_expired(doc):
+        if force:
+            # Only admins can force-acquire
+            try:
+                await check_project_permission(db, current_user.id, doc.project_id, ProjectRole.ADMIN)
+            except HTTPException:
+                raise HTTPException(403, "Only project admins can force-acquire locks")
+        else:
+            locker = await db.get(User, doc.locked_by)
+            raise HTTPException(409, detail=f"Document is locked by {locker.name if locker else 'another user'}")
+
+    # Acquire lock
+    doc.locked_by = current_user.id
+    doc.locked_at = datetime.utcnow()
+    await db.commit()
+    return {"locked": True, "locked_by": current_user.id, "locked_at": doc.locked_at}
+
+
+@router.post("/{doc_id}/unlock")
+async def api_release_lock(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Release the editing lock. Only the lock holder or a project admin can unlock."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user)
+
+    if not doc.locked_by:
+        return {"locked": False}
+
+    # Allow: lock holder, or project admin+
+    if doc.locked_by != current_user.id:
+        try:
+            await check_project_permission(db, current_user.id, doc.project_id, ProjectRole.ADMIN)
+        except HTTPException:
+            raise HTTPException(403, "Only the lock holder or a project admin can unlock")
+
+    doc.locked_by = None
+    doc.locked_at = None
+    await db.commit()
+    return {"locked": False}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -2,14 +2,6 @@ import { NodeSelection, type Selection } from "@tiptap/pm/state"
 import type { JSONContent, Editor } from "@tiptap/react"
 import { isTextSelection, isNodeSelection, posToDOMRect } from "@tiptap/react"
 
-// TipTap Collaboration
-export const TIPTAP_COLLAB_DOC_PREFIX =
-  import.meta.env.VITE_TIPTAP_COLLAB_DOC_PREFIX || ""
-export const TIPTAP_COLLAB_APP_ID =
-  import.meta.env.VITE_TIPTAP_COLLAB_APP_ID || ""
-export const TIPTAP_COLLAB_TOKEN =
-  import.meta.env.VITE_TIPTAP_COLLAB_TOKEN || ""
-
 // TipTap AI
 export const TIPTAP_AI_APP_ID = import.meta.env.VITE_TIPTAP_AI_APP_ID || ""
 export const TIPTAP_AI_TOKEN = import.meta.env.VITE_TIPTAP_AI_TOKEN || ""
@@ -112,9 +104,6 @@ export const isSelectionValid = (
 
 /**
  * Checks if the current text selection is valid for editing
- * - Not empty
- * - Not a code block
- * - Not a node selection
  */
 export const isTextSelectionValid = (editor: Editor | null): boolean => {
   if (!editor) return false
@@ -167,64 +156,11 @@ export const getAvatar = (name: string) => {
 }
 
 /**
- * Fetch collaboration JWT token from the API
- */
-export const fetchCollabToken = async () => {
-  if (USE_JWT_TOKEN_API_ENDPOINT) {
-    try {
-      // Example API endpoint that returns a JWT token.
-      // TODO: implement this API endpoint in your app
-      const response = await fetch(`/api/collaboration`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch token: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return data.token
-    } catch (error) {
-      console.error("Failed to fetch collaboration token:", error)
-      return null
-    }
-  }
-
-  // TODO: as a developer, use the example JWT token provided in the Tiptap
-  // Cloud dashboard for local development only. In production, implement an API
-  // endpoint that generates a new JWT token in the server. Then, call that API
-  // endpoint from this function.
-  // When you've implemented the API endpoint, remove the code below.
-  if (!TIPTAP_COLLAB_TOKEN) {
-    alert(`Set up your environment variables to connect to Tiptap Cloud:
-- VITE_TIPTAP_COLLAB_DOC_PREFIX - Prefix for identifying collaborative documents
-- VITE_TIPTAP_COLLAB_APP_ID - Your Document Server App ID
-- VITE_TIPTAP_COLLAB_TOKEN - JWT token for accessing Collaboration services (do not use in production)
-- VITE_TIPTAP_AI_APP_ID - Your AI App ID
-- VITE_TIPTAP_AI_TOKEN - JWT token for accessing AI services (do not use in production)
-Follow this guide: https://tiptap.dev/docs/ui-components/templates/notion-like-editor`)
-  } else {
-    console.warn(
-      "You are using the example JWT token provided in the Tiptap Cloud dashboard. This is only for local development and should not be used in production. In production, implement an API endpoint that generates a new JWT token in the server, and call that API endpoint from the fetchCollabToken function. More info in the docs: https://tiptap.dev/docs/ui-components/templates/notion-like-editor"
-    )
-  }
-
-  // A hardcoded token for demonstration purposes.
-  // TODO: remove this in production and use the API endpoint instead
-  return TIPTAP_COLLAB_TOKEN
-}
-
-/**
  * Fetch AI JWT token from the API
  */
 export const fetchAiToken = async () => {
   if (USE_JWT_TOKEN_API_ENDPOINT) {
     try {
-      // Example API endpoint that returns a JWT token.
-      // TODO: implement this API endpoint in your app
       const response = await fetch(`/api/ai`, {
         method: "POST",
         headers: {
@@ -244,26 +180,9 @@ export const fetchAiToken = async () => {
     }
   }
 
-  // TODO: as a developer, use the example JWT token provided in the Tiptap
-  // Cloud dashboard for local development only. In production, implement an API
-  // endpoint that generates a new JWT token in the server. Then, call that API
-  // endpoint from this function.
-  // When you've implemented the API endpoint, remove the code below.
   if (!TIPTAP_AI_TOKEN) {
-    alert(`Set up your environment variables to connect to Tiptap Cloud:
-- VITE_TIPTAP_COLLAB_DOC_PREFIX - Prefix for identifying collaborative documents
-- VITE_TIPTAP_COLLAB_APP_ID - Your Document Server App ID
-- VITE_TIPTAP_COLLAB_TOKEN - JWT token for accessing Collaboration services (do not use in production)
-- VITE_TIPTAP_AI_APP_ID - Your AI App ID
-- VITE_TIPTAP_AI_TOKEN - JWT token for accessing AI services (do not use in production)
-Follow this guide: https://tiptap.dev/docs/ui-components/templates/notion-like-editor`)
-  } else {
-    console.warn(
-      "You are using the example JWT token provided in the Tiptap Cloud dashboard. This is only for local development and should not be used in production. In production, implement an API endpoint that generates a new JWT token in the server, and call that API endpoint from the fetchAiToken function. More info in the docs: https://tiptap.dev/docs/ui-components/templates/notion-like-editor"
-    )
+    console.warn("VITE_TIPTAP_AI_TOKEN not set")
   }
 
-  // A hardcoded token for demonstration purposes.
-  // TODO: remove this in production and use the API endpoint instead
   return TIPTAP_AI_TOKEN
 }

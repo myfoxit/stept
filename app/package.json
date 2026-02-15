@@ -53,8 +53,6 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.12",
     "@tiptap/core": "^3.0.7",
-    "@tiptap/extension-collaboration": "^3.0.7",
-    "@tiptap/extension-collaboration-caret": "^3.0.7",
     "@tiptap/extension-color": "^3.0.7",
     "@tiptap/extension-document": "^3.0.7",
     "@tiptap/extension-drag-handle-react": "^3.0.7",
@@ -102,7 +100,6 @@
     "tailwindcss": "^4.1.11",
     "uuid": "^11.1.0",
     "vaul": "^1.1.2",
-    "yjs": "^13.6.27",
     "zod": "^3.25.67",
     "zustand": "^5.0.6"
   },

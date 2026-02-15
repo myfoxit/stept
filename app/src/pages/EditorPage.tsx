@@ -8,13 +8,15 @@ import {
   type PageLayout,
 } from '@/components/page-layout-selector';
 import { useState, useEffect, useMemo } from 'react';
-import { useDocument, useUpdateDocumentLayout } from '@/hooks/api/documents';
+import { useDocument, useUpdateDocumentLayout, useDocumentLock, useAcquireDocumentLock, useReleaseDocumentLock } from '@/hooks/api/documents';
 import { exportDocument, type DocumentExportFormat } from '@/api/documents';
 import { ExportDialog } from '@/components/export-dialog';
 import { ShareDialog } from '@/components/share-dialog';
 import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { IconLock } from '@tabler/icons-react';
 import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
 import { CommentButton } from '@/components/Comments/CommentButton';
 import { CommentPanel } from '@/components/Comments/CommentPanel';
@@ -23,6 +25,9 @@ import { useAuth } from '@/providers/auth-provider';
 export default function EditorPage() {
   const { docId } = useParams<{ docId: string }>();
   const { data: doc } = useDocument(docId!);
+  const { data: lockStatus } = useDocumentLock(docId!);
+  const acquireLock = useAcquireDocumentLock(docId!);
+  const releaseLock = useReleaseDocumentLock(docId!);
   const { setContext } = useChat();
   const { selectedProjectId } = useProject();
   const { user } = useAuth();
@@ -33,10 +38,33 @@ export default function EditorPage() {
   const [pageLayout, setPageLayout] = useState<PageLayout>('full');
   const updateLayout = useUpdateDocumentLayout(docId!);
 
-  const isReadOnly = useMemo(() => {
+  const isPermissionReadOnly = useMemo(() => {
     if (!doc) return false;
     return (doc as any).permission === 'view';
   }, [doc]);
+
+  const isLockedByOther = lockStatus?.locked && !lockStatus?.is_mine;
+  const isReadOnly = isPermissionReadOnly || !!isLockedByOther;
+
+  // Auto-acquire lock when opening for editing
+  useEffect(() => {
+    if (!docId || isPermissionReadOnly) return;
+    acquireLock.mutate();
+    return () => {
+      releaseLock.mutate();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docId, isPermissionReadOnly]);
+
+  // Release lock on page unload
+  useEffect(() => {
+    if (!docId || isPermissionReadOnly) return;
+    const handleUnload = () => {
+      navigator.sendBeacon?.(`/api/v1/documents/${docId}/unlock`);
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [docId, isPermissionReadOnly]);
 
   // Set chat context when viewing a document
   useEffect(() => {
@@ -115,6 +143,28 @@ export default function EditorPage() {
           <CommentButton count={commentCount} onClick={() => setCommentsOpen(true)} />
         )}
       </SiteHeader>
+      {isLockedByOther && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <Alert variant="destructive" className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <IconLock className="h-4 w-4" />
+              <AlertDescription>
+                {lockStatus?.locked_by_name || 'Someone'} is currently editing this document.
+              </AlertDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                acquireLock.mutate(true);
+              }}
+              className="ml-4 shrink-0"
+            >
+              Take over
+            </Button>
+          </Alert>
+        </div>
+      )}
       {selectedProjectId && docId && (
         <div className="mx-auto max-w-4xl px-4 pt-4">
           <ContextLinkPanel projectId={selectedProjectId} resourceType="document" resourceId={docId} />

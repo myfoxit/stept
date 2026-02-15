@@ -1,4 +1,4 @@
-import { getDocument, saveDocument, linkDocument, unlinkDocument, moveDocument, deleteDocument, listDocuments, createDocument, duplicateDocument, getFilteredDocuments } from '@/api/documents';
+import { getDocument, saveDocument, linkDocument, unlinkDocument, moveDocument, deleteDocument, listDocuments, createDocument, duplicateDocument, getFilteredDocuments, getDocumentLock, acquireDocumentLock, releaseDocumentLock, type DocumentLockStatus } from '@/api/documents';
 import { getTextContainer, getAllTextContainer, saveTextContainer, createTextContainer } from '@/api/text_container';
 import type { PageLayout } from '@/components/page-layout-selector';
 import { apiClient, type ApiError } from '@/lib/apiClient';
@@ -238,6 +238,38 @@ export const useFilteredDocuments = (
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
       qc.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DOCUMENT LOCKING HOOKS
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const useDocumentLock = (docId: string) =>
+  useQuery<DocumentLockStatus>({
+    queryKey: [...queryKeys.document(docId), 'lock'],
+    queryFn: () => getDocumentLock(docId),
+    refetchInterval: 30_000,
+    enabled: !!docId,
+  });
+
+export const useAcquireDocumentLock = (docId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (force?: boolean) => acquireDocumentLock(docId, force),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...queryKeys.document(docId), 'lock'] });
+    },
+  });
+};
+
+export const useReleaseDocumentLock = (docId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => releaseDocumentLock(docId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...queryKeys.document(docId), 'lock'] });
     },
   });
 };
