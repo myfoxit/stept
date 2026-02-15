@@ -409,7 +409,7 @@ async def reindex_embeddings(
     """
     Trigger bulk reindexing of embeddings for the current user's workflows.
     """
-    from app.services.indexer import reindex_project, reindex_all_for_user
+    from app.services.indexer import reindex_project, reindex_all_for_user, index_document
     from app.services.embeddings import has_embedding_api
 
     if not has_embedding_api():
@@ -635,6 +635,7 @@ async def unified_semantic_search(
     )
 
     workflow_results: list[dict] = []
+    query_vector = None
 
     # Try semantic search for workflows
     if has_embedding_api():
@@ -665,8 +666,44 @@ async def unified_semantic_search(
                 "matching_steps": r.get("matching_steps", []),
             })
 
-    # Documents: always keyword (no embeddings for docs yet)
-    doc_results = await _search_documents_keyword(q, project_id, current_user.id, limit, db)
+    # Documents: search via embeddings if available, otherwise keyword
+    doc_results: list[dict] = []
+    if has_embedding_api() and query_vector is not None:
+        # Search document embeddings
+        from sqlalchemy import text as sa_text
+        vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
+        doc_sql = sa_text("""
+            SELECT e.source_type, e.source_id, e.metadata,
+                   e.embedding <=> :query_vector AS distance
+            FROM embeddings e
+            WHERE e.source_type IN ('document', 'document_chunk')
+              AND e.metadata->>'project_id' = :project_id
+            ORDER BY e.embedding <=> :query_vector
+            LIMIT :limit
+        """)
+        doc_sem_result = await db.execute(doc_sql, {
+            "query_vector": vector_str,
+            "project_id": project_id,
+            "limit": limit,
+        })
+        doc_sem_rows = doc_sem_result.fetchall()
+        seen_doc_ids: set[str] = set()
+        for source_type, source_id, metadata, distance in doc_sem_rows:
+            meta = metadata or {}
+            doc_id = meta.get("doc_id", source_id)
+            if doc_id in seen_doc_ids:
+                continue
+            seen_doc_ids.add(doc_id)
+            score = round(max(0.0, 1.0 - distance), 4)
+            doc_results.append({
+                "type": "document",
+                "id": doc_id,
+                "name": meta.get("title", "Untitled"),
+                "preview": "",
+                "score": score,
+            })
+    else:
+        doc_results = await _search_documents_keyword(q, project_id, current_user.id, limit, db)
 
     all_results = workflow_results + doc_results
     all_results.sort(key=lambda r: r["score"], reverse=True)

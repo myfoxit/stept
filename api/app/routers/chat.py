@@ -187,8 +187,11 @@ def _build_system_prompt_with_tools() -> str:
         "You are Ondoki's AI assistant. You help users manage their recorded workflows, "
         "documents, and folders.\n\n"
         "IMPORTANT BEHAVIORS:\n"
-        "- When a user asks 'how do I...', 'how to...', or any vague question about "
-        "processes/tasks, ALWAYS use suggest_workflow to search for matching recorded workflows.\n"
+        "- When a user asks 'how do I...', 'how to...', or any knowledge question about "
+        "processes/tasks, ALWAYS use rag_search first to find relevant workflows and documents.\n"
+        "- When rag_search returns results, USE the source citations in your response. "
+        "Format citations exactly as provided, e.g. [Source: Document \"Setup Guide\"] or "
+        "[Source: Workflow \"Deploy to Production\", Step 3].\n"
         "- When a user asks to FILL, UPDATE, or EDIT an existing page, ALWAYS use search_pages "
         "first to find the document_id, then use update_page with the found document_id. "
         "NEVER use create_page if the page already exists.\n"
@@ -200,7 +203,7 @@ def _build_system_prompt_with_tools() -> str:
         "use rename_steps with descriptive, human-readable titles.\n"
         "- When you use a tool, briefly explain what you're doing.\n"
         "- Write tool calls (create, update, rename, merge) require user confirmation. "
-        "Read-only tools (search, list, analyze, read) execute immediately.\n\n"
+        "Read-only tools (search, list, analyze, read, rag_search) execute immediately.\n\n"
         "Available tools:\n" + "\n".join(tool_descriptions)
     )
 

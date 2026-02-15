@@ -14,7 +14,7 @@ from sqlalchemy import select, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import ProcessRecordingSession, ProcessRecordingStep, Embedding
+from app.models import ProcessRecordingSession, ProcessRecordingStep, Embedding, Document
 from app.services.embeddings import (
     content_hash,
     generate_embeddings,
@@ -165,7 +165,7 @@ async def index_workflow_background(session_id: str) -> None:
 
 
 async def reindex_project(project_id: str, user_id: str, db: AsyncSession) -> int:
-    """Reindex all workflows in a project. Returns total embeddings created."""
+    """Reindex all workflows and documents in a project. Returns total embeddings created."""
     stmt = select(ProcessRecordingSession.id).where(
         and_(
             ProcessRecordingSession.project_id == project_id,
@@ -179,6 +179,14 @@ async def reindex_project(project_id: str, user_id: str, db: AsyncSession) -> in
     total = 0
     for sid in session_ids:
         total += await index_workflow(sid, db)
+
+    # Index documents
+    doc_stmt = select(Document.id).where(Document.project_id == project_id)
+    doc_result = await db.execute(doc_stmt)
+    doc_ids = [row[0] for row in doc_result.all()]
+
+    for did in doc_ids:
+        total += await index_document(did, db)
 
     return total
 
@@ -199,6 +207,182 @@ async def reindex_all_for_user(user_id: str, db: AsyncSession) -> int:
         total += await index_workflow(sid, db)
 
     return total
+
+
+# ---------------------------------------------------------------------------
+# Document indexing
+# ---------------------------------------------------------------------------
+
+def document_text(doc) -> str:
+    """Extract plain text from a Document's TipTap JSON content."""
+    from app.document_export import tiptap_to_markdown
+
+    parts: list[str] = []
+    if doc.name:
+        parts.append(doc.name)
+    if doc.content:
+        md = tiptap_to_markdown(doc.content)
+        if md:
+            parts.append(md)
+    return "\n".join(parts)
+
+
+def _chunk_text(text: str, chunk_size: int = 2000, overlap: int = 200) -> list[str]:
+    """
+    Split text into chunks of ~chunk_size characters with overlap.
+    (~500 tokens ≈ ~2000 chars for English text)
+    """
+    if len(text) <= chunk_size:
+        return [text]
+
+    chunks: list[str] = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        chunks.append(chunk)
+        start = end - overlap
+    return chunks
+
+
+async def index_document(doc_id: str, db: AsyncSession) -> int:
+    """
+    Index (or re-index) a single document with chunking.
+    Returns the number of embeddings created/updated.
+    """
+    if not has_embedding_api():
+        logger.debug("No embedding API available — skipping index for doc %s", doc_id)
+        return 0
+
+    stmt = select(Document).where(Document.id == doc_id)
+    result = await db.execute(stmt)
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        logger.warning("Document %s not found for indexing", doc_id)
+        return 0
+
+    full_text = document_text(doc)
+    if not full_text.strip():
+        return 0
+
+    # Build items: one whole-document embedding + chunk embeddings
+    items: list[dict] = []
+
+    # Whole document embedding
+    items.append({
+        "source_type": "document",
+        "source_id": doc.id,
+        "text": full_text[:32000],
+        "metadata": {
+            "doc_id": doc.id,
+            "project_id": doc.project_id,
+            "title": doc.name or "Untitled",
+        },
+    })
+
+    # Chunk embeddings
+    chunks = _chunk_text(full_text)
+    if len(chunks) > 1:
+        for i, chunk in enumerate(chunks):
+            items.append({
+                "source_type": "document_chunk",
+                "source_id": f"{doc.id}_chunk_{i}",
+                "text": chunk,
+                "metadata": {
+                    "doc_id": doc.id,
+                    "project_id": doc.project_id,
+                    "chunk_index": i,
+                    "title": doc.name or "Untitled",
+                },
+            })
+
+    # Check content hashes to skip unchanged
+    items_to_embed: list[dict] = []
+    for item in items:
+        h = content_hash(item["text"])
+        item["hash"] = h
+        existing = await db.execute(
+            select(Embedding).where(
+                and_(
+                    Embedding.source_type == item["source_type"],
+                    Embedding.source_id == item["source_id"],
+                    Embedding.content_hash == h,
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+        items_to_embed.append(item)
+
+    if not items_to_embed:
+        logger.debug("All embeddings for document %s are up-to-date", doc_id)
+        return 0
+
+    texts = [item["text"] for item in items_to_embed]
+    vectors = await generate_embeddings(texts)
+
+    if vectors is None:
+        logger.error("Embedding generation failed for document %s", doc_id)
+        return 0
+
+    count = 0
+    for item, vector in zip(items_to_embed, vectors):
+        await db.execute(
+            delete(Embedding).where(
+                and_(
+                    Embedding.source_type == item["source_type"],
+                    Embedding.source_id == item["source_id"],
+                )
+            )
+        )
+        emb = Embedding(
+            source_type=item["source_type"],
+            source_id=item["source_id"],
+            content_hash=item["hash"],
+            embedding=vector,
+            metadata_=item["metadata"],
+        )
+        db.add(emb)
+        count += 1
+
+    await db.flush()
+    logger.info("Indexed %d embeddings for document %s", count, doc_id)
+    return count
+
+
+async def index_document_background(doc_id: str) -> None:
+    """Index a document in a separate DB session (fire-and-forget)."""
+    from app.database import session_scope
+
+    try:
+        async with session_scope() as db:
+            await index_document(doc_id, db)
+    except Exception as exc:
+        logger.error("Background document indexing failed for %s: %s", doc_id, exc)
+
+
+async def delete_document_embeddings(doc_id: str, db: AsyncSession) -> int:
+    """Remove all embeddings for a document (document + chunk embeddings)."""
+    result1 = await db.execute(
+        delete(Embedding).where(
+            and_(
+                Embedding.source_type == "document",
+                Embedding.source_id == doc_id,
+            )
+        )
+    )
+    result2 = await db.execute(
+        delete(Embedding).where(
+            and_(
+                Embedding.source_type == "document_chunk",
+                Embedding.source_id.like(f"{doc_id}_chunk_%"),
+            )
+        )
+    )
+    deleted = result1.rowcount + result2.rowcount
+    logger.info("Deleted %d embeddings for document %s", deleted, doc_id)
+    return deleted
 
 
 async def delete_workflow_embeddings(session_id: str, db: AsyncSession) -> int:

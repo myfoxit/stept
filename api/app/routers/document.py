@@ -284,6 +284,12 @@ async def api_update_document(
     )
     await update_document_search(db, updated.id, updated.name, updated.content)
     await db.commit()
+
+    # Fire-and-forget: index document for semantic search
+    if payload.content is not None:
+        import asyncio
+        from app.services.indexer import index_document_background
+        asyncio.create_task(index_document_background(doc_id))
     return updated
 
 # Move document
@@ -590,6 +596,9 @@ async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db), c
     if not doc:
         raise HTTPException(404, "document not found")
     await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
+    # Clean up embeddings before deleting
+    from app.services.indexer import delete_document_embeddings
+    await delete_document_embeddings(doc_id, db)
     try:
         await delete_document(db, doc_id)
     except ValueError as e:
