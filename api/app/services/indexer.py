@@ -67,6 +67,7 @@ async def index_workflow(session_id: str, db: AsyncSession) -> int:
                 "generated_title": session.generated_title,
                 "project_id": session.project_id,
                 "user_id": session.user_id,
+                "chunk_text": wf_text[:4000],
             },
         })
 
@@ -84,6 +85,7 @@ async def index_workflow(session_id: str, db: AsyncSession) -> int:
                     "project_id": session.project_id,
                     "user_id": session.user_id,
                     "workflow_name": session.name or session.generated_title,
+                    "chunk_text": s_text[:4000],
                 },
             })
 
@@ -278,6 +280,7 @@ async def index_document(doc_id: str, db: AsyncSession) -> int:
             "doc_id": doc.id,
             "project_id": doc.project_id,
             "title": doc.name or "Untitled",
+            "chunk_text": full_text[:4000],
         },
     })
 
@@ -293,7 +296,9 @@ async def index_document(doc_id: str, db: AsyncSession) -> int:
                     "doc_id": doc.id,
                     "project_id": doc.project_id,
                     "chunk_index": i,
+                    "total_chunks": len(chunks),
                     "title": doc.name or "Untitled",
+                    "chunk_text": chunk,
                 },
             })
 

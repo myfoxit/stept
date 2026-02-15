@@ -225,15 +225,16 @@ async def _semantic_search(
             seen_docs.add(doc_id)
             title = meta.get("title", "Untitled")
             chunk_info = f", Chunk {meta.get('chunk_index', 0) + 1}" if source_type == "document_chunk" else ""
-            # Fetch content snippet
-            snippet = ""
-            try:
-                doc = await db.get(Document, doc_id)
-                if doc and doc.content:
-                    from app.document_export import tiptap_to_markdown
-                    snippet = tiptap_to_markdown(doc.content)[:4000].strip()
-            except Exception:
-                pass
+            # Use stored chunk_text from metadata; fall back to fetching
+            snippet = meta.get("chunk_text", "")
+            if not snippet:
+                try:
+                    doc = await db.get(Document, doc_id)
+                    if doc and doc.content:
+                        from app.document_export import tiptap_to_markdown
+                        snippet = tiptap_to_markdown(doc.content)[:4000].strip()
+                except Exception:
+                    pass
             results.append({
                 "source_type": "document",
                 "source_id": doc_id,
@@ -248,14 +249,15 @@ async def _semantic_search(
                 continue
             seen_workflows.add(source_id)
             wf_name = meta.get("name") or meta.get("generated_title") or "Untitled Workflow"
-            snippet = ""
-            try:
-                wf = await db.get(ProcessRecordingSession, source_id)
-                if wf:
-                    from app.services.embeddings import workflow_text
-                    snippet = workflow_text(wf)[:4000].strip()
-            except Exception:
-                pass
+            snippet = meta.get("chunk_text", "")
+            if not snippet:
+                try:
+                    wf = await db.get(ProcessRecordingSession, source_id)
+                    if wf:
+                        from app.services.embeddings import workflow_text
+                        snippet = workflow_text(wf)[:4000].strip()
+                except Exception:
+                    pass
             results.append({
                 "source_type": "workflow",
                 "source_id": source_id,
@@ -272,10 +274,12 @@ async def _semantic_search(
             seen_workflows.add(wf_id)
             wf_name = meta.get("workflow_name", "Untitled Workflow")
             step_num = meta.get("step_number", "?")
+            snippet = meta.get("chunk_text", "")
             results.append({
                 "source_type": "step",
                 "source_id": source_id,
                 "title": f"{wf_name} — Step {step_num}",
+                "snippet": snippet,
                 "citation": f'[Source: Workflow "{wf_name}", Step {step_num}]',
                 "similarity": score,
             })
