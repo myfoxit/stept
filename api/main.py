@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -64,6 +64,8 @@ api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(auth_providers.router, prefix="/auth/providers", tags=["auth_providers"])
 api_router.include_router(shared.router, tags=["shared"])
 api_router.include_router(context_links.router, tags=["context-links"])
+api_router.include_router(comments.router, tags=["comments"])
+api_router.include_router(git_sync.router, tags=["git-sync"])
 
 
 # Mount the versioned router on the main app

@@ -455,6 +455,51 @@ class LLMUsage(Base):
     created_at = Column(DateTime, server_default=func.now(), index=True)
 
 
+class GitSyncConfig(Base):
+    __tablename__ = "git_sync_configs"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+    provider = Column(String(20), nullable=False)  # github, gitlab, bitbucket
+    repo_url = Column(String(500), nullable=False)
+    branch = Column(String(100), nullable=False, default="main")
+    directory = Column(String(500), nullable=False, default="/")
+    access_token = Column(String(500), nullable=False)  # encrypted via crypto.encrypt
+    sync_format = Column(String(10), nullable=False, default="markdown")
+    auto_sync = Column(Boolean, nullable=False, default=False)
+    last_sync_at = Column(DateTime, nullable=True)
+    last_sync_status = Column(String(20), nullable=True)  # success, error, in_progress
+    last_sync_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    project = relationship("Project", backref="git_sync_config")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    resource_type = Column(String(20), nullable=False)  # 'document' or 'workflow'
+    resource_id = Column(String(16), nullable=False)
+    parent_id = Column(String(16), ForeignKey("comments.id", ondelete="SET NULL"), nullable=True)
+    content = Column(Text, nullable=False)
+    resolved = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project", backref="comments")
+    user = relationship("User", foreign_keys=[user_id], backref="comments")
+    parent = relationship("Comment", remote_side=[id], backref=backref("replies", cascade="all, delete-orphan"))
+
+    __table_args__ = (
+        Index('ix_comments_resource', 'resource_type', 'resource_id'),
+    )
+
+
 class ContextLink(Base):
     """Links a URL pattern or app name to a workflow or document."""
     __tablename__ = "context_links"

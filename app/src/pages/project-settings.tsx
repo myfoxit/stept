@@ -53,6 +53,7 @@ import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } fro
 import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWizard';
 import { AiUsageCard } from '@/components/Settings/AiUsageCard';
 import { ProviderLogin } from '@/components/Settings/ProviderLogin';
+import { GitSyncCard } from '@/components/Settings/GitSyncCard';
 
 const roleIcons: Record<string, typeof IconCrown> = {
   owner: IconCrown,
@@ -401,6 +402,9 @@ export function ProjectSettingsPage() {
         />
 
         {aiConfig?.configured && <AiUsageCard />}
+
+        {/* Git Sync — only for admin/owner */}
+        {canManageMembers && projectId && <GitSyncCard projectId={projectId} />}
         
         {/* Invite Dialog */}
         <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
