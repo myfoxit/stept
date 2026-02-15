@@ -210,38 +210,103 @@ class OndokiApp {
     });
   }
 
-  private createTray(): void {
-    const icon = nativeImage.createFromDataURL(
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAhGVYSWZNTQAqAAAACAAFARIAAwAAAAEAAQAAARoABQAAAAEAAABKARsABQAAAAEAAABSASgAAwAAAAEAAgAAh2kABAAAAAEAAABaAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAACBsJLmAAAACXBIWXMAAAsTAAALEwEAmpwYAAABWWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNi4wLjAiPgogICA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogICAgICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgICAgICAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyI+CiAgICAgICAgIDx0aWZmOk9yaWVudGF0aW9uPjE8L3RpZmY6T3JpZW50YXRpb24+CiAgICAgIDwvcmRmOkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgoZXuEHAAAA2klEQVQ4EWNkIBMwkqkfZDALA4mGl5eX/2dkZPzPxMT0n4GB4T8DA8N/BgYGBhD9/z+I/R+kBsb+D9MDYsMAmAYQGwZAYhiNBxcgyTIwMPxnZGT8z8TE9J+BgeE/AwMDA4gGsf+D2CA1MLZ/GJ+JEOsBBv4zMjL+Z2Ji+s/AwPCfgYGBAUSA2P9BbJAaGNs/SE8TIzFuBkUBCBgZMzAw/mdiYvrPwMDwn4GBgQFEgNj/QWyQGhjbP4jPxECs70FRAWP/B+mBsWF8JmJ9D4oKGPs/SA+MDeUDAAAFXk/7qNX2XAAAAABJRU5ErkJggg=='
-    );
+  private normalTrayIcon: Electron.NativeImage | null = null;
+  private badgeTrayIcon: Electron.NativeImage | null = null;
 
-    this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  private createTray(): void {
+    // 32x32 white circle template image for macOS menu bar
+    const trayIcon = nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAJRJREFUWEft1rENwCAMBVBYJRuwSjZhDTZhlWzAKhQpUpTCn2AwTuEG6fTvbGOI0HxFzfzUAfh3BW6S7iO2Z+AvJelU4C7pIOli5B5AWj6IOl1aLACAtQIpA8ByhdwCuXMb+xvgDKQBXkEa4BWkAUagAo1z/gcwbsB4C8azYPwciJ+E8aMofhjHr6P/dz0cLwCvvEIhS8Z5nwAAAABJRU5ErkJggg=='
+    );
+    trayIcon.setTemplateImage(true);
+    this.normalTrayIcon = trayIcon;
+
+    // Badge icon (colored, non-template) for when matches are found
+    const badgeIcon = nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAJRJREFUWEft1rENwCAMBVBYJRuwSjZhDTZhlWzAKhQpUpTCn2AwTuEG6fTvbGOI0HxFzfzUAfh3BW6S7iO2Z+AvJelU4C7pIOli5B5AWj6IOl1aLACAtQIpA8ByhdwCuXMb+xvgDKQBXkEa4BWkAUagAo1z/gcwbsB4C8azYPwciJ+E8aMofhjHr6P/dz0cLwCvvEIhS8Z5nwAAAABJRU5ErkJggg=='
+    );
+    badgeIcon.setTemplateImage(false);
+    this.badgeTrayIcon = badgeIcon;
+
+    this.tray = new Tray(trayIcon);
     this.tray.setToolTip('Ondoki');
     this.updateTrayMenu();
+
+    // Listen for context match events from ipc-handlers
+    app.on('context-matches-updated' as any, (matches: any[], ctx: any) => {
+      if (this.badgeTrayIcon) {
+        this.tray?.setImage(this.badgeTrayIcon);
+      }
+      const contextLabel = ctx.url
+        ? `${ctx.appName} — ${new URL(ctx.url).hostname}`
+        : ctx.appName;
+      this.updateTrayMenu(contextLabel, matches);
+    });
+
+    app.on('context-no-matches' as any, () => {
+      if (this.normalTrayIcon) {
+        this.tray?.setImage(this.normalTrayIcon);
+      }
+      this.updateTrayMenu();
+    });
   }
 
-  private updateTrayMenu(contextInfo?: string): void {
+  private updateTrayMenu(contextInfo?: string, matches?: any[]): void {
     if (!this.tray) return;
 
     const template: Electron.MenuItemConstructorOptions[] = [
       { label: 'Open Ondoki', click: () => this.showMainWindow() },
       { type: 'separator' },
-      {
-        label: contextInfo ? `📍 ${contextInfo}` : '📍 No context detected',
+    ];
+
+    if (contextInfo) {
+      template.push({
+        label: `📍 ${contextInfo}`,
         enabled: false,
-      },
-      {
-        label: '📝 Add Context Note...',
+      });
+      template.push({
+        label: `➕ Add context for "${contextInfo}"...`,
         click: () => {
           this.showMainWindow();
           if (this.mainWindow) {
             this.mainWindow.webContents.send('show-add-context-note');
           }
         },
+      });
+    }
+
+    if (matches && matches.length > 0) {
+      template.push({ type: 'separator' });
+      template.push({ label: `📋 ${matches.length} suggestion${matches.length > 1 ? 's' : ''}`, enabled: false });
+      for (const m of matches.slice(0, 5)) {
+        template.push({
+          label: `  ${m.resource_type === 'workflow' ? '🔄' : '📄'} ${m.resource_name}`,
+          click: () => {
+            const settings = this.settingsManager.getSettings();
+            const frontendUrl = settings.frontendUrl || 'http://localhost:5173';
+            const resourcePath = m.resource_type === 'workflow' ? `/workflow/${m.resource_id}` : `/editor/${m.resource_id}`;
+            shell.openExternal(`${frontendUrl}${resourcePath}`);
+          },
+        });
+      }
+    }
+
+    if (!contextInfo && (!matches || matches.length === 0)) {
+      template.push({ label: '📍 No context detected', enabled: false });
+    }
+
+    template.push({ type: 'separator' });
+    template.push({
+      label: '📝 Add Context Note...',
+      click: () => {
+        this.showMainWindow();
+        if (this.mainWindow) {
+          this.mainWindow.webContents.send('show-add-context-note');
+        }
       },
-      { type: 'separator' },
-      { label: 'Quit', click: () => { this.isQuitting = true; app.quit(); } },
-    ];
+    });
+    template.push({ type: 'separator' });
+    template.push({ label: 'Quit', click: () => { this.isQuitting = true; app.quit(); } });
 
     this.tray.setContextMenu(Menu.buildFromTemplate(template));
   }

@@ -161,6 +161,7 @@ export interface Settings {
   llmBaseUrl: string;
   autoAnnotateSteps: boolean;
   autoGenerateGuide: boolean;
+  frontendUrl: string;
 }
 
 export interface ChatMessage {

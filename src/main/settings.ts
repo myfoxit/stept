@@ -12,6 +12,7 @@ export interface Settings {
   llmBaseUrl: string;
   autoAnnotateSteps: boolean;
   autoGenerateGuide: boolean;
+  frontendUrl: string;
 }
 
 export interface WindowState {
@@ -40,6 +41,7 @@ const defaultSettings: Settings = {
   llmBaseUrl: '',
   autoAnnotateSteps: true,
   autoGenerateGuide: false,
+  frontendUrl: 'http://localhost:5173',
 };
 
 const defaultWindowState: WindowState = {
@@ -154,6 +156,7 @@ export class SettingsManager {
           llmBaseUrl: legacyData.LlmBaseUrl || defaultSettings.llmBaseUrl,
           autoAnnotateSteps: legacyData.AutoAnnotateSteps ?? defaultSettings.autoAnnotateSteps,
           autoGenerateGuide: legacyData.AutoGenerateGuide ?? defaultSettings.autoGenerateGuide,
+          frontendUrl: legacyData.FrontendUrl || defaultSettings.frontendUrl,
         };
 
         this.saveSettings(migratedSettings);

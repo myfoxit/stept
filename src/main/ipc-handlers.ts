@@ -250,6 +250,9 @@ export function setupIpcHandlers(
         w.webContents.send('context:matches', matches, ctx);
       }
 
+      // Emit to main process for tray updates
+      app.emit('context-matches-updated', matches, ctx);
+
       // Show native notification so user sees matches even when Ondoki is in background
       if (Notification.isSupported() && matches.length > 0) {
         const title = matches.length === 1
@@ -272,6 +275,9 @@ export function setupIpcHandlers(
       for (const w of windows) {
         w.webContents.send('context:no-matches', ctx);
       }
+
+      // Emit to main process for tray updates
+      app.emit('context-no-matches');
     });
 
     contextWatcher.start();

@@ -41,13 +41,16 @@ export function ContextSuggestions() {
 
   if (matches.length === 0 || dismissed) return null;
 
-  const handleOpenResource = (match: ContextMatch) => {
+  const handleOpenResource = async (match: ContextMatch) => {
     const api = (window as any).electronAPI;
-    const settings = (api as any)?.getSettingsSync?.() || {};
-    const baseUrl = settings.chatApiUrl || 'http://localhost:8000';
-    const appUrl = baseUrl.replace('/api/v1', '').replace('/api', '');
-    const path = match.resource_type === 'workflow' ? `/workflow/${match.resource_id}` : `/editor/${match.resource_id}`;
-    window.open(`${appUrl}${path}`, '_blank');
+    try {
+      const settings = await api.getSettings();
+      const frontendUrl = (settings.frontendUrl || 'http://localhost:5173').replace(/\/+$/, '');
+      const path = match.resource_type === 'workflow' ? `/workflow/${match.resource_id}` : `/editor/${match.resource_id}`;
+      api.openExternal(`${frontendUrl}${path}`);
+    } catch (err) {
+      console.error('Failed to open resource:', err);
+    }
   };
 
   return (
