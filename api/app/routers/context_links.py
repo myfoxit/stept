@@ -89,13 +89,21 @@ async def create_context_link(
 
 @router.get("/context-links", response_model=list[ContextLinkOut])
 async def list_context_links(
-    project_id: str = Query(...),
+    project_id: Optional[str] = Query(None),
     resource_type: Optional[str] = Query(None),
     resource_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = select(ContextLink).where(ContextLink.project_id == project_id)
+    from app.models import project_members
+
+    if project_id:
+        q = select(ContextLink).where(ContextLink.project_id == project_id)
+    else:
+        user_projects = select(project_members.c.project_id).where(
+            project_members.c.user_id == current_user.id
+        )
+        q = select(ContextLink).where(ContextLink.project_id.in_(user_projects))
     if resource_type:
         q = q.where(ContextLink.resource_type == resource_type)
     if resource_id:
