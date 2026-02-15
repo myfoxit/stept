@@ -35,4 +35,4 @@ aiofiles>=25.1.0
 pgvector>=0.3.0
 cryptography>=42.0.0
 python-json-logger>=3.0.0
-mcp[cli]>=1.0.0
+# mcp>=1.0.0  -- in requirements-mcp.txt (needs Python ≥3.10)

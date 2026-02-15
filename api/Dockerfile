@@ -16,9 +16,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first (caching layer)
-COPY requirements.txt .
+COPY requirements.txt requirements-mcp.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-mcp.txt
 
 # Copy project files
 COPY . .

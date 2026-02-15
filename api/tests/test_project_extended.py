@@ -206,7 +206,7 @@ async def test_create_invite_link(
     """POST /projects/{id}/invite should create an invite token."""
     resp = await async_client.post(
         f"/api/v1/projects/{test_project['id']}/invite",
-        json={"role": "member"},
+        json={"role": "viewer", "email": "other@example.com"},
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -216,7 +216,7 @@ async def test_create_invite_link(
     # Token should be decodable
     decoded = json.loads(base64.urlsafe_b64decode(data["token"]))
     assert decoded["project_id"] == test_project["id"]
-    assert decoded["role"] == "member"
+    assert decoded["role"] == "viewer"
 
 
 @pytest.mark.asyncio
@@ -228,7 +228,7 @@ async def test_create_invite_link_unauthorized(
     """Non-admin should not be able to create invites."""
     resp = await async_client.post(
         f"/api/v1/projects/{test_project['id']}/invite",
-        json={"role": "member"},
+        json={"role": "viewer", "email": "other@example.com"},
         headers=second_auth_headers,
     )
     assert resp.status_code == 403
@@ -248,7 +248,7 @@ async def test_join_project_with_invite(
     # Create invite
     invite_resp = await async_client.post(
         f"/api/v1/projects/{test_project['id']}/invite",
-        json={"role": "member"},
+        json={"role": "viewer", "email": "other@example.com"},
         headers=auth_headers,
     )
     token = invite_resp.json()["token"]
@@ -276,7 +276,7 @@ async def test_join_project_already_member(
     # Create invite
     invite_resp = await async_client.post(
         f"/api/v1/projects/{test_project['id']}/invite",
-        json={"role": "member"},
+        json={"role": "viewer", "email": "other@example.com"},
         headers=auth_headers,
     )
     token = invite_resp.json()["token"]
@@ -353,10 +353,11 @@ async def test_create_invite_invalid_role(
     """Invalid role should be rejected."""
     resp = await async_client.post(
         f"/api/v1/projects/{test_project['id']}/invite",
-        json={"role": "superadmin"},
+        json={"role": "superadmin", "email": "other@example.com"},
         headers=auth_headers,
     )
-    assert resp.status_code == 400
+    # Pydantic validation rejects invalid role with 422
+    assert resp.status_code in (400, 422)
 
 
 @pytest.mark.asyncio

@@ -234,8 +234,8 @@ async def test_get_filtered_documents_no_auth(
 
 
 @pytest.mark.asyncio
-async def test_delete_nonexistent_document(async_client: AsyncClient):
-    resp = await async_client.delete("/api/v1/documents/nonexistent")
+async def test_delete_nonexistent_document(async_client: AsyncClient, auth_headers: dict):
+    resp = await async_client.delete("/api/v1/documents/nonexistent", headers=auth_headers)
     assert resp.status_code == 404
 
 
@@ -297,14 +297,14 @@ async def test_export_document_html(
 
 
 @pytest.mark.asyncio
-async def test_export_nonexistent_document_markdown(async_client: AsyncClient):
-    resp = await async_client.get("/api/v1/documents/nonexistent/export/markdown")
+async def test_export_nonexistent_document_markdown(async_client: AsyncClient, auth_headers: dict):
+    resp = await async_client.get("/api/v1/documents/nonexistent/export/markdown", headers=auth_headers)
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_export_nonexistent_document_html(async_client: AsyncClient):
-    resp = await async_client.get("/api/v1/documents/nonexistent/export/html")
+async def test_export_nonexistent_document_html(async_client: AsyncClient, auth_headers: dict):
+    resp = await async_client.get("/api/v1/documents/nonexistent/export/html", headers=auth_headers)
     assert resp.status_code == 404
 
 

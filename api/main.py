@@ -80,8 +80,11 @@ app.include_router(public_router, prefix="/api/v1/public", tags=["public"])
 app.include_router(health.router)
 
 # MCP (Model Context Protocol) server — mounted outside versioned API
-from app.mcp_server import mcp as mcp_server
-app.mount("/mcp", mcp_server.streamable_http_app())
+try:
+    from app.mcp_server import mcp as mcp_server
+    app.mount("/mcp", mcp_server.streamable_http_app())
+except ImportError:
+    pass  # mcp package not installed — MCP endpoints disabled
 
 # Test-only endpoints (seed/cleanup) — only in test/development environments
 if os.getenv("ENVIRONMENT") in ("test", "development"):

@@ -28,11 +28,50 @@ router = APIRouter()
 
 
 async def _check_doc_access(db, doc, current_user, required_role=ProjectRole.VIEWER):
-    """Check user can access document. Raises 404 for private docs, 403 for no access."""
+    """Check user can access document. Raises 404 for private docs, 403 for no access.
+    
+    Access is granted if:
+    1. User is the owner of a private doc
+    2. User is a member of the document's project with sufficient role
+    3. User has a ResourceShare granting access (view or edit)
+    """
+    # Private doc: only owner or someone with a direct share
     if doc.is_private and doc.owner_id != current_user.id:
-        raise HTTPException(404, "document not found")
+        # Check if user has a direct share
+        from app.models import ResourceShare
+        share = await db.scalar(
+            select(ResourceShare).where(
+                ResourceShare.resource_type == "document",
+                ResourceShare.resource_id == doc.id,
+                ResourceShare.shared_with_user_id == current_user.id,
+            )
+        )
+        if not share:
+            raise HTTPException(404, "document not found")
+        # For editor-required operations, check share permission
+        if required_role in (ProjectRole.EDITOR, ProjectRole.ADMIN, ProjectRole.OWNER):
+            if share.permission != "edit":
+                raise HTTPException(403, "View-only access — cannot edit")
+        return  # Access granted via share
+    
     if doc.project_id:
-        await check_project_permission(db, current_user.id, doc.project_id, required_role)
+        try:
+            await check_project_permission(db, current_user.id, doc.project_id, required_role)
+        except HTTPException:
+            # Fallback: check if user has a direct ResourceShare
+            from app.models import ResourceShare
+            share = await db.scalar(
+                select(ResourceShare).where(
+                    ResourceShare.resource_type == "document",
+                    ResourceShare.resource_id == doc.id,
+                    ResourceShare.shared_with_user_id == current_user.id,
+                )
+            )
+            if not share:
+                raise
+            if required_role in (ProjectRole.EDITOR, ProjectRole.ADMIN, ProjectRole.OWNER):
+                if share.permission != "edit":
+                    raise HTTPException(403, "View-only access — cannot edit")
 
 # List all documents (must come before /{doc_id})
 @router.get("/", response_model=list[DocumentRead])
