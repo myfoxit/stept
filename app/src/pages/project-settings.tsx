@@ -55,6 +55,7 @@ import { AiUsageCard } from '@/components/Settings/AiUsageCard';
 import { ProviderLogin } from '@/components/Settings/ProviderLogin';
 import { GitSyncCard } from '@/components/Settings/GitSyncCard';
 import { McpSettingsCard } from '@/components/Settings/McpSettingsCard';
+import { ReindexCard } from '@/components/Settings/ReindexCard';
 
 const roleIcons: Record<string, typeof IconCrown> = {
   owner: IconCrown,
@@ -409,6 +410,9 @@ export function ProjectSettingsPage() {
 
         {/* MCP API Keys — only for admin/owner */}
         {canManageMembers && projectId && <McpSettingsCard projectId={projectId} />}
+
+        {/* Knowledge Base Reindex */}
+        {projectId && <ReindexCard projectId={projectId} />}
         
         {/* Invite Dialog */}
         <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
