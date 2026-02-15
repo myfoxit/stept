@@ -1,5 +1,5 @@
 """
-Git Sync router — configure and trigger bidirectional Git sync for projects.
+Git Export router — configure and trigger one-way export of pages to Git.
 """
 from datetime import datetime, timezone
 from typing import Optional
@@ -26,8 +26,6 @@ class GitSyncConfigIn(BaseModel):
     branch: str = Field("main", max_length=100)
     directory: str = Field("/", max_length=500)
     access_token: str = Field(..., max_length=500)
-    sync_format: str = Field("markdown", pattern="^(markdown|html)$")
-    auto_sync: bool = False
 
 
 class GitSyncConfigOut(BaseModel):
@@ -38,26 +36,15 @@ class GitSyncConfigOut(BaseModel):
     branch: str
     directory: str
     access_token_masked: str
-    sync_format: str
-    auto_sync: bool
     last_sync_at: Optional[datetime] = None
     last_sync_status: Optional[str] = None
     last_sync_error: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 
-class GitSyncStatusOut(BaseModel):
-    last_sync_at: Optional[datetime] = None
-    last_sync_status: Optional[str] = None
-    last_sync_error: Optional[str] = None
-
-
 def _mask_token(token: str) -> str:
-    """Mask access token for display — show last 4 chars only."""
     if not token or len(token) <= 4:
         return "****"
     return "****" + token[-4:]
@@ -73,17 +60,11 @@ def _config_to_out(config: GitSyncConfig) -> GitSyncConfigOut:
         branch=config.branch,
         directory=config.directory,
         access_token_masked=_mask_token(raw_token),
-        sync_format=config.sync_format,
-        auto_sync=config.auto_sync,
         last_sync_at=config.last_sync_at,
         last_sync_status=config.last_sync_status,
         last_sync_error=config.last_sync_error,
-        created_at=config.created_at,
-        updated_at=config.updated_at,
     )
 
-
-# ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.get("/git-sync/{project_id}", response_model=GitSyncConfigOut)
 async def get_git_sync_config(
@@ -96,7 +77,7 @@ async def get_git_sync_config(
         select(GitSyncConfig).where(GitSyncConfig.project_id == project_id)
     )
     if not config:
-        raise HTTPException(404, "Git sync not configured for this project")
+        raise HTTPException(404, "Git export not configured for this project")
     return _config_to_out(config)
 
 
@@ -108,7 +89,6 @@ async def upsert_git_sync_config(
     current_user: User = Depends(get_current_user),
 ):
     await check_project_permission(db, current_user.id, project_id, ProjectRole.ADMIN)
-
     config = await db.scalar(
         select(GitSyncConfig).where(GitSyncConfig.project_id == project_id)
     )
@@ -120,8 +100,6 @@ async def upsert_git_sync_config(
         config.branch = body.branch
         config.directory = body.directory
         config.access_token = encrypted_token
-        config.sync_format = body.sync_format
-        config.auto_sync = body.auto_sync
     else:
         config = GitSyncConfig(
             id=gen_suffix(),
@@ -131,8 +109,6 @@ async def upsert_git_sync_config(
             branch=body.branch,
             directory=body.directory,
             access_token=encrypted_token,
-            sync_format=body.sync_format,
-            auto_sync=body.auto_sync,
         )
         db.add(config)
 
@@ -152,70 +128,31 @@ async def delete_git_sync_config(
         select(GitSyncConfig).where(GitSyncConfig.project_id == project_id)
     )
     if not config:
-        raise HTTPException(404, "Git sync not configured")
+        raise HTTPException(404, "Git export not configured")
     await db.delete(config)
     await db.commit()
 
 
-@router.post("/git-sync/{project_id}/push")
-async def push_to_git(
+@router.post("/git-sync/{project_id}/export")
+async def export_to_git(
     project_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Export all project pages to the configured Git repo as Markdown."""
     await check_project_permission(db, current_user.id, project_id, ProjectRole.ADMIN)
     config = await db.scalar(
         select(GitSyncConfig).where(GitSyncConfig.project_id == project_id)
     )
     if not config:
-        raise HTTPException(404, "Git sync not configured")
+        raise HTTPException(404, "Git export not configured")
 
-    from app.services.git_sync_service import push_to_git as do_push
+    from app.services.git_sync_service import export_to_git as do_export
     try:
-        result = await do_push(db, config)
+        result = await do_export(db, config)
         return result
     except Exception as e:
-        raise HTTPException(500, f"Push failed: {str(e)[:200]}")
-
-
-@router.post("/git-sync/{project_id}/pull")
-async def pull_from_git(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    await check_project_permission(db, current_user.id, project_id, ProjectRole.ADMIN)
-    config = await db.scalar(
-        select(GitSyncConfig).where(GitSyncConfig.project_id == project_id)
-    )
-    if not config:
-        raise HTTPException(404, "Git sync not configured")
-
-    from app.services.git_sync_service import pull_from_git as do_pull
-    try:
-        result = await do_pull(db, config)
-        return result
-    except Exception as e:
-        raise HTTPException(500, f"Pull failed: {str(e)[:200]}")
-
-
-@router.get("/git-sync/{project_id}/status", response_model=GitSyncStatusOut)
-async def get_git_sync_status(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    await check_project_permission(db, current_user.id, project_id, ProjectRole.ADMIN)
-    config = await db.scalar(
-        select(GitSyncConfig).where(GitSyncConfig.project_id == project_id)
-    )
-    if not config:
-        raise HTTPException(404, "Git sync not configured")
-    return GitSyncStatusOut(
-        last_sync_at=config.last_sync_at,
-        last_sync_status=config.last_sync_status,
-        last_sync_error=config.last_sync_error,
-    )
+        raise HTTPException(500, f"Export failed: {str(e)[:200]}")
 
 
 @router.post("/git-sync/{project_id}/test")
@@ -228,14 +165,12 @@ async def test_git_connection(
     """Test connection without saving config."""
     await check_project_permission(db, current_user.id, project_id, ProjectRole.ADMIN)
 
-    # Create a temporary config object for testing
     temp_config = GitSyncConfig(
         provider=body.provider,
         repo_url=body.repo_url,
         branch=body.branch,
         directory=body.directory,
         access_token=encrypt(body.access_token),
-        sync_format=body.sync_format,
     )
 
     from app.services.git_sync_service import test_connection

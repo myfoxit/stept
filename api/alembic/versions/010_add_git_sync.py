@@ -1,4 +1,4 @@
-"""Add git sync configuration
+"""Add git export configuration
 
 Revision ID: 010
 Revises: 009
@@ -22,8 +22,6 @@ def upgrade():
         sa.Column("branch", sa.String(100), nullable=False, server_default="main"),
         sa.Column("directory", sa.String(500), nullable=False, server_default="/"),
         sa.Column("access_token", sa.String(500), nullable=False),
-        sa.Column("sync_format", sa.String(10), nullable=False, server_default="markdown"),
-        sa.Column("auto_sync", sa.Boolean, nullable=False, server_default="false"),
         sa.Column("last_sync_at", sa.DateTime, nullable=True),
         sa.Column("last_sync_status", sa.String(20), nullable=True),
         sa.Column("last_sync_error", sa.Text, nullable=True),

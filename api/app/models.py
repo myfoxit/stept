@@ -465,8 +465,6 @@ class GitSyncConfig(Base):
     branch = Column(String(100), nullable=False, default="main")
     directory = Column(String(500), nullable=False, default="/")
     access_token = Column(String(500), nullable=False)  # encrypted via crypto.encrypt
-    sync_format = Column(String(10), nullable=False, default="markdown")
-    auto_sync = Column(Boolean, nullable=False, default=False)
     last_sync_at = Column(DateTime, nullable=True)
     last_sync_status = Column(String(20), nullable=True)  # success, error, in_progress
     last_sync_error = Column(Text, nullable=True)
