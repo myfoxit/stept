@@ -41,13 +41,24 @@ def _get_openai_config() -> tuple[str | None, str]:
     provider = _provider()
     api_key = _api_key()
 
-    # Most providers support the /v1/embeddings endpoint (OpenAI-compatible)
-    # Only skip for providers that definitely don't (anthropic, ollama without embeddings)
+    # Anthropic doesn't have an embeddings endpoint
     if provider == "anthropic":
         return None, ""
+    # Ollama doesn't need an API key — use a dummy one
+    if provider == "ollama":
+        return "ollama", _base_url()
     if api_key:
         return api_key, _base_url()
     return None, ""
+
+
+def _get_embedding_model() -> str:
+    """Return the embedding model name based on the provider."""
+    from app.services.llm import _provider
+    provider = _provider()
+    if provider == "ollama":
+        return "nomic-embed-text"
+    return EMBEDDING_MODEL  # text-embedding-3-small for OpenAI
 
 
 def has_embedding_api() -> bool:
@@ -89,7 +100,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]] | None:
             "content-type": "application/json",
         }
         payload = {
-            "model": EMBEDDING_MODEL,
+            "model": _get_embedding_model(),
             "input": cleaned,
         }
 
@@ -102,6 +113,12 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]] | None:
             # Sort by index to maintain order
             sorted_data = sorted(data["data"], key=lambda x: x["index"])
             batch_embeddings = [item["embedding"] for item in sorted_data]
+            # Pad/truncate to EMBEDDING_DIM for consistent vector size
+            for j, emb in enumerate(batch_embeddings):
+                if len(emb) < EMBEDDING_DIM:
+                    batch_embeddings[j] = emb + [0.0] * (EMBEDDING_DIM - len(emb))
+                elif len(emb) > EMBEDDING_DIM:
+                    batch_embeddings[j] = emb[:EMBEDDING_DIM]
             all_embeddings.extend(batch_embeddings)
 
         except Exception as exc:
