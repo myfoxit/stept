@@ -16,7 +16,7 @@ import json
 import logging
 from typing import Optional, AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +29,7 @@ from app.models import (
     ProcessRecordingSession,
     ProcessRecordingStep,
     User,
+    LLMUsage,
 )
 from app.security import get_current_user
 from app.services import llm as llm_service
@@ -572,3 +573,27 @@ async def list_tools(
             for t in tools
         ]
     }
+
+
+@router.get("/usage")
+async def get_usage(
+    days: int = Query(default=30, le=365),
+    project_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from datetime import datetime, timedelta
+    from sqlalchemy import func as sqlfunc
+    since = datetime.utcnow() - timedelta(days=days)
+    query = select(
+        sqlfunc.sum(LLMUsage.input_tokens).label("total_input"),
+        sqlfunc.sum(LLMUsage.output_tokens).label("total_output"),
+        sqlfunc.sum(LLMUsage.total_tokens).label("total_tokens"),
+        sqlfunc.sum(LLMUsage.estimated_cost_usd).label("total_cost"),
+        sqlfunc.count(LLMUsage.id).label("request_count"),
+    ).where(LLMUsage.user_id == current_user.id, LLMUsage.created_at >= since)
+    if project_id:
+        query = query.where(LLMUsage.project_id == project_id)
+    result = await db.execute(query)
+    row = result.one()
+    return {"days": days, "total_input_tokens": row.total_input or 0, "total_output_tokens": row.total_output or 0, "total_tokens": row.total_tokens or 0, "estimated_cost_usd": round(row.total_cost or 0, 4), "request_count": row.request_count or 0}

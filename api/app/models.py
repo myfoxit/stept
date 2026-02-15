@@ -1,7 +1,7 @@
 from typing import Any
 
 from sqlalchemy import (
-    Column, Integer, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint, Index
+    Column, Integer, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint, Index, Float
 )
 from sqlalchemy.orm import relationship, backref
 from .database import Base
@@ -432,3 +432,18 @@ class Embedding(Base):
     __table_args__ = (
         UniqueConstraint('source_type', 'source_id', name='_embedding_source_unique'),
     )
+
+
+class LLMUsage(Base):
+    __tablename__ = "llm_usage"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    model = Column(String(100), nullable=True)
+    provider = Column(String(50), nullable=True)
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    total_tokens = Column(Integer, nullable=False, default=0)
+    estimated_cost_usd = Column(Float, nullable=True)
+    endpoint = Column(String(50), nullable=True)  # chat, inline, annotation, guide
+    created_at = Column(DateTime, server_default=func.now(), index=True)

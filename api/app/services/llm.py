@@ -489,6 +489,21 @@ async def chat_completion(
                 _circuit_record_success()
                 return _iter_anthropic_stream(resp)
             _circuit_record_success()
+            # Log usage for non-streaming Anthropic responses
+            try:
+                data = resp.json()
+                usage = data.get("usage", {})
+                if usage:
+                    import asyncio
+                    from app.services.usage_tracker import log_usage
+                    asyncio.create_task(log_usage(
+                        model=resolved_model, provider="anthropic",
+                        input_tokens=usage.get("input_tokens", 0),
+                        output_tokens=usage.get("output_tokens", 0),
+                        endpoint="chat",
+                    ))
+            except Exception:
+                pass
             return resp
         else:
             # OpenAI / Ollama / compatible
@@ -498,6 +513,21 @@ async def chat_completion(
                 _circuit_record_success()
                 return _iter_openai_stream(resp)
             _circuit_record_success()
+            # Log usage for non-streaming OpenAI responses
+            try:
+                data = resp.json()
+                usage = data.get("usage", {})
+                if usage:
+                    import asyncio
+                    from app.services.usage_tracker import log_usage
+                    asyncio.create_task(log_usage(
+                        model=resolved_model, provider=provider,
+                        input_tokens=usage.get("prompt_tokens", 0),
+                        output_tokens=usage.get("completion_tokens", 0),
+                        endpoint="chat",
+                    ))
+            except Exception:
+                pass
             return resp
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as exc:
         _circuit_record_failure()
