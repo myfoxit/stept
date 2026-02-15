@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUpdateProject } from '@/hooks/api/projects';
+import { toast } from 'sonner';
 
 const data = {
   user: {
@@ -271,6 +272,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         data-testid={`project-item-${p.id}`}
                       >
                         <span className="truncate pr-12">{p.name}</span>
+                        {p.created_by_name && (
+                          <span className="text-xs text-muted-foreground ml-1 truncate">
+                            by {p.created_by_name}
+                          </span>
+                        )}
                         {p.id === selectedProjectId && (
                           <IconCheck className="size-4 shrink-0 text-muted-foreground" />
                         )}
@@ -391,10 +397,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </DialogClose>
               <Button
                 onClick={async () => {
-                  const p = await createProject(newProjectName.trim());
-                  setNewProjectName('');
-                  setNewProjectDialogOpen(false);
-                  setSelectedProjectId(p.id);
+                  try {
+                    const p = await createProject(newProjectName.trim());
+                    setNewProjectName('');
+                    setNewProjectDialogOpen(false);
+                    setSelectedProjectId(p.id);
+                  } catch (err: any) {
+                    const detail = err?.response?.data?.detail || err?.message || '';
+                    if (err?.response?.status === 409 || detail.includes('already have a project')) {
+                      toast.error('Duplicate project name', {
+                        description: 'You already have a project with this name. Please choose a different name.',
+                      });
+                    } else {
+                      toast.error('Failed to create project', { description: detail });
+                    }
+                  }
                 }}
                 disabled={!newProjectName.trim()}
                 data-testid="new-project-create-btn"

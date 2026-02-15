@@ -2,7 +2,7 @@ from sqlalchemy import select, delete, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.utils import gen_suffix
-from app.models import Project, project_members, ProjectRole
+from app.models import Project, project_members, ProjectRole, User
 from typing import Optional
 
 async def create_project(db: AsyncSession, name: str, user_id: str) -> Project:
@@ -27,19 +27,32 @@ async def create_project(db: AsyncSession, name: str, user_id: str) -> Project:
     await db.refresh(project)
     return project
 
-async def get_projects(db: AsyncSession, user_id: str) -> list[Project]:
+async def get_projects(db: AsyncSession, user_id: str) -> list[dict]:
     """
     Fetch all projects where user is a member (owner or participant).
+    Returns dicts with created_by_name included.
     """
-    # Query projects through the association table
+    # Query projects through the association table, join owner for display name
     stmt = (
-        select(Project)
-        .join(project_members)
+        select(Project, User.name.label("created_by_name"))
+        .join(project_members, Project.id == project_members.c.project_id)
+        .join(User, Project.owner_id == User.id)
         .where(project_members.c.user_id == user_id)
-        .options(selectinload(Project.members))  # Optionally load members
     )
     res = await db.execute(stmt)
-    return res.scalars().unique().all()
+    rows = res.unique().all()
+    results = []
+    for project, created_by_name in rows:
+        results.append({
+            "id": project.id,
+            "name": project.name,
+            "user_id": project.user_id,
+            "owner_id": project.owner_id,
+            "created_at": project.created_at,
+            "updated_at": project.updated_at,
+            "created_by_name": created_by_name,
+        })
+    return results
 
 async def delete_project(db: AsyncSession, project_id: str) -> None:
     """

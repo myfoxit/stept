@@ -16,6 +16,7 @@ class ProjectRead(BaseModel):
     owner_id: str  # New field for project owner
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    created_by_name: Optional[str] = None  # Creator's display name
     
     class Config:
         from_attributes = True

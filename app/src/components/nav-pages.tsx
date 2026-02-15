@@ -833,7 +833,7 @@ export function NavPages({ userRole }: { userRole: string }) {
   const [createIsPrivate, setCreateIsPrivate] = React.useState(false);  // NEW
 
   const canCreatePage =
-    userRole === 'owner' || userRole === 'admin' || userRole === 'member';
+    userRole === 'owner' || userRole === 'admin' || userRole === 'editor';
 
   const handleDragEnd = () => {
     setDragCounter((c) => c + 1);
@@ -1028,7 +1028,8 @@ export function NavPages({ userRole }: { userRole: string }) {
         </SidebarMenu>
       </SidebarGroup>
 
-      {/* NEW: Private Section */}
+      {/* NEW: Private Section — only show when there are private items or user can create */}
+      {(privateTree.length > 0 || canCreatePage) && (
       <SidebarGroup
         className="py-2"
         onDragOver={(e) => {
@@ -1083,6 +1084,7 @@ export function NavPages({ userRole }: { userRole: string }) {
           )}
         </SidebarMenu>
       </SidebarGroup>
+      )}
 
       {/* Create Folder dialog */}
       <Dialog open={open} onOpenChange={setOpen}>

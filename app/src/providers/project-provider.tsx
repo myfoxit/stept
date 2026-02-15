@@ -6,9 +6,10 @@ import { useProjects, useProjectRole, useCreateProject, useDeleteProject, useUpd
 export interface Project {
   id: string;
   name: string;
+  created_by_name?: string;
 }
 
-export type ProjectRole = 'owner' | 'admin' | 'member' | 'viewer' | null;
+export type ProjectRole = 'owner' | 'admin' | 'editor' | 'viewer' | null;
 
 interface ProjectContextValue {
   projects: Project[];

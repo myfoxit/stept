@@ -54,20 +54,18 @@ import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWi
 import { AiUsageCard } from '@/components/Settings/AiUsageCard';
 import { ProviderLogin } from '@/components/Settings/ProviderLogin';
 
-const roleIcons = {
+const roleIcons: Record<string, typeof IconCrown> = {
   owner: IconCrown,
   admin: IconUser,
   editor: IconEdit,
   viewer: IconEye,
-  member: IconUser,
 };
 
-const roleLabels = {
+const roleLabels: Record<string, string> = {
   owner: 'Owner',
   admin: 'Admin',
   editor: 'Editor',
   viewer: 'Viewer',
-  member: 'Member',
 };
 
 export function ProjectSettingsPage() {
@@ -82,7 +80,7 @@ export function ProjectSettingsPage() {
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
-  const [inviteRole, setInviteRole] = useState<string>('member');
+  const [inviteRole, setInviteRole] = useState<string>('viewer');
   const [linkCopied, setLinkCopied] = useState(false);
 
   // ── AI / LLM Settings ──────────────────────────────────────────────────────
@@ -255,7 +253,6 @@ export function ProjectSettingsPage() {
                                   <SelectItem value="admin">Admin</SelectItem>
                                   <SelectItem value="editor">Editor</SelectItem>
                                   <SelectItem value="viewer">Viewer</SelectItem>
-                                  <SelectItem value="member">Member</SelectItem>
                                 </SelectContent>
                               </Select>
                             ) : (
@@ -422,7 +419,6 @@ export function ProjectSettingsPage() {
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="editor">Editor</SelectItem>
                     <SelectItem value="viewer">Viewer</SelectItem>
-                    <SelectItem value="member">Member</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
