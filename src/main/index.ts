@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, shell } from 'electron';
+import { app, BrowserWindow, protocol, shell, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
@@ -11,6 +11,7 @@ const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
 class OndokiApp {
   private mainWindow: BrowserWindow | null = null;
+  private tray: Tray | null = null;
   private authService: AuthService;
   private settingsManager: SettingsManager;
   private isQuitting = false;
@@ -40,6 +41,9 @@ class OndokiApp {
 
     // Create main window
     this.createMainWindow();
+
+    // Create tray icon
+    this.createTray();
 
     // Handle protocol on startup (if launched via protocol)
     this.handleStartupProtocol();
@@ -204,6 +208,51 @@ class OndokiApp {
       shell.openExternal(url);
       return { action: 'deny' };
     });
+  }
+
+  private createTray(): void {
+    const icon = nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAhGVYSWZNTQAqAAAACAAFARIAAwAAAAEAAQAAARoABQAAAAEAAABKARsABQAAAAEAAABSASgAAwAAAAEAAgAAh2kABAAAAAEAAABaAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAACBsJLmAAAACXBIWXMAAAsTAAALEwEAmpwYAAABWWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNi4wLjAiPgogICA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogICAgICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgICAgICAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyI+CiAgICAgICAgIDx0aWZmOk9yaWVudGF0aW9uPjE8L3RpZmY6T3JpZW50YXRpb24+CiAgICAgIDwvcmRmOkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgoZXuEHAAAA2klEQVQ4EWNkIBMwkqkfZDALA4mGl5eX/2dkZPzPxMT0n4GB4T8DA8N/BgYGBhD9/z+I/R+kBsb+D9MDYsMAmAYQGwZAYhiNBxcgyTIwMPxnZGT8z8TE9J+BgeE/AwMDA4gGsf+D2CA1MLZ/GJ+JEOsBBv4zMjL+Z2Ji+s/AwPCfgYGBAUSA2P9BbJAaGNs/SE8TIzFuBkUBCBgZMzAw/mdiYvrPwMDwn4GBgQFEgNj/QWyQGhjbP4jPxECs70FRAWP/B+mBsWF8JmJ9D4oKGPs/SA+MDeUDAAAFXk/7qNX2XAAAAABJRU5ErkJggg=='
+    );
+
+    this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
+    this.tray.setToolTip('Ondoki');
+    this.updateTrayMenu();
+  }
+
+  private updateTrayMenu(contextInfo?: string): void {
+    if (!this.tray) return;
+
+    const template: Electron.MenuItemConstructorOptions[] = [
+      { label: 'Open Ondoki', click: () => this.showMainWindow() },
+      { type: 'separator' },
+      {
+        label: contextInfo ? `📍 ${contextInfo}` : '📍 No context detected',
+        enabled: false,
+      },
+      {
+        label: '📝 Add Context Note...',
+        click: () => {
+          this.showMainWindow();
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send('show-add-context-note');
+          }
+        },
+      },
+      { type: 'separator' },
+      { label: 'Quit', click: () => { this.isQuitting = true; app.quit(); } },
+    ];
+
+    this.tray.setContextMenu(Menu.buildFromTemplate(template));
+  }
+
+  private showMainWindow(): void {
+    if (!this.mainWindow) {
+      this.createMainWindow();
+    } else {
+      this.mainWindow.show();
+      this.mainWindow.focus();
+    }
   }
 
   private getAppIcon(): string | undefined {
