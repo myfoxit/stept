@@ -33,7 +33,7 @@ export const useAuth = () => {
           isLoading: false,
         }));
         // Auto-start context watcher
-        window.electronAPI.contextStart?.('');
+        window.electronAPI.contextStart?.(status.projects?.[0]?.id || '');
       }
     }).catch(() => {});
     
@@ -84,7 +84,7 @@ export const useAuth = () => {
           isLoading: false,
         }));
         // Auto-start context watcher
-        window.electronAPI.contextStart?.('');
+        window.electronAPI.contextStart?.(status?.projects?.[0]?.id || '');
       } else {
         setState(prev => ({ ...prev, isLoading: false }));
       }
