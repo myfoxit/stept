@@ -413,7 +413,9 @@ def _create_access_token(user_id: str, expires_delta: dt.timedelta = dt.timedelt
         "exp": expire,
         "type": "access"
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
+    jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
+    signing_secret = jwt_secrets[0] if jwt_secrets else settings.JWT_SECRET
+    return jwt.encode(payload, signing_secret, algorithm="HS256")
 
 @router.get("/authorize")
 async def authorize(
@@ -625,7 +627,19 @@ async def websocket_notifications(
     try:
         # Validate the JWT access token
         try:
-            payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+            jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
+            if not jwt_secrets:
+                jwt_secrets = [settings.JWT_SECRET]
+            payload = None
+            for secret in jwt_secrets:
+                try:
+                    payload = jwt.decode(token, secret, algorithms=["HS256"])
+                    break
+                except jwt.InvalidTokenError:
+                    continue
+            if payload is None:
+                await websocket.close(code=1008, reason="Invalid token")
+                return
             user_id = payload.get("sub")
             token_type = payload.get("type")
             
