@@ -194,7 +194,9 @@ async def reindex_project(project_id: str, user_id: str, db: AsyncSession) -> in
 
 
 async def reindex_all_for_user(user_id: str, db: AsyncSession) -> int:
-    """Reindex all workflows for a user across all projects."""
+    """Reindex all workflows and documents for a user across all projects."""
+    from app.models import project_members
+
     stmt = select(ProcessRecordingSession.id).where(
         and_(
             ProcessRecordingSession.user_id == user_id,
@@ -207,6 +209,17 @@ async def reindex_all_for_user(user_id: str, db: AsyncSession) -> int:
     total = 0
     for sid in session_ids:
         total += await index_workflow(sid, db)
+
+    # Also index documents from all user's projects
+    proj_stmt = select(project_members.c.project_id).where(
+        project_members.c.user_id == user_id
+    )
+    proj_ids = [row[0] for row in (await db.execute(proj_stmt)).all()]
+    if proj_ids:
+        doc_stmt = select(Document.id).where(Document.project_id.in_(proj_ids))
+        doc_ids = [row[0] for row in (await db.execute(doc_stmt)).all()]
+        for did in doc_ids:
+            total += await index_document(did, db)
 
     return total
 

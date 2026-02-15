@@ -368,12 +368,29 @@ function renderInline(text: string): React.ReactNode {
     if (linkMatch) {
       const [, linkText, url] = linkMatch;
       const isInternal = url.startsWith('/');
+      if (isInternal) {
+        return (
+          <a
+            key={i}
+            href={url}
+            className="text-primary underline hover:text-primary/80"
+            onClick={(e) => {
+              e.preventDefault();
+              // Use React Router navigation without full page reload
+              window.dispatchEvent(new CustomEvent('ondoki-navigate', { detail: url }));
+            }}
+          >
+            {linkText}
+          </a>
+        );
+      }
       return (
         <a
           key={i}
           href={url}
           className="text-primary underline hover:text-primary/80"
-          {...(isInternal ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           {linkText}
         </a>

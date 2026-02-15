@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IconTrash, IconBrain, IconTool, IconX, IconMessageCircle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import { ChatInput } from './ChatInput';
 import { cn } from '@/lib/utils';
 
 export function ChatPanel() {
+  const navigate = useNavigate();
   const {
     messages,
     isLoading,
@@ -21,6 +23,16 @@ export function ChatPanel() {
   } = useChat();
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Handle internal link navigation from chat messages
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const url = (e as CustomEvent).detail;
+      if (typeof url === 'string') navigate(url);
+    };
+    window.addEventListener('ondoki-navigate', handler);
+    return () => window.removeEventListener('ondoki-navigate', handler);
+  }, [navigate]);
 
   React.useEffect(() => {
     if (scrollRef.current) {

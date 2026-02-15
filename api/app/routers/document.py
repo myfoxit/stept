@@ -125,6 +125,13 @@ async def api_create_document(
     )
     await update_document_search(db, doc.id, doc.name, doc.content)
     await db.commit()
+
+    # Fire-and-forget: index document for semantic search
+    if payload.content:
+        import asyncio
+        from app.services.indexer import index_document_background
+        asyncio.create_task(index_document_background(doc.id))
+
     return doc
 
 # Get single document
