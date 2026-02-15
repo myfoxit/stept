@@ -20,11 +20,19 @@ from app.crud.document import (
     move_document,           
     duplicate_document,      
 )
-from app.security import get_current_user
-from app.models import User
+from app.security import get_current_user, check_project_permission
+from app.models import User, ProjectRole
 from app.services.search_indexer import update_document_search
 
 router = APIRouter()
+
+
+async def _check_doc_access(db, doc, current_user, required_role=ProjectRole.VIEWER):
+    """Check user can access document. Raises 404 for private docs, 403 for no access."""
+    if doc.is_private and doc.owner_id != current_user.id:
+        raise HTTPException(404, "document not found")
+    if doc.project_id:
+        await check_project_permission(db, current_user.id, doc.project_id, required_role)
 
 # List all documents (must come before /{doc_id})
 @router.get("/", response_model=list[DocumentRead])
@@ -91,6 +99,8 @@ async def api_get_document(
     if not doc:
         raise HTTPException(404, "document not found")
     
+    await _check_doc_access(db, doc, current_user)
+    
     # Determine effective permission
     permission = "edit"  # default for project members / owner
     if doc.owner_id and doc.owner_id != current_user.id:
@@ -135,6 +145,8 @@ async def api_update_document(
     if not doc:
         raise HTTPException(404, "document not found")
     
+    await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
+    
     # Check edit permission: owner, or has edit ResourceShare
     if doc.owner_id and doc.owner_id != current_user.id:
         from app.models import ResourceShare
@@ -169,6 +181,10 @@ async def api_move_document(
     current_user: User = Depends(get_current_user)
 ):
     """Move document to new folder"""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
     try:
         return await move_document(
             db,
@@ -190,6 +206,10 @@ async def api_duplicate_document(
     current_user: User = Depends(get_current_user)
 ):
     """Duplicate a document"""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
     try:
       # reuse imported duplicate_document
         return await duplicate_document(
@@ -205,7 +225,11 @@ async def api_duplicate_document(
 
 # Delete document
 @router.delete("/{doc_id}", status_code=204)
-async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
     try:
         await delete_document(db, doc_id)
     except ValueError as e:
@@ -229,6 +253,7 @@ async def get_document_share_settings(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
 
     stmt = sel(ResourceShare).where(
         ResourceShare.resource_type == "document",
@@ -271,6 +296,7 @@ async def share_document(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     if not doc.share_token:
         doc.share_token = uuid.uuid4().hex
     doc.is_public = True
@@ -289,6 +315,7 @@ async def unshare_document(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     doc.is_public = False
     doc.is_public = False
     await db.commit()
@@ -307,6 +334,7 @@ async def enable_document_public_link(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     if not doc.share_token:
         doc.share_token = uuid.uuid4().hex
     doc.is_public = True
@@ -329,6 +357,7 @@ async def disable_document_public_link(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     # Keep the token so re-enabling gives the same URL
     doc.is_public = False
     await db.commit()
@@ -348,6 +377,7 @@ async def invite_to_document(
     doc = await db.get(DocumentModel, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
 
     email = body.get("email", "").strip().lower()
     permission = body.get("permission", "view")
@@ -436,6 +466,7 @@ async def export_document_markdown(
     doc_id: str,
     page_layout: str = Query(default="document", description="Page layout: full, document, a4, letter"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export document as Markdown"""
     from app.document_export import generate_document_markdown
@@ -443,6 +474,7 @@ async def export_document_markdown(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     
     markdown = generate_document_markdown(doc, page_layout=page_layout)
     filename = f"{doc.name or 'document'}.md".replace(" ", "_")
@@ -462,6 +494,7 @@ async def export_document_html(
     embed_styles: bool = Query(default=True, description="Include inline styles"),
     page_layout: str = Query(default="document", description="Page layout: full, document, a4, letter"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export document as HTML"""
     from app.document_export import generate_document_html
@@ -469,6 +502,7 @@ async def export_document_html(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     
     html = generate_document_html(doc, embed_styles=embed_styles, page_layout=page_layout)
     filename = f"{doc.name or 'document'}.html".replace(" ", "_")
@@ -487,6 +521,7 @@ async def export_document_pdf(
     doc_id: str,
     page_layout: str = Query(default=None, description="Page layout: full, document, a4, letter. If not provided, uses document's stored layout."),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export document as PDF using Gotenberg"""
     from app.document_export import generate_document_pdf
@@ -494,6 +529,7 @@ async def export_document_pdf(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     
     # Use provided layout or fall back to document's stored layout
     effective_layout = page_layout or doc.page_layout or "document"
@@ -519,6 +555,7 @@ async def export_document_confluence(
     doc_id: str,
     page_layout: str = Query(default="document"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export document as Confluence Storage Format"""
     from app.document_export import generate_document_confluence
@@ -526,6 +563,7 @@ async def export_document_confluence(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     
     confluence = generate_document_confluence(doc, page_layout=page_layout)
     filename = f"{doc.name or 'document'}_confluence.xml".replace(" ", "_")
@@ -542,6 +580,7 @@ async def export_document_notion(
     doc_id: str,
     page_layout: str = Query(default="document"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export document as Notion-compatible Markdown"""
     from app.document_export import generate_document_notion_markdown
@@ -549,6 +588,7 @@ async def export_document_notion(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     
     notion_md = generate_document_notion_markdown(doc, page_layout=page_layout)
     filename = f"{doc.name or 'document'}_notion.md".replace(" ", "_")
@@ -565,6 +605,7 @@ async def export_document_docx(
     doc_id: str,
     page_layout: str = Query(default=None, description="Page layout: full, document, a4, letter. If not provided, uses document's stored layout."),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Export document as Microsoft Word document"""
     from app.document_export import generate_document_docx
@@ -572,6 +613,7 @@ async def export_document_docx(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
     
     # Use provided layout or fall back to document's stored layout
     effective_layout = page_layout or doc.page_layout or "document"
