@@ -1,9 +1,21 @@
-import { useState, useEffect } from 'react';
-import { IconLink, IconPlus, IconTrash, IconWorld, IconDeviceDesktop } from '@tabler/icons-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useRef } from 'react';
+import {
+  IconLink,
+  IconPlus,
+  IconX,
+  IconWorld,
+  IconDeviceDesktop,
+  IconChevronDown,
+  IconSearch,
+} from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -17,6 +29,8 @@ import {
   deleteContextLink,
   type ContextLink,
 } from '@/api/context-links';
+import { useProject } from '@/providers/project-provider';
+import { apiClient } from '@/lib/apiClient';
 
 interface ContextLinkPanelProps {
   projectId: string;
@@ -24,13 +38,39 @@ interface ContextLinkPanelProps {
   resourceId: string;
 }
 
+const MATCH_ICONS: Record<string, typeof IconWorld> = {
+  url_pattern: IconWorld,
+  url_exact: IconWorld,
+  app_name: IconDeviceDesktop,
+  window_title: IconDeviceDesktop,
+};
+
+const PLACEHOLDERS: Record<string, string> = {
+  url_pattern: '*.salesforce.com/*',
+  url_exact: 'https://app.example.com/dashboard',
+  app_name: 'Microsoft Excel',
+  window_title: 'Customer Portal',
+};
+
+interface SearchResult {
+  type: string;
+  id: string;
+  name: string;
+}
+
 export function ContextLinkPanel({ projectId, resourceType, resourceId }: ContextLinkPanelProps) {
   const [links, setLinks] = useState<ContextLink[]>([]);
-  const [showForm, setShowForm] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [matchType, setMatchType] = useState('url_pattern');
   const [matchValue, setMatchValue] = useState('');
   const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Search existing contexts to add
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allLinks, setAllLinks] = useState<ContextLink[]>([]);
+  const [searchResults, setSearchResults] = useState<ContextLink[]>([]);
 
   useEffect(() => {
     loadLinks();
@@ -45,9 +85,37 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
     }
   };
 
+  const loadAllLinks = async () => {
+    try {
+      const data = await listContextLinks(projectId);
+      // Filter out links already on this resource
+      const existing = new Set(links.map(l => l.id));
+      setAllLinks(data.filter(l => !existing.has(l.id)));
+      setSearchResults(data.filter(l => !existing.has(l.id)));
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (searchMode) loadAllLinks();
+  }, [searchMode]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(allLinks);
+    } else {
+      const q = searchQuery.toLowerCase();
+      setSearchResults(allLinks.filter(l =>
+        l.match_value.toLowerCase().includes(q) ||
+        (l.note || '').toLowerCase().includes(q)
+      ));
+    }
+  }, [searchQuery, allLinks]);
+
   const handleCreate = async () => {
     if (!matchValue.trim()) return;
-    setLoading(true);
+    setSaving(true);
     try {
       await createContextLink({
         project_id: projectId,
@@ -59,12 +127,32 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
       });
       setMatchValue('');
       setNote('');
-      setShowForm(false);
+      setAddOpen(false);
       await loadLinks();
     } catch {
       // ignore
     }
-    setLoading(false);
+    setSaving(false);
+  };
+
+  const handleAddExisting = async (link: ContextLink) => {
+    setSaving(true);
+    try {
+      await createContextLink({
+        project_id: projectId,
+        match_type: link.match_type,
+        match_value: link.match_value,
+        resource_type: resourceType,
+        resource_id: resourceId,
+        note: link.note || undefined,
+      });
+      setSearchMode(false);
+      setSearchQuery('');
+      await loadLinks();
+    } catch {
+      // ignore
+    }
+    setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -76,84 +164,154 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
     }
   };
 
-  const placeholders: Record<string, string> = {
-    url_pattern: '*.salesforce.com/*/Account*',
-    url_exact: 'https://app.example.com/dashboard',
-    app_name: 'Microsoft Excel',
-    window_title: 'Customer Portal',
-  };
-
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <IconLink className="h-4 w-4" />
-            Context Links
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => setShowForm(!showForm)} className="h-7">
-            <IconPlus className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {links.length === 0 && !showForm && (
-          <p className="text-xs text-muted-foreground">
-            No context links yet. Add one to surface this {resourceType} when visiting specific URLs or apps.
-          </p>
-        )}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {/* Existing context links as tags */}
+      {links.map(link => {
+        const Icon = MATCH_ICONS[link.match_type] || IconWorld;
+        return (
+          <Badge
+            key={link.id}
+            variant="secondary"
+            className="group flex items-center gap-1 pr-1 text-xs font-normal"
+            title={link.note ? `📌 ${link.note}` : link.match_value}
+          >
+            <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="max-w-[150px] truncate">{link.match_value}</span>
+            {link.note && (
+              <span className="max-w-[100px] truncate text-muted-foreground">
+                — {link.note}
+              </span>
+            )}
+            <button
+              onClick={() => handleDelete(link.id)}
+              className="ml-0.5 rounded-sm opacity-0 hover:bg-destructive/20 group-hover:opacity-100"
+            >
+              <IconX className="h-3 w-3" />
+            </button>
+          </Badge>
+        );
+      })}
 
-        {links.map(link => (
-          <div key={link.id} className="flex items-start justify-between gap-2 rounded-md border p-2 text-xs">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                {link.match_type.includes('url') ? <IconWorld className="h-3 w-3" /> : <IconDeviceDesktop className="h-3 w-3" />}
-                <span className="font-medium">{link.match_value}</span>
-              </div>
-              {link.note && <p className="mt-1 text-muted-foreground">{link.note}</p>}
-            </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleDelete(link.id)}>
-              <IconTrash className="h-3 w-3" />
+      {/* Add button */}
+      <Popover open={addOpen} onOpenChange={setAddOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <IconLink className="h-3 w-3" />
+            {links.length === 0 ? 'Add context' : <IconPlus className="h-3 w-3" />}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-3" align="start">
+          {/* Toggle between new and search existing */}
+          <div className="mb-3 flex gap-1">
+            <Button
+              variant={!searchMode ? 'default' : 'outline'}
+              size="sm"
+              className="h-6 flex-1 text-xs"
+              onClick={() => setSearchMode(false)}
+            >
+              New
+            </Button>
+            <Button
+              variant={searchMode ? 'default' : 'outline'}
+              size="sm"
+              className="h-6 flex-1 text-xs"
+              onClick={() => setSearchMode(true)}
+            >
+              <IconSearch className="mr-1 h-3 w-3" />
+              Existing
             </Button>
           </div>
-        ))}
 
-        {showForm && (
-          <div className="space-y-2 rounded-md border p-3">
-            <Select value={matchType} onValueChange={setMatchType}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="url_pattern">URL Pattern (glob)</SelectItem>
-                <SelectItem value="url_exact">Exact URL</SelectItem>
-                <SelectItem value="app_name">App Name</SelectItem>
-                <SelectItem value="window_title">Window Title</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder={placeholders[matchType]}
-              value={matchValue}
-              onChange={e => setMatchValue(e.target.value)}
-              className="h-8 text-xs"
-            />
-            <Textarea
-              placeholder="Note (optional) — e.g., 'Customer X needs manual approval'"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className="min-h-[60px] text-xs"
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleCreate} disabled={loading || !matchValue.trim()} className="h-7 text-xs">
-                Save
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowForm(false)} className="h-7 text-xs">
-                Cancel
-              </Button>
+          {searchMode ? (
+            <div className="space-y-2">
+              <Input
+                placeholder="Search existing context links..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="h-7 text-xs"
+                autoFocus
+              />
+              <div className="max-h-48 space-y-1 overflow-y-auto">
+                {searchResults.length === 0 ? (
+                  <p className="py-2 text-center text-xs text-muted-foreground">
+                    {allLinks.length === 0 ? 'No other context links in this project' : 'No matches'}
+                  </p>
+                ) : (
+                  searchResults.map(link => {
+                    const Icon = MATCH_ICONS[link.match_type] || IconWorld;
+                    return (
+                      <button
+                        key={link.id}
+                        onClick={() => handleAddExisting(link)}
+                        disabled={saving}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent"
+                      >
+                        <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{link.match_value}</div>
+                          {link.note && (
+                            <div className="truncate text-muted-foreground">{link.note}</div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          ) : (
+            <div className="space-y-2">
+              <Select value={matchType} onValueChange={setMatchType}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="url_pattern">URL Pattern</SelectItem>
+                  <SelectItem value="url_exact">Exact URL</SelectItem>
+                  <SelectItem value="app_name">App Name</SelectItem>
+                  <SelectItem value="window_title">Window Title</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder={PLACEHOLDERS[matchType]}
+                value={matchValue}
+                onChange={e => setMatchValue(e.target.value)}
+                className="h-7 text-xs"
+                autoFocus
+              />
+              <Input
+                placeholder="Note (optional)"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                className="h-7 text-xs"
+              />
+              <div className="flex justify-end gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-xs"
+                  onClick={() => setAddOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={handleCreate}
+                  disabled={saving || !matchValue.trim()}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
