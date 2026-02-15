@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session as get_db
-from app.models import ProcessRecordingSession, ProcessRecordingStep, User, Embedding
+from app.models import ProcessRecordingSession, ProcessRecordingStep, User, Embedding, Document
 from app.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -434,3 +434,209 @@ async def reindex_embeddings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Reindex failed: {exc}",
         )
+
+
+# ---------------------------------------------------------------------------
+# Unified search (workflows + documents)
+# ---------------------------------------------------------------------------
+
+def _extract_tiptap_text(content) -> str:
+    """Recursively extract text from a TipTap JSON document."""
+    if not isinstance(content, dict):
+        return str(content) if content else ""
+    texts: list[str] = []
+    if "text" in content:
+        texts.append(content["text"])
+    for child in content.get("content", []):
+        texts.append(_extract_tiptap_text(child))
+    return " ".join(t for t in texts if t)
+
+
+async def _search_documents_keyword(
+    query: str,
+    project_id: str,
+    user_id: str,
+    limit: int,
+    db: AsyncSession,
+) -> list[dict]:
+    """Search documents by name and content (ILIKE)."""
+    from app.services.embeddings import keyword_similarity
+
+    search_term = f"%{query}%"
+
+    doc_conditions = [
+        Document.project_id == project_id,
+        or_(
+            Document.is_private == False,  # noqa: E712
+            and_(
+                Document.is_private == True,  # noqa: E712
+                Document.owner_id == user_id,
+            ),
+        ),
+        or_(
+            Document.name.ilike(search_term),
+            func.cast(Document.content, _text_type()).ilike(search_term),
+        ),
+    ]
+
+    stmt = select(Document).where(and_(*doc_conditions)).limit(limit)
+    result = await db.execute(stmt)
+    docs = result.scalars().all()
+
+    scored: list[dict] = []
+    for doc in docs:
+        # Score using keyword_similarity for consistent ranking
+        doc_text = (doc.name or "") + " " + _extract_tiptap_text(doc.content)
+        score = keyword_similarity(query, doc_text)
+        preview = _extract_tiptap_text(doc.content)[:200] if doc.content else ""
+        scored.append({
+            "type": "document",
+            "id": doc.id,
+            "name": doc.name,
+            "preview": preview,
+            "score": round(max(score, 0.1), 4),  # min 0.1 since ILIKE matched
+        })
+
+    return scored
+
+
+@router.get("/unified")
+async def unified_search(
+    q: str = Query(..., min_length=1, description="Search query"),
+    project_id: str = Query(..., description="Project ID to search within"),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Unified keyword search across workflows AND documents.
+    Returns results sorted by relevance score.
+    """
+    from app.services.embeddings import keyword_similarity, workflow_text, step_text
+
+    # Search workflows (reuse _keyword_search logic inline for unified scoring)
+    wf_conditions = [
+        ProcessRecordingSession.user_id == current_user.id,
+        ProcessRecordingSession.status == "completed",
+        ProcessRecordingSession.project_id == project_id,
+    ]
+    stmt = (
+        select(ProcessRecordingSession)
+        .where(and_(*wf_conditions))
+        .options(selectinload(ProcessRecordingSession.steps))
+    )
+    result = await db.execute(stmt)
+    workflows = result.scalars().all()
+
+    all_results: list[dict] = []
+
+    for wf in workflows:
+        if wf.is_private and wf.owner_id != current_user.id:
+            continue
+        wf_text_str = workflow_text(wf)
+        wf_score = keyword_similarity(q, wf_text_str)
+
+        step_scores = []
+        for step in sorted(wf.steps, key=lambda s: s.step_number):
+            s_text = step_text(step)
+            if s_text.strip():
+                s_score = keyword_similarity(q, s_text)
+                if s_score > 0.05:
+                    step_scores.append({
+                        "step_id": step.id,
+                        "step_number": step.step_number,
+                        "generated_title": step.generated_title,
+                        "score": round(s_score, 4),
+                    })
+
+        best_step_score = max((s["score"] for s in step_scores), default=0.0)
+        overall_score = max(wf_score, best_step_score)
+
+        if overall_score > 0.05:
+            all_results.append({
+                "type": "workflow",
+                "id": wf.id,
+                "name": wf.name or wf.generated_title or "Untitled Workflow",
+                "summary": wf.summary,
+                "score": round(overall_score, 4),
+                "matching_steps": sorted(step_scores, key=lambda s: s["score"], reverse=True)[:5],
+            })
+
+    # Search documents
+    doc_results = await _search_documents_keyword(q, project_id, current_user.id, limit, db)
+    all_results.extend(doc_results)
+
+    # Sort all by score descending
+    all_results.sort(key=lambda r: r["score"], reverse=True)
+
+    return {
+        "query": q,
+        "results": all_results[:limit],
+        "total_results": len(all_results),
+        "search_type": "keyword",
+    }
+
+
+@router.get("/unified-semantic")
+async def unified_semantic_search(
+    q: str = Query(..., min_length=1, description="Search query"),
+    project_id: str = Query(..., description="Project ID"),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Unified semantic search. Uses embeddings for workflows, falls back to
+    keyword matching for documents that don't have embeddings.
+    """
+    from app.services.embeddings import (
+        generate_embedding,
+        has_embedding_api,
+        keyword_similarity,
+        workflow_text,
+        step_text,
+    )
+
+    workflow_results: list[dict] = []
+
+    # Try semantic search for workflows
+    if has_embedding_api():
+        query_vector = await generate_embedding(q)
+        if query_vector is not None:
+            sem = await _vector_search(q, query_vector, current_user.id, project_id, limit, db)
+            # Convert to unified format
+            for r in sem.get("results", []):
+                workflow_results.append({
+                    "type": "workflow",
+                    "id": r["recording_id"],
+                    "name": r.get("name") or r.get("generated_title") or "Untitled",
+                    "summary": r.get("summary"),
+                    "score": r.get("score", 0),
+                    "matching_steps": r.get("matching_steps", []),
+                })
+
+    # Fallback: keyword search for workflows if semantic returned nothing
+    if not workflow_results:
+        kw = await _keyword_search(q, current_user.id, project_id, limit, db)
+        for r in kw.get("results", []):
+            workflow_results.append({
+                "type": "workflow",
+                "id": r["recording_id"],
+                "name": r.get("name") or r.get("generated_title") or "Untitled",
+                "summary": r.get("summary"),
+                "score": r.get("score", 0),
+                "matching_steps": r.get("matching_steps", []),
+            })
+
+    # Documents: always keyword (no embeddings for docs yet)
+    doc_results = await _search_documents_keyword(q, project_id, current_user.id, limit, db)
+
+    all_results = workflow_results + doc_results
+    all_results.sort(key=lambda r: r["score"], reverse=True)
+
+    return {
+        "query": q,
+        "results": all_results[:limit],
+        "total_results": len(all_results),
+        "search_type": "semantic" if has_embedding_api() else "keyword",
+    }
