@@ -14,7 +14,7 @@ from sqlalchemy import select, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import ProcessRecordingSession, ProcessRecordingStep, Embedding, Document
+from app.models import ProcessRecordingSession, ProcessRecordingStep, Embedding, Document, KnowledgeSource
 from app.services.embeddings import (
     content_hash,
     generate_embeddings,
@@ -150,6 +150,14 @@ async def index_workflow(session_id: str, db: AsyncSession) -> int:
 
     await db.flush()
     logger.info("Indexed %d embeddings for workflow %s", count, session_id)
+
+    # Auto-detect related content
+    try:
+        from app.services.link_detector import auto_link_resource
+        await auto_link_resource(session.project_id, "workflow", session_id, session.user_id, db)
+    except Exception as exc:
+        logger.debug("Auto-link skipped for workflow %s: %s", session_id, exc)
+
     return count
 
 
@@ -366,6 +374,14 @@ async def index_document(doc_id: str, db: AsyncSession) -> int:
 
     await db.flush()
     logger.info("Indexed %d embeddings for document %s", count, doc_id)
+
+    # Auto-detect related content
+    try:
+        from app.services.link_detector import auto_link_resource
+        await auto_link_resource(doc.project_id, "document", doc_id, None, db)
+    except Exception as exc:
+        logger.debug("Auto-link skipped for document %s: %s", doc_id, exc)
+
     return count
 
 
@@ -435,4 +451,154 @@ async def delete_workflow_embeddings(session_id: str, db: AsyncSession) -> int:
         )
         deleted += result2.rowcount
 
+    return deleted
+
+
+# ---------------------------------------------------------------------------
+# Knowledge source indexing
+# ---------------------------------------------------------------------------
+
+async def index_knowledge_source(source_id: str, db: AsyncSession) -> int:
+    """
+    Index (or re-index) a single KnowledgeSource with chunking.
+    Returns the number of embeddings created/updated.
+    """
+    if not has_embedding_api():
+        logger.debug("No embedding API available — skipping index for knowledge source %s", source_id)
+        return 0
+
+    stmt = select(KnowledgeSource).where(KnowledgeSource.id == source_id)
+    result = await db.execute(stmt)
+    source = result.scalar_one_or_none()
+
+    if not source:
+        logger.warning("KnowledgeSource %s not found for indexing", source_id)
+        return 0
+
+    full_text = source.processed_content or source.raw_content or ""
+    if not full_text.strip():
+        return 0
+
+    items: list[dict] = []
+
+    # Whole source embedding
+    items.append({
+        "source_type": "knowledge_source",
+        "source_id": source.id,
+        "text": full_text[:32000],
+        "metadata": {
+            "knowledge_source_id": source.id,
+            "project_id": source.project_id,
+            "name": source.name,
+            "chunk_text": full_text[:4000],
+        },
+    })
+
+    # Chunk embeddings
+    chunks = _chunk_text(full_text)
+    if len(chunks) > 1:
+        for i, chunk in enumerate(chunks):
+            items.append({
+                "source_type": "knowledge_chunk",
+                "source_id": f"{source.id}_chunk_{i}",
+                "text": chunk,
+                "metadata": {
+                    "knowledge_source_id": source.id,
+                    "project_id": source.project_id,
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "name": source.name,
+                    "chunk_text": chunk,
+                },
+            })
+
+    # Check content hashes to skip unchanged
+    items_to_embed: list[dict] = []
+    for item in items:
+        h = content_hash(item["text"])
+        item["hash"] = h
+        existing = await db.execute(
+            select(Embedding).where(
+                and_(
+                    Embedding.source_type == item["source_type"],
+                    Embedding.source_id == item["source_id"],
+                    Embedding.content_hash == h,
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+        items_to_embed.append(item)
+
+    if not items_to_embed:
+        logger.debug("All embeddings for knowledge source %s are up-to-date", source_id)
+        return 0
+
+    texts = [item["text"] for item in items_to_embed]
+    vectors = await generate_embeddings(texts)
+
+    if vectors is None:
+        logger.error("Embedding generation failed for knowledge source %s", source_id)
+        return 0
+
+    count = 0
+    for item, vector in zip(items_to_embed, vectors):
+        await db.execute(
+            delete(Embedding).where(
+                and_(
+                    Embedding.source_type == item["source_type"],
+                    Embedding.source_id == item["source_id"],
+                )
+            )
+        )
+        emb = Embedding(
+            source_type=item["source_type"],
+            source_id=item["source_id"],
+            content_hash=item["hash"],
+            embedding=vector,
+            metadata_=item["metadata"],
+        )
+        db.add(emb)
+        count += 1
+
+    # Update last_indexed_at
+    from datetime import datetime, timezone
+    source.last_indexed_at = datetime.now(timezone.utc)
+
+    await db.flush()
+    logger.info("Indexed %d embeddings for knowledge source %s", count, source_id)
+    return count
+
+
+async def index_knowledge_source_background(source_id: str) -> None:
+    """Index a knowledge source in a separate DB session (fire-and-forget)."""
+    from app.database import session_scope
+
+    try:
+        async with session_scope() as db:
+            await index_knowledge_source(source_id, db)
+    except Exception as exc:
+        logger.error("Background knowledge source indexing failed for %s: %s", source_id, exc)
+
+
+async def delete_knowledge_source_embeddings(source_id: str, db: AsyncSession) -> int:
+    """Remove all embeddings for a knowledge source."""
+    result1 = await db.execute(
+        delete(Embedding).where(
+            and_(
+                Embedding.source_type == "knowledge_source",
+                Embedding.source_id == source_id,
+            )
+        )
+    )
+    result2 = await db.execute(
+        delete(Embedding).where(
+            and_(
+                Embedding.source_type == "knowledge_chunk",
+                Embedding.source_id.like(f"{source_id}_chunk_%"),
+            )
+        )
+    )
+    deleted = result1.rowcount + result2.rowcount
+    logger.info("Deleted %d embeddings for knowledge source %s", deleted, source_id)
     return deleted

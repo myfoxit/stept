@@ -59,6 +59,7 @@ async def get_filtered_workflows_endpoint(
 @router.post("/session/create", response_model=SessionResponse)
 async def create_upload_session(
     session_data: SessionCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -90,6 +91,10 @@ async def create_upload_session(
         name=session_data.name,
         is_private=is_private,  # CHANGED: Use computed value
     )
+
+    from app.services.audit import log_audit
+    from app.models import AuditAction
+    await log_audit(db, AuditAction.CREATE, user_id=current_user.id, project_id=session_data.project_id, resource_type="workflow", resource_id=session.id, resource_name=session_data.name, request=request)
 
     return SessionResponse(session_id=session.id)
 

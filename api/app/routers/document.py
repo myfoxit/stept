@@ -1,5 +1,5 @@
 # app/api/document.py
-from fastapi import APIRouter, Depends, HTTPException, Response, Query
+from fastapi import APIRouter, Depends, HTTPException, Response, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
@@ -23,6 +23,8 @@ from app.crud.document import (
 from app.security import get_current_user, check_project_permission
 from app.models import User, ProjectRole
 from app.services.search_indexer import update_document_search
+from app.services.audit import log_audit
+from app.models import AuditAction
 
 router = APIRouter()
 
@@ -110,6 +112,7 @@ async def api_get_filtered_documents(
 @router.post("/", response_model=DocumentRead, status_code=201)
 async def api_create_document(
     payload: DocumentCreate, 
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -125,6 +128,7 @@ async def api_create_document(
     )
     await update_document_search(db, doc.id, doc.name, doc.content)
     await db.commit()
+    await log_audit(db, AuditAction.CREATE, user_id=current_user.id, project_id=doc.project_id, resource_type="document", resource_id=doc.id, resource_name=doc.name, request=request)
 
     # Fire-and-forget: index document for semantic search
     if payload.content:
@@ -185,6 +189,7 @@ async def api_get_document(
 async def api_update_document(
     doc_id: str,
     payload: DocumentUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -291,6 +296,7 @@ async def api_update_document(
     )
     await update_document_search(db, updated.id, updated.name, updated.content)
     await db.commit()
+    await log_audit(db, AuditAction.EDIT, user_id=current_user.id, project_id=updated.project_id, resource_type="document", resource_id=updated.id, resource_name=updated.name, request=request)
 
     # Fire-and-forget: index document for semantic search
     if payload.content is not None:
@@ -598,7 +604,7 @@ async def api_restore_version(
 
 # Delete document
 @router.delete("/{doc_id}", status_code=204)
-async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def api_delete_document(doc_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "document not found")
@@ -610,6 +616,7 @@ async def api_delete_document(doc_id: str, db: AsyncSession = Depends(get_db), c
         await delete_document(db, doc_id)
     except ValueError as e:
         raise HTTPException(404, str(e))
+    await log_audit(db, AuditAction.DELETE, user_id=current_user.id, project_id=doc.project_id, resource_type="document", resource_id=doc.id, resource_name=doc.name, request=request)
     return Response(status_code=204)
 
 
@@ -840,6 +847,7 @@ async def update_document_invite(
 @router.get("/{doc_id}/export/markdown")
 async def export_document_markdown(
     doc_id: str,
+    request: Request,
     page_layout: str = Query(default="document", description="Page layout: full, document, a4, letter"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -854,6 +862,7 @@ async def export_document_markdown(
     
     markdown = generate_document_markdown(doc, page_layout=page_layout)
     filename = f"{doc.name or 'document'}.md".replace(" ", "_")
+    await log_audit(db, AuditAction.EXPORT, user_id=current_user.id, project_id=doc.project_id, resource_type="document", resource_id=doc.id, resource_name=doc.name, detail={"format": "markdown"}, request=request)
     
     return Response(
         content=markdown,
@@ -867,6 +876,7 @@ async def export_document_markdown(
 @router.get("/{doc_id}/export/html")
 async def export_document_html(
     doc_id: str,
+    request: Request,
     embed_styles: bool = Query(default=True, description="Include inline styles"),
     page_layout: str = Query(default="document", description="Page layout: full, document, a4, letter"),
     db: AsyncSession = Depends(get_db),
@@ -882,6 +892,7 @@ async def export_document_html(
     
     html = generate_document_html(doc, embed_styles=embed_styles, page_layout=page_layout)
     filename = f"{doc.name or 'document'}.html".replace(" ", "_")
+    await log_audit(db, AuditAction.EXPORT, user_id=current_user.id, project_id=doc.project_id, resource_type="document", resource_id=doc.id, resource_name=doc.name, detail={"format": "html"}, request=request)
     
     return Response(
         content=html,

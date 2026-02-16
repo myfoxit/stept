@@ -177,6 +177,11 @@ async def login(
     resp = JSONResponse(resp_payload)
     _set_session_cookie(resp, session_token, request)
     _clear_legacy_refresh_cookie(resp)
+
+    from app.services.audit import log_audit
+    from app.models import AuditAction
+    await log_audit(db, AuditAction.LOGIN, user_id=user.id, request=request)
+
     return resp
 
 # New: Redis-backed WebSocket connection manager for multi-server support

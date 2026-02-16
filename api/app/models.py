@@ -563,3 +563,95 @@ class McpApiKey(Base):
 
     project = relationship("Project", backref="mcp_api_keys")
     creator = relationship("User", backref="mcp_api_keys")
+
+
+class SourceType(enum.Enum):
+    UPLOAD = "upload"
+    WEB_CLIP = "web_clip"
+    SLACK = "slack"
+    MEETING = "meeting"
+    GIT_PR = "git_pr"
+
+class KnowledgeSource(Base):
+    __tablename__ = "knowledge_sources"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_type = Column(SQLEnum(SourceType, name="source_type_enum", values_callable=enum_values, native_enum=False), nullable=False)
+    name = Column(String(500), nullable=False)
+    external_id = Column(String(512), nullable=True)
+    external_url = Column(String(1024), nullable=True)
+    raw_content = Column(Text, nullable=True)
+    processed_content = Column(Text, nullable=True)
+    file_path = Column(String(1024), nullable=True)
+    file_size = Column(Integer, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_indexed_at = Column(DateTime, nullable=True)
+
+    project = relationship("Project", backref="knowledge_sources")
+    creator = relationship("User", backref="knowledge_sources")
+
+
+class AuditAction(enum.Enum):
+    VIEW = "view"
+    CREATE = "create"
+    EDIT = "edit"
+    DELETE = "delete"
+    SHARE = "share"
+    EXPORT = "export"
+    LOGIN = "login"
+    MCP_ACCESS = "mcp_access"
+    RAG_QUERY = "rag_query"
+    UPLOAD = "upload"
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    api_key_id = Column(String(16), nullable=True, index=True)
+    action = Column(SQLEnum(AuditAction, name="audit_action_enum", values_callable=enum_values, native_enum=False), nullable=False, index=True)
+    resource_type = Column(String(30), nullable=True)
+    resource_id = Column(String(64), nullable=True)
+    resource_name = Column(String(500), nullable=True)
+    detail = Column(JSON, nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+    project = relationship("Project", backref="audit_logs")
+    user = relationship("User", backref="audit_logs")
+
+
+class LinkType(enum.Enum):
+    RELATED = "related"
+    DEPENDS_ON = "depends_on"
+    SUPERSEDES = "supersedes"
+    PART_OF = "part_of"
+
+class KnowledgeLink(Base):
+    __tablename__ = "knowledge_links"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_type = Column(String(30), nullable=False)
+    source_id = Column(String(16), nullable=False)
+    target_type = Column(String(30), nullable=False)
+    target_id = Column(String(16), nullable=False)
+    link_type = Column(SQLEnum(LinkType, name="link_type_enum", values_callable=enum_values, native_enum=False), nullable=False)
+    confidence = Column(Float, nullable=True)
+    auto_detected = Column(Boolean, nullable=False, default=False)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    project = relationship("Project", backref="knowledge_links")
+    creator = relationship("User", backref="knowledge_links")
+
+    __table_args__ = (
+        UniqueConstraint('source_type', 'source_id', 'target_type', 'target_id', 'link_type', name='_knowledge_link_unique'),
+        Index('idx_kl_source', 'source_type', 'source_id'),
+        Index('idx_kl_target', 'target_type', 'target_id'),
+    )
