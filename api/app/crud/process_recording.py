@@ -314,6 +314,12 @@ async def upload_metadata(
         delete(ProcessRecordingStep).where(ProcessRecordingStep.session_id == session_id)
     )
     
+    # Deduplicate by step_number (desktop may send duplicates due to listener leak)
+    seen_steps: dict = {}
+    for meta in metadata:
+        seen_steps[meta.step_number] = meta
+    metadata = list(seen_steps.values())
+
     # Create step records
     for meta in metadata:
         timestamp = meta.timestamp
