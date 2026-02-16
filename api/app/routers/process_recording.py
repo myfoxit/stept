@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from typing import Optional, List
 import os
+import json
 from datetime import datetime
 import io
 
@@ -177,9 +178,90 @@ async def finalize_upload_session(
     try:
        
         await finalize_session(db, session_id, user_id=current_user.id)
+        
+        # Auto-index CLI sessions into RAG pipeline
+        session = await db.get(ProcessRecordingSession, session_id)
+        if session and session.client_name == "ondoki-cli":
+            import asyncio
+            from app.services.indexer import index_workflow_background
+            asyncio.create_task(index_workflow_background(session_id))
+        
         return {"status": "success", "message": "Session finalized"}
     except ValueError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.post("/session/{session_id}/cli-session", status_code=status.HTTP_200_OK)
+async def upload_cli_session(
+    session_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a full CLI terminal session JSON (from ondoki-cli).
+    
+    Stores the complete session file (with event stream for replay)
+    as an attachment on the recording session.
+    """
+    try:
+        body = await request.body()
+        if not body:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty body")
+        
+        # Validate it's valid JSON
+        try:
+            session_data = json.loads(body)
+        except json.JSONDecodeError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid JSON")
+        
+        # Get the session
+        session = await db.get(ProcessRecordingSession, session_id)
+        if not session:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+        
+        # Store the CLI session data as a file
+        filename = f"cli-session-{session_id}.json"
+        storage_dir = os.path.join("uploads", "recordings", session_id)
+        os.makedirs(storage_dir, exist_ok=True)
+        filepath = os.path.join(storage_dir, filename)
+        
+        with open(filepath, "wb") as f:
+            f.write(body)
+        
+        # Create a file record
+        file_record = ProcessRecordingFile(
+            session_id=session_id,
+            step_number=0,  # 0 = session-level attachment
+            filename=filename,
+            filepath=filepath,
+            file_size=len(body),
+            mime_type="application/json",
+        )
+        db.add(file_record)
+        
+        # Update session metadata with CLI info
+        if session_data.get("title") and not session.name:
+            session.name = session_data["title"]
+        if not session.client_name or session.client_name == "ProcessRecorder":
+            session.client_name = "ondoki-cli"
+        if session_data.get("ssh_target"):
+            session.name = session.name or f"SSH: {session_data['ssh_target']}"
+        if session_data.get("summary"):
+            session.summary = session_data["summary"]
+        
+        await db.commit()
+        
+        return {
+            "status": "success",
+            "filename": filename,
+            "size": len(body),
+            "commands": len(session_data.get("commands", [])),
+            "events": len(session_data.get("events", [])),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
 
 @router.get("/session/{session_id}/status")  # removed response_model to allow extra fields
