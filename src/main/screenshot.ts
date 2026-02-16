@@ -613,6 +613,7 @@ export class ScreenshotService {
       const metadata = await sharp(fullScreenshot).metadata();
       const imgW = metadata.width || 3840;
       const imgH = metadata.height || 2160;
+      console.log(`[DIAG] annotatedScreenshot: img=${imgW}x${imgH}, display=${targetDisplay.size.width}x${targetDisplay.size.height}, scale=${scale}, crop=left:${pLeft} top:${pTop} w:${pWidth} h:${pHeight}, bounds=${JSON.stringify(bounds)}`);
       pWidth = Math.min(pWidth, imgW - pLeft);
       pHeight = Math.min(pHeight, imgH - pTop);
 

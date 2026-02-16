@@ -280,12 +280,22 @@ export class RecordingService extends EventEmitter {
     try {
       this.flushTypedText();
 
-      // Coordinates are already normalized to logical pixels by setupGlobalHooks
       const clickPoint = { x: event.x, y: event.y };
 
       // Query native OS for full info: window, element, scale factor
       const fullInfo = await this.screenshotService.getFullInfoAtPoint(clickPoint);
       const scaleFactor = fullInfo?.scaleFactor ?? this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
+
+      // === DIAGNOSTIC LOGGING ===
+      const captureRegion = this.getCaptureRegion();
+      console.log('[DIAG] === Click Event ===');
+      console.log('[DIAG] raw event coords:', { x: event.x, y: event.y, button: event.button });
+      console.log('[DIAG] platform:', process.platform);
+      console.log('[DIAG] scaleFactor:', scaleFactor);
+      console.log('[DIAG] nativeAvailable:', this.screenshotService.isNativeAvailable());
+      console.log('[DIAG] fullInfo:', JSON.stringify(fullInfo, null, 2)?.substring(0, 500));
+      console.log('[DIAG] captureRegion:', captureRegion);
+      // === END DIAGNOSTIC ===
 
       // Extract window info
       const windowTitle = fullInfo?.window?.title || 'Unknown Window';
@@ -339,6 +349,7 @@ export class RecordingService extends EventEmitter {
       // Take DPI-aware annotated screenshot
       let screenshotPath: string | undefined;
       try {
+        console.log('[DIAG] Taking screenshot — captureRegion:', captureRegion, 'clickRelative:', screenshotRelative, 'scale:', scaleFactor);
         screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
           captureRegion,
           screenshotRelative,
@@ -346,8 +357,9 @@ export class RecordingService extends EventEmitter {
           ++this.stepCount,
           scaleFactor
         );
+        console.log('[DIAG] Screenshot saved:', screenshotPath);
       } catch (error) {
-        console.error('Failed to take screenshot:', error);
+        console.error('[DIAG] Failed to take screenshot:', error);
         this.stepCount++; // Still increment
       }
 
