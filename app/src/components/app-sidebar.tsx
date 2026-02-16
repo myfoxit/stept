@@ -14,6 +14,10 @@ import {
   IconDotsVertical,
   IconShare,
   IconLink,
+  IconUpload,
+  IconShieldCheck,
+  IconChartBar,
+  IconTopologyStarRing3,
 } from '@tabler/icons-react';
 
 import { NavMain } from '@/components/nav-main';
@@ -76,6 +80,26 @@ const data = {
       title: 'Team',
       url: '/team',
       icon: IconUsers,
+    },
+    {
+      title: 'Knowledge Base',
+      url: '/knowledge',
+      icon: IconUpload,
+    },
+    {
+      title: 'Analytics',
+      url: '/analytics',
+      icon: IconChartBar,
+    },
+    {
+      title: 'Knowledge Graph',
+      url: '/knowledge-graph',
+      icon: IconTopologyStarRing3,
+    },
+    {
+      title: 'Audit Log',
+      url: '/audit',
+      icon: IconShieldCheck,
     },
   ],
   navSecondary: [
