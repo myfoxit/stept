@@ -287,14 +287,12 @@ export class RecordingService extends EventEmitter {
       const scaleFactor = fullInfo?.scaleFactor ?? this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
 
       // === DIAGNOSTIC LOGGING ===
-      const captureRegion = this.getCaptureRegion();
       console.log('[DIAG] === Click Event ===');
       console.log('[DIAG] raw event coords:', { x: event.x, y: event.y, button: event.button });
       console.log('[DIAG] platform:', process.platform);
       console.log('[DIAG] scaleFactor:', scaleFactor);
       console.log('[DIAG] nativeAvailable:', this.screenshotService.isNativeAvailable());
       console.log('[DIAG] fullInfo:', JSON.stringify(fullInfo, null, 2)?.substring(0, 500));
-      console.log('[DIAG] captureRegion:', captureRegion);
       // === END DIAGNOSTIC ===
 
       // Extract window info
