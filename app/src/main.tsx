@@ -29,6 +29,7 @@ import { KnowledgeBasePage } from '@/pages/knowledge-base';
 import { AuditLogPage } from '@/pages/audit-log';
 import { AnalyticsDashboardPage } from '@/pages/analytics-dashboard';
 import { KnowledgeGraphPage } from '@/pages/knowledge-graph';
+import VideoImportPage from '@/pages/video-import';
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/audit" element={<AuditLogPage />} />
                   <Route path="/analytics" element={<AnalyticsDashboardPage />} />
                   <Route path="/knowledge-graph" element={<KnowledgeGraphPage />} />
+                  <Route path="/video-import" element={<VideoImportPage />} />
                   <Route
                     path="/text-container/:containerId?"
                     element={<TextContainerEditor />}

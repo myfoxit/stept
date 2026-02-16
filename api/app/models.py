@@ -1,7 +1,7 @@
 from typing import Any
 
 from sqlalchemy import (
-    Column, Integer, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint, Index, Float
+    Column, Integer, BigInteger, String, ForeignKey, Text, text, JSON, DateTime, func, Boolean, UniqueConstraint, Index, Float
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import relationship, backref
@@ -294,6 +294,16 @@ class ProcessRecordingSession(Base):
     difficulty = Column(String, nullable=True)  # easy, medium, advanced
     is_processed = Column(Boolean, nullable=False, default=False)
     guide_markdown = Column(Text, nullable=True)
+    
+    # Video import fields
+    source_type = Column(String(20), default="desktop")  # desktop, cli, video
+    video_filename = Column(String, nullable=True)
+    video_size_bytes = Column(BigInteger, nullable=True)
+    video_duration_seconds = Column(Float, nullable=True)
+    processing_progress = Column(Integer, default=0)  # 0-100
+    processing_stage = Column(String, nullable=True)  # uploading, extracting_audio, transcribing, extracting_frames, analyzing, generating, done, failed
+    processing_error = Column(String, nullable=True)
+    
     search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
     
     # Relationships

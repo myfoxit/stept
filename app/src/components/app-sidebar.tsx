@@ -18,6 +18,7 @@ import {
   IconShieldCheck,
   IconChartBar,
   IconTopologyStarRing3,
+  IconMovie,
 } from '@tabler/icons-react';
 
 import { NavMain } from '@/components/nav-main';
@@ -95,6 +96,11 @@ const data = {
       title: 'Knowledge Graph',
       url: '/knowledge-graph',
       icon: IconTopologyStarRing3,
+    },
+    {
+      title: 'Video → Guide',
+      url: '/video-import',
+      icon: IconMovie,
     },
     {
       title: 'Audit Log',
