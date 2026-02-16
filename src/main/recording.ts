@@ -658,15 +658,11 @@ export class RecordingService extends EventEmitter {
 
   /**
    * Convert uiohook event coordinates to logical pixels.
-   * uiohook reports physical pixels on Windows, logical on macOS.
+   * On most setups uiohook already reports logical pixels.
+   * Override this if your platform reports physical pixels.
    */
   private normalizeEventCoords(x: number, y: number): { x: number; y: number } {
-    if (process.platform === 'win32') {
-      const sf = this.screenshotService.getScaleFactorAtPoint(x, y);
-      if (sf > 1) {
-        return { x: Math.round(x / sf), y: Math.round(y / sf) };
-      }
-    }
+    // uiohook-napi v1.5+ reports logical coordinates on all platforms
     return { x, y };
   }
 
