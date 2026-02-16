@@ -70,6 +70,9 @@ export class RecordingService extends EventEmitter {
   private overlayWindow?: BrowserWindow;
   private currentText = '';
   private textFlushTimeout?: NodeJS.Timeout;
+  // On Windows, uiohook may report physical coords while Electron uses logical.
+  // This ratio converts uiohook coords → logical coords.
+  private coordScale = 1;
   private hooksStarted = false;
   private clickProcessing = false; // Prevent concurrent click handling
   private lastClickTime = 0;
@@ -106,8 +109,23 @@ export class RecordingService extends EventEmitter {
       this.startGlobalHooks();
       this.emitStateChanged();
 
+      // Detect coordinate scale mismatch (Windows DPI issue)
+      // uiohook may report physical pixels while Electron uses logical
+      if (process.platform === 'win32') {
+        const region = this.getCaptureRegion();
+        const effectiveScale = await this.screenshotService.getEffectiveScale(region);
+        const electronScale = this.screenshotService.getScaleFactorAtPoint(region.x, region.y);
+        if (effectiveScale > 1 && electronScale <= 1) {
+          // Electron thinks scale=1 but screenshot is larger → uiohook reports physical coords
+          this.coordScale = effectiveScale;
+          console.log(`[DPI] Detected coordinate mismatch: effectiveScale=${effectiveScale}, electronScale=${electronScale}, coordScale=${this.coordScale}`);
+        } else {
+          this.coordScale = 1;
+        }
+      }
+
       const nativeStatus = this.screenshotService.isNativeAvailable() ? 'native APIs active' : 'fallback mode';
-      console.log(`Recording started (${nativeStatus}):`, { captureArea, projectId });
+      console.log(`Recording started (${nativeStatus}):`, { captureArea, projectId, coordScale: this.coordScale });
     } catch (error) {
       this.isRecording = false;
       throw new Error(`Failed to start recording: ${error instanceof Error ? error.message : String(error)}`);
@@ -284,12 +302,15 @@ export class RecordingService extends EventEmitter {
 
       // Query native OS for full info: window, element, scale factor
       const fullInfo = await this.screenshotService.getFullInfoAtPoint(clickPoint);
-      const scaleFactor = fullInfo?.scaleFactor ?? this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
+      // Use coordScale (detected from actual screenshot dimensions) as the effective scale
+      // for screenshot cropping. Electron's scaleFactor may incorrectly report 1 on Windows.
+      const scaleFactor = this.coordScale > 1 ? this.coordScale : (fullInfo?.scaleFactor ?? this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y));
 
       // === DIAGNOSTIC LOGGING ===
       console.log('[DIAG] === Click Event ===');
       console.log('[DIAG] raw event coords:', { x: event.x, y: event.y, button: event.button });
-      console.log('[DIAG] platform:', process.platform);
+      console.log('[DIAG] normalized clickPoint:', clickPoint);
+      console.log('[DIAG] platform:', process.platform, 'coordScale:', this.coordScale);
       console.log('[DIAG] scaleFactor:', scaleFactor);
       console.log('[DIAG] nativeAvailable:', this.screenshotService.isNativeAvailable());
       console.log('[DIAG] fullInfo:', JSON.stringify(fullInfo, null, 2)?.substring(0, 500));
@@ -668,11 +689,16 @@ export class RecordingService extends EventEmitter {
 
   /**
    * Convert uiohook event coordinates to logical pixels.
-   * On most setups uiohook already reports logical pixels.
-   * Override this if your platform reports physical pixels.
+   * On Windows with DPI scaling, uiohook reports physical coords
+   * while Electron uses logical. coordScale is detected at recording start.
    */
   private normalizeEventCoords(x: number, y: number): { x: number; y: number } {
-    // uiohook-napi v1.5+ reports logical coordinates on all platforms
+    if (this.coordScale > 1) {
+      return {
+        x: Math.round(x / this.coordScale),
+        y: Math.round(y / this.coordScale),
+      };
+    }
     return { x, y };
   }
 

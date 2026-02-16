@@ -73,9 +73,15 @@ namespace Ondoki.Native
         [DllImport("shcore.dll", SetLastError = true)]
         public static extern int GetDpiForMonitor(IntPtr hMonitor, int dpiType, out uint dpiX, out uint dpiY);
 
+        [DllImport("shcore.dll", SetLastError = true)]
+        public static extern int SetProcessDpiAwareness(int awareness);
+
         // DPI awareness (Windows 10 1607+)
         [DllImport("user32.dll", SetLastError = true)]
         public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetProcessDPIAware();
 
         // UI Automation COM
         [DllImport("oleacc.dll")]
@@ -543,6 +549,11 @@ namespace Ondoki.Native
 
         static int Main(string[] args)
         {
+            // Set Per-Monitor DPI awareness so GetDpiForMonitor returns real values
+            // and GetWindowRect returns unscaled (physical) coordinates
+            try { Win32.SetProcessDpiAwareness(2); } // 2 = Per-Monitor DPI Aware
+            catch { try { Win32.SetProcessDPIAware(); } catch { } } // Fallback for older Windows
+
             if (args.Length < 1)
             {
                 Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>|serve");

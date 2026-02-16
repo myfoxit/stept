@@ -4,6 +4,11 @@ import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
 import { AuthService } from './auth';
 
+// Enable proper DPI scaling on Windows
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('high-dpi-support', '1');
+}
+
 // Resolve paths for renderer and preload
 const isDev = process.argv.includes('--development');
 const RENDERER_PATH = path.join(__dirname, '..', 'renderer', 'index.html');

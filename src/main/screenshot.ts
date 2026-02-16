@@ -265,10 +265,10 @@ export class ScreenshotService {
 
       const timer = setTimeout(() => {
         this.pendingRequests.delete(id);
-        console.warn(`Native request ${id} (${cmd}) timed out, falling back to one-shot`);
+        console.warn(`Native request ${id} (${cmd}) timed out after 5s, falling back to one-shot`);
         // Fallback to one-shot on timeout
         this.execNativeOneShot(args).then(resolve);
-      }, 3000);
+      }, 5000);
 
       this.pendingRequests.set(id, { resolve, reject: () => resolve(null), timer });
 
@@ -381,6 +381,22 @@ export class ScreenshotService {
   public getScaleFactorAtPoint(x: number, y: number): number {
     const display = screen.getDisplayNearestPoint({ x, y });
     return display?.scaleFactor ?? 1;
+  }
+
+  /**
+   * Get the effective scale factor for a display, detecting cases where
+   * Electron reports scaleFactor=1 but the display is actually scaled.
+   * This happens on Windows when DPI awareness isn't fully propagated.
+   */
+  public async getEffectiveScale(displayBounds: Rectangle): Promise<number> {
+    try {
+      const screenshot = await this.takeScreenshotNative({ x: displayBounds.x, y: displayBounds.y });
+      const metadata = await sharp(screenshot).metadata();
+      if (metadata.width && displayBounds.width > 0) {
+        return metadata.width / displayBounds.width;
+      }
+    } catch {}
+    return this.getScaleFactorAtPoint(displayBounds.x, displayBounds.y);
   }
 
   // ------------------------------------------------------------------
