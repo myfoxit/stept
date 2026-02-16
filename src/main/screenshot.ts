@@ -153,7 +153,8 @@ export class ScreenshotService {
           }
         } catch { continue; }
       }
-      console.warn('Native window-info.exe not found. Build with: cd native/windows && dotnet publish -c Release -r win-x64 --self-contained');
+      console.warn('Native window-info.exe not found. Mouse click detection will record clicks but without window/element details.');
+      console.warn('To enable full detection, build with: cd native/windows && dotnet publish -c Release -r win-x64 --self-contained');
     }
   }
 

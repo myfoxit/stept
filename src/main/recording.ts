@@ -298,19 +298,24 @@ export class RecordingService extends EventEmitter {
         return;
       }
 
-      // Skip system UI (Dock, Mission Control, Exposé, Notification Center, Spotlight, etc.)
-      const systemApps = [
-        'Dock', 'WindowManager', 'Spotlight', 'NotificationCenter',
-        'SystemUIServer', 'Control Center', 'Mission Control',
-        'loginwindow', 'ScreenSaverEngine', 'AirPlayUIAgent',
-      ];
-      if (systemApps.includes(ownerApp) || !ownerApp || ownerApp === 'Window Server') {
-        this.clickProcessing = false;
-        return;
+      // Skip system UI — but ONLY if we have reliable native info.
+      // When the native binary isn't available (e.g. not built on Windows),
+      // ownerApp will be empty — don't discard those clicks.
+      if (ownerApp) {
+        const systemApps = [
+          'Dock', 'WindowManager', 'Spotlight', 'NotificationCenter',
+          'SystemUIServer', 'Control Center', 'Mission Control',
+          'loginwindow', 'ScreenSaverEngine', 'AirPlayUIAgent',
+          'Window Server',
+        ];
+        if (systemApps.includes(ownerApp)) {
+          this.clickProcessing = false;
+          return;
+        }
       }
 
-      // Skip if no real window found (happens during Mission Control/Exposé animations)
-      if (windowTitle === 'Unknown Window' && !windowBounds.width) {
+      // Skip if no real window found AND native is available (Mission Control/Exposé animations)
+      if (windowTitle === 'Unknown Window' && !windowBounds.width && this.screenshotService.isNativeAvailable()) {
         this.clickProcessing = false;
         return;
       }
@@ -509,13 +514,21 @@ export class RecordingService extends EventEmitter {
 
     try {
       const windowInfo = this.screenshotService.getCurrentWindow();
+      // Fallback: use Electron's focused window title if native returns nothing
+      let windowTitle = windowInfo?.title || '';
+      let ownerApp = windowInfo?.ownerName || '';
+      if (!windowTitle) {
+        const focused = BrowserWindow.getFocusedWindow();
+        windowTitle = focused?.getTitle() || 'Unknown Window';
+      }
+      if (!windowTitle) windowTitle = 'Unknown Window';
 
       const step: RecordedStep = {
         stepNumber: ++this.stepCount,
         timestamp: new Date(),
         actionType: 'Type',
-        windowTitle: windowInfo?.title || 'Unknown Window',
-        description: `Typed: "${this.currentText}" in ${windowInfo?.title || 'Unknown Window'}`,
+        windowTitle,
+        description: `Typed: "${this.currentText}" in ${windowTitle}`,
         textTyped: this.currentText,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
@@ -525,7 +538,7 @@ export class RecordingService extends EventEmitter {
         },
         screenshotRelativeMousePosition: { x: 0, y: 0 },
         screenshotSize: { width: 0, height: 0 },
-        ownerApp: windowInfo?.ownerName || undefined,
+        ownerApp: ownerApp || undefined,
       };
 
       this.emit('step-recorded', step);
