@@ -1,14 +1,17 @@
-// Native macOS window info helper
-// Compiled: swiftc -O -o window-info window-info.swift -framework AppKit -framework CoreGraphics -framework ApplicationServices
+// Native macOS window info + input hooks helper
+// Compile: swiftc -O -o window-info window-info.swift -framework AppKit -framework CoreGraphics -framework ApplicationServices
 // Usage: window-info mouse          → returns mouse position + window under cursor + element info
 //        window-info windows        → returns all visible windows
 //        window-info point <x> <y>  → returns window/element at point
 //        window-info serve          → persistent JSON-RPC mode via stdin/stdout
+//        window-info hooks          → stream input events (click/key/scroll) as JSON lines
 // Output: JSON to stdout
 
 import AppKit
 import CoreGraphics
 import Foundation
+
+// MARK: - Data types
 
 struct Point: Codable {
     let x: Double
@@ -69,26 +72,41 @@ struct ServeRequest: Codable {
     let args: [String: Double]?
 }
 
-struct ServeResponse: Codable {
-    let id: Int
-    let result: AnyCodable?
-    let error: String?
+// MARK: - Hook event types
+
+struct HookClickEvent: Codable {
+    let type = "click"
+    let x: Double
+    let y: Double
+    let button: Int
+    let window: WindowResult?
+    let element: ElementInfo?
+    let scale: Double
+    let timestamp: Int64
 }
 
-// Simple wrapper to encode any Codable value
-struct AnyCodable: Codable {
-    let value: Any
-    
-    init(_ value: Any) { self.value = value }
-    
-    init(from decoder: Decoder) throws {
-        fatalError("Not used")
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        // We'll handle encoding differently
-        fatalError("Not used directly")
-    }
+struct HookKeyEvent: Codable {
+    let type = "key"
+    let keycode: Int
+    let modifiers: [String]
+    let window: WindowResult?
+    let timestamp: Int64
+}
+
+struct HookScrollEvent: Codable {
+    let type = "scroll"
+    let x: Double
+    let y: Double
+    let deltaX: Double
+    let deltaY: Double
+    let window: WindowResult?
+    let timestamp: Int64
+}
+
+struct HookReadyEvent: Codable {
+    let type = "ready"
+    let platform = "darwin"
+    let coordSpace = "logical"
 }
 
 // MARK: - Helpers
@@ -209,6 +227,25 @@ func getDisplayForPoint(_ point: CGPoint) -> DisplayInfo {
     return displays.first ?? DisplayInfo(id: 0, bounds: Rect(x: 0, y: 0, width: 1920, height: 1080), scaleFactor: 1.0, isPrimary: true)
 }
 
+func getScaleForPoint(_ point: CGPoint) -> Double {
+    return getDisplayForPoint(point).scaleFactor
+}
+
+// MARK: - JSON output helpers
+
+let encoder: JSONEncoder = {
+    let e = JSONEncoder()
+    e.outputFormatting = .sortedKeys
+    return e
+}()
+
+func writeJSON<T: Encodable>(_ value: T) {
+    if let data = try? encoder.encode(value), let json = String(data: data, encoding: .utf8) {
+        print(json)
+        fflush(stdout)
+    }
+}
+
 // MARK: - Commands (return JSON Data)
 
 func buildMouseResult() -> Data? {
@@ -234,7 +271,6 @@ func buildMouseResult() -> Data? {
         element: element
     )
     
-    let encoder = JSONEncoder()
     return try? encoder.encode(result)
 }
 
@@ -243,7 +279,6 @@ func buildWindowsResult() -> Data? {
         windows: getWindowList(),
         displays: getDisplays()
     )
-    let encoder = JSONEncoder()
     return try? encoder.encode(result)
 }
 
@@ -266,14 +301,12 @@ func buildPointResult(x: Double, y: Double) -> Data? {
         element: element
     )
     
-    let encoder = JSONEncoder()
     return try? encoder.encode(result)
 }
 
 // MARK: - Serve mode (persistent JSON-RPC via stdin/stdout)
 
 func handleServe() {
-    // Disable stdout buffering
     setbuf(stdout, nil)
     
     while let line = readLine(strippingNewline: true) {
@@ -281,7 +314,6 @@ func handleServe() {
         
         guard let lineData = line.data(using: .utf8),
               let request = try? JSONDecoder().decode(ServeRequest.self, from: lineData) else {
-            // Write error for unparseable input
             let errJson = "{\"id\":0,\"error\":\"invalid JSON\"}\n"
             fputs(errJson, stdout)
             fflush(stdout)
@@ -307,7 +339,6 @@ func handleServe() {
             errorMsg = "unknown command: \(request.cmd)"
         }
         
-        // Build response
         var response: String
         if let err = errorMsg {
             let escaped = err.replacingOccurrences(of: "\"", with: "\\\"")
@@ -323,41 +354,163 @@ func handleServe() {
     }
 }
 
-// MARK: - CLI Commands (pretty-printed for human consumption)
+// MARK: - Hooks mode (CGEventTap — stream input events)
+
+// Global ref so we can re-enable the tap if it gets disabled
+var globalEventTap: CFMachPort?
+
+func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+    // Re-enable tap if it got disabled (system disables after timeout)
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        if let tap = globalEventTap {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+        return Unmanaged.passRetained(event)
+    }
+    
+    let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+    let location = event.location // CGPoint in Quartz coords (top-left origin, logical)
+    
+    switch type {
+    case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+        let button: Int
+        switch type {
+        case .leftMouseDown: button = 1
+        case .rightMouseDown: button = 2
+        default: button = 3
+        }
+        
+        let point = CGPoint(x: location.x, y: location.y)
+        let window = getWindowAtPoint(point)
+        var element: ElementInfo? = nil
+        if let w = window {
+            element = getElementAtPoint(point, pid: w.ownerPID)
+        }
+        let scale = getScaleForPoint(point)
+        
+        let clickEvent = HookClickEvent(
+            x: location.x,
+            y: location.y,
+            button: button,
+            window: window,
+            element: element,
+            scale: scale,
+            timestamp: timestamp
+        )
+        writeJSON(clickEvent)
+        
+    case .keyDown:
+        let keycode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+        var modifiers: [String] = []
+        if flags.contains(.maskControl) { modifiers.append("ctrl") }
+        if flags.contains(.maskAlternate) { modifiers.append("alt") }
+        if flags.contains(.maskShift) { modifiers.append("shift") }
+        if flags.contains(.maskCommand) { modifiers.append("meta") }
+        
+        // Get foreground window for keyboard events
+        let mouseLocation = NSEvent.mouseLocation
+        let screenHeight = NSScreen.main?.frame.height ?? 1080
+        let flippedY = screenHeight - mouseLocation.y
+        let foregroundWindow = getWindowAtPoint(CGPoint(x: mouseLocation.x, y: flippedY))
+        
+        let keyEvent = HookKeyEvent(
+            keycode: keycode,
+            modifiers: modifiers,
+            window: foregroundWindow,
+            timestamp: timestamp
+        )
+        writeJSON(keyEvent)
+        
+    case .scrollWheel:
+        let deltaY = event.getDoubleValueField(.scrollWheelEventDeltaAxis1)
+        let deltaX = event.getDoubleValueField(.scrollWheelEventDeltaAxis2)
+        
+        let point = CGPoint(x: location.x, y: location.y)
+        let window = getWindowAtPoint(point)
+        
+        let scrollEvent = HookScrollEvent(
+            x: location.x,
+            y: location.y,
+            deltaX: deltaX,
+            deltaY: deltaY,
+            window: window,
+            timestamp: timestamp
+        )
+        writeJSON(scrollEvent)
+        
+    default:
+        break
+    }
+    
+    return Unmanaged.passRetained(event)
+}
+
+func handleHooks() {
+    setbuf(stdout, nil)
+    
+    // Events we want to capture
+    let eventMask: CGEventMask = (
+        (1 << CGEventType.leftMouseDown.rawValue) |
+        (1 << CGEventType.rightMouseDown.rawValue) |
+        (1 << CGEventType.otherMouseDown.rawValue) |
+        (1 << CGEventType.keyDown.rawValue) |
+        (1 << CGEventType.scrollWheel.rawValue)
+    )
+    
+    guard let eventTap = CGEvent.tapCreate(
+        tap: .cgSessionEventTap,
+        place: .headInsertEventTap,
+        options: .listenOnly,
+        eventsOfInterest: eventMask,
+        callback: eventTapCallback,
+        userInfo: nil
+    ) else {
+        fputs("{\"type\":\"error\",\"message\":\"Failed to create event tap. Grant accessibility permissions in System Preferences.\"}\n", stderr)
+        exit(1)
+    }
+    
+    globalEventTap = eventTap
+    
+    let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+    CGEvent.tapEnable(tap: eventTap, enable: true)
+    
+    // Send ready message
+    writeJSON(HookReadyEvent())
+    
+    // Run forever
+    CFRunLoopRun()
+}
+
+// MARK: - CLI Commands
 
 func handleMouse() {
-    if let data = buildMouseResult(), let json = String(data: data, encoding: .utf8) {
-        // Pretty-print for CLI
+    if let data = buildMouseResult() {
         if let obj = try? JSONSerialization.jsonObject(with: data),
            let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
            let prettyStr = String(data: pretty, encoding: .utf8) {
             print(prettyStr)
-        } else {
-            print(json)
         }
     }
 }
 
-func handleWindows() {
-    if let data = buildWindowsResult(), let json = String(data: data, encoding: .utf8) {
+func handleWindowsCmd() {
+    if let data = buildWindowsResult() {
         if let obj = try? JSONSerialization.jsonObject(with: data),
            let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
            let prettyStr = String(data: pretty, encoding: .utf8) {
             print(prettyStr)
-        } else {
-            print(json)
         }
     }
 }
 
 func handlePointQuery(x: Double, y: Double) {
-    if let data = buildPointResult(x: x, y: y), let json = String(data: data, encoding: .utf8) {
+    if let data = buildPointResult(x: x, y: y) {
         if let obj = try? JSONSerialization.jsonObject(with: data),
            let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
            let prettyStr = String(data: pretty, encoding: .utf8) {
             print(prettyStr)
-        } else {
-            print(json)
         }
     }
 }
@@ -367,7 +520,7 @@ func handlePointQuery(x: Double, y: Double) {
 let args = CommandLine.arguments
 
 if args.count < 2 {
-    fputs("Usage: window-info mouse|windows|point <x> <y>|serve\n", stderr)
+    fputs("Usage: window-info mouse|windows|point <x> <y>|serve|hooks\n", stderr)
     exit(1)
 }
 
@@ -375,7 +528,7 @@ switch args[1] {
 case "mouse":
     handleMouse()
 case "windows":
-    handleWindows()
+    handleWindowsCmd()
 case "point":
     if args.count >= 4, let x = Double(args[2]), let y = Double(args[3]) {
         handlePointQuery(x: x, y: y)
@@ -385,6 +538,8 @@ case "point":
     }
 case "serve":
     handleServe()
+case "hooks":
+    handleHooks()
 default:
     fputs("Unknown command: \(args[1])\n", stderr)
     exit(1)

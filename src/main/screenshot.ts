@@ -706,4 +706,8 @@ export class ScreenshotService {
   public isNativeAvailable(): boolean {
     return this.nativeAvailable;
   }
+
+  public getNativeBinaryPath(): string | null {
+    return this.nativeBinaryPath;
+  }
 }

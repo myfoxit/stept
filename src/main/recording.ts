@@ -1,18 +1,71 @@
 import { EventEmitter } from 'events';
 import { BrowserWindow } from 'electron';
-let uIOhook: any;
-let UiohookKey: any;
-try {
-  const mod = require('uiohook-napi');
-  uIOhook = mod.uIOhook;
-  UiohookKey = mod.UiohookKey;
-} catch (e) {
-  console.warn('uiohook-napi not available:', (e as Error).message);
-}
-import { ScreenshotService, PointQueryResult } from './screenshot';
+import { ScreenshotService } from './screenshot';
+import { ChildProcess, spawn } from 'child_process';
+import { createInterface, Interface as ReadlineInterface } from 'readline';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+
+// ---- Native hook event types ----
+
+interface NativeClickEvent {
+  type: 'click';
+  x: number;
+  y: number;
+  button: number;
+  window: NativeWindowInfo | null;
+  element: NativeElementInfo | null;
+  scale: number;
+  timestamp: number;
+}
+
+interface NativeKeyEvent {
+  type: 'key';
+  keycode: number;
+  scancode?: number;  // Windows sends scancode too
+  modifiers: string[];
+  window: NativeWindowInfo | null;
+  timestamp: number;
+}
+
+interface NativeScrollEvent {
+  type: 'scroll';
+  x: number;
+  y: number;
+  deltaX: number;
+  deltaY: number;
+  window: NativeWindowInfo | null;
+  timestamp: number;
+}
+
+interface NativeReadyEvent {
+  type: 'ready';
+  platform: string;
+  coordSpace: 'logical' | 'physical';
+}
+
+interface NativeWindowInfo {
+  handle: number;
+  title: string;
+  ownerName: string;
+  ownerPID: number;
+  bounds: { x: number; y: number; width: number; height: number };
+  isVisible: boolean;
+  layer: number;
+}
+
+interface NativeElementInfo {
+  role: string;
+  title: string;
+  value: string;
+  description: string;
+  subrole: string;
+}
+
+type NativeEvent = NativeClickEvent | NativeKeyEvent | NativeScrollEvent | NativeReadyEvent;
+
+// ---- Public types ----
 
 export interface CaptureArea {
   type: 'all-displays' | 'single-display' | 'window';
@@ -58,6 +111,65 @@ export interface RecordingState {
   captureArea?: CaptureArea;
 }
 
+// ---- macOS CGKeyCode → character map ----
+// CGEventTap reports CGKeyCode (virtual keycodes), not hardware scancodes
+const MAC_KEYCODE_MAP: Record<number, string> = {
+  0: 'a', 1: 's', 2: 'd', 3: 'f', 4: 'h', 5: 'g', 6: 'z', 7: 'x',
+  8: 'c', 9: 'v', 11: 'b', 12: 'q', 13: 'w', 14: 'e', 15: 'r',
+  16: 'y', 17: 't', 18: '1', 19: '2', 20: '3', 21: '4', 22: '6',
+  23: '5', 24: '=', 25: '9', 26: '7', 27: '-', 28: '8', 29: '0',
+  30: ']', 31: 'o', 32: 'u', 33: '[', 34: 'i', 35: 'p', 37: 'l',
+  38: 'j', 39: "'", 40: 'k', 41: ';', 42: '\\', 43: ',', 44: '/',
+  45: 'n', 46: 'm', 47: '.', 49: ' ', 50: '`',
+};
+
+const MAC_NAMED_KEY_MAP: Record<number, string> = {
+  36: 'Enter', 48: 'Tab', 51: 'Backspace', 53: 'Escape',
+  117: 'Delete', 115: 'Home', 119: 'End',
+  116: 'PageUp', 121: 'PageDown',
+  123: 'Left', 124: 'Right', 125: 'Down', 126: 'Up',
+  122: 'F1', 120: 'F2', 99: 'F3', 118: 'F4', 96: 'F5', 97: 'F6',
+  98: 'F7', 100: 'F8', 101: 'F9', 109: 'F10', 103: 'F11', 111: 'F12',
+};
+
+// F9 keycode for pause/resume toggle
+const MAC_F9 = 101;
+
+// ---- Windows Virtual Key → character map ----
+const WIN_VK_MAP: Record<number, string> = {
+  // Letters A-Z (VK_A=0x41 to VK_Z=0x5A)
+  0x41: 'a', 0x42: 'b', 0x43: 'c', 0x44: 'd', 0x45: 'e', 0x46: 'f',
+  0x47: 'g', 0x48: 'h', 0x49: 'i', 0x4A: 'j', 0x4B: 'k', 0x4C: 'l',
+  0x4D: 'm', 0x4E: 'n', 0x4F: 'o', 0x50: 'p', 0x51: 'q', 0x52: 'r',
+  0x53: 's', 0x54: 't', 0x55: 'u', 0x56: 'v', 0x57: 'w', 0x58: 'x',
+  0x59: 'y', 0x5A: 'z',
+  // Numbers 0-9
+  0x30: '0', 0x31: '1', 0x32: '2', 0x33: '3', 0x34: '4',
+  0x35: '5', 0x36: '6', 0x37: '7', 0x38: '8', 0x39: '9',
+  // Punctuation
+  0xBA: ';', 0xBB: '=', 0xBC: ',', 0xBD: '-', 0xBE: '.', 0xBF: '/',
+  0xC0: '`', 0xDB: '[', 0xDC: '\\', 0xDD: ']', 0xDE: "'",
+  0x20: ' ', // Space
+};
+
+const WIN_NAMED_KEY_MAP: Record<number, string> = {
+  0x08: 'Backspace', 0x09: 'Tab', 0x0D: 'Enter', 0x1B: 'Escape',
+  0x2E: 'Delete', 0x2D: 'Insert', 0x24: 'Home', 0x23: 'End',
+  0x21: 'PageUp', 0x22: 'PageDown',
+  0x25: 'Left', 0x26: 'Up', 0x27: 'Right', 0x28: 'Down',
+  0x2C: 'PrintScreen', 0x13: 'Pause',
+  0x70: 'F1', 0x71: 'F2', 0x72: 'F3', 0x73: 'F4', 0x74: 'F5', 0x75: 'F6',
+  0x76: 'F7', 0x77: 'F8', 0x78: 'F9', 0x79: 'F10', 0x7A: 'F11', 0x7B: 'F12',
+};
+
+// F9 = VK_F9
+const WIN_F9 = 0x78;
+
+// Windows modifier VK codes — ignore as standalone keypresses
+const WIN_MODIFIER_VKS = [0x10, 0x11, 0x12, 0x5B, 0x5C, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x14];
+// macOS modifier keycodes — ignore as standalone keypresses
+const MAC_MODIFIER_KEYCODES = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
+
 export class RecordingService extends EventEmitter {
   private isRecording = false;
   private isPaused = false;
@@ -70,19 +182,24 @@ export class RecordingService extends EventEmitter {
   private overlayWindow?: BrowserWindow;
   private currentText = '';
   private textFlushTimeout?: NodeJS.Timeout;
-  // On Windows, uiohook may report physical coords while Electron uses logical.
-  // This ratio converts uiohook coords → logical coords.
-  private coordScale = 1;
-  private hooksStarted = false;
-  private clickProcessing = false; // Prevent concurrent click handling
+  private clickProcessing = false;
   private lastClickTime = 0;
   private lastClickPos = { x: 0, y: 0 };
+
+  // Native hooks process
+  private hooksProcess: ChildProcess | null = null;
+  private hooksRl: ReadlineInterface | null = null;
+  private coordSpace: 'logical' | 'physical' = 'logical';
+  private coordScale = 1; // physical→logical conversion factor
 
   constructor() {
     super();
     this.screenshotService = new ScreenshotService();
-    this.setupGlobalHooks();
   }
+
+  // ------------------------------------------------------------------
+  // Recording lifecycle
+  // ------------------------------------------------------------------
 
   public async startRecording(captureArea?: CaptureArea, projectId?: string): Promise<void> {
     if (this.isRecording) {
@@ -106,26 +223,10 @@ export class RecordingService extends EventEmitter {
         await this.showOverlay();
       }
 
-      this.startGlobalHooks();
+      await this.startNativeHooks();
       this.emitStateChanged();
 
-      // Detect coordinate scale mismatch (Windows DPI issue)
-      // uiohook may report physical pixels while Electron uses logical
-      if (process.platform === 'win32') {
-        const region = this.getCaptureRegion();
-        const effectiveScale = await this.screenshotService.getEffectiveScale(region);
-        const electronScale = this.screenshotService.getScaleFactorAtPoint(region.x, region.y);
-        if (effectiveScale > 1 && electronScale <= 1) {
-          // Electron thinks scale=1 but screenshot is larger → uiohook reports physical coords
-          this.coordScale = effectiveScale;
-          console.log(`[DPI] Detected coordinate mismatch: effectiveScale=${effectiveScale}, electronScale=${electronScale}, coordScale=${this.coordScale}`);
-        } else {
-          this.coordScale = 1;
-        }
-      }
-
-      const nativeStatus = this.screenshotService.isNativeAvailable() ? 'native APIs active' : 'fallback mode';
-      console.log(`Recording started (${nativeStatus}):`, { captureArea, projectId, coordScale: this.coordScale });
+      console.log(`Recording started (native hooks, coordSpace=${this.coordSpace}):`, { captureArea, projectId });
     } catch (error) {
       this.isRecording = false;
       throw new Error(`Failed to start recording: ${error instanceof Error ? error.message : String(error)}`);
@@ -137,7 +238,7 @@ export class RecordingService extends EventEmitter {
 
     try {
       this.flushTypedText();
-      this.stopGlobalHooks();
+      this.stopNativeHooks();
       await this.hideOverlay();
 
       this.isRecording = false;
@@ -179,148 +280,181 @@ export class RecordingService extends EventEmitter {
   }
 
   // ------------------------------------------------------------------
-  // Global input hooks
+  // Native hooks process
   // ------------------------------------------------------------------
 
-  private setupGlobalHooks(): void {
-    if (!uIOhook) {
-      console.warn('uiohook-napi not available — recording will not capture input');
-      return;
+  private async startNativeHooks(): Promise<void> {
+    const binaryPath = this.screenshotService.getNativeBinaryPath();
+    if (!binaryPath) {
+      throw new Error('Native binary not found — cannot start input hooks');
     }
 
-    uIOhook.on('mousedown', (event: any) => {
-      if (!this.isRecording || this.isPaused) return;
-      const pt = this.normalizeEventCoords(event.x, event.y);
-      if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
-      this.handleMouseClickRaw({ ...event, x: pt.x, y: pt.y });
-    });
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Native hooks process did not send ready message within 5 seconds'));
+      }, 5000);
 
-    uIOhook.on('keydown', (event: any) => {
-      if (!this.isRecording) return;
+      this.hooksProcess = spawn(binaryPath, ['hooks'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
 
-      if (event.keycode === UiohookKey?.F9) {
-        if (this.isPaused) this.resumeRecording();
-        else this.pauseRecording();
-        return;
-      }
+      this.hooksRl = createInterface({ input: this.hooksProcess.stdout! });
 
-      if (this.isPaused) return;
-      this.handleKeyPress(event);
-    });
+      this.hooksRl.on('line', (line: string) => {
+        try {
+          const event = JSON.parse(line) as NativeEvent;
+          if (event.type === 'ready') {
+            clearTimeout(timeout);
+            this.coordSpace = (event as NativeReadyEvent).coordSpace;
+            // If physical coords, detect scale from screenshot dimensions
+            if (this.coordSpace === 'physical') {
+              const region = this.getCaptureRegion();
+              this.screenshotService.getEffectiveScale(region).then(scale => {
+                this.coordScale = scale;
+                console.log(`Native hooks ready: coordSpace=${this.coordSpace}, coordScale=${this.coordScale}`);
+              });
+            } else {
+              this.coordScale = 1;
+              console.log(`Native hooks ready: coordSpace=${this.coordSpace}`);
+            }
+            resolve();
+            return;
+          }
+          this.handleNativeEvent(event);
+        } catch (e) {
+          // Ignore unparseable lines
+        }
+      });
 
-    // Mouse scroll handler
-    uIOhook.on('wheel', (event: any) => {
-      if (!this.isRecording || this.isPaused) return;
-      const pt = this.normalizeEventCoords(event.x, event.y);
-      if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
-      this.handleScroll({ ...event, x: pt.x, y: pt.y });
+      this.hooksProcess.stderr?.on('data', (data: Buffer) => {
+        console.warn('Native hooks stderr:', data.toString().trim());
+      });
+
+      this.hooksProcess.on('exit', (code, signal) => {
+        console.warn(`Native hooks process exited (code=${code}, signal=${signal})`);
+        this.hooksProcess = null;
+        this.hooksRl = null;
+      });
+
+      this.hooksProcess.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(new Error(`Failed to start native hooks: ${err.message}`));
+      });
     });
   }
 
-  private startGlobalHooks(): void {
-    if (this.hooksStarted || !uIOhook) return;
-    try {
-      uIOhook.start();
-      this.hooksStarted = true;
-      console.log('Global hooks started');
-    } catch (error) {
-      console.error('Failed to start global hooks:', error);
-      throw new Error('Failed to start global input monitoring');
+  private stopNativeHooks(): void {
+    if (this.hooksProcess) {
+      try {
+        this.hooksProcess.kill();
+      } catch {}
+      this.hooksProcess = null;
     }
-  }
-
-  private stopGlobalHooks(): void {
-    if (!this.hooksStarted || !uIOhook) return;
-    try {
-      uIOhook.stop();
-      this.hooksStarted = false;
-      console.log('Global hooks stopped');
-    } catch (error) {
-      console.error('Failed to stop global hooks:', error);
+    if (this.hooksRl) {
+      this.hooksRl.close();
+      this.hooksRl = null;
     }
   }
 
   // ------------------------------------------------------------------
-  // Click handler — uses native OS APIs for accurate info
+  // Native event dispatch
   // ------------------------------------------------------------------
 
-  private pendingClick: { event: any; timeout: NodeJS.Timeout; count: number } | null = null;
+  private handleNativeEvent(event: NativeEvent): void {
+    if (!this.isRecording) return;
 
-  private handleMouseClickRaw(event: any): void {
+    switch (event.type) {
+      case 'click':
+        if (this.isPaused) return;
+        this.handleNativeClick(event as NativeClickEvent);
+        break;
+      case 'key':
+        this.handleNativeKey(event as NativeKeyEvent);
+        break;
+      case 'scroll':
+        if (this.isPaused) return;
+        this.handleNativeScroll(event as NativeScrollEvent);
+        break;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Coordinate normalization
+  // ------------------------------------------------------------------
+
+  private toLogical(x: number, y: number): { x: number; y: number } {
+    if (this.coordSpace === 'physical' && this.coordScale > 1) {
+      return {
+        x: Math.round(x / this.coordScale),
+        y: Math.round(y / this.coordScale),
+      };
+    }
+    return { x, y };
+  }
+
+  // ------------------------------------------------------------------
+  // Click handler — events arrive pre-enriched from native binary
+  // ------------------------------------------------------------------
+
+  private pendingClick: { event: NativeClickEvent; timeout: NodeJS.Timeout; count: number } | null = null;
+
+  private handleNativeClick(event: NativeClickEvent): void {
+    const pt = this.toLogical(event.x, event.y);
+
+    // Check capture area
+    if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
+
     const now = Date.now();
-    const dx = Math.abs(event.x - this.lastClickPos.x);
-    const dy = Math.abs(event.y - this.lastClickPos.y);
+    const dx = Math.abs(pt.x - this.lastClickPos.x);
+    const dy = Math.abs(pt.y - this.lastClickPos.y);
     const timeDiff = now - this.lastClickTime;
     const sameSpot = dx < 5 && dy < 5;
     const sameButton = event.button === (this.pendingClick?.event.button ?? event.button);
 
     this.lastClickTime = now;
-    this.lastClickPos = { x: event.x, y: event.y };
+    this.lastClickPos = { x: pt.x, y: pt.y };
 
-    // Double-click detection: two clicks within 400ms at same spot, same button
     if (this.pendingClick && sameSpot && sameButton && timeDiff < 400) {
       clearTimeout(this.pendingClick.timeout);
       this.pendingClick.count++;
-      // Fire as double/triple click
       this.pendingClick.timeout = setTimeout(() => {
         const pending = this.pendingClick!;
         this.pendingClick = null;
-        this.handleMouseClick(pending.event, pending.count);
-      }, 80); // Small delay to catch triple-click
+        this.processClick(pending.event, pending.count);
+      }, 80);
       return;
     }
 
-    // Fire any pending single click
     if (this.pendingClick) {
       clearTimeout(this.pendingClick.timeout);
       const pending = this.pendingClick;
       this.pendingClick = null;
-      this.handleMouseClick(pending.event, pending.count);
+      this.processClick(pending.event, pending.count);
     }
 
-    // Queue new click — wait briefly for possible double-click
     this.pendingClick = {
       event,
       count: 1,
       timeout: setTimeout(() => {
         const pending = this.pendingClick;
         this.pendingClick = null;
-        if (pending) this.handleMouseClick(pending.event, pending.count);
-      }, 300), // Wait for possible second click
+        if (pending) this.processClick(pending.event, pending.count);
+      }, 300),
     };
   }
 
-  private async handleMouseClick(event: any, clickCount: number = 1): Promise<void> {
-    // Prevent concurrent click processing
+  private async processClick(event: NativeClickEvent, clickCount: number): Promise<void> {
     if (this.clickProcessing) return;
     this.clickProcessing = true;
 
     try {
       this.flushTypedText();
 
-      const clickPoint = { x: event.x, y: event.y };
-
-      // Query native OS for full info: window, element, scale factor
-      const fullInfo = await this.screenshotService.getFullInfoAtPoint(clickPoint);
-      // Use coordScale (detected from actual screenshot dimensions) as the effective scale
-      // for screenshot cropping. Electron's scaleFactor may incorrectly report 1 on Windows.
-      const scaleFactor = this.coordScale > 1 ? this.coordScale : (fullInfo?.scaleFactor ?? this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y));
-
-      // === DIAGNOSTIC LOGGING ===
-      console.log('[DIAG] === Click Event ===');
-      console.log('[DIAG] raw event coords:', { x: event.x, y: event.y, button: event.button });
-      console.log('[DIAG] normalized clickPoint:', clickPoint);
-      console.log('[DIAG] platform:', process.platform, 'coordScale:', this.coordScale);
-      console.log('[DIAG] scaleFactor:', scaleFactor);
-      console.log('[DIAG] nativeAvailable:', this.screenshotService.isNativeAvailable());
-      console.log('[DIAG] fullInfo:', JSON.stringify(fullInfo, null, 2)?.substring(0, 500));
-      // === END DIAGNOSTIC ===
-
-      // Extract window info
-      const windowTitle = fullInfo?.window?.title || 'Unknown Window';
-      const ownerApp = fullInfo?.window?.ownerName || '';
-      const windowBounds = fullInfo?.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
-      const windowPID = fullInfo?.window?.ownerPID || 0;
+      const clickPoint = this.toLogical(event.x, event.y);
+      const windowTitle = event.window?.title || 'Unknown Window';
+      const ownerApp = event.window?.ownerName || '';
+      const windowBounds = event.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
+      const scaleFactor = event.scale || this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
 
       // Skip clicks on the recording app itself
       if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' ||
@@ -329,9 +463,7 @@ export class RecordingService extends EventEmitter {
         return;
       }
 
-      // Skip system UI — but ONLY if we have reliable native info.
-      // When the native binary isn't available (e.g. not built on Windows),
-      // ownerApp will be empty — don't discard those clicks.
+      // Skip system UI — only if we have reliable window info
       if (ownerApp) {
         const systemApps = [
           'Dock', 'WindowManager', 'Spotlight', 'NotificationCenter',
@@ -345,30 +477,20 @@ export class RecordingService extends EventEmitter {
         }
       }
 
-      // Skip if no real window found AND native is available (Mission Control/Exposé animations)
-      if (windowTitle === 'Unknown Window' && !windowBounds.width && this.screenshotService.isNativeAvailable()) {
-        this.clickProcessing = false;
-        return;
-      }
+      // Extract element info
+      const elementName = this.formatElementName(event.element);
+      const elementRole = event.element?.role || '';
+      const elementDescription = event.element?.description || event.element?.title || '';
 
-      // Extract element info (accessibility)
-      const elementName = this.formatElementName(fullInfo?.element);
-      const elementRole = fullInfo?.element?.role || '';
-      const elementDescription = fullInfo?.element?.description || fullInfo?.element?.title || '';
-
-      // Determine capture region
+      // Screenshot
       const captureRegion = this.getCaptureRegion();
-
-      // Click position relative to capture region (logical coords)
       const screenshotRelative = {
         x: Math.max(0, Math.min(clickPoint.x - captureRegion.x, captureRegion.width - 1)),
         y: Math.max(0, Math.min(clickPoint.y - captureRegion.y, captureRegion.height - 1)),
       };
 
-      // Take DPI-aware annotated screenshot
       let screenshotPath: string | undefined;
       try {
-        console.log('[DIAG] Taking screenshot — captureRegion:', captureRegion, 'clickRelative:', screenshotRelative, 'scale:', scaleFactor);
         screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
           captureRegion,
           screenshotRelative,
@@ -376,24 +498,22 @@ export class RecordingService extends EventEmitter {
           ++this.stepCount,
           scaleFactor
         );
-        console.log('[DIAG] Screenshot saved:', screenshotPath);
       } catch (error) {
-        console.error('[DIAG] Failed to take screenshot:', error);
-        this.stepCount++; // Still increment
+        console.error('Failed to take screenshot:', error);
+        this.stepCount++;
       }
 
-      // Button type
+      // Build description
       const buttonTypes: Record<number, string> = { 1: 'Left', 2: 'Right', 3: 'Middle' };
       const buttonType = buttonTypes[event.button] || 'Left';
       const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
 
-      // Build clean human-readable description
       const cleanRole = elementRole ? elementRole.replace(/^AX/, '') : '';
       const shortWindowTitle = windowTitle.length > 40 ? windowTitle.substring(0, 40) + '…' : windowTitle;
       let description = clickLabel;
       if (elementName && elementName !== cleanRole) {
         description += ` on "${elementName}"`;
-      } else if (cleanRole && !['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter'].includes(cleanRole)) {
+      } else if (cleanRole && !['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter', 'Client', 'Pane'].includes(cleanRole)) {
         description += ` on ${cleanRole}`;
       }
       description += ` in ${shortWindowTitle}`;
@@ -410,15 +530,9 @@ export class RecordingService extends EventEmitter {
           x: clickPoint.x - windowBounds.x,
           y: clickPoint.y - windowBounds.y,
         },
-        windowSize: {
-          width: windowBounds.width,
-          height: windowBounds.height,
-        },
+        windowSize: { width: windowBounds.width, height: windowBounds.height },
         screenshotRelativeMousePosition: screenshotRelative,
-        screenshotSize: {
-          width: captureRegion.width,
-          height: captureRegion.height,
-        },
+        screenshotSize: { width: captureRegion.width, height: captureRegion.height },
         elementName: elementName || undefined,
         elementRole: elementRole || undefined,
         elementDescription: elementDescription || undefined,
@@ -427,7 +541,7 @@ export class RecordingService extends EventEmitter {
 
       this.emit('step-recorded', step);
     } catch (error) {
-      console.error('Error handling mouse click:', error);
+      console.error('Error handling click:', error);
     } finally {
       this.clickProcessing = false;
     }
@@ -439,21 +553,23 @@ export class RecordingService extends EventEmitter {
 
   private scrollTimeout?: NodeJS.Timeout;
   private scrollAccumulator = 0;
+  private lastScrollWindow: NativeWindowInfo | null = null;
 
-  private handleScroll(event: any): void {
-    this.scrollAccumulator += event.rotation || 0;
+  private handleNativeScroll(event: NativeScrollEvent): void {
+    this.scrollAccumulator += event.deltaY;
+    this.lastScrollWindow = event.window;
 
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
 
-    this.scrollTimeout = setTimeout(async () => {
-      if (Math.abs(this.scrollAccumulator) < 3) {
+    const pt = this.toLogical(event.x, event.y);
+
+    this.scrollTimeout = setTimeout(() => {
+      if (Math.abs(this.scrollAccumulator) < 2) {
         this.scrollAccumulator = 0;
-        return; // Ignore tiny scrolls
+        return;
       }
 
-      // Coordinates already normalized by setupGlobalHooks
-      const fullInfo = await this.screenshotService.getFullInfoAtPoint({ x: event.x, y: event.y });
-      const windowTitle = fullInfo?.window?.title || 'Unknown Window';
+      const windowTitle = this.lastScrollWindow?.title || 'Unknown Window';
 
       const step: RecordedStep = {
         stepNumber: ++this.stepCount,
@@ -462,11 +578,11 @@ export class RecordingService extends EventEmitter {
         windowTitle,
         description: `Scrolled ${this.scrollAccumulator > 0 ? 'down' : 'up'} in ${windowTitle}`,
         scrollDelta: this.scrollAccumulator,
-        globalMousePosition: { x: event.x, y: event.y },
+        globalMousePosition: pt,
         relativeMousePosition: { x: 0, y: 0 },
         windowSize: {
-          width: fullInfo?.window?.bounds.width || 0,
-          height: fullInfo?.window?.bounds.height || 0,
+          width: this.lastScrollWindow?.bounds.width || 0,
+          height: this.lastScrollWindow?.bounds.height || 0,
         },
         screenshotRelativeMousePosition: { x: 0, y: 0 },
         screenshotSize: { width: 0, height: 0 },
@@ -481,84 +597,95 @@ export class RecordingService extends EventEmitter {
   // Keyboard handler
   // ------------------------------------------------------------------
 
-  private handleKeyPress(event: any): void {
+  private handleNativeKey(event: NativeKeyEvent): void {
+    const isMac = process.platform === 'darwin';
     const keycode = event.keycode;
 
-    // Ignore pure modifier key presses
-    const modifierCodes = [29, 42, 54, 56, 3675, 3676, 58]; // Ctrl, Shift, ShiftR, Alt, MetaL, MetaR, CapsLock
-    if (modifierCodes.includes(keycode)) return;
-
-    if (this.isFlushKey(keycode)) {
-      this.flushTypedText();
+    // F9 = pause/resume toggle
+    const f9Key = isMac ? MAC_F9 : WIN_F9;
+    if (keycode === f9Key) {
+      if (this.isPaused) this.resumeRecording();
+      else this.pauseRecording();
       return;
     }
 
-    // Check if modifier is held — treat as shortcut, not typing
-    const hasCtrl = event.ctrlKey || event.metaKey;
-    const hasAlt = event.altKey;
+    if (this.isPaused) return;
 
-    if (hasCtrl || hasAlt) {
-      // Record as keyboard shortcut step, not typing
-      this.flushTypedText();
-      const char = this.keycodeToChar(keycode);
-      const namedKey = RecordingService.NAMED_KEY_MAP[keycode];
-      const keyLabel = char ? char.toUpperCase() : namedKey;
+    // Ignore pure modifier keypresses
+    const modifierKeys = isMac ? MAC_MODIFIER_KEYCODES : WIN_MODIFIER_VKS;
+    if (modifierKeys.includes(keycode)) return;
+
+    const charMap = isMac ? MAC_KEYCODE_MAP : WIN_VK_MAP;
+    const namedMap = isMac ? MAC_NAMED_KEY_MAP : WIN_NAMED_KEY_MAP;
+    const flushKeys = isMac
+      ? [36, 48, 53]   // Enter, Tab, Escape (macOS CGKeyCode)
+      : [0x0D, 0x09, 0x1B]; // Enter, Tab, Escape (Windows VK)
+
+    // Flush on Enter/Tab/Escape
+    if (flushKeys.includes(keycode)) {
+      this.flushTypedText(event.window);
+      return;
+    }
+
+    const hasModifier = event.modifiers.includes('ctrl') || event.modifiers.includes('alt') || event.modifiers.includes('meta');
+
+    if (hasModifier) {
+      // Keyboard shortcut
+      this.flushTypedText(event.window);
+      const char = charMap[keycode];
+      const named = namedMap[keycode];
+      const keyLabel = char ? char.toUpperCase() : named;
       if (!keyLabel) return;
 
       const mods: string[] = [];
-      if (event.ctrlKey) mods.push('Ctrl');
-      if (event.metaKey) mods.push('Cmd');
-      if (event.altKey) mods.push('Alt');
-      if (event.shiftKey) mods.push('Shift');
+      if (event.modifiers.includes('ctrl')) mods.push('Ctrl');
+      if (event.modifiers.includes('meta')) mods.push(isMac ? 'Cmd' : 'Win');
+      if (event.modifiers.includes('alt')) mods.push(isMac ? 'Option' : 'Alt');
+      if (event.modifiers.includes('shift')) mods.push('Shift');
       const combo = [...mods, keyLabel].join('+');
 
-      const windowInfo = this.screenshotService.getCurrentWindow();
+      const windowTitle = event.window?.title || 'Unknown Window';
+
       const step: RecordedStep = {
         stepNumber: ++this.stepCount,
         timestamp: new Date(),
         actionType: 'Keyboard Shortcut',
-        windowTitle: windowInfo?.title || 'Unknown Window',
-        description: `Pressed ${combo}`,
+        windowTitle,
+        description: `Pressed ${combo} in ${windowTitle}`,
         textTyped: combo,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
-        windowSize: { width: windowInfo?.bounds.width || 0, height: windowInfo?.bounds.height || 0 },
+        windowSize: { width: event.window?.bounds.width || 0, height: event.window?.bounds.height || 0 },
         screenshotRelativeMousePosition: { x: 0, y: 0 },
         screenshotSize: { width: 0, height: 0 },
-        ownerApp: windowInfo?.ownerName || undefined,
+        ownerApp: event.window?.ownerName || undefined,
       };
       this.emit('step-recorded', step);
       return;
     }
 
     // Regular typing
-    const char = this.keycodeToChar(keycode);
+    const char = charMap[keycode];
     if (char) {
       this.currentText += char;
       if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
-      this.textFlushTimeout = setTimeout(() => this.flushTypedText(), 2000);
+      this.textFlushTimeout = setTimeout(() => this.flushTypedText(event.window), 2000);
       return;
     }
 
-    // Named key pressed without modifiers (Delete, Backspace, arrows, F-keys)
-    const namedKey = RecordingService.NAMED_KEY_MAP[keycode];
+    // Named key without modifiers
+    const namedKey = namedMap[keycode];
     if (namedKey) {
-      this.flushTypedText();
-      // Backspace modifies text — append notation inline
       if (namedKey === 'Backspace') {
         this.currentText += '[⌫]';
         if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
-        this.textFlushTimeout = setTimeout(() => this.flushTypedText(), 2000);
+        this.textFlushTimeout = setTimeout(() => this.flushTypedText(event.window), 2000);
         return;
       }
 
-      const windowInfo = this.screenshotService.getCurrentWindow();
-      let windowTitle = windowInfo?.title || '';
-      if (!windowTitle) {
-        const focused = BrowserWindow.getFocusedWindow();
-        windowTitle = focused?.getTitle() || 'Unknown Window';
-      }
+      this.flushTypedText(event.window);
 
+      const windowTitle = event.window?.title || 'Unknown Window';
       const step: RecordedStep = {
         stepNumber: ++this.stepCount,
         timestamp: new Date(),
@@ -568,16 +695,16 @@ export class RecordingService extends EventEmitter {
         textTyped: namedKey,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
-        windowSize: { width: windowInfo?.bounds.width || 0, height: windowInfo?.bounds.height || 0 },
+        windowSize: { width: event.window?.bounds.width || 0, height: event.window?.bounds.height || 0 },
         screenshotRelativeMousePosition: { x: 0, y: 0 },
         screenshotSize: { width: 0, height: 0 },
-        ownerApp: windowInfo?.ownerName || undefined,
+        ownerApp: event.window?.ownerName || undefined,
       };
       this.emit('step-recorded', step);
     }
   }
 
-  private flushTypedText(): void {
+  private flushTypedText(windowInfo?: NativeWindowInfo | null): void {
     if (!this.currentText) return;
 
     if (this.textFlushTimeout) {
@@ -586,15 +713,17 @@ export class RecordingService extends EventEmitter {
     }
 
     try {
-      const windowInfo = this.screenshotService.getCurrentWindow();
-      // Fallback: use Electron's focused window title if native returns nothing
       let windowTitle = windowInfo?.title || '';
-      let ownerApp = windowInfo?.ownerName || '';
+      const ownerApp = windowInfo?.ownerName || '';
+      if (!windowTitle) {
+        // Fallback: ask native binary for current window
+        const nativeWindow = this.screenshotService.getCurrentWindow();
+        windowTitle = nativeWindow?.title || '';
+      }
       if (!windowTitle) {
         const focused = BrowserWindow.getFocusedWindow();
         windowTitle = focused?.getTitle() || 'Unknown Window';
       }
-      if (!windowTitle) windowTitle = 'Unknown Window';
 
       const step: RecordedStep = {
         stepNumber: ++this.stepCount,
@@ -626,80 +755,13 @@ export class RecordingService extends EventEmitter {
   // Helpers
   // ------------------------------------------------------------------
 
-  private formatElementName(element: any): string {
+  private formatElementName(element: NativeElementInfo | null): string {
     if (!element) return '';
-    // Prefer title > description > value > role
     if (element.title) return element.title;
     if (element.description) return element.description;
     if (element.value && element.value.length < 50) return element.value;
-    // Humanize role: "AXButton" → "Button"
     if (element.role) return element.role.replace(/^AX/, '');
     return '';
-  }
-
-  private isFlushKey(keycode: number): boolean {
-    if (!UiohookKey) return false;
-    return [UiohookKey.Enter, UiohookKey.Tab, UiohookKey.Escape].includes(keycode);
-  }
-
-  // Scancode → character map (uiohook uses hardware scancodes, NOT keycodes)
-  private static readonly SCANCODE_MAP: Record<number, string> = {
-    // Number row
-    2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0',
-    12: '-', 13: '=',
-    // QWERTY row
-    16: 'q', 17: 'w', 18: 'e', 19: 'r', 20: 't', 21: 'y', 22: 'u', 23: 'i', 24: 'o', 25: 'p',
-    26: '[', 27: ']',
-    // ASDF row
-    30: 'a', 31: 's', 32: 'd', 33: 'f', 34: 'g', 35: 'h', 36: 'j', 37: 'k', 38: 'l',
-    39: ';', 40: "'", 41: '`', 43: '\\',
-    // ZXCV row
-    44: 'z', 45: 'x', 46: 'c', 47: 'v', 48: 'b', 49: 'n', 50: 'm',
-    51: ',', 52: '.', 53: '/',
-    // Special
-    57: ' ',
-  };
-
-  // Named keys that aren't printable characters but should be recorded
-  private static readonly NAMED_KEY_MAP: Record<number, string> = {
-    14: 'Backspace',
-    15: 'Tab',
-    28: 'Enter',
-    1: 'Escape',
-    3639: 'PrintScreen',
-    3653: 'Pause',
-    3666: 'Insert',
-    3667: 'Delete',
-    3655: 'Home',
-    3663: 'End',
-    3657: 'PageUp',
-    3665: 'PageDown',
-    57416: 'Up',
-    57419: 'Left',
-    57421: 'Right',
-    57424: 'Down',
-    // Function keys
-    59: 'F1', 60: 'F2', 61: 'F3', 62: 'F4', 63: 'F5', 64: 'F6',
-    65: 'F7', 66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12',
-  };
-
-  private keycodeToChar(keycode: number): string {
-    return RecordingService.SCANCODE_MAP[keycode] || '';
-  }
-
-  /**
-   * Convert uiohook event coordinates to logical pixels.
-   * On Windows with DPI scaling, uiohook reports physical coords
-   * while Electron uses logical. coordScale is detected at recording start.
-   */
-  private normalizeEventCoords(x: number, y: number): { x: number; y: number } {
-    if (this.coordScale > 1) {
-      return {
-        x: Math.round(x / this.coordScale),
-        y: Math.round(y / this.coordScale),
-      };
-    }
-    return { x, y };
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {
@@ -713,14 +775,13 @@ export class RecordingService extends EventEmitter {
 
   private getCaptureRegion(): Rectangle {
     if (this.captureArea?.bounds) return this.captureArea.bounds;
-
     const displays = this.screenshotService.getDisplaysSync();
     const primary = displays.find(d => d.isPrimary) || displays[0];
     return primary?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
   }
 
   // ------------------------------------------------------------------
-  // Recording overlay
+  // Overlay
   // ------------------------------------------------------------------
 
   private async showOverlay(): Promise<void> {
@@ -745,7 +806,6 @@ export class RecordingService extends EventEmitter {
         webPreferences: { nodeIntegration: false, contextIsolation: true },
       });
 
-      // Make click-through on all platforms
       this.overlayWindow.setIgnoreMouseEvents(true);
 
       await this.overlayWindow.loadURL(`data:text/html,${encodeURIComponent(`
@@ -806,7 +866,7 @@ export class RecordingService extends EventEmitter {
   }
 
   public dispose(): void {
-    this.stopGlobalHooks();
+    this.stopNativeHooks();
     this.hideOverlay();
     if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);

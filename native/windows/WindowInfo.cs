@@ -1,7 +1,6 @@
-// Native Windows window info helper
-// Compile: csc /optimize /out:window-info.exe WindowInfo.cs
-// Or: dotnet build -c Release
-// Usage: window-info.exe mouse|windows|point <x> <y>
+// Native Windows window info + input hooks helper
+// Compile: dotnet publish -c Release -r win-x64 --self-contained
+// Usage: window-info.exe mouse|windows|point <x> <y>|serve|hooks
 // Output: JSON to stdout
 
 using System;
@@ -9,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace Ondoki.Native
 {
@@ -43,6 +43,37 @@ namespace Ondoki.Native
         public int dwFlags;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct MSLLHOOKSTRUCT
+    {
+        public POINT pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct KBDLLHOOKSTRUCT
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct MSG
+    {
+        public IntPtr hwnd;
+        public uint message;
+        public IntPtr wParam;
+        public IntPtr lParam;
+        public uint time;
+        public POINT pt;
+    }
+
     #endregion
 
     #region Win32 Imports
@@ -51,6 +82,7 @@ namespace Ondoki.Native
     {
         public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
         public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, ref RECT rect, IntPtr lParam);
+        public delegate IntPtr LowLevelHookProc(int nCode, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT pt);
         [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT pt);
@@ -68,34 +100,50 @@ namespace Ondoki.Native
         [DllImport("user32.dll")] public static extern bool GetGUIThreadInfo(uint threadId, ref GUITHREADINFO info);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr hwnd, StringBuilder sb, int maxCount);
         [DllImport("user32.dll")] public static extern IntPtr RealChildWindowFromPoint(IntPtr hwnd, POINT pt);
+        [DllImport("user32.dll")] public static extern short GetKeyState(int nVirtKey);
 
-        // DPI awareness (Windows 8.1+)
+        // Hooks
+        [DllImport("user32.dll")] public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelHookProc lpfn, IntPtr hMod, uint dwThreadId);
+        [DllImport("user32.dll")] public static extern bool UnhookWindowsHookEx(IntPtr hhk);
+        [DllImport("user32.dll")] public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        // Message pump
+        [DllImport("user32.dll")] public static extern int GetMessage(out MSG msg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+        [DllImport("user32.dll")] public static extern bool TranslateMessage(ref MSG msg);
+        [DllImport("user32.dll")] public static extern IntPtr DispatchMessage(ref MSG msg);
+
+        // DPI
         [DllImport("shcore.dll", SetLastError = true)]
         public static extern int GetDpiForMonitor(IntPtr hMonitor, int dpiType, out uint dpiX, out uint dpiY);
-
         [DllImport("shcore.dll", SetLastError = true)]
         public static extern int SetProcessDpiAwareness(int awareness);
-
-        // DPI awareness (Windows 10 1607+)
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern uint GetDpiForWindow(IntPtr hwnd);
-
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetProcessDPIAware();
 
-        // UI Automation COM
+        // Accessibility
         [DllImport("oleacc.dll")]
         public static extern int AccessibleObjectFromPoint(POINT pt, [MarshalAs(UnmanagedType.Interface)] out IAccessible ppoleAcc, out object pvarChild);
 
-        [DllImport("oleacc.dll")]
-        public static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint objId, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IAccessible ppoleAcc);
-
         public const uint GA_ROOT = 2;
         public const uint MONITOR_DEFAULTTONEAREST = 2;
-        public const uint OBJID_WINDOW = 0x00000000;
+
+        public const int WH_MOUSE_LL = 14;
+        public const int WH_KEYBOARD_LL = 13;
+        public const int WM_LBUTTONDOWN = 0x0201;
+        public const int WM_RBUTTONDOWN = 0x0204;
+        public const int WM_MBUTTONDOWN = 0x0207;
+        public const int WM_MOUSEWHEEL = 0x020A;
+        public const int WM_KEYDOWN = 0x0100;
+        public const int WM_SYSKEYDOWN = 0x0104;
+
+        public const int VK_CONTROL = 0x11;
+        public const int VK_SHIFT = 0x10;
+        public const int VK_MENU = 0x12; // Alt
+        public const int VK_LWIN = 0x5B;
+        public const int VK_RWIN = 0x5C;
     }
 
-    // IAccessible COM interface (MSAA)
     [ComImport, Guid("618736e0-3c3d-11cf-810c-00aa00389b71"), InterfaceType(ComInterfaceType.InterfaceIsIDispatch)]
     interface IAccessible
     {
@@ -108,7 +156,7 @@ namespace Ondoki.Native
 
     #endregion
 
-    #region JSON Builder (zero-dependency)
+    #region JSON Builder
 
     class Json
     {
@@ -124,13 +172,13 @@ namespace Ondoki.Native
             for (int i = 0; i < pairs.Length; i++)
             {
                 if (i > 0) sb.Append(",");
-                sb.Append($"\n  {Esc(pairs[i].key)}: {pairs[i].val}");
+                sb.Append($"{Esc(pairs[i].key)}:{pairs[i].val}");
             }
-            sb.Append("\n}");
+            sb.Append("}");
             return sb.ToString();
         }
 
-        public static string Num(double v) => v.ToString("G");
+        public static string Num(double v) => v.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
         public static string Num(int v) => v.ToString();
         public static string Num(long v) => v.ToString();
         public static string Bool(bool v) => v ? "true" : "false";
@@ -144,18 +192,25 @@ namespace Ondoki.Native
             foreach (var item in items)
             {
                 if (!first) sb.Append(",");
-                sb.Append("\n  " + item);
+                sb.Append(item);
                 first = false;
             }
-            sb.Append("\n]");
+            sb.Append("]");
             return sb.ToString();
         }
 
+        public static string StrArr(IEnumerable<string> items)
+        {
+            var escaped = new List<string>();
+            foreach (var item in items) escaped.Add(Str(item));
+            return Arr(escaped);
+        }
+
         public static string Point(double x, double y) =>
-            $"{{ \"x\": {Num(x)}, \"y\": {Num(y)} }}";
+            $"{{\"x\":{Num(x)},\"y\":{Num(y)}}}";
 
         public static string Rect(int x, int y, int w, int h) =>
-            $"{{ \"x\": {Num(x)}, \"y\": {Num(y)}, \"width\": {Num(w)}, \"height\": {Num(h)} }}";
+            $"{{\"x\":{Num(x)},\"y\":{Num(y)},\"width\":{Num(w)},\"height\":{Num(h)}}}";
 
         public static string Window(long handle, string title, string ownerName, int ownerPID, int x, int y, int w, int h, bool visible) =>
             Obj(
@@ -182,6 +237,8 @@ namespace Ondoki.Native
 
     class Program
     {
+        // ---- Helpers ----
+
         static string GetWindowTitle(IntPtr hwnd)
         {
             int len = Win32.GetWindowTextLength(hwnd);
@@ -268,7 +325,6 @@ namespace Ondoki.Native
                 try { acc.get_accValue(childVar, out value); } catch { }
                 try { acc.get_accDescription(childVar, out desc); } catch { }
 
-                // Get class name of the child control
                 var childHwnd = Win32.RealChildWindowFromPoint(rootHwnd, pt);
                 string className = childHwnd != IntPtr.Zero ? GetClassName(childHwnd) : "";
 
@@ -285,7 +341,6 @@ namespace Ondoki.Native
 
         static string RoleName(int role)
         {
-            // Common MSAA roles
             switch (role)
             {
                 case 0x09: return "Window";
@@ -361,17 +416,30 @@ namespace Ondoki.Native
             );
         }
 
+        /// Build window JSON for a given screen point
+        static string BuildWindowJsonAtPoint(POINT pt)
+        {
+            var hwnd = Win32.WindowFromPoint(pt);
+            var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
+            return rootHwnd != IntPtr.Zero ? BuildWindowJson(rootHwnd) : Json.Null;
+        }
+
+        /// Build element JSON for a given screen point
+        static string BuildElementJsonAtPoint(POINT pt)
+        {
+            var hwnd = Win32.WindowFromPoint(pt);
+            var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
+            return rootHwnd != IntPtr.Zero ? GetElementJson(pt.X, pt.Y, rootHwnd) : Json.Null;
+        }
+
         // ---- Commands ----
 
         static void HandleMouse()
         {
             Win32.GetCursorPos(out POINT pt);
-            var hwnd = Win32.WindowFromPoint(pt);
-            var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
             double scale = GetScaleForPoint(pt.X, pt.Y);
-
-            string windowJson = rootHwnd != IntPtr.Zero ? BuildWindowJson(rootHwnd) : Json.Null;
-            string elementJson = rootHwnd != IntPtr.Zero ? GetElementJson(pt.X, pt.Y, rootHwnd) : Json.Null;
+            string windowJson = BuildWindowJsonAtPoint(pt);
+            string elementJson = BuildElementJsonAtPoint(pt);
 
             Console.WriteLine(Json.Obj(
                 ("mousePosition", Json.Point(pt.X, pt.Y)),
@@ -391,12 +459,10 @@ namespace Ondoki.Native
                 if (!Win32.IsWindowVisible(hwnd)) return true;
                 string title = GetWindowTitle(hwnd);
                 if (string.IsNullOrEmpty(title)) return true;
-
                 Win32.GetWindowRect(hwnd, out RECT rect);
                 int w = rect.Right - rect.Left;
                 int h = rect.Bottom - rect.Top;
                 if (w < 50 || h < 50) return true;
-
                 windowJsons.Add(BuildWindowJson(hwnd));
                 return true;
             }, IntPtr.Zero);
@@ -421,12 +487,9 @@ namespace Ondoki.Native
         static void HandlePoint(double x, double y)
         {
             var pt = new POINT { X = (int)x, Y = (int)y };
-            var hwnd = Win32.WindowFromPoint(pt);
-            var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
             double scale = GetScaleForPoint(pt.X, pt.Y);
-
-            string windowJson = rootHwnd != IntPtr.Zero ? BuildWindowJson(rootHwnd) : Json.Null;
-            string elementJson = rootHwnd != IntPtr.Zero ? GetElementJson(pt.X, pt.Y, rootHwnd) : Json.Null;
+            string windowJson = BuildWindowJsonAtPoint(pt);
+            string elementJson = BuildElementJsonAtPoint(pt);
 
             Console.WriteLine(Json.Obj(
                 ("mousePosition", Json.Point(x, y)),
@@ -440,7 +503,6 @@ namespace Ondoki.Native
 
         static void HandleServe()
         {
-            // Persistent JSON-RPC mode: read JSON lines from stdin, write responses to stdout
             string line;
             while ((line = Console.ReadLine()) != null)
             {
@@ -453,10 +515,8 @@ namespace Ondoki.Native
 
                 try
                 {
-                    // Simple JSON parsing - extract id, cmd, args.x, args.y
                     id = ExtractInt(line, "\"id\"");
                     cmd = ExtractString(line, "\"cmd\"");
-
                     int argsIdx = line.IndexOf("\"args\"");
                     if (argsIdx >= 0)
                     {
@@ -474,7 +534,6 @@ namespace Ondoki.Native
 
                 try
                 {
-                    // Capture output by redirecting to StringWriter
                     var sw = new System.IO.StringWriter();
                     var origOut = Console.Out;
                     Console.SetOut(sw);
@@ -513,6 +572,160 @@ namespace Ondoki.Native
             }
         }
 
+        // ---- Hooks mode ----
+
+        static readonly object _writeLock = new object();
+
+        static void WriteEvent(string json)
+        {
+            lock (_writeLock)
+            {
+                Console.WriteLine(json);
+                Console.Out.Flush();
+            }
+        }
+
+        static List<string> GetModifiers()
+        {
+            var mods = new List<string>();
+            if ((Win32.GetKeyState(Win32.VK_CONTROL) & 0x8000) != 0) mods.Add("ctrl");
+            if ((Win32.GetKeyState(Win32.VK_SHIFT) & 0x8000) != 0) mods.Add("shift");
+            if ((Win32.GetKeyState(Win32.VK_MENU) & 0x8000) != 0) mods.Add("alt");
+            if ((Win32.GetKeyState(Win32.VK_LWIN) & 0x8000) != 0 || (Win32.GetKeyState(Win32.VK_RWIN) & 0x8000) != 0) mods.Add("meta");
+            return mods;
+        }
+
+        static long GetTimestampMs()
+        {
+            return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+
+        // Must hold references to prevent GC
+        static Win32.LowLevelHookProc _mouseProc;
+        static Win32.LowLevelHookProc _keyboardProc;
+
+        static IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                int msg = wParam.ToInt32();
+                var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                var pt = hookStruct.pt;
+                double scale = GetScaleForPoint(pt.X, pt.Y);
+                long ts = GetTimestampMs();
+
+                if (msg == Win32.WM_LBUTTONDOWN || msg == Win32.WM_RBUTTONDOWN || msg == Win32.WM_MBUTTONDOWN)
+                {
+                    int button = msg == Win32.WM_LBUTTONDOWN ? 1 : msg == Win32.WM_RBUTTONDOWN ? 2 : 3;
+                    string windowJson = BuildWindowJsonAtPoint(pt);
+                    string elementJson = BuildElementJsonAtPoint(pt);
+
+                    WriteEvent(Json.Obj(
+                        ("type", Json.Str("click")),
+                        ("x", Json.Num(pt.X)),
+                        ("y", Json.Num(pt.Y)),
+                        ("button", Json.Num(button)),
+                        ("window", windowJson),
+                        ("element", elementJson),
+                        ("scale", Json.Num(scale)),
+                        ("timestamp", Json.Num(ts))
+                    ));
+                }
+                else if (msg == Win32.WM_MOUSEWHEEL)
+                {
+                    // Scroll delta is in high word of mouseData, signed
+                    short delta = (short)(hookStruct.mouseData >> 16);
+                    double deltaY = delta / 120.0; // 120 = WHEEL_DELTA
+
+                    // For scroll, get cursor position (hookStruct.pt is screen coords)
+                    string windowJson = BuildWindowJsonAtPoint(pt);
+
+                    WriteEvent(Json.Obj(
+                        ("type", Json.Str("scroll")),
+                        ("x", Json.Num(pt.X)),
+                        ("y", Json.Num(pt.Y)),
+                        ("deltaX", Json.Num(0)),
+                        ("deltaY", Json.Num(deltaY)),
+                        ("window", windowJson),
+                        ("timestamp", Json.Num(ts))
+                    ));
+                }
+            }
+
+            return Win32.CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        }
+
+        static IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                int msg = wParam.ToInt32();
+                if (msg == Win32.WM_KEYDOWN || msg == Win32.WM_SYSKEYDOWN)
+                {
+                    var hookStruct = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+                    var mods = GetModifiers();
+                    long ts = GetTimestampMs();
+
+                    // Get foreground window for keyboard events
+                    var fgHwnd = Win32.GetForegroundWindow();
+                    string windowJson = fgHwnd != IntPtr.Zero ? BuildWindowJson(fgHwnd) : Json.Null;
+
+                    WriteEvent(Json.Obj(
+                        ("type", Json.Str("key")),
+                        ("keycode", Json.Num((int)hookStruct.vkCode)),
+                        ("scancode", Json.Num((int)hookStruct.scanCode)),
+                        ("modifiers", Json.StrArr(mods)),
+                        ("window", windowJson),
+                        ("timestamp", Json.Num(ts))
+                    ));
+                }
+            }
+
+            return Win32.CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        }
+
+        static void HandleHooks()
+        {
+            _mouseProc = MouseHookCallback;
+            _keyboardProc = KeyboardHookCallback;
+
+            var moduleHandle = Win32.GetModuleHandle(null);
+
+            var mouseHook = Win32.SetWindowsHookEx(Win32.WH_MOUSE_LL, _mouseProc, moduleHandle, 0);
+            if (mouseHook == IntPtr.Zero)
+            {
+                Console.Error.WriteLine("Failed to install mouse hook");
+                Environment.Exit(1);
+            }
+
+            var keyboardHook = Win32.SetWindowsHookEx(Win32.WH_KEYBOARD_LL, _keyboardProc, moduleHandle, 0);
+            if (keyboardHook == IntPtr.Zero)
+            {
+                Win32.UnhookWindowsHookEx(mouseHook);
+                Console.Error.WriteLine("Failed to install keyboard hook");
+                Environment.Exit(1);
+            }
+
+            // Send ready message — coords are in physical pixel space (DPI aware)
+            WriteEvent(Json.Obj(
+                ("type", Json.Str("ready")),
+                ("platform", Json.Str("win32")),
+                ("coordSpace", Json.Str("physical"))
+            ));
+
+            // Message pump — required for low-level hooks to work
+            while (Win32.GetMessage(out MSG msg, IntPtr.Zero, 0, 0) > 0)
+            {
+                Win32.TranslateMessage(ref msg);
+                Win32.DispatchMessage(ref msg);
+            }
+
+            Win32.UnhookWindowsHookEx(mouseHook);
+            Win32.UnhookWindowsHookEx(keyboardHook);
+        }
+
+        // ---- Utilities ----
+
         static int ExtractInt(string json, string key)
         {
             int idx = json.IndexOf(key);
@@ -547,16 +760,17 @@ namespace Ondoki.Native
             return double.TryParse(sub.Substring(0, end), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value);
         }
 
+        // ---- Main ----
+
         static int Main(string[] args)
         {
-            // Set Per-Monitor DPI awareness so GetDpiForMonitor returns real values
-            // and GetWindowRect returns unscaled (physical) coordinates
-            try { Win32.SetProcessDpiAwareness(2); } // 2 = Per-Monitor DPI Aware
-            catch { try { Win32.SetProcessDPIAware(); } catch { } } // Fallback for older Windows
+            // Per-Monitor DPI Aware
+            try { Win32.SetProcessDpiAwareness(2); }
+            catch { try { Win32.SetProcessDPIAware(); } catch { } }
 
             if (args.Length < 1)
             {
-                Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>|serve");
+                Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>|serve|hooks");
                 return 1;
             }
 
@@ -567,6 +781,7 @@ namespace Ondoki.Native
                     case "mouse": HandleMouse(); break;
                     case "windows": HandleWindows(); break;
                     case "serve": HandleServe(); break;
+                    case "hooks": HandleHooks(); break;
                     case "point":
                         if (args.Length < 3 || !double.TryParse(args[1], out double px) || !double.TryParse(args[2], out double py))
                         {
