@@ -634,10 +634,8 @@ export class RecordingService extends EventEmitter {
         webPreferences: { nodeIntegration: false, contextIsolation: true },
       });
 
-      // Make click-through on macOS
-      if (process.platform === 'darwin') {
-        this.overlayWindow.setIgnoreMouseEvents(true);
-      }
+      // Make click-through on all platforms
+      this.overlayWindow.setIgnoreMouseEvents(true);
 
       await this.overlayWindow.loadURL(`data:text/html,${encodeURIComponent(`
         <!DOCTYPE html><html><head><style>

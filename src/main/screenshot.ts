@@ -494,7 +494,7 @@ export class ScreenshotService {
    * Take a screenshot using Electron's desktopCapturer (no external process).
    * Returns a PNG buffer of the specified display or the display nearest the given point.
    */
-  private async takeScreenshotNative(point?: { x: number; y: number }): Promise<Buffer> {
+  private async takeScreenshotNative(point?: { x: number; y: number }): Promise<{ buffer: Buffer; actualScale: number }> {
     const targetDisplay = point
       ? screen.getDisplayNearestPoint(point)
       : screen.getPrimaryDisplay();
@@ -525,19 +525,30 @@ export class ScreenshotService {
       throw new Error(`No desktopCapturer source found for display ${displayIdStr}`);
     }
 
-    return source.thumbnail.toPNG();
+    const thumbnail = source.thumbnail;
+    const actualWidth = thumbnail.getSize().width;
+
+    // On Windows, desktopCapturer may return logical-resolution thumbnails
+    // regardless of the requested physical size. Compute the actual scale
+    // factor from what we received vs the logical display size.
+    const actualScale = actualWidth / targetDisplay.size.width;
+
+    return { buffer: thumbnail.toPNG(), actualScale };
   }
 
   /**
    * Take a full screenshot, preferring desktopCapturer, falling back to screenshot-desktop.
    */
-  private async captureScreen(point?: { x: number; y: number }): Promise<Buffer> {
+  private async captureScreen(point?: { x: number; y: number }): Promise<{ buffer: Buffer; actualScale: number }> {
     try {
       return await this.takeScreenshotNative(point);
     } catch (e) {
       console.warn('desktopCapturer failed, falling back to screenshot-desktop:', (e as Error).message);
       if (screenshotDesktop) {
-        return await screenshotDesktop({ format: 'png' });
+        const buf = await screenshotDesktop({ format: 'png' });
+        // screenshot-desktop returns physical resolution, so actualScale = display scaleFactor
+        const display = point ? screen.getDisplayNearestPoint(point) : screen.getPrimaryDisplay();
+        return { buffer: buf, actualScale: display.scaleFactor };
       }
       throw e;
     }
@@ -548,9 +559,9 @@ export class ScreenshotService {
       let screenshot: Buffer;
 
       if (bounds) {
-        const fullScreenshot = await this.captureScreen({ x: bounds.x, y: bounds.y });
+        const { buffer: fullScreenshot, actualScale } = await this.captureScreen({ x: bounds.x, y: bounds.y });
 
-        const scale = this.getScaleFactorAtPoint(bounds.x, bounds.y);
+        const scale = actualScale;
 
         const physicalBounds = {
           left: Math.max(0, Math.round(bounds.x * scale)),
@@ -578,7 +589,8 @@ export class ScreenshotService {
           screenshot = fullScreenshot;
         }
       } else {
-        screenshot = await this.captureScreen();
+        const { buffer } = await this.captureScreen();
+        screenshot = buffer;
       }
 
       const timestamp = Date.now();
@@ -600,8 +612,11 @@ export class ScreenshotService {
     scaleFactor?: number
   ): Promise<string> {
     try {
-      const fullScreenshot = await this.captureScreen({ x: bounds.x, y: bounds.y });
-      const scale = scaleFactor ?? this.getScaleFactorAtPoint(bounds.x, bounds.y);
+      const { buffer: fullScreenshot, actualScale } = await this.captureScreen({ x: bounds.x, y: bounds.y });
+      // Use the actual scale from the captured image, not the requested scaleFactor.
+      // On Windows, desktopCapturer may return logical-resolution images, so
+      // the actual scale can differ from the display's scaleFactor.
+      const scale = actualScale;
 
       // For desktopCapturer, coordinates are relative to the display
       const targetDisplay = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y });
