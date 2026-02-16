@@ -172,8 +172,9 @@ export class RecordingService extends EventEmitter {
 
     uIOhook.on('mousedown', (event: any) => {
       if (!this.isRecording || this.isPaused) return;
-      if (this.captureArea && !this.isPointInCaptureArea(event.x, event.y)) return;
-      this.handleMouseClickRaw(event);
+      const pt = this.normalizeEventCoords(event.x, event.y);
+      if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
+      this.handleMouseClickRaw({ ...event, x: pt.x, y: pt.y });
     });
 
     uIOhook.on('keydown', (event: any) => {
@@ -192,8 +193,9 @@ export class RecordingService extends EventEmitter {
     // Mouse scroll handler
     uIOhook.on('wheel', (event: any) => {
       if (!this.isRecording || this.isPaused) return;
-      if (this.captureArea && !this.isPointInCaptureArea(event.x, event.y)) return;
-      this.handleScroll(event);
+      const pt = this.normalizeEventCoords(event.x, event.y);
+      if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
+      this.handleScroll({ ...event, x: pt.x, y: pt.y });
     });
   }
 
@@ -278,7 +280,7 @@ export class RecordingService extends EventEmitter {
     try {
       this.flushTypedText();
 
-      // uiohook reports coordinates in LOGICAL screen space (top-left origin)
+      // Coordinates are already normalized to logical pixels by setupGlobalHooks
       const clickPoint = { x: event.x, y: event.y };
 
       // Query native OS for full info: window, element, scale factor
@@ -418,6 +420,7 @@ export class RecordingService extends EventEmitter {
         return; // Ignore tiny scrolls
       }
 
+      // Coordinates already normalized by setupGlobalHooks
       const fullInfo = await this.screenshotService.getFullInfoAtPoint({ x: event.x, y: event.y });
       const windowTitle = fullInfo?.window?.title || 'Unknown Window';
 
@@ -467,14 +470,16 @@ export class RecordingService extends EventEmitter {
       // Record as keyboard shortcut step, not typing
       this.flushTypedText();
       const char = this.keycodeToChar(keycode);
-      if (!char) return;
+      const namedKey = RecordingService.NAMED_KEY_MAP[keycode];
+      const keyLabel = char ? char.toUpperCase() : namedKey;
+      if (!keyLabel) return;
 
       const mods: string[] = [];
       if (event.ctrlKey) mods.push('Ctrl');
       if (event.metaKey) mods.push('Cmd');
       if (event.altKey) mods.push('Alt');
       if (event.shiftKey) mods.push('Shift');
-      const combo = [...mods, char.toUpperCase()].join('+');
+      const combo = [...mods, keyLabel].join('+');
 
       const windowInfo = this.screenshotService.getCurrentWindow();
       const step: RecordedStep = {
@@ -501,6 +506,43 @@ export class RecordingService extends EventEmitter {
       this.currentText += char;
       if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
       this.textFlushTimeout = setTimeout(() => this.flushTypedText(), 2000);
+      return;
+    }
+
+    // Named key pressed without modifiers (Delete, Backspace, arrows, F-keys)
+    const namedKey = RecordingService.NAMED_KEY_MAP[keycode];
+    if (namedKey) {
+      this.flushTypedText();
+      // Backspace modifies text — append notation inline
+      if (namedKey === 'Backspace') {
+        this.currentText += '[⌫]';
+        if (this.textFlushTimeout) clearTimeout(this.textFlushTimeout);
+        this.textFlushTimeout = setTimeout(() => this.flushTypedText(), 2000);
+        return;
+      }
+
+      const windowInfo = this.screenshotService.getCurrentWindow();
+      let windowTitle = windowInfo?.title || '';
+      if (!windowTitle) {
+        const focused = BrowserWindow.getFocusedWindow();
+        windowTitle = focused?.getTitle() || 'Unknown Window';
+      }
+
+      const step: RecordedStep = {
+        stepNumber: ++this.stepCount,
+        timestamp: new Date(),
+        actionType: 'Key Press',
+        windowTitle,
+        description: `Pressed ${namedKey} in ${windowTitle}`,
+        textTyped: namedKey,
+        globalMousePosition: { x: 0, y: 0 },
+        relativeMousePosition: { x: 0, y: 0 },
+        windowSize: { width: windowInfo?.bounds.width || 0, height: windowInfo?.bounds.height || 0 },
+        screenshotRelativeMousePosition: { x: 0, y: 0 },
+        screenshotSize: { width: 0, height: 0 },
+        ownerApp: windowInfo?.ownerName || undefined,
+      };
+      this.emit('step-recorded', step);
     }
   }
 
@@ -587,8 +629,45 @@ export class RecordingService extends EventEmitter {
     57: ' ',
   };
 
+  // Named keys that aren't printable characters but should be recorded
+  private static readonly NAMED_KEY_MAP: Record<number, string> = {
+    14: 'Backspace',
+    15: 'Tab',
+    28: 'Enter',
+    1: 'Escape',
+    3639: 'PrintScreen',
+    3653: 'Pause',
+    3666: 'Insert',
+    3667: 'Delete',
+    3655: 'Home',
+    3663: 'End',
+    3657: 'PageUp',
+    3665: 'PageDown',
+    57416: 'Up',
+    57419: 'Left',
+    57421: 'Right',
+    57424: 'Down',
+    // Function keys
+    59: 'F1', 60: 'F2', 61: 'F3', 62: 'F4', 63: 'F5', 64: 'F6',
+    65: 'F7', 66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12',
+  };
+
   private keycodeToChar(keycode: number): string {
     return RecordingService.SCANCODE_MAP[keycode] || '';
+  }
+
+  /**
+   * Convert uiohook event coordinates to logical pixels.
+   * uiohook reports physical pixels on Windows, logical on macOS.
+   */
+  private normalizeEventCoords(x: number, y: number): { x: number; y: number } {
+    if (process.platform === 'win32') {
+      const sf = this.screenshotService.getScaleFactorAtPoint(x, y);
+      if (sf > 1) {
+        return { x: Math.round(x / sf), y: Math.round(y / sf) };
+      }
+    }
+    return { x, y };
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {
