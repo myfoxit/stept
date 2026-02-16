@@ -13,10 +13,9 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("documents", sa.Column("locked_by", sa.String(16), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True))
-    op.add_column("documents", sa.Column("locked_at", sa.DateTime, nullable=True))
+    # locked_by and locked_at already added in migration 013
+    pass
 
 
 def downgrade():
-    op.drop_column("documents", "locked_at")
-    op.drop_column("documents", "locked_by")
+    pass
