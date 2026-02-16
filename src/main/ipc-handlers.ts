@@ -33,6 +33,11 @@ export function setupIpcHandlers(
     try {
       await recordingService.startRecording(captureArea, projectId);
       
+      // Remove stale listeners from previous recordings to prevent duplicates
+      recordingService.removeAllListeners('step-recorded');
+      recordingService.removeAllListeners('state-changed');
+      smartAnnotationService.removeAllListeners('step-annotated');
+
       // Forward events to renderer + auto-annotate
       recordingService.on('step-recorded', (step) => {
         event.sender.send('step-recorded', step);
