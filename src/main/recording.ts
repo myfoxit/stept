@@ -547,7 +547,7 @@ export class RecordingService extends EventEmitter {
         },
         windowSize: { width: windowBounds.width, height: windowBounds.height },
         screenshotRelativeMousePosition: screenshotRelative,
-        screenshotSize: { width: captureRegion.width, height: captureRegion.height },
+        screenshotSize: { width: screenshotBounds.width, height: screenshotBounds.height },
         elementName: elementName || undefined,
         elementRole: elementRole || undefined,
         elementDescription: elementDescription || undefined,
