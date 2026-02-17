@@ -382,11 +382,12 @@ export class RecordingService extends EventEmitter {
   // Coordinate normalization
   // ------------------------------------------------------------------
 
-  private toLogical(x: number, y: number): { x: number; y: number } {
-    if (this.coordSpace === 'physical' && this.coordScale > 1) {
+  private toLogical(x: number, y: number, eventScale?: number): { x: number; y: number } {
+    const scale = eventScale && eventScale > 1 ? eventScale : (this.coordSpace === 'physical' && this.coordScale > 1 ? this.coordScale : 1);
+    if (scale > 1) {
       return {
-        x: Math.round(x / this.coordScale),
-        y: Math.round(y / this.coordScale),
+        x: Math.round(x / scale),
+        y: Math.round(y / scale),
       };
     }
     return { x, y };
@@ -399,7 +400,7 @@ export class RecordingService extends EventEmitter {
   private pendingClick: { event: NativeClickEvent; timeout: NodeJS.Timeout; count: number } | null = null;
 
   private handleNativeClick(event: NativeClickEvent): void {
-    const pt = this.toLogical(event.x, event.y);
+    const pt = this.toLogical(event.x, event.y, (event as any).scale);
 
     // Check capture area
     if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
@@ -450,7 +451,7 @@ export class RecordingService extends EventEmitter {
     try {
       this.flushTypedText();
 
-      const clickPoint = this.toLogical(event.x, event.y);
+      const clickPoint = this.toLogical(event.x, event.y, event.scale);
       const windowTitle = event.window?.title || 'Unknown Window';
       const ownerApp = event.window?.ownerName || '';
       const windowBounds = event.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
@@ -573,7 +574,7 @@ export class RecordingService extends EventEmitter {
 
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
 
-    const pt = this.toLogical(event.x, event.y);
+    const pt = this.toLogical(event.x, event.y, (event as any).scale);
 
     this.scrollTimeout = setTimeout(() => {
       if (Math.abs(this.scrollAccumulator) < 2) {

@@ -710,7 +710,7 @@ namespace Ondoki.Native
             WriteEvent(Json.Obj(
                 ("type", Json.Str("ready")),
                 ("platform", Json.Str("win32")),
-                ("coordSpace", Json.Str("logical"))
+                ("coordSpace", Json.Str("physical"))
             ));
 
             // Message pump — required for low-level hooks to work
