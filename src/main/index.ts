@@ -224,8 +224,8 @@ class OndokiApp {
 
   private createTray(): void {
     // Use actual app icon for tray
-    const iconPath = path.join(__dirname, '..', '..', 'electron-icons', 'macos');
-    const icon16 = nativeImage.createFromPath(path.join(iconPath, '16x16.png'));
+    const iconPath = path.join(__dirname, '..', '..', 'assets');
+    const icon16 = nativeImage.createFromPath(path.join(iconPath, 'icon.png'));
     
     // Create template version (macOS auto-adjusts for dark/light menu bar)
     const trayIcon = icon16.resize({ width: 16, height: 16 });
@@ -233,7 +233,7 @@ class OndokiApp {
     this.normalTrayIcon = trayIcon;
 
     // Badge icon: same icon but NOT template (renders in color = stands out)
-    const badgeBase = nativeImage.createFromPath(path.join(iconPath, '16x16.png'));
+    const badgeBase = nativeImage.createFromPath(path.join(iconPath, 'icon.png'));
     const badge = badgeBase.resize({ width: 16, height: 16 });
     badge.setTemplateImage(false);
     this.badgeTrayIcon = badge;
