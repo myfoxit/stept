@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Display, WindowInfo, CaptureArea } from '../../main/preload';
 import { useRecording } from '../hooks/useRecording';
-import { Search, RefreshCw, Monitor, AppWindow, Play, X, Loader2 } from 'lucide-react';
 
 interface CaptureSelectorProps {
   onSelect: (captureArea: CaptureArea) => void;
@@ -11,6 +10,7 @@ interface CaptureSelectorProps {
 const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel }) => {
   const { displays, windows, loadCaptureOptions, isLoading } = useRecording();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedId, setSelectedId] = useState<string>('all');
 
   useEffect(() => { loadCaptureOptions(); }, [loadCaptureOptions]);
 
@@ -18,95 +18,101 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
     w.title.toLowerCase().includes(searchTerm.toLowerCase()) || w.processId.toString().includes(searchTerm)
   );
 
-  const handleAllDisplaysSelect = () => { onSelect({ type: 'all-displays' }); };
-  const handleDisplaySelect = (display: Display) => {
-    onSelect({ type: 'single-display', displayId: display.id, displayName: display.name, bounds: display.bounds });
-  };
-  const handleWindowSelect = (window: WindowInfo) => {
-    onSelect({ type: 'window', windowHandle: window.handle, windowTitle: window.title, bounds: window.bounds });
+  const handleAllDisplaysSelect = () => { setSelectedId('all'); };
+  const handleDisplaySelect = (display: Display) => { setSelectedId(`display-${display.id}`); };
+  const handleWindowSelect = (window: WindowInfo) => { setSelectedId(`window-${window.handle}`); };
+
+  const handleStartCapture = () => {
+    if (selectedId === 'all') {
+      onSelect({ type: 'all-displays' });
+    } else if (selectedId.startsWith('display-')) {
+      const display = displays.find(d => `display-${d.id}` === selectedId);
+      if (display) onSelect({ type: 'single-display', displayId: display.id, displayName: display.name, bounds: display.bounds });
+    } else if (selectedId.startsWith('window-')) {
+      const win = windows.find(w => `window-${w.handle}` === selectedId);
+      if (win) onSelect({ type: 'window', windowHandle: win.handle, windowTitle: win.title, bounds: win.bounds });
+    }
   };
 
   if (isLoading) {
     return (
       <div className="dialog-overlay">
-        <div className="card p-6 text-center max-w-xs">
-          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-gray-400" />
-          <p className="text-[13px] text-gray-500">Loading capture options...</p>
+        <div style={{ background: 'var(--card)', borderRadius: 'var(--radius-xl)', padding: 32, textAlign: 'center' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Loading capture options...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dialog-overlay">
-      <div className="dialog-content max-w-3xl">
-        {/* Header */}
-        <div className="px-4 py-3 border-b flex items-center justify-between">
-          <div>
-            <h2 className="text-[14px] font-semibold text-gray-800">Select Capture Area</h2>
-            <p className="text-[11px] text-gray-400">Choose what to record</p>
+    <div className="dialog-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div style={{
+        background: 'var(--card)', borderRadius: 'var(--radius-xl)',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.2)', width: 440, maxWidth: '92vw',
+        maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Top bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px', borderBottom: '1px solid var(--border)',
+        }}>
+          <div className="search-bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" placeholder="Search windows..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-              <input type="text" placeholder="Search windows..." value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} className="input-field pl-7 w-48" />
-            </div>
-            <button onClick={() => loadCaptureOptions()} className="btn-icon" title="Refresh">
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-            <button onClick={onCancel} className="btn-icon"><X className="h-3.5 w-3.5" /></button>
-          </div>
+          <button className="btn-cap-sm" onClick={handleStartCapture}>Start Capture</button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[60vh]">
-          {/* Displays */}
+        {/* Body */}
+        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 18, overflowY: 'auto', flex: 1 }} className="scrollbar-thin">
+          {/* Screens */}
           <div>
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <Monitor className="h-3.5 w-3.5" /> Displays
-            </h3>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={handleAllDisplaysSelect}
-                className="p-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors text-center">
-                <Monitor className="h-6 w-6 mx-auto mb-1 text-gray-400" />
-                <div className="text-[13px] font-medium text-gray-700">Entire Screen</div>
-                <div className="text-[11px] text-gray-400">All displays</div>
-              </button>
+            <div style={{ fontSize: '0.64rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 8 }}>
+              Screens
+            </div>
+            <div className="screens-grid">
+              <div className={`screen-opt ${selectedId === 'all' ? 'sel' : ''}`} onClick={handleAllDisplaysSelect}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: selectedId === 'all' ? 'var(--purple)' : 'var(--text-secondary)' }}>
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span className="so-name">Entire Screen</span>
+                <span className="so-res">All displays</span>
+              </div>
               {displays.map((display) => (
-                <button key={display.id} onClick={() => handleDisplaySelect(display)}
-                  className="p-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors text-center">
-                  <Monitor className="h-6 w-6 mx-auto mb-1 text-gray-400" />
-                  <div className="text-[13px] font-medium text-gray-700">{display.name}</div>
-                  <div className="text-[11px] text-gray-400">
-                    {display.bounds.width}×{display.bounds.height}
-                    {display.isPrimary && <span className="ml-1 text-indigo-500">Primary</span>}
-                  </div>
-                </button>
+                <div key={display.id} className={`screen-opt ${selectedId === `display-${display.id}` ? 'sel' : ''}`}
+                  onClick={() => handleDisplaySelect(display)}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                    style={{ color: selectedId === `display-${display.id}` ? 'var(--purple)' : 'var(--text-secondary)' }}>
+                    <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span className="so-name">{display.name}</span>
+                  <span className="so-res">{display.bounds.width} × {display.bounds.height}</span>
+                </div>
               ))}
             </div>
           </div>
 
-          {/* Windows */}
+          {/* Applications */}
           <div>
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <AppWindow className="h-3.5 w-3.5" /> Applications
-            </h3>
+            <div style={{ fontSize: '0.64rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 8 }}>
+              Applications
+            </div>
             {filteredWindows.length === 0 ? (
-              <div className="py-6 text-center text-xs text-gray-400">
+              <div style={{ padding: '24px 0', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                 {searchTerm ? 'No matching windows' : 'No visible windows'}
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="apps-grid">
                 {filteredWindows.map((window) => (
-                  <button key={window.handle} onClick={() => handleWindowSelect(window)}
-                    className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors text-left">
-                    <div className="h-16 bg-gray-50 rounded border mb-2 flex items-center justify-center">
-                      <AppWindow className="h-5 w-5 text-gray-300" />
+                  <div key={window.handle} className={`app-opt ${selectedId === `window-${window.handle}` ? 'sel' : ''}`}
+                    onClick={() => handleWindowSelect(window)}>
+                    <div className="app-thumb">
+                      <div style={{ width: '80%', height: '65%', background: 'linear-gradient(135deg, #DDDDE6, #CCCCD6)', borderRadius: 4 }} />
                     </div>
-                    <div className="text-[12px] font-medium text-gray-700 truncate">{window.title}</div>
-                    <div className="text-[11px] text-gray-400">{window.bounds.width}×{window.bounds.height}</div>
-                  </button>
+                    <div className="app-nm">{window.title}</div>
+                  </div>
                 ))}
               </div>
             )}
@@ -114,14 +120,8 @@ const CaptureSelector: React.FC<CaptureSelectorProps> = ({ onSelect, onCancel })
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t flex items-center justify-between">
-          <span className="text-[11px] text-gray-400">Click to start recording</span>
-          <div className="flex gap-2">
-            <button onClick={onCancel} className="btn-secondary">Cancel</button>
-            <button onClick={handleAllDisplaysSelect} className="btn-primary gap-1.5">
-              <Play className="h-3.5 w-3.5" /> Full Screen
-            </button>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 18px', borderTop: '1px solid var(--border)' }}>
+          <button className="btn-text" onClick={onCancel}>Cancel</button>
         </div>
       </div>
     </div>

@@ -2,12 +2,10 @@ import React, { useEffect, useState } from 'react';
 import MainWindow from './components/MainWindow';
 import { ContextSuggestions } from './components/ContextSuggestions';
 import { AddContextNoteDialog } from './components/AddContextNoteDialog';
-import { Loader2, Circle } from 'lucide-react';
 import useAuth from './hooks/useAuth';
 
 const App: React.FC = () => {
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showAddContext, setShowAddContext] = useState(false);
   const auth = useAuth();
 
@@ -30,30 +28,29 @@ const App: React.FC = () => {
 
   if (!ready) {
     return (
-      <div className="h-screen bg-white flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-400">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-[13px]">Starting Ondoki...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="h-screen bg-white flex items-center justify-center p-4">
-        <div className="card p-4 max-w-sm w-full text-center space-y-3">
-          <p className="text-[13px] text-red-600">{error}</p>
-          <button onClick={() => window.location.reload()} className="btn-primary">
-            Reload
-          </button>
+      <div style={{
+        height: '100vh',
+        background: '#FFFFFF',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
+          <div className="loading-spinner" style={{
+            width: 16, height: 16,
+            border: '2px solid rgba(108,92,231,0.15)',
+            borderTop: '2px solid #6C5CE7',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <span style={{ fontSize: '0.82rem', fontFamily: "'DM Sans', sans-serif" }}>Starting Ondoki...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div style={{ height: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <MainWindow />
       <ContextSuggestions />
       <AddContextNoteDialog

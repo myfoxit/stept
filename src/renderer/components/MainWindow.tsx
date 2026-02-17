@@ -10,46 +10,17 @@ import ExportDialog from './ExportDialog';
 import SettingsWindow from './SettingsWindow';
 import LlmSetupWizard from './LlmSetupWizard';
 import GuidePreview from './GuidePreview';
-import {
-  Play,
-  Square,
-  Pause,
-  Settings as SettingsIcon,
-  MessageCircle,
-  Sparkles,
-  Check,
-  Mic,
-  Trash2,
-  Circle,
-  LogOut,
-  LogIn,
-  ChevronDown,
-  FileText,
-} from 'lucide-react';
+import { OndokiLogo } from './OndokiLogo';
 
-interface MainWindowProps {}
-
-const MainWindow: React.FC<MainWindowProps> = () => {
+const MainWindow: React.FC = () => {
   const electronAPI = useElectronAPI();
   const {
-    isAuthenticated,
-    user,
-    projects,
-    hasProjects,
-    isLoading: authLoading,
-    login,
-    logout,
+    isAuthenticated, user, projects, hasProjects, isLoading: authLoading, login, logout,
   } = useAuth();
 
   const {
-    recordingState,
-    steps,
-    isLoading: recordingLoading,
-    startRecording,
-    stopRecording,
-    togglePause,
-    clearSteps,
-    formattedDuration,
+    recordingState, steps, isLoading: recordingLoading, startRecording, stopRecording,
+    togglePause, clearSteps, formattedDuration,
   } = useRecording();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -92,34 +63,28 @@ const MainWindow: React.FC<MainWindowProps> = () => {
   const handleLogin = async () => {
     try { await login(); } catch (error) { console.error('Login failed:', error); }
   };
-
   const handleLogout = async () => {
     try { await logout(); setSelectedProjectId(''); } catch (error) { console.error('Logout failed:', error); }
   };
-
   const handleStartRecording = () => {
     if (!selectedProjectId) { alert('Please select a project first'); return; }
     setShowCaptureSelector(true);
   };
-
   const handleCaptureSelected = async (captureArea: any) => {
     setShowCaptureSelector(false);
     try { await startRecording(captureArea, selectedProjectId); }
     catch (error) { console.error('Failed to start recording:', error); alert('Failed to start recording: ' + (error as Error).message); }
   };
-
   const handleCompleteRecording = async () => {
     try { await stopRecording(); if (steps.length > 0) setShowExportDialog(true); }
     catch (error) { console.error('Failed to stop recording:', error); }
   };
-
   const handleDeleteRecording = async () => {
     if (confirm('Are you sure you want to delete this recording?')) {
       try { await stopRecording(); clearSteps(); }
       catch (error) { console.error('Failed to delete recording:', error); }
     }
   };
-
   const handleGenerateGuide = () => {
     if (steps.length === 0) { alert('No steps recorded. Record some steps first.'); return; }
     if (!settings?.llmApiKey) {
@@ -131,69 +96,75 @@ const MainWindow: React.FC<MainWindowProps> = () => {
 
   if (authLoading) {
     return (
-      <div className="h-screen flex items-center justify-center text-gray-400 text-[13px]">
-        Loading...
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="h-11 flex-shrink-0 border-b bg-white flex items-center justify-between px-3">
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded bg-indigo-500 flex items-center justify-center">
-            <Circle className="h-3 w-3 text-white" />
+    <div style={{ minHeight: '100vh', background: 'var(--card)', display: 'flex', flexDirection: 'column' }}>
+      {!isAuthenticated ? (
+        /* ===== SIGN IN SCREEN ===== */
+        <div style={{
+          padding: '40px 24px 32px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
+          flex: 1, justifyContent: 'center',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <OndokiLogo size={48} />
+            <span style={{
+              fontFamily: "'Outfit', sans-serif", fontWeight: 800,
+              fontSize: '1.4rem', letterSpacing: '-0.03em', color: 'var(--dark)',
+            }}>ondoki</span>
           </div>
-          <span className="text-[13px] font-semibold text-gray-800">Ondoki</span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* AI status dot */}
-          <div className="flex items-center gap-1.5 mr-2">
-            <div className={`h-1.5 w-1.5 rounded-full ${settings?.llmApiKey ? 'bg-green-400' : 'bg-gray-300'}`} />
-            <span className="text-[11px] text-gray-400">{settings?.llmApiKey ? 'AI' : 'No AI'}</span>
-          </div>
-
-          {isAuthenticated && (
-            <button onClick={() => setShowChatWindow(true)} className="btn-icon" title="Chat">
-              <MessageCircle className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button onClick={() => setShowLlmSetup(true)} className="btn-icon" title="AI Setup">
-            <Sparkles className="h-3.5 w-3.5" />
+          <p style={{
+            fontSize: '0.82rem', color: 'var(--text-secondary)',
+            textAlign: 'center', lineHeight: 1.5, marginTop: -8,
+          }}>
+            AI-powered process documentation.<br />Capture, transcribe, and share.
+          </p>
+          <button className="btn-primary" onClick={handleLogin} disabled={authLoading}>
+            {authLoading ? 'Signing In...' : 'Sign In'}
           </button>
-          <button onClick={() => setShowSettingsWindow(true)} className="btn-icon" title="Settings">
-            <SettingsIcon className="h-3.5 w-3.5" />
-          </button>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>v{appVersion}</span>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        {!isAuthenticated ? (
-          /* Login */
-          <div className="flex items-center justify-center h-full p-4">
-            <div className="card p-4 w-full max-w-xs space-y-3">
-              <div className="text-center space-y-1">
-                <h2 className="text-[15px] font-semibold text-gray-800">Welcome to Ondoki</h2>
-                <p className="text-xs text-gray-400">Sign in to start creating guides</p>
+      ) : (
+        /* ===== DASHBOARD ===== */
+        <div style={{ padding: '22px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{
+                fontFamily: "'Outfit', sans-serif", fontSize: '1.05rem',
+                fontWeight: 700, color: 'var(--dark)', letterSpacing: '-0.02em',
+              }}>
+                Hello, {user?.name || user?.email?.split('@')[0] || 'User'}
               </div>
-              <button onClick={handleLogin} disabled={authLoading} className="btn-primary w-full h-9">
-                <LogIn className="h-3.5 w-3.5 mr-1.5" />
-                {authLoading ? 'Signing In...' : 'Sign In'}
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {user?.email}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="icon-btn" title="Chat" onClick={() => setShowChatWindow(true)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </button>
-              <p className="text-center text-[11px] text-gray-300">v{appVersion}</p>
+              <button className="icon-btn" title="Settings" onClick={() => setShowSettingsWindow(true)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="p-3 space-y-2.5 max-w-md mx-auto">
-            {/* Project selector row */}
-            <div className="flex items-center gap-2">
+
+          {/* Project selector */}
+          <div>
+            <div className="field-label">Project</div>
+            <div style={{ position: 'relative' }}>
               <select
+                className="custom-select"
                 value={selectedProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="input-field flex-1"
                 disabled={!hasProjects}
               >
                 {hasProjects ? (
@@ -204,114 +175,109 @@ const MainWindow: React.FC<MainWindowProps> = () => {
                   <option value="">No projects</option>
                 )}
               </select>
-
-              {/* Voice toggle */}
-              <button
-                onClick={() => setVoiceTranscription(!voiceTranscription)}
-                className={`btn-icon flex-shrink-0 ${voiceTranscription ? 'text-indigo-500 bg-indigo-50' : ''}`}
-                title={voiceTranscription ? 'Voice transcription on' : 'Voice transcription off'}
-              >
-                <Mic className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Recording controls */}
-            {recordingState.isRecording ? (
-              <div className="card p-3 space-y-2.5">
-                {/* Status bar */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {!recordingState.isPaused && (
-                      <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                    )}
-                    <span className="text-[13px] font-medium text-gray-700">
-                      {recordingState.isPaused ? 'Paused' : 'Recording'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-400">
-                    <span>{formattedDuration}</span>
-                    <span>{recordingState.stepCount} steps</span>
-                  </div>
-                </div>
-
-                {/* Control buttons */}
-                <div className="flex gap-1.5">
-                  <button onClick={togglePause} disabled={recordingLoading} className="btn-secondary flex-1 gap-1.5">
-                    {recordingState.isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                    {recordingState.isPaused ? 'Resume' : 'Pause'}
-                  </button>
-                  <button onClick={handleDeleteRecording} disabled={recordingLoading} className="btn-ghost btn-sm">
-                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                  </button>
-                  <button onClick={handleCompleteRecording} disabled={recordingLoading} className="btn-primary gap-1.5">
-                    <Check className="h-3.5 w-3.5" />
-                    Done
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-1.5">
-                <button
-                  onClick={handleStartRecording}
-                  disabled={!hasProjects || !selectedProjectId}
-                  className="btn-primary flex-1 h-9 gap-1.5"
-                >
-                  <Play className="h-3.5 w-3.5" />
-                  Start Recording
-                </button>
-                {steps.length > 0 && (
-                  <button onClick={handleGenerateGuide} className="btn-secondary h-9 gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Guide
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Steps list */}
-            {steps.length > 0 && !recordingState.isRecording && (
-              <div className="card">
-                <div className="px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-500">{steps.length} steps recorded</span>
-                  <FileText className="h-3 w-3 text-gray-300" />
-                </div>
-                <div className="max-h-40 overflow-y-auto scrollbar-thin">
-                  {steps.slice(-5).map((step) => (
-                    <div key={step.stepNumber} className="flex items-center gap-2.5 px-3 py-1.5 border-b last:border-0">
-                      <div className="h-5 w-5 rounded bg-gray-100 text-[10px] font-medium text-gray-500 flex items-center justify-center flex-shrink-0">
-                        {step.stepNumber}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 truncate">{getStepTitle(step)}</p>
-                        <p className="text-[11px] text-gray-400 truncate">{getStepSubtitle(step)}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {steps.length > 5 && (
-                    <p className="text-center text-[11px] text-gray-300 py-1">
-                      +{steps.length - 5} more
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Sign out */}
-            <div className="flex justify-center pt-1">
-              <button onClick={handleLogout} className="btn-ghost text-xs text-gray-400 gap-1">
-                <LogOut className="h-3 w-3" />
-                Sign Out
-              </button>
+              <svg style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }}
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
             </div>
           </div>
-        )}
-      </main>
 
-      {/* Status bar */}
-      <div className="h-7 flex-shrink-0 border-t bg-white px-3 flex items-center justify-between text-[11px] text-gray-400">
-        <span>{isAuthenticated ? user?.email : 'Not signed in'}</span>
-        <span>v{appVersion}</span>
-      </div>
+          {/* Voice transcription toggle */}
+          <div className="toggle-row">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-secondary)' }}>
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+              <span style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)' }}>Voice transcription</span>
+            </div>
+            <button
+              className={`toggle ${voiceTranscription ? 'on' : ''}`}
+              onClick={() => setVoiceTranscription(!voiceTranscription)}
+            />
+          </div>
+
+          {/* Recording controls */}
+          {recordingState.isRecording ? (
+            <div className={`recording-card ${!recordingState.isPaused ? 'active' : ''}`}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {!recordingState.isPaused && (
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 2s infinite' }} />
+                  )}
+                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.85rem', fontWeight: 700, color: 'var(--dark)' }}>
+                    {recordingState.isPaused ? 'Paused' : 'Recording'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 12, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  <span>{formattedDuration}</span>
+                  <span>{recordingState.stepCount} steps</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-sm ghost" style={{ flex: 1 }} onClick={togglePause} disabled={recordingLoading}>
+                  {recordingState.isPaused ? '▶ Resume' : '⏸ Pause'}
+                </button>
+                <button className="btn-sm ghost" onClick={handleDeleteRecording} disabled={recordingLoading} style={{ color: 'var(--red)' }}>
+                  🗑
+                </button>
+                <button className="btn-sm primary" onClick={handleCompleteRecording} disabled={recordingLoading}>
+                  ✓ Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button className="btn-primary" onClick={handleStartRecording} disabled={!hasProjects || !selectedProjectId}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polygon points="10 8 16 12 10 16 10 8"/>
+                </svg>
+                Start Capture
+              </button>
+              {steps.length > 0 && (
+                <button className="btn-sm primary" style={{ width: '100%' }} onClick={handleGenerateGuide}>
+                  ✨ Generate Guide ({steps.length} steps)
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Steps list */}
+          {steps.length > 0 && !recordingState.isRecording && (
+            <div className="steps-card">
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{steps.length} steps recorded</span>
+              </div>
+              <div style={{ maxHeight: 160, overflowY: 'auto' }} className="scrollbar-thin">
+                {steps.slice(-5).map((step) => (
+                  <div key={step.stepNumber} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, background: 'var(--bg)',
+                      fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>{step.stepNumber}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getStepTitle(step)}</p>
+                      <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getStepSubtitle(step)}</p>
+                    </div>
+                  </div>
+                ))}
+                {steps.length > 5 && (
+                  <p style={{ textAlign: 'center', fontSize: '0.62rem', color: 'var(--text-muted)', padding: 6 }}>
+                    +{steps.length - 5} more
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Sign out */}
+          <button className="btn-signout" onClick={handleLogout}>Sign Out</button>
+        </div>
+      )}
 
       {/* Modals */}
       {showCaptureSelector && (

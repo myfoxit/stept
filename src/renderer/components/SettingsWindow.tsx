@@ -1,231 +1,192 @@
 import React, { useState, useEffect } from 'react';
 import { Settings } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
-import { X, Settings as SettingsIcon, Bot, Wrench, Loader2, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { OndokiLogoSmall } from './OndokiLogo';
 
 interface SettingsWindowProps {
   onClose: () => void;
   onSettingsChange?: (settings: Settings) => void;
 }
 
+type LlmProvider = 'ondoki' | 'openai' | 'anthropic' | 'gemini' | 'custom';
+
+const MODEL_OPTIONS: { id: LlmProvider; name: string; desc: string; iconBg: string; iconColor: string; iconContent: React.ReactNode }[] = [
+  { id: 'ondoki', name: 'Ondoki', desc: 'Default · Built-in', iconBg: 'rgba(108,92,231,0.08)', iconColor: '#6C5CE7', iconContent: <OndokiLogoSmall /> },
+  { id: 'openai', name: 'OpenAI', desc: 'GPT-4o, GPT-4', iconBg: '#E8F5E8', iconColor: '#10A37F', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>G</span> },
+  { id: 'anthropic', name: 'Claude', desc: 'Sonnet, Opus, Haiku', iconBg: '#FFF0E6', iconColor: '#D97706', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>C</span> },
+  { id: 'gemini', name: 'Gemini', desc: 'Pro, Flash, Ultra', iconBg: '#E8F0FE', iconColor: '#4285F4', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>G</span> },
+  { id: 'custom', name: 'Custom (Ollama)', desc: 'Self-hosted · Local inference', iconBg: '#F0F0F4', iconColor: '#555', iconContent: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M12 8v8M8 12h8"/></svg>
+  )},
+];
+
 const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChange }) => {
   const electronAPI = useElectronAPI();
   const [settings, setSettings] = useState<Settings>({
-    cloudEndpoint: '', chatApiUrl: '', apiKey: '', llmProvider: 'openai',
+    cloudEndpoint: '', chatApiUrl: '', apiKey: '', llmProvider: 'ondoki',
     llmApiKey: '', llmModel: '', llmBaseUrl: '', autoAnnotateSteps: true, autoGenerateGuide: false,
     frontendUrl: 'http://localhost:5173',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'advanced'>('general');
+  const [showLlmSetup, setShowLlmSetup] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
       if (!electronAPI) return;
       try {
         const s = await electronAPI.getSettings();
-        setSettings(s); setIsLoading(false);
-      } catch { setError('Failed to load settings'); setIsLoading(false); }
+        setSettings(s);
+        setIsLoading(false);
+      } catch { setIsLoading(false); }
     };
     loadSettings();
   }, [electronAPI]);
 
   const handleInputChange = (field: keyof Settings, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [field]: value }));
-    setError(null); setSuccessMessage(null);
   };
 
   const handleSave = async () => {
     if (!electronAPI) return;
     try {
-      setIsSaving(true); setError(null);
+      setIsSaving(true);
       await electronAPI.saveSettings(settings);
-      setSuccessMessage('Saved!');
       onSettingsChange?.(settings);
-      setTimeout(onClose, 800);
+      setTimeout(onClose, 300);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save');
+      console.error('Failed to save:', e);
     } finally { setIsSaving(false); }
   };
 
-  const handleReset = async () => {
-    if (!confirm('Reset all settings to defaults?') || !electronAPI) return;
-    try {
-      setIsSaving(true); setError(null);
-      await electronAPI.resetSettings();
-      const s = await electronAPI.getSettings();
-      setSettings(s); setSuccessMessage('Reset!');
-      onSettingsChange?.(s);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to reset');
-    } finally { setIsSaving(false); }
+  const selectedModel = (settings.llmProvider || 'ondoki') as LlmProvider;
+  const showConfig = selectedModel !== 'ondoki';
+
+  const getEndpointDefaults = (provider: LlmProvider) => {
+    switch (provider) {
+      case 'openai': return { endpoint: 'https://api.openai.com/v1', label: 'OpenAI Endpoint' };
+      case 'anthropic': return { endpoint: 'https://api.anthropic.com/v1', label: 'Anthropic Endpoint' };
+      case 'gemini': return { endpoint: 'https://generativelanguage.googleapis.com/v1', label: 'Google AI Endpoint' };
+      case 'custom': return { endpoint: 'http://localhost:11434', label: 'Ollama Endpoint' };
+      default: return { endpoint: '', label: 'Endpoint' };
+    }
   };
 
   if (isLoading) {
     return (
       <div className="dialog-overlay">
-        <div className="card p-6 text-center max-w-xs">
-          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-gray-400" />
-          <p className="text-[13px] text-gray-500">Loading settings...</p>
+        <div style={{ background: 'var(--card)', borderRadius: 'var(--radius-xl)', padding: 32, textAlign: 'center' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Loading settings...</p>
         </div>
       </div>
     );
   }
 
-  const tabs = [
-    { id: 'general' as const, label: 'General', icon: SettingsIcon },
-    { id: 'ai' as const, label: 'AI', icon: Bot },
-    { id: 'advanced' as const, label: 'Advanced', icon: Wrench },
-  ];
-
   return (
-    <div className="dialog-overlay">
-      <div className="dialog-content max-w-2xl">
-        {/* Header */}
-        <div className="px-4 py-3 border-b flex items-center justify-between">
-          <h2 className="text-[14px] font-semibold text-gray-800">Settings</h2>
-          <button onClick={onClose} className="btn-icon"><X className="h-3.5 w-3.5" /></button>
-        </div>
+    <div className="dialog-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: 'var(--card)', borderRadius: 'var(--radius-xl)',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.2)', width: 420, maxWidth: '92vw',
+        maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Body */}
+        <div style={{ padding: '22px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', flex: 1 }} className="scrollbar-thin">
+          {/* AI Model Section */}
+          <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <span className="section-title">AI Model</span>
+              <button className="btn-wizard" onClick={() => setShowLlmSetup(true)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+                Setup Wizard
+              </button>
+            </div>
 
-        <div className="flex" style={{ height: '380px' }}>
-          {/* Sidebar */}
-          <div className="w-36 border-r p-2 space-y-0.5">
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] transition-colors ${
-                    activeTab === tab.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'
-                  }`}>
-                  <Icon className="h-3.5 w-3.5" />{tab.label}
-                </button>
-              );
-            })}
+            <div className="model-grid">
+              {MODEL_OPTIONS.map((model) => (
+                <div
+                  key={model.id}
+                  className={`model-card ${selectedModel === model.id ? 'selected' : ''}`}
+                  style={model.id === 'custom' ? { gridColumn: 'span 2' } : undefined}
+                  onClick={() => handleInputChange('llmProvider', model.id)}
+                >
+                  <div className="model-icon" style={{ background: model.iconBg, color: model.iconColor }}>
+                    {model.iconContent}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                    <span className="model-name">{model.name}</span>
+                    <span className="model-desc">{model.desc}</span>
+                  </div>
+                  <div className="model-check">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Dynamic config panel */}
+            {showConfig && (
+              <div style={{
+                marginTop: 10, padding: 12, background: 'var(--bg)',
+                borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+                display: 'flex', flexDirection: 'column', gap: 10,
+              }}>
+                <div>
+                  <span className="config-label">{getEndpointDefaults(selectedModel).label}</span>
+                  <input className="text-input" style={{ fontSize: '0.78rem', padding: '9px 12px' }}
+                    value={settings.llmBaseUrl || ''} placeholder={getEndpointDefaults(selectedModel).endpoint}
+                    onChange={(e) => handleInputChange('llmBaseUrl', e.target.value)} />
+                </div>
+                {selectedModel !== 'custom' && (
+                  <div>
+                    <span className="config-label">API Key</span>
+                    <input className="text-input" type="password" style={{ fontSize: '0.78rem', padding: '9px 12px' }}
+                      value={settings.llmApiKey || ''} placeholder="sk-..."
+                      onChange={(e) => handleInputChange('llmApiKey', e.target.value)} />
+                  </div>
+                )}
+                <div>
+                  <span className="config-label">Model Name</span>
+                  <input className="text-input" style={{ fontSize: '0.78rem', padding: '9px 12px' }}
+                    value={settings.llmModel || ''} placeholder={selectedModel === 'custom' ? 'llama3, mistral...' : 'gpt-4o'}
+                    onChange={(e) => handleInputChange('llmModel', e.target.value)} />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Content */}
-          <div className="flex-1 p-4 overflow-y-auto scrollbar-thin">
-            {activeTab === 'general' && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-[13px] font-medium text-gray-700 mb-2">Cloud Integration</h3>
-                  <div className="space-y-2.5">
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">Cloud Endpoint</label>
-                      <input type="url" value={settings.cloudEndpoint} onChange={(e) => handleInputChange('cloudEndpoint', e.target.value)}
-                        className="input-field" placeholder="https://api.ondoki.com" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">API Key</label>
-                      <input type="password" value={settings.apiKey} onChange={(e) => handleInputChange('apiKey', e.target.value)}
-                        className="input-field" placeholder="Your API key" />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-medium text-gray-700 mb-2">Recording</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input type="checkbox" checked={settings.autoAnnotateSteps}
-                        onChange={(e) => handleInputChange('autoAnnotateSteps', e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-500" />
-                      <div>
-                        <span className="text-[13px] text-gray-700">Auto-annotate steps</span>
-                        <p className="text-[11px] text-gray-400">Generate descriptions with AI</p>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-2.5 cursor-pointer">
-                      <input type="checkbox" checked={settings.autoGenerateGuide}
-                        onChange={(e) => handleInputChange('autoGenerateGuide', e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-500" />
-                      <div>
-                        <span className="text-[13px] text-gray-700">Auto-generate guide</span>
-                        <p className="text-[11px] text-gray-400">Create guide after recording</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
+          {/* Export Section */}
+          <div>
+            <span className="section-title" style={{ display: 'block', marginBottom: 14 }}>Export</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <div className="field-label">Cloud Endpoint URL</div>
+                <input className="text-input" style={{ fontSize: '0.78rem' }}
+                  value={settings.cloudEndpoint || ''}
+                  onChange={(e) => handleInputChange('cloudEndpoint', e.target.value)} />
               </div>
-            )}
-
-            {activeTab === 'ai' && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-[13px] font-medium text-gray-700 mb-2">AI Provider</h3>
-                  <div className="space-y-2.5">
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">Provider</label>
-                      <select value={settings.llmProvider} onChange={(e) => handleInputChange('llmProvider', e.target.value)} className="input-field">
-                        <option value="openai">OpenAI</option>
-                        <option value="anthropic">Anthropic</option>
-                        <option value="azure">Azure OpenAI</option>
-                        <option value="custom">Custom</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">API Key</label>
-                      <input type="password" value={settings.llmApiKey} onChange={(e) => handleInputChange('llmApiKey', e.target.value)}
-                        className="input-field" placeholder="AI provider API key" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">Model</label>
-                      <input type="text" value={settings.llmModel} onChange={(e) => handleInputChange('llmModel', e.target.value)}
-                        className="input-field" placeholder={settings.llmProvider === 'openai' ? 'gpt-4o-mini' : settings.llmProvider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'Model'} />
-                    </div>
-                    {(settings.llmProvider === 'custom' || settings.llmProvider === 'azure') && (
-                      <div>
-                        <label className="text-xs font-medium text-gray-500 mb-1 block">Base URL</label>
-                        <input type="url" value={settings.llmBaseUrl} onChange={(e) => handleInputChange('llmBaseUrl', e.target.value)}
-                          className="input-field" placeholder="https://..." />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 rounded-md p-2.5 flex items-start gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-amber-700">API keys are stored locally and only used for processing your recordings.</p>
-                </div>
+              <div>
+                <div className="field-label">API Key (Optional)</div>
+                <input className="text-input" type="password" style={{ fontSize: '0.78rem' }}
+                  value={settings.apiKey || ''} placeholder="Bearer token or API key"
+                  onChange={(e) => handleInputChange('apiKey', e.target.value)} />
               </div>
-            )}
-
-            {activeTab === 'advanced' && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-[13px] font-medium text-gray-700 mb-2">Chat Service</h3>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Chat API URL</label>
-                    <input type="url" value={settings.chatApiUrl} onChange={(e) => handleInputChange('chatApiUrl', e.target.value)}
-                      className="input-field" placeholder="https://api.ondoki.com/chat" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-medium text-gray-700 mb-2">Reset</h3>
-                  <div className="bg-red-50 border border-red-100 rounded-md p-2.5">
-                    <p className="text-[11px] text-red-600 mb-2">Reset all settings to defaults. Cannot be undone.</p>
-                    <button onClick={handleReset} disabled={isSaving} className="btn-destructive btn-sm gap-1">
-                      <RotateCcw className="h-3 w-3" /> Reset
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t flex items-center justify-between">
-          <div>
-            {error && <span className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{error}</span>}
-            {successMessage && <span className="text-xs text-green-500 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{successMessage}</span>}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={onClose} disabled={isSaving} className="btn-secondary">Cancel</button>
-            <button onClick={handleSave} disabled={isSaving} className="btn-primary">
-              {isSaving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', gap: 8,
+          padding: '14px 20px', borderTop: '1px solid var(--border)',
+        }}>
+          <button className="btn-sm ghost" onClick={onClose} disabled={isSaving}>Cancel</button>
+          <button className="btn-sm primary" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
     </div>

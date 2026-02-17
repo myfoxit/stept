@@ -1,7 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AnnotatedStep, RecordedStep } from '../../main/preload';
 import { useChat, useMessageFormatting } from '../hooks/useChat';
-import { X, Send, MessageCircle, RotateCcw, Check, Loader2 } from 'lucide-react';
 
 interface ChatWindowProps {
   steps: any[];
@@ -40,83 +38,113 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ steps, onClose }) => {
   };
 
   return (
-    <div className="dialog-overlay">
-      <div className="bg-white rounded-lg shadow-xl border w-full max-w-lg h-[500px] flex flex-col">
+    <div className="dialog-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: 'var(--card)', borderRadius: 'var(--radius-xl)',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.2)', width: 440, maxWidth: '92vw',
+        height: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
         {/* Header */}
-        <div className="px-3 py-2.5 border-b flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-4 w-4 text-gray-400" />
-            <span className="text-[13px] font-semibold text-gray-800">Chat</span>
-            {includeRecordingContext && steps.length > 0 && (
-              <span className="text-[11px] text-green-500 flex items-center gap-0.5">
-                <Check className="h-3 w-3" />{steps.length} steps
-              </span>
-            )}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.92rem', fontWeight: 700, color: 'var(--dark)' }}>Chat</span>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.68rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
               <input type="checkbox" checked={includeRecordingContext} onChange={toggleRecordingContext}
-                className="h-3 w-3 rounded border-gray-300 text-indigo-500" />
+                style={{ width: 12, height: 12 }} />
               Recording
             </label>
-            <button onClick={onClose} className="btn-icon"><X className="h-3.5 w-3.5" /></button>
+            <button onClick={onClose} style={{
+              width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
+              background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'var(--text-secondary)',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 scrollbar-thin">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }} className="scrollbar-thin">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <MessageCircle className="h-8 w-8 text-gray-200 mb-2" />
-              <p className="text-xs text-gray-400">Ask about your recording or workflow</p>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8, opacity: 0.3 }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <p style={{ fontSize: '0.78rem' }}>Ask about your recording or workflow</p>
             </div>
           )}
           {messages.map((message, index) => (
-            <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] px-2.5 py-1.5 rounded-lg text-[13px] ${
-                message.role === 'user'
-                  ? 'bg-indigo-500 text-white rounded-br-sm'
-                  : 'bg-gray-100 text-gray-700 rounded-bl-sm'
-              }`}>
-                <div className={`whitespace-pre-wrap ${isCodeMessage(message.content) ? 'font-mono text-xs' : ''}`}>
+            <div key={index} style={{ display: 'flex', justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth: '80%', padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+                fontSize: '0.82rem', lineHeight: 1.5,
+                ...(message.role === 'user'
+                  ? { background: 'var(--purple)', color: 'white', borderBottomRightRadius: 4 }
+                  : { background: 'var(--bg)', color: 'var(--text-primary)', borderBottomLeftRadius: 4, border: '1px solid var(--border)' }),
+              }}>
+                <div style={{ whiteSpace: 'pre-wrap', fontFamily: isCodeMessage(message.content) ? 'monospace' : 'inherit', fontSize: isCodeMessage(message.content) ? '0.75rem' : undefined }}>
                   {message.content}
                 </div>
-                <div className="text-[10px] mt-0.5 opacity-60">{formatTimestamp(message.timestamp || new Date())}</div>
+                <div style={{ fontSize: '0.6rem', marginTop: 4, opacity: 0.6 }}>{formatTimestamp(message.timestamp || new Date())}</div>
               </div>
             </div>
           ))}
           {isStreaming && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                <span className="text-[11px] text-gray-400">Typing...</span>
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Typing...</span>
               </div>
             </div>
           )}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-2 text-xs text-red-600">{error}</div>
+            <div style={{ background: 'rgba(255,95,87,0.08)', border: '1px solid rgba(255,95,87,0.2)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: '0.72rem', color: 'var(--red)' }}>
+              {error}
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}
-        <div className="border-t px-3 py-2">
-          <div className="flex gap-1.5">
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <textarea ref={inputRef} value={inputValue} onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown} placeholder="Type a message..." rows={1}
-              className="input-field flex-1 resize-none py-1.5" style={{ minHeight: '32px', maxHeight: '80px' }}
-              disabled={isLoading} />
+              style={{
+                flex: 1, resize: 'none', minHeight: 38, maxHeight: 80,
+                padding: '9px 14px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', color: 'var(--text-primary)',
+                background: 'var(--card)', outline: 'none',
+              }}
+              disabled={isLoading}
+              onFocus={(e) => e.target.style.borderColor = 'var(--purple)'}
+              onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+            />
             <button onClick={handleSendMessage} disabled={!inputValue.trim() || isLoading}
-              className="btn-primary h-8 w-8 p-0 flex-shrink-0">
-              {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              style={{
+                width: 38, height: 38, borderRadius: 'var(--radius-sm)', border: 'none',
+                background: 'var(--purple)', color: 'white', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: !inputValue.trim() || isLoading ? 0.5 : 1, flexShrink: 0,
+              }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
             </button>
           </div>
           {messages.length > 0 && (
-            <div className="flex justify-between items-center mt-1.5">
-              <button onClick={clearChat} className="text-[11px] text-gray-400 hover:text-gray-600 flex items-center gap-0.5">
-                <RotateCcw className="h-3 w-3" /> Clear
-              </button>
-              <span className="text-[11px] text-gray-300">Enter to send</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+              <button className="btn-text" style={{ padding: '2px 6px', fontSize: '0.68rem' }} onClick={clearChat}>Clear</button>
+              <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Enter to send</span>
             </div>
           )}
         </div>
