@@ -482,17 +482,29 @@ export class RecordingService extends EventEmitter {
       const elementRole = event.element?.role || '';
       const elementDescription = event.element?.description || event.element?.title || '';
 
-      // Screenshot
+      // Screenshot — use the display where the click happened
       const captureRegion = this.getCaptureRegion();
+      let screenshotBounds = captureRegion;
+      if (!this.captureArea?.bounds) {
+        // "all-displays" mode: find the display containing this click
+        const displays = this.screenshotService.getDisplaysSync();
+        const clickDisplay = displays.find(d =>
+          clickPoint.x >= d.bounds.x && clickPoint.x < d.bounds.x + d.bounds.width &&
+          clickPoint.y >= d.bounds.y && clickPoint.y < d.bounds.y + d.bounds.height
+        );
+        if (clickDisplay) {
+          screenshotBounds = clickDisplay.bounds;
+        }
+      }
       const screenshotRelative = {
-        x: Math.max(0, Math.min(clickPoint.x - captureRegion.x, captureRegion.width - 1)),
-        y: Math.max(0, Math.min(clickPoint.y - captureRegion.y, captureRegion.height - 1)),
+        x: Math.max(0, Math.min(clickPoint.x - screenshotBounds.x, screenshotBounds.width - 1)),
+        y: Math.max(0, Math.min(clickPoint.y - screenshotBounds.y, screenshotBounds.height - 1)),
       };
 
       let screenshotPath: string | undefined;
       try {
         screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
-          captureRegion,
+          screenshotBounds,
           screenshotRelative,
           this.screenshotFolder!,
           ++this.stepCount,
