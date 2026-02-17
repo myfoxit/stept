@@ -383,7 +383,7 @@ export class RecordingService extends EventEmitter {
   // ------------------------------------------------------------------
 
   private toLogical(x: number, y: number, eventScale?: number): { x: number; y: number } {
-    const scale = eventScale && eventScale > 1 ? eventScale : (this.coordSpace === 'physical' && this.coordScale > 1 ? this.coordScale : 1);
+    const scale = eventScale != null ? eventScale : (this.coordSpace === 'physical' && this.coordScale > 1 ? this.coordScale : 1);
     if (scale > 1) {
       return {
         x: Math.round(x / scale),
