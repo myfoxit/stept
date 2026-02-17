@@ -44,6 +44,9 @@ class OndokiApp {
     // Wait for app to be ready
     await app.whenReady();
 
+    // Remove default menu bar
+    Menu.setApplicationMenu(null);
+
     // Create main window
     this.createMainWindow();
 
@@ -137,6 +140,7 @@ class OndokiApp {
       minWidth: 400,
       minHeight: 500,
       show: true,
+      autoHideMenuBar: true,
       backgroundColor: '#f8fafc',
       icon: this.getAppIcon(),
       // titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',

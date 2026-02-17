@@ -201,7 +201,16 @@ const MainWindow: React.FC = () => {
 
           {/* Recording controls */}
           {recordingState.isRecording ? (
-            <div className={`recording-card ${!recordingState.isPaused ? 'active' : ''}`}>
+            <div style={{
+              border: !recordingState.isPaused ? '1.5px solid var(--red)' : '1.5px solid var(--border)',
+              boxShadow: !recordingState.isPaused ? '0 0 0 3px rgba(255, 95, 87, 0.1)' : 'none',
+              borderRadius: 'var(--radius-lg)',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              background: 'var(--card)',
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {!recordingState.isPaused && (
@@ -213,7 +222,7 @@ const MainWindow: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', gap: 12, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                   <span>{formattedDuration}</span>
-                  <span>{recordingState.stepCount} steps</span>
+                  <span>{recordingState.stepCount} {recordingState.stepCount === 1 ? 'step' : 'steps'}</span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
