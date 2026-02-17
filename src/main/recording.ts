@@ -452,6 +452,7 @@ export class RecordingService extends EventEmitter {
       this.flushTypedText();
 
       const clickPoint = this.toLogical(event.x, event.y, event.scale);
+      console.log(`[DIAG] click raw=(${event.x},${event.y}) scale=${event.scale} logical=(${clickPoint.x},${clickPoint.y})`);
       const windowTitle = event.window?.title || 'Unknown Window';
       const ownerApp = event.window?.ownerName || '';
       const windowBounds = event.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
@@ -501,6 +502,7 @@ export class RecordingService extends EventEmitter {
         x: Math.max(0, Math.min(clickPoint.x - screenshotBounds.x, screenshotBounds.width - 1)),
         y: Math.max(0, Math.min(clickPoint.y - screenshotBounds.y, screenshotBounds.height - 1)),
       };
+      console.log(`[DIAG] screenshotBounds=${JSON.stringify(screenshotBounds)} screenshotRelative=(${screenshotRelative.x},${screenshotRelative.y})`);
 
       let screenshotPath: string | undefined;
       try {
