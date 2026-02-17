@@ -13,7 +13,7 @@ module.exports = {
       /^\/src/,
       /(.eslintrc|\.gitignore|\.gitattributes)/,
       /^\/\.vscode/,
-      /^\/assets/,
+      /^\/assets\/dmg/,
       /(tsconfig|webpack|tailwind).*\.json?$/,
       /^\/forge\.config\.js$/,
     ],
