@@ -23,7 +23,7 @@ const GuidePreview: React.FC<GuidePreviewProps> = ({ steps, onClose }) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeTab, setActiveTab] = useState<'preview' | 'markdown'>('preview');
 
-  useEffect(() => { generateGuide(); }, []);
+  useEffect(() => { if (electronAPI) generateGuide(); }, [electronAPI]);
 
   const generateGuide = async () => {
     if (!electronAPI) { setError('Electron API not available'); return; }
