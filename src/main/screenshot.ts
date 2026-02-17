@@ -523,6 +523,12 @@ export class ScreenshotService {
       thumbnailSize: { width: physWidth, height: physHeight },
     });
 
+    console.log(`[DIAG] desktopCapturer: ${sources.length} sources, target display=${targetDisplay.id} (${targetDisplay.size.width}x${targetDisplay.size.height}@${targetDisplay.scaleFactor})`);
+    for (const s of sources) {
+      const thumb = s.thumbnail;
+      console.log(`[DIAG]   source: id="${s.id}" display_id="${s.display_id}" name="${s.name}" thumb=${thumb.getSize().width}x${thumb.getSize().height}`);
+    }
+
     // Match by display ID — desktopCapturer source.display_id corresponds to Electron display.id
     const displayIdStr = targetDisplay.id.toString();
     let source = sources.find(s => s.display_id === displayIdStr);
