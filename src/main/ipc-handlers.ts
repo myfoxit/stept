@@ -31,14 +31,12 @@ export function setupIpcHandlers(
   // Recording IPC handlers
   ipcMain.handle('recording:start', async (event, captureArea, projectId) => {
     try {
-      await recordingService.startRecording(captureArea, projectId);
-      
-      // Remove stale listeners from previous recordings to prevent duplicates
+      // Remove stale listeners BEFORE starting to prevent race conditions
       recordingService.removeAllListeners('step-recorded');
       recordingService.removeAllListeners('state-changed');
       smartAnnotationService.removeAllListeners('step-annotated');
 
-      // Forward events to renderer + auto-annotate
+      // Set up new listeners BEFORE starting so we don't miss early events
       recordingService.on('step-recorded', (step) => {
         event.sender.send('step-recorded', step);
 
@@ -51,7 +49,6 @@ export function setupIpcHandlers(
         }
       });
 
-      // Forward annotation results to renderer
       smartAnnotationService.on('step-annotated', (annotatedStep) => {
         event.sender.send('step-annotated', annotatedStep);
       });
@@ -59,6 +56,8 @@ export function setupIpcHandlers(
       recordingService.on('state-changed', (state) => {
         event.sender.send('recording-state-changed', state);
       });
+
+      await recordingService.startRecording(captureArea, projectId);
       
       return { success: true };
     } catch (error) {

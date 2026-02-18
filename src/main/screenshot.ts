@@ -533,6 +533,15 @@ export class ScreenshotService {
     const displayIdStr = targetDisplay.id.toString();
     let source = sources.find(s => s.display_id === displayIdStr);
 
+    // Fallback: match by expected physical thumbnail size (handles Windows mixed-DPI
+    // where display_id doesn't always match Electron's id)
+    if (!source) {
+      source = sources.find(s => {
+        const thumb = s.thumbnail.getSize();
+        return Math.abs(thumb.width - physWidth) < 10 && Math.abs(thumb.height - physHeight) < 10;
+      });
+    }
+
     // Fallback: if only one source (single monitor), just use it
     if (!source && sources.length === 1) {
       source = sources[0];
@@ -544,6 +553,7 @@ export class ScreenshotService {
     }
 
     if (!source) {
+      console.error(`No desktopCapturer source for display ${displayIdStr}. Sources:`, sources.map(s => ({ id: s.id, display_id: s.display_id, name: s.name, thumb: s.thumbnail.getSize() })));
       throw new Error(`No desktopCapturer source found for display ${displayIdStr}`);
     }
 
@@ -553,7 +563,7 @@ export class ScreenshotService {
   /**
    * Take a full screenshot, preferring desktopCapturer, falling back to screenshot-desktop.
    */
-  private async captureScreen(point?: { x: number; y: number }): Promise<Buffer> {
+  public async captureScreen(point?: { x: number; y: number }): Promise<Buffer> {
     try {
       return await this.takeScreenshotNative(point);
     } catch (e) {
@@ -619,10 +629,11 @@ export class ScreenshotService {
     clickPoint: { x: number; y: number },
     outputDir: string,
     stepNumber: number,
-    scaleFactor?: number
+    scaleFactor?: number,
+    preCapturedBuffer?: Buffer
   ): Promise<string> {
     try {
-      const fullScreenshot = await this.captureScreen({ x: bounds.x, y: bounds.y });
+      const fullScreenshot = preCapturedBuffer ?? await this.captureScreen({ x: bounds.x, y: bounds.y });
       const scale = scaleFactor ?? this.getScaleFactorAtPoint(bounds.x, bounds.y);
 
       // For desktopCapturer, coordinates are relative to the display

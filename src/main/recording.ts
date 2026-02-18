@@ -183,6 +183,7 @@ export class RecordingService extends EventEmitter {
   private currentText = '';
   private textFlushTimeout?: NodeJS.Timeout;
   private clickProcessing = false;
+  private clickQueue: { event: NativeClickEvent; count: number; preCapture?: Buffer }[] = [];
   private lastClickTime = 0;
   private lastClickPos = { x: 0, y: 0 };
 
@@ -382,13 +383,27 @@ export class RecordingService extends EventEmitter {
   // Coordinate normalization
   // ------------------------------------------------------------------
 
+  /**
+   * Convert raw native event coordinates to logical screen coordinates.
+   *
+   * macOS (coordSpace="logical"):  CGEventTap reports logical points → passthrough.
+   *   The event.scale is the display's backingScaleFactor — it does NOT mean
+   *   the coords need dividing; they're already logical.
+   *
+   * Windows (coordSpace="physical"):  Low-level hooks with Per-Monitor DPI V2
+   *   report physical screen pixels → divide by the per-event scale to get logical.
+   */
   private toLogical(x: number, y: number, eventScale?: number): { x: number; y: number } {
-    const scale = eventScale != null ? eventScale : (this.coordSpace === 'physical' && this.coordScale > 1 ? this.coordScale : 1);
-    if (scale > 1) {
-      return {
-        x: Math.round(x / scale),
-        y: Math.round(y / scale),
-      };
+    // Only convert when the native binary reports physical coordinates (Windows).
+    // macOS always reports logical — never divide, regardless of event.scale.
+    if (this.coordSpace === 'physical') {
+      const scale = eventScale ?? this.coordScale;
+      if (scale > 1) {
+        return {
+          x: Math.round(x / scale),
+          y: Math.round(y / scale),
+        };
+      }
     }
     return { x, y };
   }
@@ -397,7 +412,7 @@ export class RecordingService extends EventEmitter {
   // Click handler — events arrive pre-enriched from native binary
   // ------------------------------------------------------------------
 
-  private pendingClick: { event: NativeClickEvent; timeout: NodeJS.Timeout; count: number } | null = null;
+  private pendingClick: { event: NativeClickEvent; timeout: NodeJS.Timeout; count: number; preCapture?: Buffer } | null = null;
 
   private handleNativeClick(event: NativeClickEvent): void {
     const pt = this.toLogical(event.x, event.y, (event as any).scale);
@@ -415,151 +430,195 @@ export class RecordingService extends EventEmitter {
     this.lastClickTime = now;
     this.lastClickPos = { x: pt.x, y: pt.y };
 
-    if (this.pendingClick && sameSpot && sameButton && timeDiff < 400) {
+    // Pre-capture screenshot immediately at click time (before debounce).
+    // This captures what the user was looking at when they clicked — like Scribe/Tango.
+    // Fire-and-forget; the promise resolves into pendingClick.preCapture.
+    const capturePromise = this.preCaptureScreenshot(pt);
+
+    if (this.pendingClick && sameSpot && sameButton && timeDiff < 300) {
+      // Double/triple click — keep the FIRST click's pre-capture (shows pre-click state)
       clearTimeout(this.pendingClick.timeout);
       this.pendingClick.count++;
+      const pending = this.pendingClick;
       this.pendingClick.timeout = setTimeout(() => {
-        const pending = this.pendingClick!;
         this.pendingClick = null;
-        this.processClick(pending.event, pending.count);
+        this.processClick(pending.event, pending.count, pending.preCapture);
       }, 80);
       return;
     }
 
     if (this.pendingClick) {
+      // New click at different location — flush the old one
       clearTimeout(this.pendingClick.timeout);
       const pending = this.pendingClick;
       this.pendingClick = null;
-      this.processClick(pending.event, pending.count);
+      this.processClick(pending.event, pending.count, pending.preCapture);
     }
 
-    this.pendingClick = {
+    // Store this click as pending, attach pre-capture when it resolves
+    const newPending = {
       event,
       count: 1,
-      timeout: setTimeout(() => {
-        const pending = this.pendingClick;
-        this.pendingClick = null;
-        if (pending) this.processClick(pending.event, pending.count);
-      }, 300),
+      preCapture: undefined as Buffer | undefined,
+      timeout: null as any as NodeJS.Timeout,
     };
+    newPending.timeout = setTimeout(() => {
+      this.pendingClick = null;
+      this.processClick(newPending.event, newPending.count, newPending.preCapture);
+    }, 150);
+    this.pendingClick = newPending;
+
+    // Attach pre-capture buffer when ready (usually ~20-50ms)
+    capturePromise.then(buf => {
+      if (buf && this.pendingClick === newPending) {
+        newPending.preCapture = buf;
+      }
+    });
   }
 
-  private async processClick(event: NativeClickEvent, clickCount: number): Promise<void> {
-    if (this.clickProcessing) return;
+  /**
+   * Capture a raw screenshot buffer immediately at click time.
+   * Returns the display screenshot as a PNG buffer, or undefined on failure.
+   */
+  private async preCaptureScreenshot(clickPoint: { x: number; y: number }): Promise<Buffer | undefined> {
+    try {
+      return await this.screenshotService.captureScreen({ x: clickPoint.x, y: clickPoint.y });
+    } catch (error) {
+      console.warn('Pre-capture screenshot failed:', error);
+      return undefined;
+    }
+  }
+
+  private async processClick(event: NativeClickEvent, clickCount: number, preCapture?: Buffer): Promise<void> {
+    if (this.clickProcessing) {
+      this.clickQueue.push({ event, count: clickCount, preCapture });
+      return;
+    }
     this.clickProcessing = true;
 
     try {
-      this.flushTypedText();
-
-      const clickPoint = this.toLogical(event.x, event.y, event.scale);
-      console.log(`[DIAG] click raw=(${event.x},${event.y}) scale=${event.scale} logical=(${clickPoint.x},${clickPoint.y})`);
-      const windowTitle = event.window?.title || 'Unknown Window';
-      const ownerApp = event.window?.ownerName || '';
-      const windowBounds = event.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
-      const scaleFactor = event.scale || this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
-
-      // Skip clicks on the recording app itself
-      if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' ||
-          windowTitle === 'Ondoki Desktop' || windowTitle.startsWith('Ondoki')) {
-        this.clickProcessing = false;
-        return;
-      }
-
-      // Skip system UI — only if we have reliable window info
-      if (ownerApp) {
-        const systemApps = [
-          'Dock', 'WindowManager', 'Spotlight', 'NotificationCenter',
-          'SystemUIServer', 'Control Center', 'Mission Control',
-          'loginwindow', 'ScreenSaverEngine', 'AirPlayUIAgent',
-          'Window Server',
-        ];
-        if (systemApps.includes(ownerApp)) {
-          this.clickProcessing = false;
-          return;
+      await this._processClickInner(event, clickCount, preCapture);
+      while (this.clickQueue.length > 0) {
+        const next = this.clickQueue.shift()!;
+        try {
+          await this._processClickInner(next.event, next.count, next.preCapture);
+        } catch (error) {
+          console.error('Error processing queued click:', error);
         }
       }
-
-      // Extract element info
-      const elementName = this.formatElementName(event.element);
-      const elementRole = event.element?.role || '';
-      const elementDescription = event.element?.description || event.element?.title || '';
-
-      // Screenshot — use the display where the click happened
-      const captureRegion = this.getCaptureRegion();
-      let screenshotBounds = captureRegion;
-      if (!this.captureArea?.bounds) {
-        // "all-displays" mode: find the display containing this click
-        const displays = this.screenshotService.getDisplaysSync();
-        const clickDisplay = displays.find(d =>
-          clickPoint.x >= d.bounds.x && clickPoint.x < d.bounds.x + d.bounds.width &&
-          clickPoint.y >= d.bounds.y && clickPoint.y < d.bounds.y + d.bounds.height
-        );
-        if (clickDisplay) {
-          screenshotBounds = clickDisplay.bounds;
-        }
-      }
-      const screenshotRelative = {
-        x: Math.max(0, Math.min(clickPoint.x - screenshotBounds.x, screenshotBounds.width - 1)),
-        y: Math.max(0, Math.min(clickPoint.y - screenshotBounds.y, screenshotBounds.height - 1)),
-      };
-      console.log(`[DIAG] screenshotBounds=${JSON.stringify(screenshotBounds)} screenshotRelative=(${screenshotRelative.x},${screenshotRelative.y})`);
-
-      let screenshotPath: string | undefined;
-      try {
-        screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
-          screenshotBounds,
-          screenshotRelative,
-          this.screenshotFolder!,
-          ++this.stepCount,
-          scaleFactor
-        );
-      } catch (error) {
-        console.error('Failed to take screenshot:', error);
-        this.stepCount++;
-      }
-
-      // Build description
-      const buttonTypes: Record<number, string> = { 1: 'Left', 2: 'Right', 3: 'Middle' };
-      const buttonType = buttonTypes[event.button] || 'Left';
-      const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
-
-      const cleanRole = elementRole ? elementRole.replace(/^AX/, '') : '';
-      const shortWindowTitle = windowTitle.length > 40 ? windowTitle.substring(0, 40) + '…' : windowTitle;
-      let description = clickLabel;
-      if (elementName && elementName !== cleanRole) {
-        description += ` on "${elementName}"`;
-      } else if (cleanRole && !['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter', 'Client', 'Pane'].includes(cleanRole)) {
-        description += ` on ${cleanRole}`;
-      }
-      description += ` in ${shortWindowTitle}`;
-
-      const step: RecordedStep = {
-        stepNumber: this.stepCount,
-        timestamp: new Date(),
-        actionType: clickLabel,
-        windowTitle,
-        description,
-        screenshotPath,
-        globalMousePosition: clickPoint,
-        relativeMousePosition: {
-          x: clickPoint.x - windowBounds.x,
-          y: clickPoint.y - windowBounds.y,
-        },
-        windowSize: { width: windowBounds.width, height: windowBounds.height },
-        screenshotRelativeMousePosition: screenshotRelative,
-        screenshotSize: { width: screenshotBounds.width, height: screenshotBounds.height },
-        elementName: elementName || undefined,
-        elementRole: elementRole || undefined,
-        elementDescription: elementDescription || undefined,
-        ownerApp: ownerApp || undefined,
-      };
-
-      this.emit('step-recorded', step);
     } catch (error) {
       console.error('Error handling click:', error);
     } finally {
       this.clickProcessing = false;
     }
+  }
+
+  private async _processClickInner(event: NativeClickEvent, clickCount: number, preCapture?: Buffer): Promise<void> {
+    this.flushTypedText();
+
+    const clickPoint = this.toLogical(event.x, event.y, event.scale);
+    console.log(`[DIAG] click raw=(${event.x},${event.y}) scale=${event.scale} logical=(${clickPoint.x},${clickPoint.y})`);
+    const windowTitle = event.window?.title || 'Unknown Window';
+    const ownerApp = event.window?.ownerName || '';
+    const windowBounds = event.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
+    const scaleFactor = event.scale || this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
+
+    // Skip clicks on the recording app itself
+    if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' ||
+        windowTitle === 'Ondoki Desktop' || windowTitle.startsWith('Ondoki')) {
+      return;
+    }
+
+    // Skip system UI — only if we have reliable window info
+    if (ownerApp) {
+      const systemApps = [
+        'Dock', 'WindowManager', 'Spotlight', 'NotificationCenter',
+        'SystemUIServer', 'Control Center', 'Mission Control',
+        'loginwindow', 'ScreenSaverEngine', 'AirPlayUIAgent',
+        'Window Server',
+      ];
+      if (systemApps.includes(ownerApp)) {
+        return;
+      }
+    }
+
+    // Extract element info
+    const elementName = this.formatElementName(event.element);
+    const elementRole = event.element?.role || '';
+    const elementDescription = event.element?.description || event.element?.title || '';
+
+    // Screenshot — use the display where the click happened
+    const captureRegion = this.getCaptureRegion();
+    let screenshotBounds = captureRegion;
+    if (!this.captureArea?.bounds) {
+      // "all-displays" mode: find the display containing this click
+      const displays = this.screenshotService.getDisplaysSync();
+      const clickDisplay = displays.find(d =>
+        clickPoint.x >= d.bounds.x && clickPoint.x < d.bounds.x + d.bounds.width &&
+        clickPoint.y >= d.bounds.y && clickPoint.y < d.bounds.y + d.bounds.height
+      );
+      if (clickDisplay) {
+        screenshotBounds = clickDisplay.bounds;
+      }
+    }
+    const screenshotRelative = {
+      x: Math.max(0, Math.min(clickPoint.x - screenshotBounds.x, screenshotBounds.width - 1)),
+      y: Math.max(0, Math.min(clickPoint.y - screenshotBounds.y, screenshotBounds.height - 1)),
+    };
+    console.log(`[DIAG] screenshotBounds=${JSON.stringify(screenshotBounds)} screenshotRelative=(${screenshotRelative.x},${screenshotRelative.y})`);
+
+    let screenshotPath: string | undefined;
+    try {
+      screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
+        screenshotBounds,
+        screenshotRelative,
+        this.screenshotFolder!,
+        ++this.stepCount,
+        scaleFactor,
+        preCapture  // Use pre-captured screenshot from click time
+      );
+    } catch (error) {
+      console.error('Failed to take screenshot:', error);
+      this.stepCount++;
+    }
+
+    // Build description
+    const buttonTypes: Record<number, string> = { 1: 'Left', 2: 'Right', 3: 'Middle' };
+    const buttonType = buttonTypes[event.button] || 'Left';
+    const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
+
+    const cleanRole = elementRole ? elementRole.replace(/^AX/, '') : '';
+    const shortWindowTitle = windowTitle.length > 40 ? windowTitle.substring(0, 40) + '…' : windowTitle;
+    let description = clickLabel;
+    if (elementName && elementName !== cleanRole) {
+      description += ` on "${elementName}"`;
+    } else if (cleanRole && !['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter', 'Client', 'Pane'].includes(cleanRole)) {
+      description += ` on ${cleanRole}`;
+    }
+    description += ` in ${shortWindowTitle}`;
+
+    const step: RecordedStep = {
+      stepNumber: this.stepCount,
+      timestamp: new Date(),
+      actionType: clickLabel,
+      windowTitle,
+      description,
+      screenshotPath,
+      globalMousePosition: clickPoint,
+      relativeMousePosition: {
+        x: clickPoint.x - windowBounds.x,
+        y: clickPoint.y - windowBounds.y,
+      },
+      windowSize: { width: windowBounds.width, height: windowBounds.height },
+      screenshotRelativeMousePosition: screenshotRelative,
+      screenshotSize: { width: screenshotBounds.width, height: screenshotBounds.height },
+      elementName: elementName || undefined,
+      elementRole: elementRole || undefined,
+      elementDescription: elementDescription || undefined,
+      ownerApp: ownerApp || undefined,
+    };
+
+    this.emit('step-recorded', step);
   }
 
   // ------------------------------------------------------------------

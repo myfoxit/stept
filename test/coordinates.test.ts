@@ -12,8 +12,17 @@ import {
 // =====================================================================
 
 describe('toLogical — coordinate normalization', () => {
-  it('macOS logical coords pass through unchanged', () => {
+  it('macOS logical coords pass through unchanged (scale=2 Retina)', () => {
+    // REGRESSION: recording.ts was dividing by event.scale even for logical coords,
+    // halving all click positions on Retina displays
     expect(toLogical(500, 300, 'logical', 2.0)).toEqual({ x: 500, y: 300 });
+  });
+
+  it('macOS logical coords pass through with ANY scale value', () => {
+    // The scale factor should NEVER affect logical coords — it's metadata only
+    expect(toLogical(1000, 800, 'logical', 3.0)).toEqual({ x: 1000, y: 800 });
+    expect(toLogical(1440, 900, 'logical', 2.0)).toEqual({ x: 1440, y: 900 });
+    expect(toLogical(2560, 1600, 'logical', 2.0)).toEqual({ x: 2560, y: 1600 });
   });
 
   it('macOS logical coords pass through even with scale=1', () => {
