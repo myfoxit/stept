@@ -6,6 +6,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -120,6 +123,17 @@ namespace Ondoki.Native
         public static extern int SetProcessDpiAwareness(int awareness);
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetProcessDPIAware();
+
+        // GDI - Screen capture
+        [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hwnd);
+        [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
+        [DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+        [DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int w, int h);
+        [DllImport("gdi32.dll")] public static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+        [DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int w, int h, IntPtr hdcSrc, int xSrc, int ySrc, uint rop);
+        [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr obj);
+        [DllImport("gdi32.dll")] public static extern bool DeleteDC(IntPtr hdc);
+        public const uint SRCCOPY = 0x00CC0020;
 
         // Accessibility
         [DllImport("oleacc.dll")]
@@ -237,6 +251,49 @@ namespace Ondoki.Native
 
     class Program
     {
+        // ---- Screen capture ----
+        static string captureDir = Path.Combine(Path.GetTempPath(), "ondoki-captures");
+
+        static string CaptureDisplayAtPoint(int x, int y)
+        {
+            try
+            {
+                Directory.CreateDirectory(captureDir);
+                POINT pt; pt.X = x; pt.Y = y;
+                IntPtr hMonitor = Win32.MonitorFromPoint(pt, 2 /* MONITOR_DEFAULTTONEAREST */);
+                MONITORINFO mi = new MONITORINFO();
+                mi.cbSize = Marshal.SizeOf(mi);
+                Win32.GetMonitorInfo(hMonitor, ref mi);
+
+                int left = mi.rcMonitor.Left;
+                int top = mi.rcMonitor.Top;
+                int w = mi.rcMonitor.Right - left;
+                int h = mi.rcMonitor.Bottom - top;
+
+                IntPtr hdcScreen = Win32.GetDC(IntPtr.Zero);
+                IntPtr hdcMem = Win32.CreateCompatibleDC(hdcScreen);
+                IntPtr hBitmap = Win32.CreateCompatibleBitmap(hdcScreen, w, h);
+                IntPtr hOld = Win32.SelectObject(hdcMem, hBitmap);
+                Win32.BitBlt(hdcMem, 0, 0, w, h, hdcScreen, left, top, Win32.SRCCOPY);
+                Win32.SelectObject(hdcMem, hOld);
+
+                string path = Path.Combine(captureDir, $"cap_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.png");
+                using (var bmp = System.Drawing.Image.FromHbitmap(hBitmap))
+                {
+                    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+
+                Win32.DeleteObject(hBitmap);
+                Win32.DeleteDC(hdcMem);
+                Win32.ReleaseDC(IntPtr.Zero, hdcScreen);
+                return path;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         // ---- Helpers ----
 
         static string GetWindowTitle(IntPtr hwnd)
@@ -616,6 +673,10 @@ namespace Ondoki.Native
 
                 if (msg == Win32.WM_LBUTTONDOWN || msg == Win32.WM_RBUTTONDOWN || msg == Win32.WM_MBUTTONDOWN)
                 {
+                    // Capture screenshot FIRST — synchronous BitBlt before anything else
+                    // This runs in the low-level hook, before the click reaches the target app
+                    string screenshotPath = CaptureDisplayAtPoint(pt.X, pt.Y);
+
                     int button = msg == Win32.WM_LBUTTONDOWN ? 1 : msg == Win32.WM_RBUTTONDOWN ? 2 : 3;
                     string windowJson = BuildWindowJsonAtPoint(pt);
                     string elementJson = BuildElementJsonAtPoint(pt);
@@ -627,6 +688,7 @@ namespace Ondoki.Native
                     var mr = monInfo.rcMonitor;
                     string monBoundsJson = Json.Rect(mr.Left, mr.Top, mr.Right - mr.Left, mr.Bottom - mr.Top);
 
+                    string screenshotJson = screenshotPath != null ? Json.Str(screenshotPath) : "null";
                     WriteEvent(Json.Obj(
                         ("type", Json.Str("click")),
                         ("x", Json.Num(pt.X)),
@@ -636,7 +698,8 @@ namespace Ondoki.Native
                         ("element", elementJson),
                         ("scale", Json.Num(scale)),
                         ("monitorBounds", monBoundsJson),
-                        ("timestamp", Json.Num(ts))
+                        ("timestamp", Json.Num(ts)),
+                        ("screenshotPath", screenshotJson)
                     ));
                 }
                 else if (msg == Win32.WM_MOUSEWHEEL)
