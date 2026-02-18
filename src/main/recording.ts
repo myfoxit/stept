@@ -710,29 +710,8 @@ export class RecordingService extends EventEmitter {
     const buttonType = buttonTypes[event.button] || 'Left';
     const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
 
-    const cleanRole = elementRole ? elementRole.replace(/^AX/, '') : '';
-    const shortWindowTitle = windowTitle.length > 40 ? windowTitle.substring(0, 40) + '…' : windowTitle;
-    
-    // Build a meaningful element label from all available info
-    const ignoredRoles = ['Group', 'ScrollArea', 'Window', 'Unknown', 'WebArea', 'Splitter', 'Client', 'Pane'];
-    const usefulRole = cleanRole && !ignoredRoles.includes(cleanRole) ? cleanRole : '';
-    const elLabel = elementName || elementDescription || usefulRole || '';
-    
-    let description = clickLabel;
-    if (elLabel) {
-      // If we have both element name and a useful role, combine them
-      if (elementName && usefulRole && usefulRole !== elementName) {
-        description += ` on ${usefulRole} "${elementName}"`;
-      } else {
-        description += ` on "${elLabel}"`;
-      }
-    }
-    if (shortWindowTitle && shortWindowTitle !== 'Unknown Window') {
-      description += ` in ${shortWindowTitle}`;
-    } else if (!elLabel) {
-      // No element, no window — just say "click here"
-      description += ' here';
-    }
+    // Simple description — LLM will construct the real one from metadata
+    const description = `${clickLabel} here`;
 
     const step: RecordedStep = {
       stepNumber: this.stepCount,
