@@ -630,7 +630,8 @@ export class ScreenshotService {
     outputDir: string,
     stepNumber: number,
     scaleFactor?: number,
-    preCapturedBuffer?: Buffer
+    preCapturedBuffer?: Buffer,
+    physicalAnnotation?: { x: number; y: number }
   ): Promise<string> {
     try {
       const fullScreenshot = preCapturedBuffer ?? await this.captureScreen({ x: bounds.x, y: bounds.y });
@@ -654,8 +655,12 @@ export class ScreenshotService {
         throw new Error(`Invalid crop region: ${pWidth}x${pHeight} at ${pLeft},${pTop} (img ${imgW}x${imgH}, scale ${scale})`);
       }
 
-      const pClickX = Math.round(clickPoint.x * scale);
-      const pClickY = Math.round(clickPoint.y * scale);
+      const pClickX = physicalAnnotation
+        ? Math.round(physicalAnnotation.x)
+        : Math.round(clickPoint.x * scale);
+      const pClickY = physicalAnnotation
+        ? Math.round(physicalAnnotation.y)
+        : Math.round(clickPoint.y * scale);
 
       const circleRadius = Math.round(15 * scale);
       const circleSize = circleRadius * 2;

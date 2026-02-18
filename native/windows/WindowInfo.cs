@@ -620,6 +620,13 @@ namespace Ondoki.Native
                     string windowJson = BuildWindowJsonAtPoint(pt);
                     string elementJson = BuildElementJsonAtPoint(pt);
 
+                    // Get physical monitor bounds for accurate multi-monitor positioning
+                    var hMonitor = Win32.MonitorFromPoint(pt, Win32.MONITOR_DEFAULTTONEAREST);
+                    var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                    Win32.GetMonitorInfo(hMonitor, ref monInfo);
+                    var mr = monInfo.rcMonitor;
+                    string monBoundsJson = Json.Rect(mr.Left, mr.Top, mr.Right - mr.Left, mr.Bottom - mr.Top);
+
                     WriteEvent(Json.Obj(
                         ("type", Json.Str("click")),
                         ("x", Json.Num(pt.X)),
@@ -628,6 +635,7 @@ namespace Ondoki.Native
                         ("window", windowJson),
                         ("element", elementJson),
                         ("scale", Json.Num(scale)),
+                        ("monitorBounds", monBoundsJson),
                         ("timestamp", Json.Num(ts))
                     ));
                 }

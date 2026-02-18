@@ -17,6 +17,7 @@ interface NativeClickEvent {
   window: NativeWindowInfo | null;
   element: NativeElementInfo | null;
   scale: number;
+  monitorBounds?: { x: number; y: number; width: number; height: number };
   timestamp: number;
 }
 
@@ -567,6 +568,17 @@ export class RecordingService extends EventEmitter {
     };
     console.log(`[DIAG] screenshotBounds=${JSON.stringify(screenshotBounds)} screenshotRelative=(${screenshotRelative.x},${screenshotRelative.y})`);
 
+    // On Windows with mixed DPI, physical hook coords don't match Electron's logical
+    // display bounds. Use the native monitor's physical bounds for accurate annotation.
+    let physicalAnnotation: { x: number; y: number } | undefined;
+    if (event.monitorBounds) {
+      physicalAnnotation = {
+        x: event.x - event.monitorBounds.x,
+        y: event.y - event.monitorBounds.y,
+      };
+      console.log(`[DIAG] monitorBounds=${JSON.stringify(event.monitorBounds)} physicalAnnotation=(${physicalAnnotation.x},${physicalAnnotation.y})`);
+    }
+
     let screenshotPath: string | undefined;
     try {
       screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
@@ -575,7 +587,8 @@ export class RecordingService extends EventEmitter {
         this.screenshotFolder!,
         ++this.stepCount,
         scaleFactor,
-        preCapture  // Use pre-captured screenshot from click time
+        preCapture,  // Use pre-captured screenshot from click time
+        physicalAnnotation  // Physical pixel offset for accurate multi-monitor annotation
       );
     } catch (error) {
       console.error('Failed to take screenshot:', error);
