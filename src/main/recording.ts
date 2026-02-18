@@ -240,6 +240,22 @@ export class RecordingService extends EventEmitter {
         await this.showOverlay();
       }
 
+      // Minimize the Ondoki window and show countdown before recording starts
+      const { BrowserWindow } = require('electron');
+      const mainWindow = BrowserWindow.getAllWindows().find((w: any) => !w.isDestroyed());
+      if (mainWindow) {
+        mainWindow.minimize();
+      }
+
+      // 3-2-1 countdown — give user time to prepare
+      this.emit('countdown', 3);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      this.emit('countdown', 2);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      this.emit('countdown', 1);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      this.emit('countdown', 0);
+
       await this.startNativeHooks();
       this.emitStateChanged();
 
@@ -623,10 +639,11 @@ export class RecordingService extends EventEmitter {
     const windowBounds = event.window?.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
     const scaleFactor = event.scale || this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
 
-    // Skip clicks on the recording app itself
-    if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' ||
-        windowTitle === 'Ondoki Desktop' || windowTitle.startsWith('Ondoki')) {
-      console.log(`[DIAG] click filtered: app="${ownerApp}" title="${windowTitle}"`);
+    // Skip clicks on the recording app itself — match by PID, not window title
+    // (title matching catches Chrome tabs with "Ondoki" in them)
+    const electronPID = process.pid;
+    if (event.window?.ownerPID === electronPID) {
+      console.log(`[DIAG] click filtered: own PID=${electronPID} title="${windowTitle}"`);
       return;
     }
 

@@ -496,7 +496,7 @@ func handleHooks() {
     guard let eventTap = CGEvent.tapCreate(
         tap: .cgSessionEventTap,
         place: .headInsertEventTap,
-        options: .listenOnly,
+        options: .defaultTap,  // Active tap: callback runs BEFORE event reaches target app
         eventsOfInterest: eventMask,
         callback: eventTapCallback,
         userInfo: nil
