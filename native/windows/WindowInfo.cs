@@ -721,6 +721,23 @@ namespace Ondoki.Native
                 ("coordSpace", Json.Str("physical"))
             ));
 
+            // Send physical display bounds so Electron can map physical→logical coords
+            var nativeDisplays = GetDisplays();
+            var dispJsonList = new List<string>();
+            foreach (var d in nativeDisplays)
+            {
+                dispJsonList.Add(Json.Obj(
+                    ("bounds", Json.Rect(d.Bounds.Left, d.Bounds.Top,
+                        d.Bounds.Right - d.Bounds.Left, d.Bounds.Bottom - d.Bounds.Top)),
+                    ("scaleFactor", Json.Num(d.Scale)),
+                    ("isPrimary", Json.Bool(d.IsPrimary))
+                ));
+            }
+            WriteEvent(Json.Obj(
+                ("type", Json.Str("displays")),
+                ("displays", Json.Arr(dispJsonList))
+            ));
+
             // Message pump — required for low-level hooks to work
             while (Win32.GetMessage(out MSG msg, IntPtr.Zero, 0, 0) > 0)
             {

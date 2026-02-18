@@ -64,7 +64,16 @@ interface NativeElementInfo {
   subrole: string;
 }
 
-type NativeEvent = NativeClickEvent | NativeKeyEvent | NativeScrollEvent | NativeReadyEvent;
+interface NativeDisplaysEvent {
+  type: 'displays';
+  displays: Array<{
+    bounds: { x: number; y: number; width: number; height: number };
+    scaleFactor: number;
+    isPrimary: boolean;
+  }>;
+}
+
+type NativeEvent = NativeClickEvent | NativeKeyEvent | NativeScrollEvent | NativeReadyEvent | NativeDisplaysEvent;
 
 // ---- Public types ----
 
@@ -194,6 +203,11 @@ export class RecordingService extends EventEmitter {
   private coordSpace: 'logical' | 'physical' = 'logical';
   private coordScale = 1; // physical→logical conversion factor
 
+  // Maps physical monitor bounds key → Electron Display (for Windows mixed-DPI)
+  private physicalDisplayMap: Map<string, Electron.Display> = new Map();
+  // Maps physical monitor bounds key → logical bounds (for proper toLogical conversion)
+  private physicalToLogicalBounds: Map<string, { x: number; y: number; width: number; height: number }> = new Map();
+
   constructor() {
     super();
     this.screenshotService = new ScreenshotService();
@@ -322,6 +336,10 @@ export class RecordingService extends EventEmitter {
             resolve();
             return;
           }
+          if (event.type === 'displays') {
+            this.handleNativeDisplays((event as NativeDisplaysEvent).displays);
+            return;
+          }
           this.handleNativeEvent(event);
         } catch (e) {
           // Ignore unparseable lines
@@ -409,6 +427,86 @@ export class RecordingService extends EventEmitter {
     return { x, y };
   }
 
+  /**
+   * Convert physical virtual-screen coordinates to Electron logical coordinates
+   * using the physical→logical display mapping (handles mixed-DPI correctly).
+   */
+  private physicalToLogical(x: number, y: number, monitorBounds?: { x: number; y: number; width: number; height: number }, eventScale?: number): { x: number; y: number } {
+    if (monitorBounds && this.physicalToLogicalBounds.size > 0) {
+      const key = this.boundsKey(monitorBounds);
+      const logicalBounds = this.physicalToLogicalBounds.get(key);
+      if (logicalBounds) {
+        const scale = eventScale ?? this.coordScale;
+        return {
+          x: Math.round(logicalBounds.x + (x - monitorBounds.x) / scale),
+          y: Math.round(logicalBounds.y + (y - monitorBounds.y) / scale),
+        };
+      }
+    }
+    // Fallback to old method
+    return this.toLogical(x, y, eventScale);
+  }
+
+  private boundsKey(b: { x: number; y: number; width: number; height: number }): string {
+    return `${b.x},${b.y},${b.width},${b.height}`;
+  }
+
+  /**
+   * Build mapping between native physical display bounds and Electron displays.
+   * Matches by: primary first, then by physical size + spatial ordering.
+   */
+  private handleNativeDisplays(nativeDisplays: NativeDisplaysEvent['displays']): void {
+    const { screen } = require('electron');
+    const electronDisplays: Electron.Display[] = screen.getAllDisplays();
+
+    this.physicalDisplayMap.clear();
+    this.physicalToLogicalBounds.clear();
+
+    // Group native displays by physical size
+    const nativeBySize = new Map<string, typeof nativeDisplays>();
+    for (const nd of nativeDisplays) {
+      const key = `${nd.bounds.width}x${nd.bounds.height}`;
+      if (!nativeBySize.has(key)) nativeBySize.set(key, []);
+      nativeBySize.get(key)!.push(nd);
+    }
+
+    // Group Electron displays by physical size
+    const electronBySize = new Map<string, Electron.Display[]>();
+    for (const ed of electronDisplays) {
+      const physW = Math.round(ed.bounds.width * ed.scaleFactor);
+      const physH = Math.round(ed.bounds.height * ed.scaleFactor);
+      const key = `${physW}x${physH}`;
+      if (!electronBySize.has(key)) electronBySize.set(key, []);
+      electronBySize.get(key)!.push(ed);
+    }
+
+    // Match within each physical-size group, ordered by x then y position
+    for (const [sizeKey, natives] of nativeBySize) {
+      const electrons = electronBySize.get(sizeKey);
+      if (!electrons || electrons.length === 0) continue;
+
+      // Sort both by x position (physical and logical ordering should match)
+      natives.sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y);
+      electrons.sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y);
+
+      for (let i = 0; i < Math.min(natives.length, electrons.length); i++) {
+        const key = this.boundsKey(natives[i].bounds);
+        this.physicalDisplayMap.set(key, electrons[i]);
+        this.physicalToLogicalBounds.set(key, electrons[i].bounds);
+        console.log(`[DIAG] Display map: physical(${key}) → electron(id=${electrons[i].id}, bounds=${JSON.stringify(electrons[i].bounds)}, scale=${electrons[i].scaleFactor})`);
+      }
+    }
+
+    console.log(`[DIAG] Display mapping: ${this.physicalDisplayMap.size} of ${nativeDisplays.length} matched`);
+  }
+
+  /**
+   * Find the Electron Display for a click's physical monitorBounds.
+   */
+  private findDisplayForMonitorBounds(monitorBounds: { x: number; y: number; width: number; height: number }): Electron.Display | undefined {
+    return this.physicalDisplayMap.get(this.boundsKey(monitorBounds));
+  }
+
   // ------------------------------------------------------------------
   // Click handler — events arrive pre-enriched from native binary
   // ------------------------------------------------------------------
@@ -416,7 +514,7 @@ export class RecordingService extends EventEmitter {
   private pendingClick: { event: NativeClickEvent; timeout: NodeJS.Timeout; count: number; preCapture?: Buffer } | null = null;
 
   private handleNativeClick(event: NativeClickEvent): void {
-    const pt = this.toLogical(event.x, event.y, (event as any).scale);
+    const pt = this.physicalToLogical(event.x, event.y, event.monitorBounds, (event as any).scale);
 
     // Check capture area
     if (this.captureArea && !this.isPointInCaptureArea(pt.x, pt.y)) return;
@@ -517,7 +615,7 @@ export class RecordingService extends EventEmitter {
   private async _processClickInner(event: NativeClickEvent, clickCount: number, preCapture?: Buffer): Promise<void> {
     this.flushTypedText();
 
-    const clickPoint = this.toLogical(event.x, event.y, event.scale);
+    const clickPoint = this.physicalToLogical(event.x, event.y, event.monitorBounds, event.scale);
     console.log(`[DIAG] click raw=(${event.x},${event.y}) scale=${event.scale} logical=(${clickPoint.x},${clickPoint.y})`);
     const windowTitle = event.window?.title || 'Unknown Window';
     const ownerApp = event.window?.ownerName || '';
@@ -527,6 +625,7 @@ export class RecordingService extends EventEmitter {
     // Skip clicks on the recording app itself
     if (ownerApp === 'Electron' || ownerApp === 'Ondoki Desktop' ||
         windowTitle === 'Ondoki Desktop' || windowTitle.startsWith('Ondoki')) {
+      console.log(`[DIAG] click filtered: app="${ownerApp}" title="${windowTitle}"`);
       return;
     }
 
@@ -539,6 +638,7 @@ export class RecordingService extends EventEmitter {
         'Window Server',
       ];
       if (systemApps.includes(ownerApp)) {
+        console.log(`[DIAG] click filtered: systemApp="${ownerApp}"`);
         return;
       }
     }
@@ -553,13 +653,23 @@ export class RecordingService extends EventEmitter {
     let screenshotBounds = captureRegion;
     if (!this.captureArea?.bounds) {
       // "all-displays" mode: find the display containing this click
-      const displays = this.screenshotService.getDisplaysSync();
-      const clickDisplay = displays.find(d =>
-        clickPoint.x >= d.bounds.x && clickPoint.x < d.bounds.x + d.bounds.width &&
-        clickPoint.y >= d.bounds.y && clickPoint.y < d.bounds.y + d.bounds.height
-      );
-      if (clickDisplay) {
-        screenshotBounds = clickDisplay.bounds;
+      // Prefer physical monitor mapping (accurate on Windows mixed-DPI)
+      if (event.monitorBounds) {
+        const mappedDisplay = this.findDisplayForMonitorBounds(event.monitorBounds);
+        if (mappedDisplay) {
+          screenshotBounds = mappedDisplay.bounds;
+        }
+      }
+      if (screenshotBounds === captureRegion) {
+        // Fallback: match by logical click point
+        const displays = this.screenshotService.getDisplaysSync();
+        const clickDisplay = displays.find(d =>
+          clickPoint.x >= d.bounds.x && clickPoint.x < d.bounds.x + d.bounds.width &&
+          clickPoint.y >= d.bounds.y && clickPoint.y < d.bounds.y + d.bounds.height
+        );
+        if (clickDisplay) {
+          screenshotBounds = clickDisplay.bounds;
+        }
       }
     }
     const screenshotRelative = {
