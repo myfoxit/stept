@@ -623,8 +623,10 @@ export class RecordingService extends EventEmitter {
         y: clickPoint.y - windowBounds.y,
       },
       windowSize: { width: windowBounds.width, height: windowBounds.height },
-      screenshotRelativeMousePosition: screenshotRelative,
-      screenshotSize: { width: screenshotBounds.width, height: screenshotBounds.height },
+      screenshotRelativeMousePosition: physicalAnnotation ?? screenshotRelative,
+      screenshotSize: event.monitorBounds
+        ? { width: event.monitorBounds.width, height: event.monitorBounds.height }
+        : { width: screenshotBounds.width, height: screenshotBounds.height },
       elementName: elementName || undefined,
       elementRole: elementRole || undefined,
       elementDescription: elementDescription || undefined,
