@@ -19,6 +19,7 @@ interface NativeClickEvent {
   scale: number;
   monitorBounds?: { x: number; y: number; width: number; height: number };
   timestamp: number;
+  screenshotPath?: string;
 }
 
 interface NativeKeyEvent {
@@ -691,13 +692,26 @@ export class RecordingService extends EventEmitter {
 
     let screenshotPath: string | undefined;
     try {
+      // Use native pre-click screenshot if available (captured synchronously in event tap)
+      let nativePreCapture = preCapture;
+      if (!nativePreCapture && event.screenshotPath) {
+        try {
+          const fs = require('fs');
+          nativePreCapture = fs.readFileSync(event.screenshotPath);
+          // Clean up temp file
+          fs.unlink(event.screenshotPath, () => {});
+        } catch (e) {
+          console.error('[DIAG] Failed to read native screenshot:', e);
+        }
+      }
+      
       screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
         screenshotBounds,
         screenshotRelative,
         this.screenshotFolder!,
         ++this.stepCount,
         scaleFactor,
-        preCapture,  // Use pre-captured screenshot from click time
+        nativePreCapture,  // Native pre-click screenshot (synchronous, correct state)
         physicalAnnotation  // Physical pixel offset for accurate multi-monitor annotation
       );
     } catch (error) {

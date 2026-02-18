@@ -83,6 +83,7 @@ struct HookClickEvent: Codable {
     let element: ElementInfo?
     let scale: Double
     let timestamp: Int64
+    let screenshotPath: String?
 }
 
 struct HookKeyEvent: Codable {
@@ -239,6 +240,35 @@ let encoder: JSONEncoder = {
     return e
 }()
 
+// ---------------------------------------------------------------------------
+// Synchronous screenshot capture at click time
+// ---------------------------------------------------------------------------
+
+let captureDir: String = {
+    let dir = NSTemporaryDirectory() + "ondoki-captures/"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    return dir
+}()
+
+func captureDisplayAtPoint(_ point: CGPoint) -> String? {
+    // Find which display contains this point
+    var displayID: CGDirectDisplayID = 0
+    var count: UInt32 = 0
+    CGGetDisplaysWithPoint(point, 1, &displayID, &count)
+    if count == 0 { displayID = CGMainDisplayID() }
+    
+    // Synchronous capture — ~3-5ms, runs BEFORE event reaches target app
+    guard let image = CGDisplayCreateImage(displayID) else { return nil }
+    
+    let path = captureDir + "cap_\(Int64(Date().timeIntervalSince1970 * 1000)).png"
+    let url = URL(fileURLWithPath: path)
+    guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return nil }
+    CGImageDestinationAddImage(dest, image, nil)
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    
+    return path
+}
+
 func writeJSON<T: Encodable>(_ value: T) {
     if let data = try? encoder.encode(value), let json = String(data: data, encoding: .utf8) {
         print(json)
@@ -381,6 +411,10 @@ func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
         }
         
         let point = CGPoint(x: location.x, y: location.y)
+        
+        // Capture screenshot SYNCHRONOUSLY before event reaches target app
+        let screenshotPath = captureDisplayAtPoint(point)
+        
         let window = getWindowAtPoint(point)
         var element: ElementInfo? = nil
         if let w = window {
@@ -395,7 +429,8 @@ func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
             window: window,
             element: element,
             scale: scale,
-            timestamp: timestamp
+            timestamp: timestamp,
+            screenshotPath: screenshotPath
         )
         writeJSON(clickEvent)
         
