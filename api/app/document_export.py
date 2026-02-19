@@ -553,10 +553,17 @@ def generate_document_html(
     """ if for_pdf else ""
     
     base_styles = """
+        *, *::before, *::after { box-sizing: border-box; }
         body { 
             font-family: Arial, sans-serif; 
+            font-size: 1rem;
             line-height: 1.6;
             color: #1e293b;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            overflow-wrap: break-word;
+            text-size-adjust: none;
+            white-space: pre-wrap;
         }
         h1 { font-size: 2rem; margin-bottom: 0.5rem; margin-top: 0; }
         h2 { font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; }
@@ -648,8 +655,16 @@ async def generate_pdf_from_captured_html(
             font-size: 1rem;
             line-height: 1.6;
             color: #1e293b;
+            /* Match browser globals from _variables.scss */
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            overflow-wrap: break-word;
+            text-size-adjust: none;
         }}
-        p {{ margin: 0; }}
+        /* Match ProseMirror styles from paragraph-node.scss */
+        *, *::before, *::after {{ box-sizing: border-box; }}
+        .ProseMirror, [data-node-type] {{ white-space: pre-wrap; }}
+        p {{ margin: 0; font-size: 1rem; line-height: 1.6; }}
         h1 {{ font-size: 2rem; margin-bottom: 0.5rem; margin-top: 0; }}
         h2 {{ font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; }}
         h3 {{ font-size: 1.5rem; margin-top: 0.75rem; margin-bottom: 0.25rem; }}
