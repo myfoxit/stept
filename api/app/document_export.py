@@ -837,12 +837,21 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
     """Generate Word document export with proper page sizing."""
     try:
         from docx import Document
-        from docx.shared import Inches, Mm
+        from docx.shared import Inches, Mm, Pt
         from docx.enum.text import WD_BREAK
     except ImportError:
         raise RuntimeError("python-docx is required for Word export. Install with: pip install python-docx")
     
     word_doc = Document()
+    
+    # Set default font to Arial 12pt to match browser editor
+    style = word_doc.styles['Normal']
+    style.font.name = 'Arial'
+    style.font.size = Pt(12)
+    style.paragraph_format.line_spacing = 1.6
+    style.paragraph_format.space_before = Pt(0)
+    style.paragraph_format.space_after = Pt(0)
+    
     section = word_doc.sections[0]
     
     # Set page size based on layout (use PAGE_FORMATS for all known formats)
@@ -895,6 +904,8 @@ def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
                 text = node.get("text", "")
                 marks = node.get("marks", [])
                 run = p.add_run(text)
+                run.font.name = 'Arial'
+                run.font.size = Pt(12)  # 1rem = 16px = 12pt
                 for mark in marks:
                     mark_type = mark.get("type", "")
                     if mark_type == "bold":
@@ -908,13 +919,14 @@ def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
                     elif mark_type == "code":
                         run.font.name = 'Courier New'
             elif node.get("type") == "hardBreak":
-                p.add_run("\n")
+                run = p.add_run("\n")
+                run.font.name = 'Arial'
     
     def set_paragraph_spacing(p):
-        """Set tight paragraph spacing."""
+        """Match browser: line-height 1.6, no paragraph margins."""
         p.paragraph_format.space_before = Pt(0)
-        p.paragraph_format.space_after = Pt(6)
-        p.paragraph_format.line_spacing = 1.15
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1.6
     
     for node in nodes:
         node_type = node.get("type", "")
@@ -925,6 +937,9 @@ def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
             h = word_doc.add_heading(text, level)
             h.paragraph_format.space_before = Pt(12) if level == 1 else Pt(8)
             h.paragraph_format.space_after = Pt(4)
+            # Set Arial on heading runs (override heading style default)
+            for run in h.runs:
+                run.font.name = 'Arial'
         
         elif node_type == "paragraph":
             p = word_doc.add_paragraph()
