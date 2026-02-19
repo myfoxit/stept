@@ -852,6 +852,17 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
     style.paragraph_format.space_before = Pt(0)
     style.paragraph_format.space_after = Pt(0)
     
+    # Disable "snap to grid" on Normal style — prevents Word from
+    # rounding line heights to the document grid, which causes spacing drift.
+    from docx.oxml.ns import qn
+    pPr = style.element.get_or_add_pPr()
+    snap = pPr.find(qn('w:snapToGrid'))
+    if snap is None:
+        snap = pPr.makeelement(qn('w:snapToGrid'), {qn('w:val'): '0'})
+        pPr.append(snap)
+    else:
+        snap.set(qn('w:val'), '0')
+    
     section = word_doc.sections[0]
     
     # Set page size based on layout (use PAGE_FORMATS for all known formats)
@@ -888,7 +899,14 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
 def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
     """Add a list of TipTap nodes to a Word document."""
     from docx.shared import Pt, Twips
-    from docx.enum.text import WD_BREAK
+    from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
+    
+    ALIGN_MAP = {
+        "left": WD_ALIGN_PARAGRAPH.LEFT,
+        "center": WD_ALIGN_PARAGRAPH.CENTER,
+        "right": WD_ALIGN_PARAGRAPH.RIGHT,
+        "justify": WD_ALIGN_PARAGRAPH.JUSTIFY,
+    }
     
     def extract_text_from_node(node: Dict[str, Any]) -> str:
         if node.get("type") == "text":
@@ -945,6 +963,10 @@ def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
             p = word_doc.add_paragraph()
             add_runs_to_paragraph(p, node.get("content", []))
             set_paragraph_spacing(p)
+            # Preserve text alignment from TipTap
+            text_align = node.get("attrs", {}).get("textAlign") or "left"
+            if text_align in ALIGN_MAP:
+                p.paragraph_format.alignment = ALIGN_MAP[text_align]
         
         elif node_type == "bulletList":
             for item in node.get("content", []):
