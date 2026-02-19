@@ -22,17 +22,19 @@ PAGE_FORMATS = {
     "a4": {
         "width_mm": 210,
         "height_mm": 297,
-        # Use browser's actual pixel values / 96 for exact match.
-        # Browser: width=794px, height=1123px, padding=72px, border=1px (border-box)
-        # Effective margin = 72 + 1 = 73px per side
-        # Paper and margins derived from px/96 so Gotenberg content width = browser content width exactly.
-        "width_in": 794 / 96,       # 8.27083in (browser's 794px, not A4's 210mm)
-        "height_in": 1123 / 96,     # 11.69792in (browser's 1123px, not A4's 297mm)
+        # Derived from browser pagination/index.ts PAGE_FORMATS.A4:
+        # width=794px, height=1123px (cmToPixels(21, 96), cmToPixels(29.7, 96))
+        # margins: left/right=76px (2cm), top/bottom=94px (2.5cm)
+        # Plus 1px border on each side (border-box) → effective margin = padding + 1
+        # Paper: 794/96 in, margins: 77/96 in (left/right), 95/96 in (top/bottom)
+        # Content: 794 - 77*2 = 640px wide, 1123 - 95*2 = 933px tall
+        "width_in": 794 / 96,
+        "height_in": 1123 / 96,
         "margins_in": {
-            "top": 73 / 96,         # 72px padding + 1px border
-            "bottom": 73 / 96,
-            "left": 73 / 96,
-            "right": 73 / 96,
+            "top": 95 / 96,      # 94px padding + 1px border
+            "bottom": 95 / 96,
+            "left": 77 / 96,     # 76px padding + 1px border
+            "right": 77 / 96,
         },
     },
     "letter": {
