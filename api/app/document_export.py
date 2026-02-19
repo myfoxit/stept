@@ -838,7 +838,7 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
     try:
         from docx import Document
         from docx.shared import Inches, Mm, Pt
-        from docx.enum.text import WD_BREAK
+        from docx.enum.text import WD_BREAK, WD_LINE_SPACING
     except ImportError:
         raise RuntimeError("python-docx is required for Word export. Install with: pip install python-docx")
     
@@ -848,7 +848,8 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
     style = word_doc.styles['Normal']
     style.font.name = 'Arial'
     style.font.size = Pt(12)
-    style.paragraph_format.line_spacing = 1.6
+    style.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+    style.paragraph_format.line_spacing = Pt(19.2)
     style.paragraph_format.space_before = Pt(0)
     style.paragraph_format.space_after = Pt(0)
     
@@ -899,7 +900,7 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
 def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
     """Add a list of TipTap nodes to a Word document."""
     from docx.shared import Pt, Twips
-    from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH
+    from docx.enum.text import WD_BREAK, WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
     
     ALIGN_MAP = {
         "left": WD_ALIGN_PARAGRAPH.LEFT,
@@ -941,10 +942,14 @@ def _add_nodes_to_docx(word_doc: Any, nodes: List[Dict]) -> None:
                 run.font.name = 'Arial'
     
     def set_paragraph_spacing(p):
-        """Match browser: line-height 1.6, no paragraph margins."""
+        """Match browser: CSS line-height 1.6 at 1rem (16px = 12pt).
+        CSS line-height 1.6 = 1.6 × font-size = 1.6 × 12pt = 19.2pt.
+        Word 'multiple 1.6' = 1.6 × single-spacing (~14.4pt) = ~23pt — WRONG.
+        Must use exact line spacing instead."""
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(0)
-        p.paragraph_format.line_spacing = 1.6
+        p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        p.paragraph_format.line_spacing = Pt(19.2)
     
     for node in nodes:
         node_type = node.get("type", "")
