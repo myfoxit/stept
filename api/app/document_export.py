@@ -2,6 +2,7 @@
 Utility functions for exporting documents/pages to various formats.
 Handles TipTap JSON content conversion without brittle manual pagination.
 """
+import base64
 import io
 import os
 import httpx
@@ -10,6 +11,27 @@ from typing import Any, Dict, List, Optional
 
 # Gotenberg configuration
 GOTENBERG_URL = os.getenv("GOTENBERG_URL", "http://gotenberg:3000")
+
+# Font directory for embedded fonts
+FONTS_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+
+
+def _inter_font_face_css() -> str:
+    """Generate @font-face CSS with Inter font embedded as base64 data URIs."""
+    faces = []
+    weights = [("Inter-Regular.woff2", 400), ("Inter-SemiBold.woff2", 600), ("Inter-Bold.woff2", 700)]
+    for filename, weight in weights:
+        path = os.path.join(FONTS_DIR, filename)
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            faces.append(f"""@font-face {{
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: {weight};
+  src: url(data:font/woff2;base64,{b64}) format('woff2');
+}}""")
+    return "\n".join(faces)
 
 # Page dimensions in mm (matching frontend PAGE_FORMATS)
 # Frontend uses pixels at ~96dpi, so we convert:
@@ -596,10 +618,8 @@ def generate_document_html(
 <head>
     <meta charset="UTF-8">
     <title>{safe_title}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+{_inter_font_face_css()}
 {pdf_styles}
 {base_styles}
     </style>
@@ -635,10 +655,8 @@ async def generate_pdf_from_captured_html(
 <head>
     <meta charset="UTF-8">
     <title>{safe_title}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        {_inter_font_face_css()}
         body {{
             margin: 0;
             padding: 0;
@@ -690,7 +708,6 @@ async def generate_pdf_from_captured_html(
         "paperHeight": str(page_format['height_in']),
         "printBackground": "true",
         "scale": "1.0",
-        "waitDelay": "2s",
     }
     
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -729,7 +746,6 @@ async def generate_document_pdf(doc: Any, page_layout: str = "document") -> byte
                     "paperHeight": str(page_format['height_in']),
                     "printBackground": "true",
                     "scale": "1.0",
-                    "waitDelay": "2s",
                 }
             else:
                 # Default fallback for "full" or "document" layout
