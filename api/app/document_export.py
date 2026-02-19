@@ -547,14 +547,14 @@ def generate_document_html(
     base_styles = """
         body { 
             font-family: Arial, sans-serif; 
-            line-height: normal;
+            line-height: 1.6;
             color: #1e293b;
         }
         h1 { font-size: 2rem; margin-bottom: 0.5rem; margin-top: 0; }
         h2 { font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; }
         h3 { font-size: 1.5rem; margin-top: 0.75rem; margin-bottom: 0.25rem; }
         h4 { font-size: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.25rem; }
-        p { margin: 0; }
+        p { margin: 0; font-size: 1rem; line-height: 1.6; }
         ul, ol { margin: 0.25rem 0; padding-left: 2rem; }
         li { margin: 0.125rem 0; }
         blockquote { 
