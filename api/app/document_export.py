@@ -37,13 +37,70 @@ PAGE_FORMATS = {
             "right": 77 / 96,
         },
     },
+    "a3": {
+        "width_mm": 297,
+        "height_mm": 420,
+        # Browser: 1123x1587px, margins t/b=94px l/r=76px, +1px border → content 969x1397px
+        "width_in": 1123 / 96,
+        "height_in": 1587 / 96,
+        "margins_in": {
+            "top": 95 / 96,
+            "bottom": 95 / 96,
+            "left": 77 / 96,
+            "right": 77 / 96,
+        },
+    },
+    "a5": {
+        "width_mm": 148,
+        "height_mm": 210,
+        # Browser: 559x794px, margins t/b=76px l/r=57px, +1px border → content 443x640px
+        "width_in": 559 / 96,
+        "height_in": 794 / 96,
+        "margins_in": {
+            "top": 77 / 96,
+            "bottom": 77 / 96,
+            "left": 58 / 96,
+            "right": 58 / 96,
+        },
+    },
     "letter": {
         "width_mm": 215.9,
         "height_mm": 279.4,
-        "width_in": 8.5,
-        "height_in": 11,
-        # Margins in inches (matching frontend ~96px at 96dpi = 1 inch)
-        "margins_in": {"top": 1.0, "bottom": 1.0, "left": 1.0, "right": 1.0},
+        # Browser: 816x1056px, margins t/b/l/r=96px, +1px border → content 622x862px
+        "width_in": 816 / 96,
+        "height_in": 1056 / 96,
+        "margins_in": {
+            "top": 97 / 96,
+            "bottom": 97 / 96,
+            "left": 97 / 96,
+            "right": 97 / 96,
+        },
+    },
+    "legal": {
+        "width_mm": 215.9,
+        "height_mm": 355.6,
+        # Browser: 816x1344px, margins t/b/l/r=96px, +1px border → content 622x1150px
+        "width_in": 816 / 96,
+        "height_in": 1344 / 96,
+        "margins_in": {
+            "top": 97 / 96,
+            "bottom": 97 / 96,
+            "left": 97 / 96,
+            "right": 97 / 96,
+        },
+    },
+    "tabloid": {
+        "width_mm": 279.4,
+        "height_mm": 431.8,
+        # Browser: 1056x1632px, margins t/b/l/r=96px, +1px border → content 862x1438px
+        "width_in": 1056 / 96,
+        "height_in": 1632 / 96,
+        "margins_in": {
+            "top": 97 / 96,
+            "bottom": 97 / 96,
+            "left": 97 / 96,
+            "right": 97 / 96,
+        },
     },
 }
 
@@ -723,7 +780,7 @@ async def generate_pdf_from_captured_html(
 async def generate_document_pdf(doc: Any, page_layout: str = "document") -> bytes:
     """Generate PDF using Gotenberg's HTML-to-PDF conversion."""
     
-    is_paginated = page_layout in ("a4", "letter")
+    is_paginated = page_layout in PAGE_FORMATS
     page_format = PAGE_FORMATS.get(page_layout, PAGE_FORMATS["a4"])
     
     # Generate the full HTML document
@@ -788,17 +845,9 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
     word_doc = Document()
     section = word_doc.sections[0]
     
-    # Set page size based on layout
-    if page_layout == "a4":
-        page_format = PAGE_FORMATS["a4"]
-        section.page_width = Mm(page_format["width_mm"])
-        section.page_height = Mm(page_format["height_mm"])
-        section.top_margin = Inches(page_format["margins_in"]["top"])
-        section.bottom_margin = Inches(page_format["margins_in"]["bottom"])
-        section.left_margin = Inches(page_format["margins_in"]["left"])
-        section.right_margin = Inches(page_format["margins_in"]["right"])
-    elif page_layout == "letter":
-        page_format = PAGE_FORMATS["letter"]
+    # Set page size based on layout (use PAGE_FORMATS for all known formats)
+    if page_layout in PAGE_FORMATS:
+        page_format = PAGE_FORMATS[page_layout]
         section.page_width = Inches(page_format["width_in"])
         section.page_height = Inches(page_format["height_in"])
         section.top_margin = Inches(page_format["margins_in"]["top"])
@@ -806,7 +855,7 @@ def generate_document_docx(doc: Any, page_layout: str = "document") -> bytes:
         section.left_margin = Inches(page_format["margins_in"]["left"])
         section.right_margin = Inches(page_format["margins_in"]["right"])
     else:
-        # Default to standard Letter sized for "document" view
+        # Default to Letter for "document" view
         section.page_width = Inches(8.5)
         section.page_height = Inches(11)
         section.top_margin = Inches(1)
