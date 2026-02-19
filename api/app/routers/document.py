@@ -937,6 +937,45 @@ async def export_document_pdf(
     )
 
 
+@router.post("/{doc_id}/export/pdf-dom")
+async def export_document_pdf_dom(
+    doc_id: str,
+    body: dict,
+    page_layout: str = Query(default=None, description="Page layout: full, document, a4, letter."),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export document as PDF using captured browser DOM HTML for pixel-perfect output."""
+    from app.document_export import generate_pdf_from_captured_html
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    await _check_doc_access(db, doc, current_user)
+
+    effective_layout = page_layout or doc.page_layout or "document"
+    captured_html = body.get("html", "")
+    if not captured_html:
+        raise HTTPException(400, "No HTML content provided")
+
+    try:
+        pdf_bytes = await generate_pdf_from_captured_html(
+            captured_html, doc.name or "Document", effective_layout
+        )
+    except Exception as e:
+        raise HTTPException(500, f"PDF generation failed: {str(e)}")
+
+    filename = f"{doc.name or 'document'}.pdf".replace(" ", "_")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        }
+    )
+
+
 @router.get("/{doc_id}/export/confluence")
 async def export_document_confluence(
     doc_id: str,

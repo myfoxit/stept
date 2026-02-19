@@ -607,6 +607,94 @@ def generate_document_html(
 </html>"""
 
 
+async def generate_pdf_from_captured_html(
+    captured_html: str, title: str, page_layout: str = "a4"
+) -> bytes:
+    """Generate PDF from captured browser DOM HTML for pixel-perfect output.
+    
+    The captured HTML comes directly from the browser's ProseMirror editor,
+    so it has the exact same text layout. We just wrap it with matching
+    styles and send to Gotenberg.
+    """
+    page_format = PAGE_FORMATS.get(
+        page_layout if page_layout in PAGE_FORMATS else "a4",
+        PAGE_FORMATS["a4"]
+    )
+    margins = page_format['margins_in']
+    safe_title = html_module.escape(title)
+    
+    # Styles that match the browser editor exactly:
+    # - Arial font (same as notion-like-editor.scss)
+    # - line-height 1.6 (same as paragraph-node.scss)
+    # - margin 0 on p (same as notion-like-editor.scss margin-top: 0 !important)
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{safe_title}</title>
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #1e293b;
+        }}
+        p {{ margin: 0; }}
+        h1 {{ font-size: 2rem; margin-bottom: 0.5rem; margin-top: 0; }}
+        h2 {{ font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; }}
+        h3 {{ font-size: 1.5rem; margin-top: 0.75rem; margin-bottom: 0.25rem; }}
+        h4 {{ font-size: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.25rem; }}
+        ul, ol {{ margin: 0.25rem 0; padding-left: 2rem; }}
+        li {{ margin: 0.125rem 0; }}
+        blockquote {{
+            border-left: 3px solid #e2e8f0;
+            padding-left: 1rem;
+            margin: 0.5rem 0;
+            color: #64748b;
+        }}
+        pre {{
+            background: #f1f5f9;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            overflow-x: auto;
+            font-size: 0.875rem;
+        }}
+        img {{ max-width: 100%; display: block; margin: 10px 0; }}
+        table {{ border-collapse: collapse; width: 100%; margin: 0.5rem 0; }}
+        th, td {{ border: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; }}
+        th {{ background: #f8fafc; font-weight: 600; }}
+    </style>
+</head>
+<body>
+{captured_html}
+</body>
+</html>"""
+    
+    gotenberg_endpoint = f"{GOTENBERG_URL}/forms/chromium/convert/html"
+    
+    data = {
+        "marginTop": str(margins['top']),
+        "marginBottom": str(margins['bottom']),
+        "marginLeft": str(margins['left']),
+        "marginRight": str(margins['right']),
+        "paperWidth": str(page_format['width_in']),
+        "paperHeight": str(page_format['height_in']),
+        "printBackground": "true",
+        "scale": "1.0",
+    }
+    
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            gotenberg_endpoint,
+            data=data,
+            files={"files": ("index.html", html_content.encode("utf-8"), "text/html")},
+        )
+        response.raise_for_status()
+        return response.content
+
+
 async def generate_document_pdf(doc: Any, page_layout: str = "document") -> bytes:
     """Generate PDF using Gotenberg's HTML-to-PDF conversion."""
     

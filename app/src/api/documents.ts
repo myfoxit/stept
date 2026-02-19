@@ -227,3 +227,43 @@ export async function exportDocument(
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
+
+/**
+ * Export document as PDF using captured browser DOM HTML.
+ * This sends the actual rendered HTML to the server for pixel-perfect PDF generation.
+ */
+export async function exportDocumentPdfDom(
+  docId: string,
+  capturedHtml: string,
+  options?: ExportOptions
+): Promise<void> {
+  const params: Record<string, string> = {};
+  if (options?.pageLayout) {
+    params.page_layout = options.pageLayout;
+  }
+
+  const response = await apiClient.post(
+    `/documents/${docId}/export/pdf-dom`,
+    { html: capturedHtml },
+    { params, responseType: 'blob' }
+  );
+
+  const contentDisposition = response.headers['content-disposition'];
+  let filename = 'document.pdf';
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+    if (match) filename = match[1];
+  }
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/pdf',
+  });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}

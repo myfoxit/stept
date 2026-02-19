@@ -9,7 +9,7 @@ import {
 } from '@/components/page-layout-selector';
 import { useState, useEffect, useMemo } from 'react';
 import { useDocument, useUpdateDocumentLayout, useDocumentLock, useAcquireDocumentLock, useReleaseDocumentLock } from '@/hooks/api/documents';
-import { exportDocument, type DocumentExportFormat } from '@/api/documents';
+import { exportDocument, exportDocumentPdfDom, type DocumentExportFormat } from '@/api/documents';
 import { ExportDialog } from '@/components/export-dialog';
 import { ShareDialog } from '@/components/share-dialog';
 import { useChat } from '@/components/Chat/ChatContext';
@@ -95,6 +95,25 @@ export default function EditorPage() {
 
   const handleExport = async (format: DocumentExportFormat) => {
     if (!docId) return;
+
+    // For PDF: capture the browser DOM for pixel-perfect export
+    if (format === 'pdf') {
+      const proseMirror = document.querySelector('.tiptap.ProseMirror');
+      if (proseMirror) {
+        const clone = proseMirror.cloneNode(true) as HTMLElement;
+        // Strip pagination decorations
+        clone.querySelectorAll(
+          '.tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap'
+        ).forEach(el => el.remove());
+        // Remove pagination wrapper padding
+        clone.style.padding = '0';
+        clone.style.width = 'auto';
+        clone.style.minHeight = 'auto';
+        await exportDocumentPdfDom(docId, clone.innerHTML, { pageLayout });
+        return;
+      }
+    }
+
     await exportDocument(docId, format, { pageLayout });
   };
 
