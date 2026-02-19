@@ -636,7 +636,7 @@ async def generate_pdf_from_captured_html(
         body {{
             margin: 0;
             padding: 0;
-            width: 650px;
+            width: 649px;
             font-family: Arial, sans-serif;
             font-size: 1rem;
             line-height: 1.6;
