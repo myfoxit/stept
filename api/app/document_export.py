@@ -22,10 +22,18 @@ PAGE_FORMATS = {
     "a4": {
         "width_mm": 210,
         "height_mm": 297,
-        "width_in": 8.27,
-        "height_in": 11.69,
-        # Margins in inches (matching frontend ~96px at 96dpi = 1 inch)
-        "margins_in": {"top": 0.75, "bottom": 0.75, "left": 0.75, "right": 0.75},
+        # Use browser's actual pixel values / 96 for exact match.
+        # Browser: width=794px, height=1123px, padding=72px, border=1px (border-box)
+        # Effective margin = 72 + 1 = 73px per side
+        # Paper and margins derived from px/96 so Gotenberg content width = browser content width exactly.
+        "width_in": 794 / 96,       # 8.27083in (browser's 794px, not A4's 210mm)
+        "height_in": 1123 / 96,     # 11.69792in (browser's 1123px, not A4's 297mm)
+        "margins_in": {
+            "top": 73 / 96,         # 72px padding + 1px border
+            "bottom": 73 / 96,
+            "left": 73 / 96,
+            "right": 73 / 96,
+        },
     },
     "letter": {
         "width_mm": 215.9,
@@ -636,7 +644,6 @@ async def generate_pdf_from_captured_html(
         body {{
             margin: 0;
             padding: 0;
-            width: 648px;
             font-family: Arial, sans-serif;
             font-size: 1rem;
             line-height: 1.6;
