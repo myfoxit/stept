@@ -546,7 +546,7 @@ def generate_document_html(
     
     base_styles = """
         body { 
-            font-family: Arial, sans-serif; 
+            font-family: 'Inter', sans-serif; 
             line-height: 1.6;
             color: #1e293b;
         }
@@ -596,6 +596,9 @@ def generate_document_html(
 <head>
     <meta charset="UTF-8">
     <title>{safe_title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
 {pdf_styles}
 {base_styles}
@@ -624,7 +627,7 @@ async def generate_pdf_from_captured_html(
     safe_title = html_module.escape(title)
     
     # Styles that match the browser editor exactly:
-    # - Arial font (same as notion-like-editor.scss)
+    # - Inter web font (same as notion-like-editor.scss) — identical .woff2 on both sides
     # - line-height 1.6 (same as paragraph-node.scss)
     # - margin 0 on p (same as notion-like-editor.scss margin-top: 0 !important)
     html_content = f"""<!DOCTYPE html>
@@ -632,12 +635,15 @@ async def generate_pdf_from_captured_html(
 <head>
     <meta charset="UTF-8">
     <title>{safe_title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {{
             margin: 0;
             padding: 0;
             width: 650px;
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
             font-size: 1rem;
             line-height: 1.6;
             color: #1e293b;
@@ -684,6 +690,7 @@ async def generate_pdf_from_captured_html(
         "paperHeight": str(page_format['height_in']),
         "printBackground": "true",
         "scale": "1.0",
+        "waitDelay": "2s",
     }
     
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -722,6 +729,7 @@ async def generate_document_pdf(doc: Any, page_layout: str = "document") -> byte
                     "paperHeight": str(page_format['height_in']),
                     "printBackground": "true",
                     "scale": "1.0",
+                    "waitDelay": "2s",
                 }
             else:
                 # Default fallback for "full" or "document" layout
