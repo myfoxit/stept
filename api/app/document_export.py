@@ -25,7 +25,7 @@ PAGE_FORMATS = {
         "width_in": 8.27,
         "height_in": 11.69,
         # Margins in inches (matching frontend ~96px at 96dpi = 1 inch)
-        "margins_in": {"top": 0.8, "bottom": 1.0, "left": 1.0, "right": 1.0},
+        "margins_in": {"top": 0.75, "bottom": 0.75, "left": 0.75, "right": 0.75},
     },
     "letter": {
         "width_mm": 215.9,
@@ -220,10 +220,13 @@ def tiptap_nodes_to_html(nodes: List[Dict], page_layout: str = "document") -> st
         
         if node_type == "paragraph":
             content = "".join(convert_node(c) for c in node.get("content", []))
+            # Preserve textAlign attribute
+            text_align = node.get("attrs", {}).get("textAlign", "") if node.get("attrs") else ""
+            style = f' style="text-align: {text_align}"' if text_align and text_align != "left" else ""
             # Preserve empty paragraphs for vertical spacing
             if not content:
-                return "<p><br></p>"
-            return f"<p>{content}</p>"
+                return f"<p{style}><br></p>"
+            return f"<p{style}>{content}</p>"
         
         if node_type == "bulletList":
             items = "".join(convert_node(c) for c in node.get("content", []))
@@ -543,15 +546,15 @@ def generate_document_html(
     
     base_styles = """
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            line-height: 1.4;
+            font-family: Arial, sans-serif; 
+            line-height: normal;
             color: #1e293b;
         }
         h1 { font-size: 2rem; margin-bottom: 0.5rem; margin-top: 0; }
         h2 { font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; }
         h3 { font-size: 1.5rem; margin-top: 0.75rem; margin-bottom: 0.25rem; }
         h4 { font-size: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.25rem; }
-        p { margin: 0.25rem 0; }
+        p { margin: 0; }
         ul, ol { margin: 0.25rem 0; padding-left: 2rem; }
         li { margin: 0.125rem 0; }
         blockquote { 
