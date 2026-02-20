@@ -182,40 +182,52 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center justify-between">
             <SidebarMenuButton
+              style={{ height: "36px" }}
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:!p-1.5 mb-2"
             >
               <Link to="#">
                 <svg
-                  style={{ width: "24px", height: "auto" }}
-                  viewBox="0 0 38 30"
-                  fill="none"
-                  className="text-primary flex-shrink-0"
+                  style={{ width: "38px", height: "36px" }}
+                  width="38"
+                  height="36"
+                  viewBox="0 0 38 36"
                 >
                   <rect
-                    y="2"
-                    width="13"
-                    height="5"
-                    rx="2.5"
-                    fill="currentColor"
+                    x="0"
+                    y="4"
+                    width="32"
+                    height="32"
+                    rx="9"
+                    fill="#D94F3D"
                   />
                   <rect
-                    y="12"
-                    width="22"
-                    height="5"
-                    rx="2.5"
-                    fill="currentColor"
+                    x="7"
+                    y="11"
+                    width="10"
+                    height="3.5"
+                    rx="1.75"
+                    fill="white"
                   />
                   <rect
-                    y="22"
-                    width="17"
-                    height="5"
-                    rx="2.5"
-                    fill="currentColor"
+                    x="7"
+                    y="17.5"
+                    width="18"
+                    height="3.5"
+                    rx="1.75"
+                    fill="white"
+                  />
+                  <rect
+                    x="7"
+                    y="24"
+                    width="14"
+                    height="3.5"
+                    rx="1.75"
+                    fill="white"
                   />
                   <path
-                    d="M32 0 L33.8 5.6 L38 7.5 L33.8 9.4 L32 15 L30.2 9.4 L26 7.5 L30.2 5.6 Z"
-                    fill="currentColor"
+                    d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
+                    fill="#D94F3D"
                   />
                 </svg>
                 <span

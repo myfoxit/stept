@@ -1,32 +1,47 @@
-import { useParams } from 'react-router-dom';
-import { NotionEditor } from '@/components/tiptap-templates/simple/notion-editor';
-import { Button } from '@/components/ui/button';
-import { SiteHeader } from '@/components/site-header';
-import { IconDownload, IconShare, IconEye, IconLock } from '@tabler/icons-react';
-import { Folder as FolderIcon } from 'lucide-react';
+import { useParams } from "react-router-dom";
+import { NotionEditor } from "@/components/tiptap-templates/simple/notion-editor";
+import { Button } from "@/components/ui/button";
+import { SiteHeader } from "@/components/site-header";
+import {
+  IconDownload,
+  IconShare,
+  IconEye,
+  IconLock,
+} from "@tabler/icons-react";
+import { Folder as FolderIcon } from "lucide-react";
 import {
   PageLayoutSelector,
   type PageLayout,
-} from '@/components/page-layout-selector';
-import { useState, useEffect, useMemo } from 'react';
-import { useDocument, useUpdateDocumentLayout, useDocumentLock, useAcquireDocumentLock, useReleaseDocumentLock } from '@/hooks/api/documents';
-import { exportDocument, exportDocumentPdfDom, type DocumentExportFormat } from '@/api/documents';
-import { ExportDialog } from '@/components/export-dialog';
-import { ShareDialog } from '@/components/share-dialog';
-import { useChat } from '@/components/Chat/ChatContext';
-import { useProject } from '@/providers/project-provider';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
-import { CommentButton } from '@/components/Comments/CommentButton';
-import { CommentPanel } from '@/components/Comments/CommentPanel';
-import { useFolderTree } from '@/hooks/api/folders';
-import { useAuth } from '@/providers/auth-provider';
+} from "@/components/page-layout-selector";
+import { useState, useEffect, useMemo } from "react";
+import {
+  useDocument,
+  useUpdateDocumentLayout,
+  useDocumentLock,
+  useAcquireDocumentLock,
+  useReleaseDocumentLock,
+} from "@/hooks/api/documents";
+import {
+  exportDocument,
+  exportDocumentPdfDom,
+  type DocumentExportFormat,
+} from "@/api/documents";
+import { ExportDialog } from "@/components/export-dialog";
+import { ShareDialog } from "@/components/share-dialog";
+import { useChat } from "@/components/Chat/ChatContext";
+import { useProject } from "@/providers/project-provider";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ContextLinkPanel } from "@/components/ContextLinks/ContextLinkPanel";
+import { CommentButton } from "@/components/Comments/CommentButton";
+import { CommentPanel } from "@/components/Comments/CommentPanel";
+import { useFolderTree } from "@/hooks/api/folders";
+import { useAuth } from "@/providers/auth-provider";
 
 // Helper to find a folder name from the tree
 function findFolderName(tree: any[], folderId: string): string | null {
   for (const node of tree) {
-    if (node.id === folderId) return node.name || 'Untitled';
+    if (node.id === folderId) return node.name || "Untitled";
     if (node.children?.length) {
       const found = findFolderName(node.children, folderId);
       if (found) return found;
@@ -53,10 +68,13 @@ export default function EditorPage() {
     const crumbs: { label: string }[] = [];
     const folderId = (doc as any).folder_id;
     if (folderId) {
-      const folderName = findFolderName([...sharedTree, ...privateTree], folderId);
+      const folderName = findFolderName(
+        [...sharedTree, ...privateTree],
+        folderId,
+      );
       if (folderName) crumbs.push({ label: folderName });
     }
-    crumbs.push({ label: doc.name || 'Untitled' });
+    crumbs.push({ label: doc.name || "Untitled" });
     return crumbs.length > 0 ? crumbs : undefined;
   }, [doc, sharedTree, privateTree]);
 
@@ -70,12 +88,12 @@ export default function EditorPage() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
 
-  const [pageLayout, setPageLayout] = useState<PageLayout>('full');
+  const [pageLayout, setPageLayout] = useState<PageLayout>("full");
   const updateLayout = useUpdateDocumentLayout(docId!);
 
   const isPermissionReadOnly = useMemo(() => {
     if (!doc) return false;
-    return (doc as any).permission === 'view';
+    return (doc as any).permission === "view";
   }, [doc]);
 
   const isLockedByOther = lockStatus?.locked && !lockStatus?.is_mine;
@@ -97,14 +115,17 @@ export default function EditorPage() {
     const handleUnload = () => {
       navigator.sendBeacon?.(`/api/v1/documents/${docId}/unlock`);
     };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
   }, [docId, isPermissionReadOnly]);
 
   // Set chat context when viewing a document
   useEffect(() => {
     if (docId) {
-      setContext({ document_id: docId, project_id: selectedProjectId || undefined });
+      setContext({
+        document_id: docId,
+        project_id: selectedProjectId || undefined,
+      });
     }
     return () => setContext(null);
   }, [docId, setContext]);
@@ -118,8 +139,8 @@ export default function EditorPage() {
 
   // Apply globally for CSS
   useEffect(() => {
-    document.documentElement.setAttribute('data-page-layout', pageLayout);
-    return () => document.documentElement.removeAttribute('data-page-layout');
+    document.documentElement.setAttribute("data-page-layout", pageLayout);
+    return () => document.documentElement.removeAttribute("data-page-layout");
   }, [pageLayout]);
 
   const handleLayoutChange = (value: PageLayout) => {
@@ -132,18 +153,20 @@ export default function EditorPage() {
     if (!docId) return;
 
     // For PDF: capture the browser DOM for pixel-perfect export
-    if (format === 'pdf') {
-      const proseMirror = document.querySelector('.tiptap.ProseMirror');
+    if (format === "pdf") {
+      const proseMirror = document.querySelector(".tiptap.ProseMirror");
       if (proseMirror) {
         const clone = proseMirror.cloneNode(true) as HTMLElement;
         // Strip pagination decorations
-        clone.querySelectorAll(
-          '.tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap'
-        ).forEach(el => el.remove());
+        clone
+          .querySelectorAll(
+            ".tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap",
+          )
+          .forEach((el) => el.remove());
         // Remove pagination wrapper padding
-        clone.style.padding = '0';
-        clone.style.width = 'auto';
-        clone.style.minHeight = 'auto';
+        clone.style.padding = "0";
+        clone.style.width = "auto";
+        clone.style.minHeight = "auto";
         await exportDocumentPdfDom(docId, clone.innerHTML, { pageLayout });
         return;
       }
@@ -154,7 +177,7 @@ export default function EditorPage() {
 
   return (
     <div>
-      <SiteHeader name={doc?.name || 'Editor'} breadcrumbs={breadcrumbs}>
+      <SiteHeader name={doc?.name || "Editor"} breadcrumbs={breadcrumbs}>
         {isReadOnly && (
           <Badge variant="secondary" className="gap-1 text-xs">
             <IconEye className="h-3 w-3" />
@@ -163,47 +186,57 @@ export default function EditorPage() {
         )}
 
         {!isReadOnly && (
-          <PageLayoutSelector value={pageLayout} onChange={handleLayoutChange} />
+          <PageLayoutSelector
+            value={pageLayout}
+            onChange={handleLayoutChange}
+          />
         )}
 
         {!isReadOnly && (
           <ShareDialog
             resourceType="document"
             resourceId={docId!}
-            resourceName={doc?.name || 'Document'}
+            resourceName={doc?.name || "Document"}
             isPrivate={doc?.is_private}
             trigger={
               <Button variant="outline" size="sm">
-                <IconShare className="h-4 w-4 mr-2" />
-                Share
+                <IconShare />
+                <span className=" hidden md:inline">Share</span>
               </Button>
             }
           />
         )}
-        
+
         <ExportDialog
           onExport={handleExport}
           title="Export Document"
           description="Choose a format to export your document."
           trigger={
             <Button variant="default" size="sm">
-              <IconDownload className="h-4 w-4 mr-2" />
-              Export
+              <IconDownload />
+              <span className=" hidden md:inline">Export</span>
             </Button>
           }
         />
 
         {selectedProjectId && docId && (
-          <CommentButton count={commentCount} onClick={() => setCommentsOpen(true)} />
+          <CommentButton
+            count={commentCount}
+            onClick={() => setCommentsOpen(true)}
+          />
         )}
       </SiteHeader>
       {isLockedByOther && (
         <div className="mx-auto max-w-4xl px-4 pt-4">
-          <Alert variant="destructive" className="flex items-center justify-between">
+          <Alert
+            variant="destructive"
+            className="flex items-center justify-between"
+          >
             <div className="flex items-center gap-2">
               <IconLock className="h-4 w-4" />
               <AlertDescription>
-                {lockStatus?.locked_by_name || 'Someone'} is currently editing this document.
+                {lockStatus?.locked_by_name || "Someone"} is currently editing
+                this document.
               </AlertDescription>
             </div>
             <Button
@@ -225,7 +258,11 @@ export default function EditorPage() {
         headerSlot={(saveStatus, errorMessage) => (
           <>
             {selectedProjectId && docId && (
-              <ContextLinkPanel projectId={selectedProjectId} resourceType="document" resourceId={docId} />
+              <ContextLinkPanel
+                projectId={selectedProjectId}
+                resourceType="document"
+                resourceId={docId}
+              />
             )}
             <div className="flex items-center gap-2 text-xs mt-2">
               {folderName && (
@@ -234,15 +271,23 @@ export default function EditorPage() {
                   {folderName}
                 </span>
               )}
-              {saveStatus === 'saving' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground animate-pulse">Saving...</span>
+              {saveStatus === "saving" && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground animate-pulse">
+                  Saving...
+                </span>
               )}
-              {saveStatus === 'saved' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-green-600 font-medium">✓ Saved</span>
+              {saveStatus === "saved" && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-green-600 font-medium">
+                  ✓ Saved
+                </span>
               )}
-              {(saveStatus === 'error' || saveStatus === 'validation-error') && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-red-500 font-medium" title={errorMessage ?? undefined}>
-                  {errorMessage ?? 'Error'}
+              {(saveStatus === "error" ||
+                saveStatus === "validation-error") && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-red-500 font-medium"
+                  title={errorMessage ?? undefined}
+                >
+                  {errorMessage ?? "Error"}
                 </span>
               )}
             </div>

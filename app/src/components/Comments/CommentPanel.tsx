@@ -350,13 +350,13 @@ export function CommentPanel({
         </div>
 
         {/* New comment */}
-        <div className="border-t pt-3 space-y-2">
+        <div className="border-t pt-3 space-y-2 p-2">
           <Textarea
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
             placeholder="Add a comment…"
             rows={3}
-            className="text-sm"
+            className="text-sm "
           />
           <Button
             className="w-full"
@@ -364,7 +364,7 @@ export function CommentPanel({
             onClick={handleSubmit}
             disabled={loading || !newContent.trim()}
           >
-            <IconSend className="mr-1.5 h-3.5 w-3.5" />
+            <IconSend  />
             Comment
           </Button>
         </div>

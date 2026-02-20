@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ondoki — Contained Bars Brand & Icon System</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --red:#D94F3D;
+  --red-hover:#C4442F;
+  --red-light:rgba(217,79,61,0.06);
+  --red-light2:rgba(217,79,61,0.10);
+  --ink:#1C1917;
+  --ink-80:#292524;
+  --ink-60:#44403C;
+  --stone:#78716C;
+  --stone-light:#A8A29E;
+  --stone-lighter:#D6D3D1;
+  --warm-bg:#FFFBFA;
+  --warm-bg2:#FFF5F3;
+  --surface:#fff;
+  --dark:#0F0D0B;
+  --dark-surface:#1A1816;
+  --dark-border:#2A2725;
+}
+
+body{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  background:var(--warm-bg);
+  min-height:100vh;
+  color:var(--ink);
+}
+
+/* ---- HEADER ---- */
+.brand-header{
+  text-align:center;
+  padding:56px 24px 40px;
+  border-bottom:1px solid #F0EDEB;
+}
+.brand-header h1{
+  font-family:'Manrope',sans-serif;
+  font-size:2.2rem;
+  font-weight:800;
+  letter-spacing:-0.04em;
+  color:var(--ink);
+}
+.brand-header .sub{
+  font-size:0.88rem;
+  color:var(--stone);
+  margin-top:8px;
+  line-height:1.5;
+  max-width:520px;
+  margin-left:auto;margin-right:auto;
+}
+
+/* ---- SECTIONS ---- */
+.section{
+  max-width:1080px;
+  margin:0 auto;
+  padding:56px 32px;
+  border-bottom:1px solid #F0EDEB;
+}
+.section:last-child{border-bottom:none;}
+.section-label{
+  font-family:'Manrope';
+  font-size:0.6rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:0.16em;
+  color:var(--red);
+  margin-bottom:6px;
+}
+.section-title{
+  font-family:'Manrope';
+  font-size:1.35rem;
+  font-weight:800;
+  letter-spacing:-0.03em;
+  color:var(--ink);
+  margin-bottom:4px;
+}
+.section-desc{
+  font-size:0.8rem;
+  color:var(--stone);
+  line-height:1.5;
+  margin-bottom:28px;
+  max-width:500px;
+}
+
+/* ---- ICON GRID ---- */
+.icon-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:20px;
+  align-items:end;
+}
+.icon-item{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+}
+.icon-item .size-label{
+  font-size:0.56rem;
+  font-weight:700;
+  color:var(--stone-light);
+  text-transform:uppercase;
+  letter-spacing:0.12em;
+}
+
+/* ---- SHOWCASE CARDS ---- */
+.showcase-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+.showcase-card{
+  border-radius:16px;
+  padding:40px 32px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  min-height:200px;
+  position:relative;
+}
+.showcase-card.light{background:var(--surface);border:1px solid #E7E5E4;}
+.showcase-card.dark{background:var(--dark);border:1px solid var(--dark-border);}
+.showcase-card.red{background:var(--red);border:1px solid var(--red-hover);}
+.showcase-card .card-label{
+  position:absolute;
+  top:12px;left:16px;
+  font-size:0.5rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.14em;
+}
+.showcase-card.light .card-label{color:var(--stone-lighter);}
+.showcase-card.dark .card-label{color:#44403C;}
+.showcase-card.red .card-label{color:rgba(255,255,255,0.4);}
+
+/* ---- CONTEXT MOCKUPS ---- */
+.context-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:20px;
+}
+.context-card{
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid #E7E5E4;
+  background:var(--surface);
+}
+.context-card-header{
+  padding:10px 14px;
+  font-size:0.56rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.14em;
+  color:var(--stone-light);
+  border-bottom:1px solid #F0EDEB;
+}
+.context-card-body{
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+  min-height:100px;
+}
+
+/* ---- FAVICON STRIP ---- */
+.favicon-strip{
+  display:flex;
+  gap:16px;
+  align-items:end;
+  flex-wrap:wrap;
+}
+.fav-item{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+}
+.fav-box{
+  display:flex;align-items:center;justify-content:center;
+  background:#F5F4F2;
+  border-radius:6px;
+  border:1px solid #E7E5E4;
+}
+.fav-label{
+  font-size:0.5rem;
+  font-weight:700;
+  color:var(--stone-lighter);
+  text-transform:uppercase;
+  letter-spacing:0.1em;
+}
+
+/* ---- BROWSER TAB MOCKUP ---- */
+.browser-tab-mock{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  background:#F5F4F2;
+  border-radius:8px 8px 0 0;
+  padding:8px 16px 8px 10px;
+  border:1px solid #E7E5E4;
+  border-bottom:none;
+}
+.browser-tab-mock .tab-title{
+  font-size:0.72rem;
+  font-weight:600;
+  color:var(--ink-60);
+}
+.browser-tab-mock .tab-x{
+  font-size:0.6rem;
+  color:var(--stone-light);
+  margin-left:8px;
+}
+
+/* ---- TASKBAR MOCKUPS ---- */
+.taskbar-mac{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:#2A2725;
+  border-radius:14px;
+  padding:6px 10px;
+}
+.taskbar-dot{
+  width:4px;height:4px;
+  border-radius:50%;
+  background:var(--red);
+}
+.dock-icon{
+  width:44px;height:44px;
+  border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  background:#3A3735;
+}
+.dock-icon.active{
+  background:var(--red);
+}
+.dock-icon svg{opacity:0.4;}
+.dock-icon.active svg{opacity:1;}
+
+/* Windows taskbar */
+.taskbar-win{
+  display:inline-flex;
+  align-items:center;
+  gap:0;
+  background:#1A1816;
+  padding:0;
+  height:40px;
+}
+.win-item{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 14px;
+  height:100%;
+  position:relative;
+}
+.win-item.active::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:25%;right:25%;
+  height:2.5px;
+  border-radius:2px;
+  background:var(--red);
+}
+.win-item .win-label{
+  font-size:0.66rem;
+  font-weight:600;
+  color:#78716C;
+}
+.win-item.active .win-label{color:#fff;}
+
+/* ---- ELECTRON TITLE BAR ---- */
+.electron-mock{
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid #E7E5E4;
+  background:var(--surface);
+  max-width:480px;
+}
+.electron-titlebar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  background:#FAFAF9;
+  border-bottom:1px solid #F0EDEB;
+}
+.electron-dots{display:flex;gap:6px;}
+.electron-dots span{width:10px;height:10px;border-radius:50%;background:#E7E5E4;}
+.electron-title{
+  flex:1;text-align:center;
+  font-size:0.7rem;
+  font-weight:600;
+  color:var(--stone);
+}
+.electron-body{
+  padding:24px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.electron-body .app-name{
+  font-family:'Manrope';
+  font-size:0.95rem;
+  font-weight:800;
+  letter-spacing:-0.04em;
+  color:var(--ink);
+}
+.electron-body .app-ver{
+  font-size:0.6rem;
+  font-weight:600;
+  color:var(--stone-light);
+  margin-left:-6px;
+}
+
+/* ---- LOCKUPS ---- */
+.lockup{display:flex;align-items:center;}
+.lockup .wm{
+  font-family:'Manrope',sans-serif;
+  font-weight:800;
+  letter-spacing:-0.04em;
+  line-height:1;
+}
+
+/* ---- SPACING ---- */
+.gap-sm{gap:8px;}
+.gap-md{gap:12px;}
+.gap-lg{gap:16px;}
+.mt-4{margin-top:16px;}
+.mt-6{margin-top:24px;}
+.mt-8{margin-top:32px;}
+
+/* ---- COLOR SPECS ---- */
+.spec-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:12px;
+}
+.spec-swatch{
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid #E7E5E4;
+}
+.spec-color{height:60px;}
+.spec-info{padding:8px 10px;background:var(--surface);}
+.spec-info .spec-name{font-size:0.68rem;font-weight:700;color:var(--ink);}
+.spec-info .spec-hex{font-size:0.6rem;color:var(--stone);font-family:monospace;}
+
+/* ---- RESPONSIVE ---- */
+@media(max-width:640px){
+  .showcase-row{grid-template-columns:1fr;}
+  .section{padding:40px 20px;}
+  .brand-header h1{font-size:1.6rem;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- HEADER -->
+<!-- ============================================ -->
+<div class="brand-header">
+  <h1>ondoki</h1>
+  <p class="sub">Brand & Icon System — Contained Bars<br>Complete asset set for favicon, Electron, macOS dock, Windows taskbar, logo, and wordmark.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 1. THE ICON — ALL SIZES -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">01</div>
+  <div class="section-title">The Icon</div>
+  <div class="section-desc">Rounded square container with three white bars of varying width. Scales from 512px app icons down to 16px favicons without losing legibility.</div>
+
+  <div class="icon-grid">
+    <!-- 512 -->
+    <div class="icon-item">
+      <svg width="80" height="80" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+      <span class="size-label">512px</span>
+    </div>
+    <!-- 256 -->
+    <div class="icon-item">
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+      <span class="size-label">256px</span>
+    </div>
+    <!-- 128 -->
+    <div class="icon-item">
+      <svg width="48" height="48" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+      <span class="size-label">128px</span>
+    </div>
+    <!-- 64 -->
+    <div class="icon-item">
+      <svg width="36" height="36" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+      <span class="size-label">64px</span>
+    </div>
+    <!-- 48 -->
+    <div class="icon-item">
+      <svg width="28" height="28" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+      <span class="size-label">48px</span>
+    </div>
+    <!-- 32 -->
+    <div class="icon-item">
+      <svg width="22" height="22" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+      <span class="size-label">32px</span>
+    </div>
+    <!-- 16 -->
+    <div class="icon-item">
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+        <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+        <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+        <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+      </svg>
+      <span class="size-label">16px</span>
+    </div>
+  </div>
+
+  <!-- Pixel-hinted small sizes -->
+  <div class="section-desc mt-6" style="margin-bottom:16px;">Pixel-hinted versions for very small sizes to maintain crispness.</div>
+  <div class="icon-grid">
+    <div class="icon-item">
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+        <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+        <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+        <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+      </svg>
+      <span class="size-label">16px hinted</span>
+    </div>
+    <div class="icon-item">
+      <svg width="32" height="32" viewBox="0 0 32 32">
+        <rect width="32" height="32" rx="7" fill="#D94F3D"/>
+        <rect x="7" y="7" width="9" height="4" rx="2" fill="white"/>
+        <rect x="7" y="14" width="18" height="4" rx="2" fill="white"/>
+        <rect x="7" y="21" width="13" height="4" rx="2" fill="white"/>
+      </svg>
+      <span class="size-label">32px hinted</span>
+    </div>
+    <div class="icon-item">
+      <svg width="48" height="48" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#D94F3D"/>
+        <rect x="10" y="10" width="14" height="5.5" rx="2.75" fill="white"/>
+        <rect x="10" y="21" width="28" height="5.5" rx="2.75" fill="white"/>
+        <rect x="10" y="32" width="20" height="5.5" rx="2.75" fill="white"/>
+      </svg>
+      <span class="size-label">48px hinted</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 2. ON LIGHT / DARK / RED BACKGROUNDS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">02</div>
+  <div class="section-title">Surface Variants</div>
+  <div class="section-desc">The icon on light, dark, and brand-red backgrounds. Plus the inverted (white container) variant for dark contexts.</div>
+
+  <div class="showcase-row">
+    <div class="showcase-card light">
+      <span class="card-label">Light Surface</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+    </div>
+    <div class="showcase-card dark">
+      <span class="card-label">Dark Surface</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+    </div>
+    <div class="showcase-card red">
+      <span class="card-label">On Brand Red</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="rgba(255,255,255,0.15)"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+    </div>
+    <div class="showcase-card dark">
+      <span class="card-label">Monochrome White</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="white"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="#0F0D0B"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="#0F0D0B"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="#0F0D0B"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 3. LOGO LOCKUPS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">03</div>
+  <div class="section-title">Logo Lockups</div>
+  <div class="section-desc">Icon + wordmark in horizontal lockup. Three weights: large (marketing), medium (nav/header), small (footer/compact).</div>
+
+  <div class="showcase-row">
+    <!-- LIGHT -->
+    <div class="showcase-card light" style="gap:28px;align-items:flex-start;padding:40px 36px;">
+      <span class="card-label">Light</span>
+      <!-- Large -->
+      <div class="lockup" style="gap:14px;">
+        <svg width="44" height="44" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:1.7rem;color:#1C1917;">ondoki</span>
+      </div>
+      <!-- Medium -->
+      <div class="lockup" style="gap:10px;">
+        <svg width="30" height="30" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:1.15rem;color:#1C1917;">ondoki</span>
+      </div>
+      <!-- Small -->
+      <div class="lockup" style="gap:7px;">
+        <svg width="22" height="22" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:0.85rem;color:#1C1917;">ondoki</span>
+      </div>
+    </div>
+    <!-- DARK -->
+    <div class="showcase-card dark" style="gap:28px;align-items:flex-start;padding:40px 36px;">
+      <span class="card-label">Dark</span>
+      <!-- Large -->
+      <div class="lockup" style="gap:14px;">
+        <svg width="44" height="44" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:1.7rem;color:#fff;">ondoki</span>
+      </div>
+      <!-- Medium -->
+      <div class="lockup" style="gap:10px;">
+        <svg width="30" height="30" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:1.15rem;color:#fff;">ondoki</span>
+      </div>
+      <!-- Small -->
+      <div class="lockup" style="gap:7px;">
+        <svg width="22" height="22" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:0.85rem;color:#fff;">ondoki</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 4. WORDMARK ONLY -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">04</div>
+  <div class="section-title">Wordmark</div>
+  <div class="section-desc">Standalone wordmark for contexts where the icon is already visible (e.g. next to app icon in a list).</div>
+
+  <div class="showcase-row">
+    <div class="showcase-card light" style="gap:20px;">
+      <span class="card-label">Light</span>
+      <span class="wm" style="font-size:2.4rem;color:#1C1917;">ondoki</span>
+      <span class="wm" style="font-size:1.4rem;color:#1C1917;">ondoki</span>
+      <span class="wm" style="font-size:0.9rem;color:#1C1917;">ondoki</span>
+    </div>
+    <div class="showcase-card dark" style="gap:20px;">
+      <span class="card-label">Dark</span>
+      <span class="wm" style="font-size:2.4rem;color:#fff;">ondoki</span>
+      <span class="wm" style="font-size:1.4rem;color:#fff;">ondoki</span>
+      <span class="wm" style="font-size:0.9rem;color:#fff;">ondoki</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 5. FAVICON IN BROWSER -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">05</div>
+  <div class="section-title">Favicon — Browser Context</div>
+  <div class="section-desc">How the icon reads as a favicon in browser tabs, bookmarks bar, and address bar.</div>
+
+  <div class="context-grid">
+    <!-- Browser tab -->
+    <div class="context-card">
+      <div class="context-card-header">Browser Tab</div>
+      <div class="context-card-body" style="padding:20px 16px;justify-content:flex-start;background:#FAFAF9;">
+        <div style="display:flex;gap:0;">
+          <div class="browser-tab-mock" style="background:#fff;border-bottom:1px solid #fff;">
+            <svg width="14" height="14" viewBox="0 0 16 16">
+              <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+              <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+              <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+              <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+            </svg>
+            <span class="tab-title">Meeting — Ondoki</span>
+            <span class="tab-x">×</span>
+          </div>
+          <div class="browser-tab-mock" style="opacity:0.5;border-bottom:1px solid #E7E5E4;">
+            <svg width="14" height="14" viewBox="0 0 16 16">
+              <rect width="16" height="16" rx="3.5" fill="#ccc"/>
+              <rect x="4" y="4" width="8" height="2" rx="1" fill="white"/>
+              <rect x="4" y="8" width="8" height="2" rx="1" fill="white"/>
+              <rect x="4" y="12" width="4" height="2" rx="1" fill="white"/>
+            </svg>
+            <span class="tab-title">Other Tab</span>
+            <span class="tab-x">×</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Address bar -->
+    <div class="context-card">
+      <div class="context-card-header">Address Bar</div>
+      <div class="context-card-body" style="padding:20px 16px;justify-content:flex-start;">
+        <div style="display:flex;align-items:center;gap:8px;background:#F5F4F2;border-radius:8px;padding:8px 14px;width:100%;border:1px solid #E7E5E4;">
+          <svg width="14" height="14" viewBox="0 0 16 16">
+            <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+            <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+            <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+            <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+          </svg>
+          <span style="font-size:0.74rem;color:var(--stone);">app.ondoki.com/pages/meeting</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bookmarks bar -->
+    <div class="context-card">
+      <div class="context-card-header">Bookmarks Bar</div>
+      <div class="context-card-body" style="padding:12px 16px;justify-content:flex-start;gap:16px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <svg width="14" height="14" viewBox="0 0 16 16">
+            <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+            <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+            <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+            <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+          </svg>
+          <span style="font-size:0.68rem;font-weight:500;color:var(--ink-60);">Ondoki</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;opacity:0.35;">
+          <svg width="14" height="14" viewBox="0 0 16 16"><rect width="16" height="16" rx="3.5" fill="#888"/></svg>
+          <span style="font-size:0.68rem;font-weight:500;color:var(--stone);">GitHub</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;opacity:0.35;">
+          <svg width="14" height="14" viewBox="0 0 16 16"><rect width="16" height="16" rx="3.5" fill="#888"/></svg>
+          <span style="font-size:0.68rem;font-weight:500;color:var(--stone);">Figma</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 6. macOS DOCK -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">06</div>
+  <div class="section-title">macOS Dock</div>
+  <div class="section-desc">The icon in macOS dock context — active state with running indicator dot.</div>
+
+  <div class="context-grid">
+    <div class="context-card" style="grid-column:1/-1;">
+      <div class="context-card-header">macOS Dock</div>
+      <div class="context-card-body" style="background:#1A1816;padding:28px 20px;flex-direction:column;gap:6px;">
+        <div class="taskbar-mac">
+          <div class="dock-icon">
+            <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" rx="3.5" fill="#666"/><rect x="3" y="3" width="10" height="2" rx="1" fill="#999"/><rect x="3" y="7" width="10" height="2" rx="1" fill="#999"/></svg>
+          </div>
+          <div class="dock-icon">
+            <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" rx="3.5" fill="#555"/><circle cx="8" cy="8" r="4" fill="#888"/></svg>
+          </div>
+          <div class="dock-icon active">
+            <svg width="24" height="24" viewBox="0 0 512 512" style="opacity:1;">
+              <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+              <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+              <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+              <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+            </svg>
+          </div>
+          <div class="dock-icon">
+            <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" rx="3.5" fill="#555"/><rect x="4" y="5" width="8" height="6" rx="1" fill="#888"/></svg>
+          </div>
+          <div class="dock-icon">
+            <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" rx="3.5" fill="#555"/><path d="M5 4 L12 8 L5 12Z" fill="#888"/></svg>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;padding:0 10px;justify-content:center;">
+          <div style="width:44px;display:flex;justify-content:center;"><div style="width:0;height:0;"></div></div>
+          <div style="width:44px;display:flex;justify-content:center;"><div style="width:0;height:0;"></div></div>
+          <div style="width:44px;display:flex;justify-content:center;"><div class="taskbar-dot"></div></div>
+          <div style="width:44px;display:flex;justify-content:center;"><div style="width:0;height:0;"></div></div>
+          <div style="width:44px;display:flex;justify-content:center;"><div style="width:0;height:0;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 7. WINDOWS TASKBAR -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">07</div>
+  <div class="section-title">Windows Taskbar</div>
+  <div class="section-desc">The icon in Windows taskbar with active indicator line.</div>
+
+  <div class="context-grid">
+    <div class="context-card" style="grid-column:1/-1;">
+      <div class="context-card-header">Windows 11 Taskbar</div>
+      <div class="context-card-body" style="padding:0;background:#1A1816;">
+        <div class="taskbar-win" style="width:100%;justify-content:center;">
+          <div class="win-item" style="padding:0 18px;">
+            <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#555"/></svg>
+          </div>
+          <div class="win-item" style="padding:0 18px;">
+            <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#555"/></svg>
+          </div>
+          <div class="win-item active" style="padding:0 18px;">
+            <svg width="20" height="20" viewBox="0 0 32 32">
+              <rect width="32" height="32" rx="7" fill="#D94F3D"/>
+              <rect x="7" y="7" width="9" height="4" rx="2" fill="white"/>
+              <rect x="7" y="14" width="18" height="4" rx="2" fill="white"/>
+              <rect x="7" y="21" width="13" height="4" rx="2" fill="white"/>
+            </svg>
+          </div>
+          <div class="win-item" style="padding:0 18px;">
+            <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#555"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 8. ELECTRON APP TITLE BAR -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">08</div>
+  <div class="section-title">Electron App — Title Bar</div>
+  <div class="section-desc">How the icon and wordmark appear in the Electron desktop app title bar and about screen.</div>
+
+  <div class="context-grid">
+    <div class="context-card" style="max-width:480px;">
+      <div class="context-card-header">macOS Title Bar</div>
+      <div class="context-card-body" style="flex-direction:column;align-items:stretch;padding:0;">
+        <div class="electron-titlebar">
+          <div class="electron-dots"><span></span><span></span><span></span></div>
+          <div class="electron-title">Ondoki</div>
+          <div style="width:48px;"></div>
+        </div>
+        <div style="padding:20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #F0EDEB;">
+          <svg width="26" height="26" viewBox="0 0 512 512">
+            <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+            <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+            <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+            <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+          </svg>
+          <span class="wm" style="font-size:1rem;color:var(--ink);">ondoki</span>
+          <span style="font-size:0.6rem;font-weight:600;color:var(--stone-light);background:var(--red-light);padding:2px 6px;border-radius:4px;">v0.1.0</span>
+        </div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" style="opacity:0.3;"><rect width="16" height="16" rx="3" fill="#888"/></svg>
+            <span style="font-size:0.72rem;color:var(--stone);">Shared with me</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" style="opacity:0.3;"><rect width="16" height="16" rx="3" fill="#888"/></svg>
+            <span style="font-size:0.72rem;color:var(--stone);">Knowledge Base</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--red-light);padding:4px 6px;border-radius:6px;margin:-4px -6px;">
+            <svg width="14" height="14" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#D94F3D" opacity="0.15"/><rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="#D94F3D"/><rect x="3.5" y="7" width="9" height="2" rx="1" fill="#D94F3D"/><rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="#D94F3D"/></svg>
+            <span style="font-size:0.72rem;font-weight:600;color:var(--red);">Pages</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- About screen -->
+    <div class="context-card" style="max-width:480px;">
+      <div class="context-card-header">About Screen</div>
+      <div class="context-card-body" style="flex-direction:column;gap:12px;padding:36px;">
+        <svg width="64" height="64" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </svg>
+        <span class="wm" style="font-size:1.5rem;color:var(--ink);">ondoki</span>
+        <span style="font-size:0.66rem;color:var(--stone);text-align:center;line-height:1.5;">Version 0.1.0<br>Stop losing knowledge. Start building it.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 9. APP ICON SHAPES -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">09</div>
+  <div class="section-title">Platform Icon Shapes</div>
+  <div class="section-desc">The icon adapted to platform-specific icon masks — macOS squircle, Windows square, Android adaptive circle, web circle crop.</div>
+
+  <div class="showcase-row" style="grid-template-columns:repeat(4,1fr);">
+    <!-- macOS -->
+    <div class="showcase-card light" style="min-height:140px;">
+      <span class="card-label">macOS</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+    </div>
+    <!-- Windows -->
+    <div class="showcase-card light" style="min-height:140px;">
+      <span class="card-label">Windows</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="12" fill="#D94F3D"/>
+        <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+        <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+        <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+      </svg>
+    </div>
+    <!-- Android -->
+    <div class="showcase-card light" style="min-height:140px;">
+      <span class="card-label">Android</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <clipPath id="circle-clip"><circle cx="256" cy="256" r="256"/></clipPath>
+        <circle cx="256" cy="256" r="256" fill="#D94F3D"/>
+        <g clip-path="url(#circle-clip)">
+          <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+          <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+          <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+        </g>
+      </svg>
+    </div>
+    <!-- Web / Circle -->
+    <div class="showcase-card light" style="min-height:140px;">
+      <span class="card-label">Web Avatar</span>
+      <svg width="64" height="64" viewBox="0 0 512 512">
+        <defs><clipPath id="circle-clip2"><circle cx="256" cy="256" r="256"/></clipPath></defs>
+        <circle cx="256" cy="256" r="256" fill="#D94F3D"/>
+        <g clip-path="url(#circle-clip2)">
+          <rect x="125" y="140" width="120" height="48" rx="24" fill="white"/>
+          <rect x="125" y="232" width="262" height="48" rx="24" fill="white"/>
+          <rect x="125" y="324" width="186" height="48" rx="24" fill="white"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 10. COLOR SPEC -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">10</div>
+  <div class="section-title">Color Specification</div>
+  <div class="section-desc">The brand color palette used across all icon and logo assets.</div>
+
+  <div class="spec-grid">
+    <div class="spec-swatch">
+      <div class="spec-color" style="background:#D94F3D;"></div>
+      <div class="spec-info"><div class="spec-name">Brand Red</div><div class="spec-hex">#D94F3D</div></div>
+    </div>
+    <div class="spec-swatch">
+      <div class="spec-color" style="background:#C4442F;"></div>
+      <div class="spec-info"><div class="spec-name">Red Dark</div><div class="spec-hex">#C4442F</div></div>
+    </div>
+    <div class="spec-swatch">
+      <div class="spec-color" style="background:#FFFFFF;"></div>
+      <div class="spec-info"><div class="spec-name">Icon Bars</div><div class="spec-hex">#FFFFFF</div></div>
+    </div>
+    <div class="spec-swatch">
+      <div class="spec-color" style="background:#1C1917;"></div>
+      <div class="spec-info"><div class="spec-name">Ink</div><div class="spec-hex">#1C1917</div></div>
+    </div>
+    <div class="spec-swatch">
+      <div class="spec-color" style="background:#0F0D0B;"></div>
+      <div class="spec-info"><div class="spec-name">Dark Surface</div><div class="spec-hex">#0F0D0B</div></div>
+    </div>
+    <div class="spec-swatch">
+      <div class="spec-color" style="background:#FFFBFA;"></div>
+      <div class="spec-info"><div class="spec-name">Warm BG</div><div class="spec-hex">#FFFBFA</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 11. CLEAR SPACE & MINIMUM SIZE -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">11</div>
+  <div class="section-title">Clear Space & Minimum Size</div>
+  <div class="section-desc">Minimum clear space around the icon and lockup. Minimum recommended sizes for legibility.</div>
+
+  <div class="showcase-row">
+    <div class="showcase-card light" style="gap:10px;">
+      <span class="card-label">Clear Space</span>
+      <div style="position:relative;display:inline-block;">
+        <svg width="80" height="80" viewBox="0 0 120 120">
+          <!-- Clear space guides -->
+          <rect x="10" y="10" width="100" height="100" fill="none" stroke="#D94F3D" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.3"/>
+          <!-- The icon -->
+          <g transform="translate(20,20)">
+            <svg width="80" height="80" viewBox="0 0 512 512">
+              <rect width="512" height="512" rx="115" fill="#D94F3D"/>
+              <rect x="105" y="120" width="150" height="56" rx="28" fill="white"/>
+              <rect x="105" y="228" width="302" height="56" rx="28" fill="white"/>
+              <rect x="105" y="336" width="220" height="56" rx="28" fill="white"/>
+            </svg>
+          </g>
+          <!-- Arrows -->
+          <line x1="15" y1="10" x2="15" y2="20" stroke="#D94F3D" stroke-width="0.8" opacity="0.5"/>
+          <line x1="10" y1="15" x2="20" y2="15" stroke="#D94F3D" stroke-width="0.8" opacity="0.5"/>
+          <text x="5" y="8" font-size="5" fill="#D94F3D" opacity="0.6" font-family="monospace">x</text>
+        </svg>
+      </div>
+      <span style="font-size:0.6rem;color:var(--stone);text-align:center;">Clear space = ¼ icon width<br>on all sides</span>
+    </div>
+    <div class="showcase-card light" style="gap:16px;">
+      <span class="card-label">Minimum Sizes</span>
+      <div style="display:flex;align-items:end;gap:16px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+            <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+            <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+            <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+          </svg>
+          <span style="font-size:0.5rem;color:var(--stone-light);font-weight:700;">16px min</span>
+          <span style="font-size:0.45rem;color:var(--stone-lighter);">Icon only</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div class="lockup" style="gap:5px;">
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <rect width="16" height="16" rx="3.5" fill="#D94F3D"/>
+              <rect x="3.5" y="3.5" width="4.5" height="2" rx="1" fill="white"/>
+              <rect x="3.5" y="7" width="9" height="2" rx="1" fill="white"/>
+              <rect x="3.5" y="10.5" width="6.5" height="2" rx="1" fill="white"/>
+            </svg>
+            <span class="wm" style="font-size:0.7rem;color:var(--ink);">ondoki</span>
+          </div>
+          <span style="font-size:0.5rem;color:var(--stone-light);font-weight:700;">16px+text min</span>
+          <span style="font-size:0.45rem;color:var(--stone-lighter);">Lockup</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 12. SVG EXPORT REFERENCE -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-label">12</div>
+  <div class="section-title">SVG Source</div>
+  <div class="section-desc">Copy-paste ready SVG for the icon at 512×512 master size.</div>
+
+  <div style="background:#1A1816;border-radius:12px;padding:20px 24px;font-family:monospace;font-size:0.68rem;color:#A8A29E;line-height:1.7;overflow-x:auto;white-space:pre;border:1px solid #2A2725;">
+<span style="color:#D94F3D;">&lt;svg</span> width=<span style="color:#87CEEB;">"512"</span> height=<span style="color:#87CEEB;">"512"</span> viewBox=<span style="color:#87CEEB;">"0 0 512 512"</span> xmlns=<span style="color:#87CEEB;">"http://www.w3.org/2000/svg"</span><span style="color:#D94F3D;">&gt;</span>
+  <span style="color:#D94F3D;">&lt;rect</span> width=<span style="color:#87CEEB;">"512"</span> height=<span style="color:#87CEEB;">"512"</span> rx=<span style="color:#87CEEB;">"115"</span> fill=<span style="color:#87CEEB;">"#D94F3D"</span><span style="color:#D94F3D;">/&gt;</span>
+  <span style="color:#D94F3D;">&lt;rect</span> x=<span style="color:#87CEEB;">"105"</span> y=<span style="color:#87CEEB;">"120"</span> width=<span style="color:#87CEEB;">"150"</span> height=<span style="color:#87CEEB;">"56"</span> rx=<span style="color:#87CEEB;">"28"</span> fill=<span style="color:#87CEEB;">"white"</span><span style="color:#D94F3D;">/&gt;</span>
+  <span style="color:#D94F3D;">&lt;rect</span> x=<span style="color:#87CEEB;">"105"</span> y=<span style="color:#87CEEB;">"228"</span> width=<span style="color:#87CEEB;">"302"</span> height=<span style="color:#87CEEB;">"56"</span> rx=<span style="color:#87CEEB;">"28"</span> fill=<span style="color:#87CEEB;">"white"</span><span style="color:#D94F3D;">/&gt;</span>
+  <span style="color:#D94F3D;">&lt;rect</span> x=<span style="color:#87CEEB;">"105"</span> y=<span style="color:#87CEEB;">"336"</span> width=<span style="color:#87CEEB;">"220"</span> height=<span style="color:#87CEEB;">"56"</span> rx=<span style="color:#87CEEB;">"28"</span> fill=<span style="color:#87CEEB;">"white"</span><span style="color:#D94F3D;">/&gt;</span>
+<span style="color:#D94F3D;">&lt;/svg&gt;</span></div>
+</div>
+
+</body>
+</html>

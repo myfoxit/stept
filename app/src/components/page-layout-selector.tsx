@@ -28,7 +28,7 @@ export function PageLayoutSelector({
 }: PageLayoutSelectorProps) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[160px] h-8">
+      <SelectTrigger className="w-[160px] h-8 ">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
