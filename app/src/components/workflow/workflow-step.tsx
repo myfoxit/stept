@@ -105,7 +105,7 @@ export function WorkflowStep({
       <Card className="group w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
           <div className="flex items-center gap-3 flex-1"> {/* NEW: flex-1 */}
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
               {/* NEW: show visibleIndex instead of backend stepNumber */}
               {visibleIndex}
             </div>
@@ -122,7 +122,7 @@ export function WorkflowStep({
               ) : (
                 <div
                   className={`w-full rounded-sm px-2 py-1 text-sm font-medium text-slate-800 transition
-                    ${isEditMode ? 'cursor-pointer hover:bg-indigo-50 hover:text-indigo-700' : ''}`}
+                    ${isEditMode ? 'cursor-pointer hover:bg-primary/5 hover:text-primary700' : ''}`}
                   onClick={() => isEditMode && setEditingTitle(true)}
                 >
                   {titleDraft}

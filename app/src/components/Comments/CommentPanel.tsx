@@ -52,7 +52,7 @@ function initials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  'bg-indigo-500',
+  'bg-primary',
   'bg-emerald-500',
   'bg-amber-500',
   'bg-rose-500',

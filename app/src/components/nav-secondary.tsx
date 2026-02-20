@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { type Icon } from '@tabler/icons-react';
+import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import {
@@ -20,7 +20,7 @@ export function NavSecondary({
   items: {
     title: string;
     url: string;
-    icon: Icon;
+    icon: LucideIcon;
   }[];
   projectId?: string | null;
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {

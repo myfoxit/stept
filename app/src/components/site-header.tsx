@@ -1,46 +1,42 @@
 import { ReactNode } from 'react';
-import { IconMessageCircle, IconSearch } from '@tabler/icons-react';
+import { IconMessageCircle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ThemeToggle } from './tiptap-templates/simple/notion-like-editor-theme-toggle';
 import { useChat } from '@/components/Chat/ChatContext';
-import { SearchBar } from '@/components/search/SearchResults';
-import { useSpotlight } from '@/components/spotlight/SpotlightProvider';
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 
 export function SiteHeader({
   name = 'Documents',
+  breadcrumbs,
   children,
 }: {
   name?: string;
+  breadcrumbs?: { label: string; href?: string }[];
   children?: ReactNode;
 }) {
   const { togglePanel, isOpen } = useChat();
-  const { openSpotlight } = useSpotlight();
+  const { state, isMobile } = useSidebar();
+  const showTrigger = state === 'collapsed' || isMobile;
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <SidebarTrigger className="-ml-1" />
-        <Separator
-          orientation="vertical"
-          className="mx-2 data-[orientation=vertical]:h-4"
-        />
-        <h1 className="text-base font-medium">{name}</h1>
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden h-8 gap-2 text-muted-foreground sm:flex"
-            onClick={openSpotlight}
-          >
-            <IconSearch className="h-4 w-4" />
-            <span className="text-xs">Search...</span>
-            <kbd className="pointer-events-none ml-2 inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              ⌘K
-            </kbd>
-          </Button>
-          <SearchBar className="sm:hidden" />
+        {showTrigger && <SidebarTrigger className="size-7 -ml-1 mr-1" />}
+        {breadcrumbs && breadcrumbs.length > 0 ? (
+          <nav className="flex items-center gap-1.5 text-[0.8rem]">
+            {breadcrumbs.map((crumb, i) => (
+              <span key={i} className="flex items-center gap-1.5">
+                {i > 0 && <span className="text-[#D6D3D1] text-[0.65rem]">›</span>}
+                <span className={i === breadcrumbs.length - 1 ? 'font-semibold text-[#1C1917]' : 'font-medium text-[#A8A29E] hover:text-[#D94F3D] cursor-pointer transition-colors'}>
+                  {crumb.label}
+                </span>
+              </span>
+            ))}
+          </nav>
+        ) : (
+          <h1 className="text-base font-medium">{name}</h1>
+        )}
+        <div className="ml-auto flex items-center gap-1.5">
           {children}
           <Button
             variant={isOpen ? 'default' : 'ghost'}

@@ -92,7 +92,7 @@ export function ImageUploadModal({
           <div
             className={cn(
               "mt-4 rounded-lg border-2 border-dashed p-8 text-center transition-colors",
-              isDragOver ? "border-indigo-500 bg-indigo-50" : "border-gray-300",
+              isDragOver ? "border-primary bg-primary/5" : "border-gray-300",
               isUploading && "pointer-events-none opacity-50"
             )}
             onDragOver={handleDragOver}
@@ -112,7 +112,7 @@ export function ImageUploadModal({
             <IconUpload className="mx-auto h-12 w-12 text-gray-400" />
             <div className="mt-2 text-sm text-gray-600">
               Drag and drop or{' '}
-              <button className="text-indigo-600 hover:text-indigo-500">
+              <button className="text-primary hover:text-primary">
                 choose a file
               </button>
             </div>

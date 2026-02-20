@@ -18,7 +18,7 @@ export function Layout() {
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" />
+      <AppSidebar />
       <SidebarInset>
         <div>
           <Outlet />

@@ -48,7 +48,70 @@ body,
 }
 
 .tiptap.ProseMirror {
-  font-family: Arial, sans-serif;
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: #57534E;
+  font-size: 1.08rem;
+  line-height: 1.9;
+}
+
+.tiptap.ProseMirror h1,
+.tiptap.ProseMirror h2,
+.tiptap.ProseMirror h3,
+.tiptap.ProseMirror h4,
+.tiptap.ProseMirror h5,
+.tiptap.ProseMirror h6 {
+  font-family: 'Manrope', sans-serif;
+  color: #1C1917;
+}
+
+.tiptap.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.tiptap.ProseMirror h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tiptap.ProseMirror strong {
+  color: #1C1917;
+  font-weight: 600;
+}
+
+.tiptap.ProseMirror a {
+  color: #D94F3D;
+  text-decoration: underline;
+  text-decoration-color: #E8A49A;
+  text-underline-offset: 3px;
+}
+
+.tiptap.ProseMirror a:hover {
+  text-decoration-color: #D94F3D;
+}
+
+.tiptap.ProseMirror code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.86em;
+  background: #FFF5F3;
+  border: 1px solid #FEEAE6;
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: #D94F3D;
+}
+
+.tiptap.ProseMirror blockquote {
+  border-left: 3px solid #D94F3D;
+  padding-left: 18px;
+  color: #A8A29E;
+  font-style: italic;
+}
+
+.tiptap.ProseMirror li::marker {
+  color: #E8A49A;
 }
 
 :root[data-page-layout='a4'] .notion-like-editor-wrapper {
@@ -77,21 +140,31 @@ body,
   display: flex;
   flex-direction: column;
 
+  .notion-page-meta,
+  .notion-page-title {
+    max-width: 768px;
+    width: 100%;
+    padding-left: 4rem;
+    margin: 0 auto;
+  }
+
+  .notion-page-meta {
+    padding-top: 0.5rem;
+  }
+
   .notion-page-title {
     /* visual */
-    font-size: 2rem; // ≈ 32 px
-    font-weight: 600;
-    line-height: 1.2;
+    font-family: 'Manrope', sans-serif;
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #1C1917;
     background: transparent;
     border: none;
-    max-width: 768px;
 
-    width: 100%;
-    padding: 2rem 0 0 4rem;
-    /* spacing */
-    margin: 0 auto;
-
-    margin-bottom: 0.75rem; // space before the body
+    padding-top: 1rem;
+    margin-bottom: 0.75rem;
 
     /* UX */
     outline: none;
@@ -142,6 +215,7 @@ body,
   max-width: 100%;
   overflow-x: auto; /* keep code scrolling inside container */
 }
+:root[data-page-layout='full'] .notion-like-editor-wrapper .notion-page-meta,
 :root[data-page-layout='full'] .notion-like-editor-wrapper .notion-page-title {
   max-width: 100%;
   padding: 4% var(--page-pad-x) 0;
@@ -185,6 +259,7 @@ body,
   max-width: 100%;
   overflow-x: auto;
 }
+:root[data-page-layout='document'] .notion-page-meta,
 :root[data-page-layout='document'] .notion-page-title {
   max-width: var(--page-a4-width-px);
   width: 100%;
@@ -195,6 +270,8 @@ body,
 }
 
 /* Paginated layouts: align title with page content using CSS vars provided by React */
+:root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-page-meta,
+:root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-page-meta,
 :root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-page-title,
 :root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-page-title {
   max-width: var(--page-width); /* set by React based on PAGE_FORMATS */
@@ -253,6 +330,7 @@ body,
     margin-right: auto;
   }
   
+  :root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-page-meta,
   :root[data-page-layout='a4'] .notion-like-editor-wrapper .notion-page-title {
     transform: scale(var(--page-scale));
     transform-origin: top left;
@@ -289,6 +367,7 @@ body,
     margin-right: auto;
   }
   
+  :root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-page-meta,
   :root[data-page-layout='letter'] .notion-like-editor-wrapper .notion-page-title {
     transform: scale(var(--page-scale));
     transform-origin: top left;
@@ -323,6 +402,7 @@ body,
     padding: 1rem 1rem 30vh;
   }
   
+  :root[data-page-layout='document'] .notion-page-meta,
   :root[data-page-layout='document'] .notion-page-title {
     max-width: 100%;
     padding: 1.5rem 1rem 0;
@@ -339,6 +419,7 @@ body,
     padding-right: 1rem;
   }
   
+  :root[data-page-layout='full'] .notion-like-editor-wrapper .notion-page-meta,
   :root[data-page-layout='full'] .notion-like-editor-wrapper .notion-page-title {
     padding: 1.5rem 1rem 0;
     padding-left: 1rem;

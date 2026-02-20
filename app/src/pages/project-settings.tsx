@@ -381,7 +381,7 @@ export function ProjectSettingsPage() {
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => setWizardOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <IconSparkles className="mr-2 h-4 w-4" />
                 {aiConfig?.configured ? 'Reconfigure AI' : 'Setup AI Provider'}

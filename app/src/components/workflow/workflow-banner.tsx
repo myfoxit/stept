@@ -11,10 +11,10 @@ interface WorkflowBannerProps {
 
 export function WorkflowBanner({ isEditMode, onToggleEdit, onShare }: WorkflowBannerProps) {
   return (
-    <div className="border-b border-indigo-100 bg-indigo-50/80">
+    <div className="border-b border-primary/10 bg-primary/5">
      
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2 text-sm text-indigo-900">
+        <div className="flex items-center gap-2 text-sm text-primary">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">
             <IconInfoCircle className="h-3 w-3" />
           </span>

@@ -143,7 +143,7 @@ export function HeaderStep({
             <div
               className={cn(
                 "px-2 text-sm font-medium text-slate-800",
-                isEditMode && "cursor-pointer hover:text-indigo-700"
+                isEditMode && "cursor-pointer hover:text-primary700"
               )}
               onClick={() => isEditMode && setEditingTitle(true)}
             >
@@ -408,7 +408,7 @@ export function EmptyImageStep({
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
           <div className="flex items-center gap-3">
             {/* NEW: remove numbered circle for empty image step */}
-            {/* <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
+            {/* <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
               {stepNumber}
             </div> */}
             {/* EMPTY IMAGE STEP title block changes */}
@@ -425,7 +425,7 @@ export function EmptyImageStep({
               <div
                 className={cn(
                   "w-full rounded-sm px-2 py-1 text-sm font-medium text-slate-800 transition",
-                  isEditMode && "cursor-pointer hover:bg-indigo-50 hover:text-indigo-700"
+                  isEditMode && "cursor-pointer hover:bg-primary/5 hover:text-primary700"
                 )}
                 onClick={() => isEditMode && setEditingTitle(true)}
               >
@@ -447,7 +447,7 @@ export function EmptyImageStep({
         <div
           className={cn(
             "relative bg-slate-50 transition-all",
-            isDragOver && "bg-indigo-50",
+            isDragOver && "bg-primary/5",
             isEditMode && "cursor-pointer hover:bg-slate-100"
           )}
           onDragOver={handleDragOver}
@@ -458,11 +458,11 @@ export function EmptyImageStep({
           <div className="flex h-64 flex-col items-center justify-center gap-3 p-8">
             <div className={cn(
               "rounded-full p-3 transition-colors",
-              isDragOver ? "bg-indigo-100" : "bg-slate-100 group-hover:bg-slate-200"
+              isDragOver ? "bg-primary/10" : "bg-slate-100 group-hover:bg-slate-200"
             )}>
               <IconUpload className={cn(
                 "h-8 w-8 transition-colors",
-                isDragOver ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"
+                isDragOver ? "text-primary600" : "text-slate-400 group-hover:text-slate-600"
               )} />
             </div>
             <div className="text-center">

@@ -335,8 +335,8 @@ export function WorkflowView() {
     return (
       <div>
         <SiteHeader name="Workflow" />
-        <div className="min-h-screen bg-slate-50">
-          <div className="border-b bg-indigo-50/80">
+        <div className="min-h-screen bg-white">
+          <div className="border-b bg-orange-50/50">
             <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2 text-sm">
                 <Skeleton className="h-6 w-6 rounded-full" />
@@ -556,7 +556,7 @@ export function WorkflowView() {
     <div>
       <SiteHeader name={typedWorkflow.name || 'Workflow'} />
       
-      <div className="min-h-screen bg-slate-50 rounded-2xl">
+      <div className="min-h-screen bg-white rounded-2xl">
         <WorkflowBanner
           isEditMode={isEditMode}
           onToggleEdit={handleToggleEdit}

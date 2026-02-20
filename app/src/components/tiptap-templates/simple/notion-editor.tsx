@@ -37,7 +37,7 @@ export interface EditorProviderProps {
   placeholder?: string;
 }
 
-export function NotionEditor({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
+export function NotionEditor({ docId, readOnly = false, headerSlot }: { docId: string; readOnly?: boolean; headerSlot?: (saveStatus: string, errorMessage: string | null) => React.ReactNode }) {
   const { data: doc, isLoading: docLoading } = useDocument(docId);
   const saveDocument = useSaveDocument(docId);
   const editor = useSnapEditor({ readOnly });
@@ -272,20 +272,12 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
       className={`notion-like-editor-wrapper layout-${layout}`} 
       style={combinedCssVars as React.CSSProperties}
     >
-      {/* Save status indicator */}
-      <div className="flex items-center justify-end px-4 py-1 text-xs min-h-[24px]">
-        {saveStatus === 'saving' && (
-          <span className="text-muted-foreground animate-pulse">Saving...</span>
-        )}
-        {saveStatus === 'saved' && (
-          <span className="text-green-600 dark:text-green-400">Saved ✓</span>
-        )}
-        {(saveStatus === 'error' || saveStatus === 'validation-error') && (
-          <span className="text-red-500" title={errorMessage ?? undefined}>
-            {errorMessage ?? 'Error'}
-          </span>
-        )}
-      </div>
+      {/* Header slot + save status */}
+      {headerSlot && (
+        <div className="notion-page-meta">
+          {headerSlot(saveStatus, errorMessage)}
+        </div>
+      )}
 
       {/* Conflict banner */}
       {saveStatus === 'conflict' && (
@@ -317,7 +309,7 @@ export function NotionEditor({ docId, readOnly = false }: { docId: string; readO
             </button>
             <button
               onClick={dismissRecovery}
-              className="px-3 py-1 rounded-md bg-transparent border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900"
+              className="px-3 py-1 rounded-md bg-transparent border border-primary/30 dark:border-primary/40 text-primary dark:text-primary text-xs font-medium hover:bg-primary/10 dark:hover:bg-primary/20"
             >
               Dismiss
             </button>

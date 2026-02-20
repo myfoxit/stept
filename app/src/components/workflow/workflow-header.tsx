@@ -36,7 +36,7 @@ export function WorkflowHeader({
   // Prefer override; fallback to workflow; then defaults
   const iconType = iconOverride?.type || (workflow as any).icon_type || 'tabler';
   const iconValue = iconOverride?.value || (workflow as any).icon_value || 'IconPencil';
-  const iconColor = iconOverride?.color || (workflow as any).icon_color || '#6366f1';
+  const iconColor = iconOverride?.color || (workflow as any).icon_color || '#D94F3D';
   
   const renderIcon = () => {
     if (iconType === 'favicon' && iconValue) {
@@ -91,7 +91,7 @@ export function WorkflowHeader({
           {/* NEW: make title editable in edit mode */}
           {isEditMode ? (
             <input
-              className="w-full bg-transparent text-2xl font-bold text-slate-900 outline-none rounded-md focus:ring-2 focus:ring-indigo-200 px-1"
+              className="w-full bg-transparent text-2xl font-bold text-slate-900 outline-none rounded-md focus:ring-2 focus:ring-red-200 px-1"
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={submitTitle}

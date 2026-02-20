@@ -89,14 +89,14 @@ export function SmartStepOverlay({
   const catColor = stepCategory ? categoryColors[stepCategory] || categoryColors.other : '';
 
   return (
-    <div className="border-t border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-transparent px-4 py-2.5">
+    <div className="border-t border-primary100 bg-gradient-to-r from-primary/5 to-transparent px-4 py-2.5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* AI-generated title */}
           {generatedTitle && (
             <div className="flex items-center gap-1.5 mb-1">
-              <IconSparkles className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-indigo-900 truncate">{generatedTitle}</span>
+              <IconSparkles className="h-3.5 w-3.5 text-primary500 flex-shrink-0" />
+              <span className="text-sm font-medium text-primary900 truncate">{generatedTitle}</span>
             </div>
           )}
           {/* AI-generated description */}

@@ -300,7 +300,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
   const renderStep0 = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
-        <IconSparkles className="h-12 w-12 text-indigo-500 mx-auto mb-3" />
+        <IconSparkles className="h-12 w-12 text-primary mx-auto mb-3" />
         <h2 className="text-xl font-bold">Choose your AI Provider</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Select the LLM provider to power smart features
@@ -347,12 +347,12 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
             onClick={() => setSelectedProvider(p.id)}
             className={`flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
               selectedProvider === p.id
-                ? 'border-indigo-500 bg-indigo-50/50 shadow-sm'
-                : 'border-border hover:border-indigo-200 hover:bg-accent'
+                ? 'border-primary bg-primary/5 shadow-sm'
+                : 'border-border hover:border-primary/20 hover:bg-accent'
             }`}
           >
             <div className={`flex-shrink-0 rounded-xl p-2.5 ${
-              selectedProvider === p.id ? 'bg-indigo-100 text-indigo-600' : 'bg-muted text-muted-foreground'
+              selectedProvider === p.id ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
             }`}>
               {p.icon}
             </div>
@@ -365,7 +365,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
               </div>
               <div className="text-xs text-muted-foreground">{p.description}</div>
             </div>
-            {selectedProvider === p.id && <IconCheck className="h-5 w-5 text-indigo-500" />}
+            {selectedProvider === p.id && <IconCheck className="h-5 w-5 text-primary" />}
           </button>
         ))}
       </div>
@@ -408,10 +408,10 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
             </div>
           ) : copilotUserCode ? (
             <div className="space-y-4">
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-center">
-                <p className="text-sm text-indigo-700 mb-3">Enter this code on GitHub:</p>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-center">
+                <p className="text-sm text-primary mb-3">Enter this code on GitHub:</p>
                 <div className="flex items-center justify-center gap-2">
-                  <code className="text-3xl font-mono font-bold tracking-[0.25em] text-indigo-900 bg-white px-4 py-2 rounded-lg border">
+                  <code className="text-3xl font-mono font-bold tracking-[0.25em] text-primary bg-white px-4 py-2 rounded-lg border">
                     {copilotUserCode}
                   </code>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
@@ -480,7 +480,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
           <div className="rounded-lg border p-4">
             <div className="flex items-center gap-3">
               {ollamaDetecting ? (
-                <IconLoader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                <IconLoader2 className="h-5 w-5 animate-spin text-primary" />
               ) : ollamaDetected ? (
                 <IconCheck className="h-5 w-5 text-green-500" />
               ) : (
@@ -653,7 +653,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <IconRobot className="h-5 w-5 text-indigo-500" />
+            <IconRobot className="h-5 w-5 text-primary" />
             AI Setup
             <Badge variant="outline" className="text-xs ml-auto">Step {step + 1}/3</Badge>
           </DialogTitle>
@@ -662,7 +662,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
         {/* Progress bar */}
         <div className="flex items-center gap-2 mb-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-indigo-500' : 'bg-muted'}`} />
+            <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-primary/50' : 'bg-muted'}`} />
           ))}
         </div>
 
@@ -683,7 +683,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
               Next<IconChevronRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={handleFinish} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
+            <Button onClick={handleFinish} disabled={saving} className="bg-primary hover:bg-primary/90">
               {saving ? (
                 <><IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
               ) : (

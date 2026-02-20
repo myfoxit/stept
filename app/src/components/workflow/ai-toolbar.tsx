@@ -35,14 +35,14 @@ export function AIToolbar({
   tags,
 }: AIToolbarProps) {
   return (
-    <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4">
+    <div className="rounded-xl border border-primary200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4">
       <div className="flex flex-wrap items-center gap-3">
         {/* Process All Button */}
         <Button
           onClick={onProcessAll}
           disabled={isProcessing}
           size="sm"
-          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          className="bg-primary hover:bg-primary/90 text-white"
         >
           {isProcessing ? (
             <>
@@ -68,7 +68,7 @@ export function AIToolbar({
           disabled={isProcessing}
           size="sm"
           variant="outline"
-          className="border-indigo-200 hover:bg-indigo-50"
+          className="border-primary200 hover:bg-primary/5"
         >
           <IconFileText className="mr-1.5 h-4 w-4" />
           Generate Guide
@@ -81,7 +81,7 @@ export function AIToolbar({
             disabled={isProcessing}
             size="sm"
             variant="outline"
-            className="border-indigo-200 hover:bg-indigo-50"
+            className="border-primary200 hover:bg-primary/5"
           >
             <IconTag className="mr-1.5 h-4 w-4" />
             Auto-tag
@@ -112,7 +112,7 @@ export function AIToolbar({
       {/* Progress bar during processing */}
       {isProcessing && processingProgress && (
         <div className="mt-3 space-y-1">
-          <div className="flex items-center justify-between text-xs text-indigo-700">
+          <div className="flex items-center justify-between text-xs text-primary700">
             <span>Processing step {processingProgress.current}/{processingProgress.total}…</span>
             <span>{Math.round((processingProgress.current / processingProgress.total) * 100)}%</span>
           </div>
@@ -130,7 +130,7 @@ export function AIToolbar({
             <Badge
               key={tag}
               variant="secondary"
-              className="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+              className="text-xs bg-primary/10 text-primary700 hover:bg-indigo-200"
             >
               {tag}
             </Badge>

@@ -76,7 +76,7 @@ const COLOR_PALETTE = [
   'text-emerald-600',
   'text-amber-600',
   'text-rose-600',
-  'text-indigo-600',
+  'text-primary',
   'text-teal-600',
   'text-fuchsia-600',
   'text-orange-600',

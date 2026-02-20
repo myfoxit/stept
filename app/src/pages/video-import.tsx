@@ -115,7 +115,7 @@ export default function VideoImportPage() {
       <div
         className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
           dragOver
-            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
+            ? "border-primary bg-primary/5 dark:bg-indigo-950"
             : "border-gray-300 dark:border-gray-700 hover:border-gray-400"
         }`}
         onDragOver={(e) => {
@@ -131,7 +131,7 @@ export default function VideoImportPage() {
             <div className="text-lg mb-2">Uploading... {uploadProgress}%</div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 max-w-md mx-auto">
               <div
-                className="bg-indigo-500 h-3 rounded-full transition-all"
+                className="bg-primary h-3 rounded-full transition-all"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
@@ -188,7 +188,7 @@ export default function VideoImportPage() {
                     </span>
                     <a
                       href={`/workflow/${job.session_id}`}
-                      className="text-indigo-500 hover:underline text-sm"
+                      className="text-primary hover:underline text-sm"
                     >
                       View guide →
                     </a>
@@ -201,7 +201,7 @@ export default function VideoImportPage() {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
-                        className="bg-indigo-500 h-2 rounded-full transition-all duration-500"
+                        className="bg-primary h-2 rounded-full transition-all duration-500"
                         style={{ width: `${job.progress}%` }}
                       />
                     </div>

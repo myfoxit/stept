@@ -2,7 +2,8 @@ import { useParams } from 'react-router-dom';
 import { NotionEditor } from '@/components/tiptap-templates/simple/notion-editor';
 import { Button } from '@/components/ui/button';
 import { SiteHeader } from '@/components/site-header';
-import { IconDownload, IconShare, IconEye } from '@tabler/icons-react';
+import { IconDownload, IconShare, IconEye, IconLock } from '@tabler/icons-react';
+import { Folder as FolderIcon } from 'lucide-react';
 import {
   PageLayoutSelector,
   type PageLayout,
@@ -16,11 +17,23 @@ import { useChat } from '@/components/Chat/ChatContext';
 import { useProject } from '@/providers/project-provider';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { IconLock } from '@tabler/icons-react';
 import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
 import { CommentButton } from '@/components/Comments/CommentButton';
 import { CommentPanel } from '@/components/Comments/CommentPanel';
+import { useFolderTree } from '@/hooks/api/folders';
 import { useAuth } from '@/providers/auth-provider';
+
+// Helper to find a folder name from the tree
+function findFolderName(tree: any[], folderId: string): string | null {
+  for (const node of tree) {
+    if (node.id === folderId) return node.name || 'Untitled';
+    if (node.children?.length) {
+      const found = findFolderName(node.children, folderId);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 export default function EditorPage() {
   const { docId } = useParams<{ docId: string }>();
@@ -31,6 +44,28 @@ export default function EditorPage() {
   const { setContext } = useChat();
   const { selectedProjectId } = useProject();
   const { user } = useAuth();
+  const { data: sharedTree = [] } = useFolderTree(selectedProjectId, false);
+  const { data: privateTree = [] } = useFolderTree(selectedProjectId, true);
+
+  // Build breadcrumbs from doc folder
+  const breadcrumbs = useMemo(() => {
+    if (!doc) return undefined;
+    const crumbs: { label: string }[] = [];
+    const folderId = (doc as any).folder_id;
+    if (folderId) {
+      const folderName = findFolderName([...sharedTree, ...privateTree], folderId);
+      if (folderName) crumbs.push({ label: folderName });
+    }
+    crumbs.push({ label: doc.name || 'Untitled' });
+    return crumbs.length > 0 ? crumbs : undefined;
+  }, [doc, sharedTree, privateTree]);
+
+  const folderName = useMemo(() => {
+    if (!doc) return null;
+    const folderId = (doc as any).folder_id;
+    if (!folderId) return null;
+    return findFolderName([...sharedTree, ...privateTree], folderId);
+  }, [doc, sharedTree, privateTree]);
 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
@@ -119,7 +154,7 @@ export default function EditorPage() {
 
   return (
     <div>
-      <SiteHeader name="Editor">
+      <SiteHeader name={doc?.name || 'Editor'} breadcrumbs={breadcrumbs}>
         {isReadOnly && (
           <Badge variant="secondary" className="gap-1 text-xs">
             <IconEye className="h-3 w-3" />
@@ -151,7 +186,7 @@ export default function EditorPage() {
           title="Export Document"
           description="Choose a format to export your document."
           trigger={
-            <Button variant="outline" size="sm">
+            <Button variant="default" size="sm">
               <IconDownload className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -184,12 +219,36 @@ export default function EditorPage() {
           </Alert>
         </div>
       )}
-      {selectedProjectId && docId && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <ContextLinkPanel projectId={selectedProjectId} resourceType="document" resourceId={docId} />
-        </div>
-      )}
-      <NotionEditor docId={docId as string} readOnly={isReadOnly} />
+      <NotionEditor
+        docId={docId as string}
+        readOnly={isReadOnly}
+        headerSlot={(saveStatus, errorMessage) => (
+          <>
+            {selectedProjectId && docId && (
+              <ContextLinkPanel projectId={selectedProjectId} resourceType="document" resourceId={docId} />
+            )}
+            <div className="flex items-center gap-2 text-xs mt-2">
+              {folderName && (
+                <span className="inline-flex items-center gap-1 rounded bg-muted/60 px-2 py-0.5 text-muted-foreground font-medium">
+                  <FolderIcon className="size-3" strokeWidth={1.5} />
+                  {folderName}
+                </span>
+              )}
+              {saveStatus === 'saving' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground animate-pulse">Saving...</span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-green-600 font-medium">✓ Saved</span>
+              )}
+              {(saveStatus === 'error' || saveStatus === 'validation-error') && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-red-500 font-medium" title={errorMessage ?? undefined}>
+                  {errorMessage ?? 'Error'}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      />
 
       {selectedProjectId && docId && user && (
         <CommentPanel

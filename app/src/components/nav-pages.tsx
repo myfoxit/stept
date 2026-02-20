@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -9,7 +9,8 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-} from '@/components/ui/sidebar';
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
 import {
   Dialog,
   DialogContent,
@@ -18,39 +19,34 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  IconFileDescription,
-  IconPlus,
   IconDots,
   IconEdit,
   IconShare3,
-  IconListCheck,
-  IconPlayerPlayFilled,
-  IconPlayerPlay,
-  IconListTree,
-  IconChecklist,
-  IconFileCheckFilled,
-  IconClipboardDataFilled,
   IconTrash,
-  IconChevronRight,
-  IconChevronDown,
   IconCopy,
   IconArrowsMove,
-  IconLayoutDashboard,
-  IconCircleCaretRightFilled,
-  IconCaretRightFilled,
-  IconPlayerRecordFilled,
-  IconFolder,
-  IconFolderOpen,
-  IconTimeline,
-  IconFiles,
-  IconLock,  // NEW: For private indicator
-  IconWorld,  // NEW: For shared indicator
-} from '@tabler/icons-react';
-import { Link, useNavigate } from 'react-router-dom';
+} from "@tabler/icons-react";
+import {
+  FileText,
+  File,
+  Plus,
+  ChevronRight,
+  ChevronDown,
+  FolderOpen,
+  Folder,
+  Files,
+  Lock,
+  Globe,
+  Monitor,
+  LayoutGrid,
+  Play,
+  ClipboardCheck,
+} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   DropdownMenu,
@@ -58,21 +54,39 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
-import { useProject } from '@/providers/project-provider';
-import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { useProject } from "@/providers/project-provider";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
-import { useSaveDocument, useDeleteDocument, useDuplicateDocument, useCreateDocument, useMoveDocument } from '@/hooks/api/documents';
-import { useUpdateFolder, useDeleteFolder, useToggleFolderExpansion, useDuplicateFolder, useCreateFolder, useMoveFolder, useFolderTree } from '@/hooks/api/folders';
-import { useMoveWorkflow, useDeleteWorkflow, useDuplicateWorkflow } from '@/hooks/api/workflows';
-import { useUpdateWorkflow } from '@/hooks/api/workflows';
+} from "./ui/select";
+import {
+  useSaveDocument,
+  useDeleteDocument,
+  useDuplicateDocument,
+  useCreateDocument,
+  useMoveDocument,
+} from "@/hooks/api/documents";
+import {
+  useUpdateFolder,
+  useDeleteFolder,
+  useToggleFolderExpansion,
+  useDuplicateFolder,
+  useCreateFolder,
+  useMoveFolder,
+  useFolderTree,
+} from "@/hooks/api/folders";
+import {
+  useMoveWorkflow,
+  useDeleteWorkflow,
+  useDuplicateWorkflow,
+} from "@/hooks/api/workflows";
+import { useUpdateWorkflow } from "@/hooks/api/workflows";
 
 interface DocumentNode {
   id: string;
@@ -85,8 +99,8 @@ interface DocumentNode {
   is_expanded: boolean;
   is_folder: boolean;
   is_workflow: boolean;
-  is_private: boolean;  // NEW
-  owner_id?: string | null;  // NEW
+  is_private: boolean; // NEW
+  owner_id?: string | null; // NEW
   children: DocumentNode[];
 }
 
@@ -95,29 +109,29 @@ function NavPageItem({
   userRole,
   level = 0,
   onDragEnd,
-  isPrivateSection,  // NEW: Track which section we're in
+  isPrivateSection, // NEW: Track which section we're in
 }: {
   doc: DocumentNode;
   userRole: string;
   level?: number;
   onDragEnd?: () => void;
-  isPrivateSection?: boolean;  // NEW
+  isPrivateSection?: boolean; // NEW
 }) {
   const navigate = useNavigate();
   const { selectedProjectId } = useProject();
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [newTitle, setNewTitle] = React.useState(doc.name || 'Untitled');
+  const [newTitle, setNewTitle] = React.useState(doc.name || "Untitled");
   const [createChildOpen, setCreateChildOpen] = React.useState(false);
-  const [childTitle, setChildTitle] = React.useState('');
-  const [childType, setChildType] = React.useState<'folder' | 'document'>(
-    'document'
+  const [childTitle, setChildTitle] = React.useState("");
+  const [childType, setChildType] = React.useState<"folder" | "document">(
+    "document",
   );
   const [isHovered, setIsHovered] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [dropPosition, setDropPosition] = React.useState<
-    'before' | 'after' | 'inside' | null
+    "before" | "after" | "inside" | null
   >(null);
 
   const saveFolder = useUpdateFolder();
@@ -138,8 +152,8 @@ function NavPageItem({
   const updateWorkflowHook = useUpdateWorkflow();
 
   const canEdit =
-    userRole === 'owner' || userRole === 'admin' || userRole === 'member';
-  const canDelete = userRole === 'owner' || userRole === 'admin';
+    userRole === "owner" || userRole === "admin" || userRole === "member";
+  const canDelete = userRole === "owner" || userRole === "admin";
 
   const hasChildren = doc.children && doc.children.length > 0;
   const isFolder = doc.is_folder;
@@ -158,24 +172,24 @@ function NavPageItem({
 
   const nestedCount = React.useMemo(
     () => countNestedDocs(doc) - 1,
-    [doc, countNestedDocs]
+    [doc, countNestedDocs],
   );
 
   const handleDragStart = (e: React.DragEvent) => {
     if (!canEdit) return;
 
     setIsDragging(true);
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(
-      'application/json',
+      "application/json",
       JSON.stringify({
         docId: doc.id,
         parentId: doc.parent_id,
         position: doc.position,
         isFolder: isFolder,
         isWorkflow: isWorkflow,
-        isPrivate: doc.is_private,  // NEW
-      })
+        isPrivate: doc.is_private, // NEW
+      }),
     );
   };
 
@@ -200,14 +214,14 @@ function NavPageItem({
     const isLeftSide = x < rect.width * 0.4;
 
     if (y < height * 0.3 && isLeftSide) {
-      setDropPosition('before');
+      setDropPosition("before");
     } else if (y > height * 0.7 && isLeftSide) {
-      setDropPosition('after');
+      setDropPosition("after");
     } else if (canDropAsChild) {
-      setDropPosition('inside');
+      setDropPosition("inside");
     } else {
       // If not a folder, default to after
-      setDropPosition('after');
+      setDropPosition("after");
     }
 
     setIsDragOver(true);
@@ -231,7 +245,7 @@ function NavPageItem({
     if (!canEdit || !selectedProjectId) return;
 
     try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
       const draggedDocId = data.docId;
       const draggedIsFolder = data.isFolder;
       const draggedIsWorkflow = data.isWorkflow;
@@ -243,7 +257,7 @@ function NavPageItem({
       let newParentId: string | null = null;
       let newPosition: number | undefined = undefined;
 
-      if (dropPosition === 'inside' && isFolder) {
+      if (dropPosition === "inside" && isFolder) {
         // Only allow drop as child if this is a folder
         newParentId = doc.id;
         newPosition = 0;
@@ -255,10 +269,10 @@ function NavPageItem({
             isExpanded: true,
           });
         }
-      } else if (dropPosition === 'before') {
+      } else if (dropPosition === "before") {
         newParentId = doc.parent_id;
         newPosition = doc.position;
-      } else if (dropPosition === 'after') {
+      } else if (dropPosition === "after") {
         newParentId = doc.parent_id;
         newPosition = doc.position + 1;
       }
@@ -273,7 +287,7 @@ function NavPageItem({
           parentId: newParentId,
           position: newPosition,
           projectId: selectedProjectId,
-          isPrivate: targetIsPrivate,  // NEW
+          isPrivate: targetIsPrivate, // NEW
         });
       } else if (draggedIsWorkflow) {
         await moveWorkflow.mutateAsync({
@@ -281,7 +295,7 @@ function NavPageItem({
           parentId: newParentId,
           position: newPosition,
           projectId: selectedProjectId,
-          isPrivate: targetIsPrivate,  // NEW
+          isPrivate: targetIsPrivate, // NEW
         });
       } else {
         // Move document
@@ -290,11 +304,11 @@ function NavPageItem({
           parentId: newParentId,
           position: newPosition,
           projectId: selectedProjectId,
-          isPrivate: targetIsPrivate,  // NEW
+          isPrivate: targetIsPrivate, // NEW
         });
       }
     } catch (error) {
-      console.error('Failed to move item:', error);
+      console.error("Failed to move item:", error);
     }
   };
 
@@ -304,16 +318,27 @@ function NavPageItem({
       return <span className="text-base flex-shrink-0">{doc.icon}</span>;
     if (isFolder) {
       return doc.is_expanded ? (
-        <IconFolderOpen className="size-3.5 flex-shrink-0 opacity-70" />
+        <FolderOpen
+          className="size-3.5 flex-shrink-0 opacity-50"
+          strokeWidth={1.5}
+        />
       ) : (
-        <IconFolder className="size-3.5 flex-shrink-0 opacity-70" />
+        <Folder
+          className="size-3.5 flex-shrink-0 opacity-50"
+          strokeWidth={1.5}
+        />
       );
     }
     if (isWorkflow) {
-      return <IconTimeline className="size-3.5 flex-shrink-0 opacity-70" />;
+      return (
+        <Monitor
+          className="size-3.5 flex-shrink-0 opacity-50"
+          strokeWidth={1.5}
+        />
+      );
     }
     return (
-      <IconFileDescription className="size-3.5 flex-shrink-0 opacity-70" />
+      <File className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
     );
   };
 
@@ -321,7 +346,7 @@ function NavPageItem({
   const targetHref = React.useMemo(() => {
     if (isFolder) {
       // Don't navigate anywhere for folders, they just expand/collapse
-      return '#';
+      return "#";
     } else if (isWorkflow) {
       // This id must match the workflow id used by the API
       return `/workflow/${doc.id}`;
@@ -335,8 +360,8 @@ function NavPageItem({
       <SidebarMenuItem>
         <div
           className={cn(
-            'flex items-center group/item relative transition-all h-7 rounded-md mx-1 hover:bg-sidebar-accent',
-            isDragging && 'opacity-50'
+            "flex items-center group/item relative transition-all h-7 rounded-md mx-1 hover:bg-sidebar-accent",
+            isDragging && "opacity-50",
           )}
           data-testid="folder-row"
           onMouseEnter={() => setIsHovered(true)}
@@ -349,7 +374,7 @@ function NavPageItem({
           onDrop={handleDrop}
         >
           {/* Drop indicator line for before/after */}
-          {isDragOver && dropPosition === 'before' && (
+          {isDragOver && dropPosition === "before" && (
             <div
               className="absolute -top-[1px] left-0 right-0 h-0.5 bg-primary pointer-events-none z-50"
               style={{ left: `${level * 12}px` }}
@@ -357,7 +382,7 @@ function NavPageItem({
               <div className="absolute -left-1 -top-1 size-2 rounded-full bg-primary" />
             </div>
           )}
-          {isDragOver && dropPosition === 'after' && (
+          {isDragOver && dropPosition === "after" && (
             <div
               className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-primary pointer-events-none z-50"
               style={{ left: `${level * 12}px` }}
@@ -369,24 +394,24 @@ function NavPageItem({
           {/* Highlight for dropping inside (only for folders) */}
           <div
             className={cn(
-              'absolute inset-0 pointer-events-none rounded transition-colors',
+              "absolute inset-0 pointer-events-none rounded transition-colors",
               isDragOver &&
-                dropPosition === 'inside' &&
+                dropPosition === "inside" &&
                 isFolder &&
-                'bg-primary/10 ring-1 ring-primary/50'
+                "bg-primary/10 ring-1 ring-primary/50",
             )}
           />
 
           {/* Expand/collapse button - visible for folders and documents with children */}
           <button
             className={cn(
-              'flex items-center justify-center size-5 rounded-sm transition-all flex-shrink-0 ml-0.5 outline-none',
-              'hover:bg-sidebar-accent-foreground/10',
+              "flex items-center justify-center size-5 rounded-sm transition-all flex-shrink-0 ml-0.5 outline-none",
+              "hover:bg-sidebar-accent-foreground/10",
               isFolder || hasChildren
                 ? isHovered || doc.is_expanded
-                  ? 'opacity-100'
-                  : 'opacity-60'
-                : 'opacity-0 pointer-events-none'
+                  ? "opacity-100"
+                  : "opacity-60"
+                : "opacity-0 pointer-events-none",
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -400,17 +425,17 @@ function NavPageItem({
           >
             {(isFolder || hasChildren) &&
               (doc.is_expanded ? (
-                <IconChevronDown className="size-3" />
+                <ChevronDown className="size-3" />
               ) : (
-                <IconChevronRight className="size-3" />
+                <ChevronRight className="size-3" />
               ))}
           </button>
 
           <SidebarMenuButton
             asChild={!isFolder}
             className={cn(
-              'flex-1 h-7 px-1.5 hover:bg-transparent',
-              level > 0 && 'text-sm'
+              "flex-1 h-7 px-1.5 hover:bg-transparent",
+              level > 0 && "text-sm",
             )}
             onClick={(e) => {
               if (isFolder) {
@@ -427,20 +452,35 @@ function NavPageItem({
                 {doc.icon ? (
                   <span className="text-base flex-shrink-0">{doc.icon}</span>
                 ) : doc.is_expanded ? (
-                  <IconFolderOpen className="size-3.5 flex-shrink-0 opacity-70" />
+                  <FolderOpen
+                    className="size-3.5 flex-shrink-0 opacity-50"
+                    strokeWidth={1.5}
+                  />
                 ) : (
-                  <IconFolder className="size-3.5 flex-shrink-0 opacity-70" />
+                  <Folder
+                    className="size-3.5 flex-shrink-0 opacity-50"
+                    strokeWidth={1.5}
+                  />
                 )}
-                <span className="truncate">{doc.name || 'Untitled'}</span>
+                <span className="truncate">{doc.name || "Untitled"}</span>
               </div>
             ) : (
-              <Link to={isWorkflow ? `/workflow/${doc.id}` : `/editor/${doc.id}`} className="flex items-center gap-1">
+              <Link
+                to={isWorkflow ? `/workflow/${doc.id}` : `/editor/${doc.id}`}
+                className="flex items-center gap-1"
+              >
                 {isWorkflow ? (
-                  <IconPlayerPlay className="size-3.5 flex-shrink-0 opacity-70" />
+                  <Monitor
+                    className="size-3.5 flex-shrink-0 opacity-50"
+                    strokeWidth={1.5}
+                  />
                 ) : (
-                  <IconFileDescription className="size-3.5 flex-shrink-0 opacity-70" />
+                  <File
+                    className="size-3.5 flex-shrink-0 opacity-50"
+                    strokeWidth={1.5}
+                  />
                 )}
-                <span className="truncate">{doc.name || 'Untitled'}</span>
+                <span className="truncate">{doc.name || "Untitled"}</span>
               </Link>
             )}
           </SidebarMenuButton>
@@ -450,8 +490,8 @@ function NavPageItem({
               <DropdownMenuTrigger asChild>
                 <button
                   className={cn(
-                    'rounded-sm size-5 mr-1 flex items-center justify-center hover:bg-sidebar-accent-foreground/10 data-[state=open]:bg-sidebar-accent-foreground/15 outline-none',
-                    isHovered ? 'opacity-100' : 'opacity-0'
+                    "rounded-sm size-5 mr-1 flex items-center justify-center hover:bg-sidebar-accent-foreground/10 data-[state=open]:bg-sidebar-accent-foreground/15 outline-none",
+                    isHovered ? "opacity-100" : "opacity-0",
                   )}
                   data-testid="folder-menu-button"
                 >
@@ -474,11 +514,11 @@ function NavPageItem({
                   onSelect={async () => {
                     if (!selectedProjectId) return;
                     const newIsPrivate = !doc.is_private;
-                    
+
                     if (isFolder) {
                       await moveFolder.mutateAsync({
                         folderId: doc.id,
-                        parentId: null,  // Move to root of target section
+                        parentId: null, // Move to root of target section
                         projectId: selectedProjectId,
                         isPrivate: newIsPrivate,
                       });
@@ -501,12 +541,12 @@ function NavPageItem({
                 >
                   {doc.is_private ? (
                     <>
-                      <IconWorld className="mr-2 size-4" />
+                      <Globe className="mr-2 size-4" />
                       Move to Shared
                     </>
                   ) : (
                     <>
-                      <IconLock className="mr-2 size-4" />
+                      <Lock className="mr-2 size-4" />
                       Move to Private
                     </>
                   )}
@@ -516,20 +556,20 @@ function NavPageItem({
                   <>
                     <DropdownMenuItem
                       onSelect={() => {
-                        setChildType('folder');
+                        setChildType("folder");
                         setCreateChildOpen(true);
                       }}
                     >
-                      <IconFolder className="mr-2 size-4" />
+                      <Folder className="mr-2 size-4" />
                       New Subfolder
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() => {
-                        setChildType('document');
+                        setChildType("document");
                         setCreateChildOpen(true);
                       }}
                     >
-                      <IconFileDescription className="mr-2 size-4" />
+                      <FileText className="mr-2 size-4" />
                       New Page
                     </DropdownMenuItem>
                   </>
@@ -577,12 +617,7 @@ function NavPageItem({
 
         {/* Render children recursively */}
         {(isFolder || hasChildren) && doc.is_expanded && (
-          <div
-            className={cn(
-              'ml-3 pl-1',
-              level >= 2 && 'ml-2'
-            )}
-          >
+          <div className={cn("ml-3 pl-1", level >= 2 && "ml-2")}>
             {doc.children.map((child) => (
               <NavPageItem
                 key={child.id}
@@ -590,7 +625,7 @@ function NavPageItem({
                 userRole={userRole}
                 level={level + 1}
                 onDragEnd={onDragEnd}
-                isPrivateSection={isPrivateSection}  // NEW: Pass down
+                isPrivateSection={isPrivateSection} // NEW: Pass down
               />
             ))}
           </div>
@@ -603,21 +638,21 @@ function NavPageItem({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                Add{' '}
-                {childType === 'folder'
-                  ? 'Subfolder'
-                  : childType === 'workflow'
-                  ? 'Workflow'
-                  : 'Page'}
+                Add{" "}
+                {childType === "folder"
+                  ? "Subfolder"
+                  : childType === "workflow"
+                    ? "Workflow"
+                    : "Page"}
               </DialogTitle>
               <DialogDescription>
-                Create a new{' '}
-                {childType === 'folder'
-                  ? 'subfolder'
-                  : childType === 'workflow'
-                  ? 'workflow'
-                  : 'page'}{' '}
-                in "{doc.name || 'Untitled'}"
+                Create a new{" "}
+                {childType === "folder"
+                  ? "subfolder"
+                  : childType === "workflow"
+                    ? "workflow"
+                    : "page"}{" "}
+                in "{doc.name || "Untitled"}"
               </DialogDescription>
             </DialogHeader>
 
@@ -631,11 +666,11 @@ function NavPageItem({
                   value={childTitle}
                   onChange={(e) => setChildTitle(e.target.value)}
                   placeholder={`${
-                    childType === 'folder'
-                      ? 'Subfolder'
-                      : childType === 'workflow'
-                      ? 'Workflow'
-                      : 'Page'
+                    childType === "folder"
+                      ? "Subfolder"
+                      : childType === "workflow"
+                        ? "Workflow"
+                        : "Page"
                   } name`}
                   autoFocus
                 />
@@ -649,23 +684,23 @@ function NavPageItem({
               <Button
                 onClick={async () => {
                   if (selectedProjectId) {
-                    if (childType === 'folder') {
+                    if (childType === "folder") {
                       await createFolder.mutateAsync({
-                        name: childTitle.trim() || 'Untitled',
+                        name: childTitle.trim() || "Untitled",
                         projectId: selectedProjectId,
                         parentId: doc.id,
-                        isPrivate: doc.is_private,  // NEW: Inherit privacy from parent folder
+                        isPrivate: doc.is_private, // NEW: Inherit privacy from parent folder
                       });
                     } else {
                       await createDoc.mutateAsync({
-                        title: childTitle.trim() || 'Untitled',
+                        title: childTitle.trim() || "Untitled",
                         projectId: selectedProjectId,
                         folderId: doc.id,
-                        isPrivate: doc.is_private,  // NEW: Inherit privacy from parent folder
+                        isPrivate: doc.is_private, // NEW: Inherit privacy from parent folder
                       });
                     }
-                    setChildTitle('');
-                    setChildType('document');
+                    setChildTitle("");
+                    setChildType("document");
                     setCreateChildOpen(false);
                     // Auto-expand parent
                     if (!doc.is_expanded) {
@@ -690,12 +725,11 @@ function NavPageItem({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Edit{' '}
-              {isFolder ? 'Folder' : isWorkflow ? 'Workflow' : 'Page'}
+              Edit {isFolder ? "Folder" : isWorkflow ? "Workflow" : "Page"}
             </DialogTitle>
             <DialogDescription>
-              Update the{' '}
-              {isFolder ? 'folder' : isWorkflow ? 'workflow' : 'page'} name.
+              Update the{" "}
+              {isFolder ? "folder" : isWorkflow ? "workflow" : "page"} name.
             </DialogDescription>
           </DialogHeader>
 
@@ -704,7 +738,7 @@ function NavPageItem({
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder={`${
-                isFolder ? 'Folder' : isWorkflow ? 'Workflow' : 'Page'
+                isFolder ? "Folder" : isWorkflow ? "Workflow" : "Page"
               } name`}
             />
           </div>
@@ -732,7 +766,7 @@ function NavPageItem({
                 setEditOpen(false);
               }}
               disabled={
-                !newTitle.trim() || newTitle.trim() === (doc.name || 'Untitled')
+                !newTitle.trim() || newTitle.trim() === (doc.name || "Untitled")
               }
             >
               Save
@@ -743,17 +777,16 @@ function NavPageItem({
 
       {/* Delete Dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent  className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
-              Delete{' '}
-              {isFolder ? 'Folder' : isWorkflow ? 'Workflow' : 'Page'}
+              Delete {isFolder ? "Folder" : isWorkflow ? "Workflow" : "Page"}
             </DialogTitle>
             <DialogDescription>
               {hasChildren && !isWorkflow ? (
                 <>
-                  This {isFolder ? 'folder' : 'item'} contains {nestedCount}{' '}
-                  nested {nestedCount === 1 ? 'item' : 'items'}.
+                  This {isFolder ? "folder" : "item"} contains {nestedCount}{" "}
+                  nested {nestedCount === 1 ? "item" : "items"}.
                   <br />
                   <strong className="text-destructive">
                     All nested items will be deleted.
@@ -763,7 +796,7 @@ function NavPageItem({
                 </>
               ) : (
                 `Are you sure you want to delete this ${
-                  isFolder ? 'folder' : isWorkflow ? 'workflow' : 'page'
+                  isFolder ? "folder" : isWorkflow ? "workflow" : "page"
                 }? This action cannot be undone.`
               )}
             </DialogDescription>
@@ -795,16 +828,16 @@ function NavPageItem({
                   }
                   setDeleteOpen(false);
                   if (window.location.pathname.includes(doc.id)) {
-                    navigate('/');
+                    navigate("/");
                   }
                 } catch (error) {
-                  console.error('Failed to delete:', error);
+                  console.error("Failed to delete:", error);
                 }
               }}
             >
               {hasChildren && !isWorkflow
                 ? `Delete ${nestedCount + 1} Items`
-                : 'Delete'}
+                : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -815,11 +848,17 @@ function NavPageItem({
 
 export function NavPages({ userRole }: { userRole: string }) {
   const { selectedProjectId } = useProject();
-  
+
   // NEW: Fetch shared and private trees separately
-  const { data: sharedTree = [], isLoading: sharedLoading } = useFolderTree(selectedProjectId, false);
-  const { data: privateTree = [], isLoading: privateLoading } = useFolderTree(selectedProjectId, true);
-  
+  const { data: sharedTree = [], isLoading: sharedLoading } = useFolderTree(
+    selectedProjectId,
+    false,
+  );
+  const { data: privateTree = [], isLoading: privateLoading } = useFolderTree(
+    selectedProjectId,
+    true,
+  );
+
   const createFolder = useCreateFolder();
   const moveFolder = useMoveFolder();
   const moveDoc = useMoveDocument();
@@ -827,13 +866,14 @@ export function NavPages({ userRole }: { userRole: string }) {
 
   const [dragCounter, setDragCounter] = React.useState(0);
   const [isDraggingOverShared, setIsDraggingOverShared] = React.useState(false);
-  const [isDraggingOverPrivate, setIsDraggingOverPrivate] = React.useState(false);
+  const [isDraggingOverPrivate, setIsDraggingOverPrivate] =
+    React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [title, setTitle] = React.useState('');
-  const [createIsPrivate, setCreateIsPrivate] = React.useState(false);  // NEW
+  const [title, setTitle] = React.useState("");
+  const [createIsPrivate, setCreateIsPrivate] = React.useState(false); // NEW
 
   const canCreatePage =
-    userRole === 'owner' || userRole === 'admin' || userRole === 'editor';
+    userRole === "owner" || userRole === "admin" || userRole === "editor";
 
   const handleDragEnd = () => {
     setDragCounter((c) => c + 1);
@@ -848,7 +888,7 @@ export function NavPages({ userRole }: { userRole: string }) {
     if (!canCreatePage || !selectedProjectId) return;
 
     try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
       const draggedDocId = data.docId;
       const draggedIsFolder = data.isFolder;
       const draggedIsWorkflow = data.isWorkflow;
@@ -859,7 +899,7 @@ export function NavPages({ userRole }: { userRole: string }) {
           parentId: null,
           position: sharedTree.length,
           projectId: selectedProjectId,
-          isPrivate: false,  // Move to shared
+          isPrivate: false, // Move to shared
         });
       } else if (draggedIsWorkflow) {
         await moveWorkflow.mutateAsync({
@@ -879,7 +919,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         });
       }
     } catch (error) {
-      console.error('Failed to move item to shared:', error);
+      console.error("Failed to move item to shared:", error);
     }
   };
 
@@ -892,7 +932,7 @@ export function NavPages({ userRole }: { userRole: string }) {
     if (!canCreatePage || !selectedProjectId) return;
 
     try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
       const draggedDocId = data.docId;
       const draggedIsFolder = data.isFolder;
       const draggedIsWorkflow = data.isWorkflow;
@@ -903,7 +943,7 @@ export function NavPages({ userRole }: { userRole: string }) {
           parentId: null,
           position: privateTree.length,
           projectId: selectedProjectId,
-          isPrivate: true,  // Move to private
+          isPrivate: true, // Move to private
         });
       } else if (draggedIsWorkflow) {
         await moveWorkflow.mutateAsync({
@@ -923,7 +963,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         });
       }
     } catch (error) {
-      console.error('Failed to move item to private:', error);
+      console.error("Failed to move item to private:", error);
     }
   };
 
@@ -944,33 +984,47 @@ export function NavPages({ userRole }: { userRole: string }) {
     <>
       {/* Gallery View Links */}
       <SidebarGroup className="py-2">
+        <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1]">
+          Content
+        </SidebarGroupLabel>
         <SidebarMenu className="gap-0.5">
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/documents/pages" className="flex items-center gap-2 h-7 px-2">
-                <IconFileDescription className="size-3.5 opacity-70" />
+              <Link
+                to="/documents/pages"
+                className="flex items-center gap-2 h-7 px-2"
+              >
+                <File className="size-3.5 opacity-50" strokeWidth={1.5} />
                 <span className="text-sm">Pages</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/documents/workflows" className="flex items-center gap-2 h-7 px-2">
-                <IconPlayerPlay className="size-3.5 opacity-70" />
+              <Link
+                to="/documents/workflows"
+                className="flex items-center gap-2 h-7 px-2"
+              >
+                <Monitor className="size-3.5 opacity-50" strokeWidth={1.5} />
                 <span className="text-sm">Workflows</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/documents/all" className="flex items-center gap-2 h-7 px-2">
-                <IconFiles className="size-3.5 opacity-70" />
+              <Link
+                to="/documents/all"
+                className="flex items-center gap-2 h-7 px-2"
+              >
+                <Files className="size-3.5 opacity-50" strokeWidth={1.5} />
                 <span className="text-sm">All Documents</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
+
+      <SidebarSeparator />
 
       {/* NEW: Shared Section */}
       <SidebarGroup
@@ -982,14 +1036,13 @@ export function NavPages({ userRole }: { userRole: string }) {
         onDragLeave={() => setIsDraggingOverShared(false)}
         onDrop={handleSharedDrop}
       >
-        <SidebarGroupLabel className="px-2 py-1 text-xs flex items-center gap-1">
-          <IconWorld className="size-3" />
+        <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center gap-1">
           Shared
         </SidebarGroupLabel>
         <SidebarMenu
           className={cn(
-            'gap-0.5 relative transition-colors',
-            isDraggingOverShared && 'bg-primary/5 rounded'
+            "gap-0.5 relative transition-colors",
+            isDraggingOverShared && "bg-primary/5 rounded",
           )}
           key={`shared-${dragCounter}`}
         >
@@ -1020,7 +1073,7 @@ export function NavPages({ userRole }: { userRole: string }) {
                 }}
                 className="h-7 px-2 text-gray-400"
               >
-                <IconPlus className="mr-2 size-3.5" />
+                <Plus className="mr-2 size-3.5" />
                 <span className="text-sm">New Shared Folder</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -1028,62 +1081,63 @@ export function NavPages({ userRole }: { userRole: string }) {
         </SidebarMenu>
       </SidebarGroup>
 
+      <SidebarSeparator />
+
       {/* NEW: Private Section — only show when there are private items or user can create */}
       {(privateTree.length > 0 || canCreatePage) && (
-      <SidebarGroup
-        className="py-2"
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDraggingOverPrivate(true);
-        }}
-        onDragLeave={() => setIsDraggingOverPrivate(false)}
-        onDrop={handlePrivateDrop}
-      >
-        <SidebarGroupLabel className="px-2 py-1 text-xs flex items-center gap-1">
-          <IconLock className="size-3" />
-          Private
-        </SidebarGroupLabel>
-        <SidebarMenu
-          className={cn(
-            'gap-0.5 relative transition-colors',
-            isDraggingOverPrivate && 'bg-primary/5 rounded'
-          )}
-          key={`private-${dragCounter}`}
+        <SidebarGroup
+          className="py-2"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDraggingOverPrivate(true);
+          }}
+          onDragLeave={() => setIsDraggingOverPrivate(false)}
+          onDrop={handlePrivateDrop}
         >
-          {privateTree.map((doc) => (
-            <NavPageItem
-              key={doc.id}
-              doc={doc}
-              userRole={userRole}
-              onDragEnd={handleDragEnd}
-              isPrivateSection={true}
-            />
-          ))}
+          <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center gap-1">
+            Private
+          </SidebarGroupLabel>
+          <SidebarMenu
+            className={cn(
+              "gap-0.5 relative transition-colors",
+              isDraggingOverPrivate && "bg-primary/5 rounded",
+            )}
+            key={`private-${dragCounter}`}
+          >
+            {privateTree.map((doc) => (
+              <NavPageItem
+                key={doc.id}
+                doc={doc}
+                userRole={userRole}
+                onDragEnd={handleDragEnd}
+                isPrivateSection={true}
+              />
+            ))}
 
-          {isDraggingOverPrivate && (
-            <div className="h-8 mx-2 border-2 border-dashed border-primary/50 rounded-md flex items-center justify-center">
-              <span className="text-xs text-muted-foreground">
-                Drop here to make private
-              </span>
-            </div>
-          )}
+            {isDraggingOverPrivate && (
+              <div className="h-8 mx-2 border-2 border-dashed border-primary/50 rounded-md flex items-center justify-center">
+                <span className="text-xs text-muted-foreground">
+                  Drop here to make private
+                </span>
+              </div>
+            )}
 
-          {canCreatePage && (
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => {
-                  setCreateIsPrivate(true);
-                  setOpen(true);
-                }}
-                className="h-7 px-2  text-gray-400"
-              >
-                <IconPlus className="mr-2 size-3.5" />
-                <span className="text-sm">New Private Folder</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-        </SidebarMenu>
-      </SidebarGroup>
+            {canCreatePage && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => {
+                    setCreateIsPrivate(true);
+                    setOpen(true);
+                  }}
+                  className="h-7 px-2  text-gray-400"
+                >
+                  <Plus className="mr-2 size-3.5" />
+                  <span className="text-sm">New Private Folder</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+          </SidebarMenu>
+        </SidebarGroup>
       )}
 
       {/* Create Folder dialog */}
@@ -1091,13 +1145,14 @@ export function NavPages({ userRole }: { userRole: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Create {createIsPrivate ? 'Private' : 'Shared'} Folder
+              Create {createIsPrivate ? "Private" : "Shared"} Folder
             </DialogTitle>
             <DialogDescription>
-              Enter a name for the new {createIsPrivate ? 'private' : 'shared'} folder.
+              Enter a name for the new {createIsPrivate ? "private" : "shared"}{" "}
+              folder.
               {createIsPrivate
-                ? ' Only you will be able to see this folder.'
-                : ' All project members will be able to see this folder.'}
+                ? " Only you will be able to see this folder."
+                : " All project members will be able to see this folder."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1124,12 +1179,12 @@ export function NavPages({ userRole }: { userRole: string }) {
               onClick={async () => {
                 if (selectedProjectId) {
                   await createFolder.mutateAsync({
-                    name: title.trim() || 'Untitled',
+                    name: title.trim() || "Untitled",
                     projectId: selectedProjectId,
                     parentId: undefined,
-                    isPrivate: createIsPrivate,  // NEW
+                    isPrivate: createIsPrivate, // NEW
                   });
-                  setTitle('');
+                  setTitle("");
                   setOpen(false);
                 }
               }}

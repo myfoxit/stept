@@ -1,30 +1,33 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import * as React from "react";
 import {
-  IconHelp,
   IconPlus,
-  IconSettings,
-  IconTableFilled,
-  IconUsers,
   IconChevronDown,
   IconCheck,
   IconPencil,
   IconTrash,
   IconDotsVertical,
-  IconShare,
-  IconLink,
-  IconUpload,
-  IconShieldCheck,
-  IconChartBar,
-  IconTopologyStarRing3,
-  IconMovie,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
-import { NavMain } from '@/components/nav-main';
-import { NavSecondary } from '@/components/nav-secondary';
-import { NavUser } from '@/components/nav-user';
-import { NavPages } from '@/components/nav-pages';
+import {
+  Eye,
+  Link2,
+  Users,
+  BookOpen,
+  TrendingUp,
+  Target,
+  Video,
+  PenLine,
+  Settings,
+  HelpCircle,
+  Search,
+} from "lucide-react";
+
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
+import { NavPages } from "@/components/nav-pages";
 import {
   Sidebar,
   SidebarContent,
@@ -33,9 +36,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/ui/sidebar';
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
-import { useProject } from '@/providers/project-provider';
+import { useProject } from "@/providers/project-provider";
 import {
   Dialog,
   DialogContent,
@@ -44,10 +48,10 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,69 +59,78 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
-import { Link, useNavigate } from 'react-router-dom';
-import { useUpdateProject } from '@/hooks/api/projects';
-import { toast } from 'sonner';
+} from "@/components/ui/dropdown-menu";
+import { Link, useNavigate } from "react-router-dom";
+import { useUpdateProject } from "@/hooks/api/projects";
+import { useSpotlight } from "@/components/spotlight/SpotlightProvider";
+import { toast } from "sonner";
 
 const data = {
   user: {
-    name: 'Alexander Höhne',
-    email: 'hello@ondoki.com',
-    avatar: '/profile.png',
+    name: "Alexander Höhne",
+    email: "hello@ondoki.com",
+    avatar: "/profile.png",
   },
   navMain: [
     {
-      title: 'Shared with me',
-      url: '/shared',
-      icon: IconShare,
+      title: "Shared with me",
+      url: "/shared",
+      icon: Eye,
+      group: "main",
     },
     {
-      title: 'Context Links',
-      url: '/context-links',
-      icon: IconLink,
+      title: "Context Links",
+      url: "/context-links",
+      icon: Link2,
+      group: "main",
     },
     {
-      title: 'Team',
-      url: '/team',
-      icon: IconUsers,
+      title: "Team",
+      url: "/team",
+      icon: Users,
+      group: "main",
     },
     {
-      title: 'Knowledge Base',
-      url: '/knowledge',
-      icon: IconUpload,
+      title: "Knowledge Base",
+      url: "/knowledge",
+      icon: BookOpen,
+      group: "main",
     },
     {
-      title: 'Analytics',
-      url: '/analytics',
-      icon: IconChartBar,
+      title: "Analytics",
+      url: "/analytics",
+      icon: TrendingUp,
+      group: "insights",
     },
     {
-      title: 'Knowledge Graph',
-      url: '/knowledge-graph',
-      icon: IconTopologyStarRing3,
+      title: "Knowledge Graph",
+      url: "/knowledge-graph",
+      icon: Target,
+      group: "insights",
     },
     {
-      title: 'Video → Guide',
-      url: '/video-import',
-      icon: IconMovie,
+      title: "Video → Guide",
+      url: "/video-import",
+      icon: Video,
+      group: "insights",
     },
     {
-      title: 'Audit Log',
-      url: '/audit',
-      icon: IconShieldCheck,
+      title: "Audit Log",
+      url: "/audit",
+      icon: PenLine,
+      group: "insights",
     },
   ],
   navSecondary: [
     {
-      title: 'Settings',
-      url: 'settings',
-      icon: IconSettings,
+      title: "Settings",
+      url: "settings",
+      icon: Settings,
     },
     {
-      title: 'Get Help',
-      url: 'https://docs.ondoki.com',
-      icon: IconHelp,
+      title: "Get Help",
+      url: "https://docs.ondoki.com",
+      icon: HelpCircle,
     },
   ],
 };
@@ -135,17 +148,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     userRole,
   } = useProject();
   const updateProjectMutation = useUpdateProject();
+  const { openSpotlight } = useSpotlight();
 
   const [newProjectDialogOpen, setNewProjectDialogOpen] = React.useState(false);
-  const [newProjectName, setNewProjectName] = React.useState('');
+  const [newProjectName, setNewProjectName] = React.useState("");
   const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
   const [renameProjectId, setRenameProjectId] = React.useState<string | null>(
-    null
+    null,
   );
-  const [renameProjectName, setRenameProjectName] = React.useState('');
+  const [renameProjectName, setRenameProjectName] = React.useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [deleteProjectId, setDeleteProjectId] = React.useState<string | null>(
-    null
+    null,
   );
 
   function openRename(p: { id: string; name: string }) {
@@ -159,27 +173,60 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   // Helper to check permissions
-  const canEditProject = userRole === 'owner' || userRole === 'admin';
-  const canDeleteProject = userRole === 'owner';
+  const canEditProject = userRole === "owner" || userRole === "admin";
+  const canDeleteProject = userRole === "owner";
 
   return (
-    <Sidebar
-      collapsible="offcanvas"
-      data-testid="sidebar"
-      {...props}
-    >
+    <Sidebar collapsible="offcanvas" data-testid="sidebar" {...props}>
       <SidebarHeader>
         <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarMenuItem className="flex items-center justify-between">
             <SidebarMenuButton
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <Link to="#">
-                <IconTableFilled className="!size-5" />
-                <span className="text-base font-semibold">Ondoki</span>
+                <svg
+                  style={{ width: "24px", height: "auto" }}
+                  viewBox="0 0 38 30"
+                  fill="none"
+                  className="text-primary flex-shrink-0"
+                >
+                  <rect
+                    y="2"
+                    width="13"
+                    height="5"
+                    rx="2.5"
+                    fill="currentColor"
+                  />
+                  <rect
+                    y="12"
+                    width="22"
+                    height="5"
+                    rx="2.5"
+                    fill="currentColor"
+                  />
+                  <rect
+                    y="22"
+                    width="17"
+                    height="5"
+                    rx="2.5"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M32 0 L33.8 5.6 L38 7.5 L33.8 9.4 L32 15 L30.2 9.4 L26 7.5 L30.2 5.6 Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span
+                  className="text-base font-extrabold"
+                  style={{ letterSpacing: "-0.04em" }}
+                >
+                  Ondoki
+                </span>
               </Link>
             </SidebarMenuButton>
+            <SidebarTrigger className="size-7 ml-auto" />
           </SidebarMenuItem>
           <SidebarMenuItem>
             <div className="px-1.5 py-1">
@@ -211,12 +258,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      variant="default"
-                      className="h-8 w-full justify-between px-2 font-medium"
+                      variant="ghost"
+                      className="h-8 w-full justify-between px-2 font-medium text-[0.82rem] text-[#57534E] hover:bg-[#F5F4F2]"
                       data-testid="project-selector-trigger"
                     >
                       <span className="truncate">
-                        {selectedProject?.name || 'Select Project'}
+                        {selectedProject?.name || "Select Project"}
                       </span>
                       <IconChevronDown className="size-4 opacity-60" />
                     </Button>
@@ -251,9 +298,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         {p.id === selectedProjectId && canEditProject && (
                           <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center">
                             <div className="pointer-events-auto opacity-0 transition-opacity group-hover:opacity-100">
-                              <DropdownMenu
-                                onOpenChange={() => {}}
-                              >
+                              <DropdownMenu onOpenChange={() => {}}>
                                 <DropdownMenuTrigger asChild>
                                   <Button
                                     size="icon"
@@ -278,7 +323,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     className="flex items-center gap-2"
                                     data-testid={`settings-project-${p.id}`}
                                   >
-                                    <IconSettings className="size-4" />
+                                    <Settings className="size-4" />
                                     Settings
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
@@ -328,6 +373,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      {/* Search bar */}
+      <div className="px-3 pb-2">
+        <button
+          onClick={openSpotlight}
+          className="flex w-full items-center gap-2 rounded-lg bg-[#F5F4F2] px-3 py-2 text-left transition-colors hover:border-[#E0DEDC] border border-transparent"
+        >
+          <Search className="h-3.5 w-3.5 text-[#A8A29E] flex-shrink-0" />
+          <span className="text-[0.78rem] font-medium text-[#A8A29E]">
+            Search...
+          </span>
+          <kbd className="ml-auto text-[0.6rem] font-semibold bg-white border border-[#EEECEB] px-1.5 py-px rounded text-[#D6D3D1]">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
       <SidebarContent>
         <NavMain items={data.navMain} />
         <NavPages userRole={userRole} />
@@ -366,17 +426,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 onClick={async () => {
                   try {
                     const p = await createProject(newProjectName.trim());
-                    setNewProjectName('');
+                    setNewProjectName("");
                     setNewProjectDialogOpen(false);
                     setSelectedProjectId(p.id);
                   } catch (err: any) {
-                    const detail = err?.response?.data?.detail || err?.message || '';
-                    if (err?.response?.status === 409 || detail.includes('already have a project')) {
-                      toast.error('Duplicate project name', {
-                        description: 'You already have a project with this name. Please choose a different name.',
+                    const detail =
+                      err?.response?.data?.detail || err?.message || "";
+                    if (
+                      err?.response?.status === 409 ||
+                      detail.includes("already have a project")
+                    ) {
+                      toast.error("Duplicate project name", {
+                        description:
+                          "You already have a project with this name. Please choose a different name.",
                       });
                     } else {
-                      toast.error('Failed to create project', { description: detail });
+                      toast.error("Failed to create project", {
+                        description: detail,
+                      });
                     }
                   }
                 }}
@@ -396,7 +463,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setRenameDialogOpen(o);
             if (!o) {
               setRenameProjectId(null);
-              setRenameProjectName('');
+              setRenameProjectName("");
             }
           }}
         >
@@ -445,14 +512,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       onSuccess: () => {
                         setRenameDialogOpen(false);
                         setRenameProjectId(null);
-                        setRenameProjectName('');
+                        setRenameProjectName("");
                       },
-                    }
+                    },
                   );
                 }}
                 data-testid="rename-project-save-btn"
               >
-                {updateProjectMutation.isPending ? 'Saving…' : 'Save'}
+                {updateProjectMutation.isPending ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -492,7 +559,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     await deleteProject?.(deleteProjectId);
                     if (removedActive) {
                       const remaining = projects.filter(
-                        (p) => p.id !== deleteProjectId
+                        (p) => p.id !== deleteProjectId,
                       );
                       setSelectedProjectId(remaining[0]?.id || null);
                     }
@@ -508,7 +575,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </DialogContent>
         </Dialog>
 
-        <NavSecondary items={data.navSecondary} projectId={selectedProjectId} className="mt-auto" />
+        <NavSecondary
+          items={data.navSecondary}
+          projectId={selectedProjectId}
+          className="mt-auto"
+        />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

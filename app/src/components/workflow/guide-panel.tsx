@@ -28,7 +28,7 @@ function renderMarkdown(md: string): string {
       return `<pre class="bg-slate-900 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto my-3"><code>${code}</code></pre>`;
     })
     // Inline code
-    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded text-sm">$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-primary px-1.5 py-0.5 rounded text-sm">$1</code>')
     // Headers
     .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold mt-6 mb-2 text-slate-800">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-3 text-slate-900">$1</h2>')
@@ -37,7 +37,7 @@ function renderMarkdown(md: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     // Blockquotes
-    .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-indigo-300 bg-indigo-50 pl-4 py-2 my-3 text-sm text-indigo-800 italic">$1</blockquote>')
+    .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-indigo-300 bg-primary/5 pl-4 py-2 my-3 text-sm text-indigo-800 italic">$1</blockquote>')
     // Numbered lists
     .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 list-decimal my-1">$2</li>')
     // Bullet lists
@@ -124,7 +124,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
         <SheetHeader className="px-6 py-4 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
-              <IconFileText className="h-5 w-5 text-indigo-600" />
+              <IconFileText className="h-5 w-5 text-primary" />
               Generated Guide
             </SheetTitle>
           </div>
@@ -133,7 +133,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
         {/* Toolbar */}
         <div className="flex items-center gap-2 px-6 py-3 border-b bg-slate-50 flex-shrink-0">
           {!isStreaming ? (
-            <Button size="sm" onClick={handleStream} variant="default" className="bg-indigo-600 hover:bg-indigo-700">
+            <Button size="sm" onClick={handleStream} variant="default" className="bg-primary hover:bg-primary/90">
               <IconFileText className="mr-1.5 h-3.5 w-3.5" />
               {guideContent ? 'Regenerate' : 'Generate Guide'}
             </Button>
@@ -179,7 +179,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
           )}
 
           {isStreaming && (
-            <div className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-500">
+            <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary">
               <IconLoader2 className="h-3 w-3 animate-spin" />
               Writing…
             </div>

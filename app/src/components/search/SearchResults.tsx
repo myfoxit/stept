@@ -126,7 +126,7 @@ export function SearchBar({ className }: SearchBarProps) {
             title={searchMode === 'semantic' ? 'Switch to keyword search' : 'Switch to semantic search'}
           >
             {searchMode === 'semantic' ? (
-              <IconBrain className="h-3.5 w-3.5 text-indigo-500" />
+              <IconBrain className="h-3.5 w-3.5 text-primary" />
             ) : (
               <IconAbc className="h-3.5 w-3.5" />
             )}
@@ -201,7 +201,7 @@ function SearchResultItem({
         onClick={() => onClick(result.recording_id)}
         className="w-full px-3 py-2 text-left hover:bg-accent transition-colors flex items-start gap-2"
       >
-        <IconFileText className="h-4 w-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+        <IconFileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span
@@ -209,7 +209,7 @@ function SearchResultItem({
               dangerouslySetInnerHTML={{ __html: result.name_highlighted || result.name }}
             />
             {result.is_processed && (
-              <IconSparkles className="h-3 w-3 text-indigo-500 flex-shrink-0" />
+              <IconSparkles className="h-3 w-3 text-primary flex-shrink-0" />
             )}
           </div>
           {result.summary_highlighted && result.summary && (
@@ -283,14 +283,14 @@ function SemanticResultItem({
         onClick={() => onClick(result.recording_id)}
         className="w-full px-3 py-2 text-left hover:bg-accent transition-colors flex items-start gap-2"
       >
-        <IconFileText className="h-4 w-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+        <IconFileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-medium truncate">
               {result.generated_title || result.name}
             </span>
             {result.is_processed && (
-              <IconSparkles className="h-3 w-3 text-indigo-500 flex-shrink-0" />
+              <IconSparkles className="h-3 w-3 text-primary flex-shrink-0" />
             )}
             <span className={`text-[10px] font-mono px-1 py-0.5 rounded ${scoreColor}`}>
               {scorePercent}%

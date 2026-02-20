@@ -199,7 +199,7 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+            className="h-7 gap-1.5 rounded-full bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 hover:text-[#C44535]"
           >
             <IconLink className="h-3 w-3" />
             {links.length === 0 ? 'Add context' : <IconPlus className="h-3 w-3" />}

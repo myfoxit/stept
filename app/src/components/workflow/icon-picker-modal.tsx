@@ -28,9 +28,9 @@ const POPULAR_ICONS = [
 ];
 
 const COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
+  '#D94F3D', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
   '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
-  '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6',
+  '#06b6d4', '#0ea5e9', '#3b82f6', '#D94F3D', '#8b5cf6',
 ];
 
 export function IconPickerModal({
@@ -41,7 +41,7 @@ export function IconPickerModal({
 }: IconPickerModalProps) {
   const [selectedTab, setSelectedTab] = React.useState<'tabler' | 'favicon'>(currentIcon?.type === 'favicon' ? 'favicon' : 'tabler');
   const [selectedIcon, setSelectedIcon] = React.useState(currentIcon?.value || 'IconPencil');
-  const [selectedColor, setSelectedColor] = React.useState(currentIcon?.color || '#6366f1');
+  const [selectedColor, setSelectedColor] = React.useState(currentIcon?.color || '#D94F3D');
   const [faviconUrl, setFaviconUrl] = React.useState('');
 
   // NEW: Sync state when modal opens / currentIcon changes
@@ -50,7 +50,7 @@ export function IconPickerModal({
     const type = (currentIcon?.type === 'favicon' ? 'favicon' : 'tabler') as 'tabler' | 'favicon';
     setSelectedTab(type);
     setSelectedIcon(currentIcon?.value || 'IconPencil');
-    setSelectedColor(currentIcon?.color || '#6366f1');
+    setSelectedColor(currentIcon?.color || '#D94F3D');
 
     if (type === 'favicon') {
       // Try to derive hostname for preview if value is a full URL (e.g., google s2 endpoint)
@@ -149,7 +149,7 @@ export function IconPickerModal({
                     className={cn(
                       "flex h-10 w-10 items-center justify-center rounded-lg border-2",
                       selectedIcon === iconName
-                        ? "border-indigo-500 bg-indigo-50"
+                        ? "border-primary bg-primary/5"
                         : "border-transparent hover:bg-gray-100"
                     )}
                   >
