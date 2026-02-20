@@ -1,12 +1,12 @@
 const stepsList = document.getElementById('stepsList');
 const emptyState = document.getElementById('emptyState');
-const stepCountEl = document.getElementById('stepCount');
+const badgeStepCount = document.getElementById('badgeStepCount');
 const recordingTimeEl = document.getElementById('recordingTime');
 const recordingBadge = document.getElementById('recordingBadge');
 const recordingStatus = document.getElementById('recordingStatus');
 const pauseBtn = document.getElementById('pauseBtn');
 const pauseIcon = document.getElementById('pauseIcon');
-const pauseText = document.getElementById('pauseText');
+const deleteAllBtn = document.getElementById('deleteAllBtn');
 const completeBtn = document.getElementById('completeBtn');
 const footer = document.getElementById('footer');
 
@@ -46,19 +46,20 @@ async function refreshState() {
 }
 
 function updateUI(state) {
-  stepCountEl.textContent = steps.length;
+  // Update badge with step count
+  badgeStepCount.textContent = steps.length > 0 ? `· ${steps.length} steps` : '';
 
   if (state.isPaused) {
     recordingBadge.classList.add('paused');
     recordingStatus.textContent = 'Paused';
     pauseIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-    pauseText.textContent = 'Resume';
+    pauseBtn.title = 'Resume';
   } else {
     recordingBadge.classList.remove('paused');
     recordingStatus.textContent = 'Recording';
     pauseIcon.innerHTML =
       '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-    pauseText.textContent = 'Pause';
+    pauseBtn.title = 'Pause';
   }
 }
 
@@ -95,23 +96,22 @@ function createStepCard(step, isNew) {
   card.dataset.stepNumber = step.stepNumber;
 
   card.innerHTML = `
-    ${step.screenshotDataUrl ? `<img class="step-screenshot" src="${step.screenshotDataUrl}" alt="Step ${step.stepNumber}">` : ''}
-    <div class="step-content">
-      <div class="step-header">
-        <span class="step-number">${step.stepNumber}</span>
-        <span class="step-action">${step.actionType}</span>
+    <div class="step-top-row">
+      <span class="step-number">${step.stepNumber}</span>
+      <div class="step-text">
+        <p class="step-description">${escapeHtml(step.description || step.actionType)}</p>
+        ${step.url ? `<p class="step-url">${escapeHtml(step.url)}</p>` : ''}
       </div>
-      <p class="step-description">${escapeHtml(step.description || '')}</p>
-      ${step.url ? `<p class="step-url">${escapeHtml(step.url)}</p>` : ''}
     </div>
+    ${step.screenshotDataUrl ? `<img class="step-screenshot" src="${step.screenshotDataUrl}" alt="Step ${step.stepNumber}">` : ''}
     <button class="step-delete" data-step="${step.stepNumber}" title="Delete step">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2">
-        <path d="M18 6L6 18M6 6l12 12"/>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
       </svg>
     </button>
   `;
 
-  // Add delete handler
   card.querySelector('.step-delete').addEventListener('click', async (e) => {
     e.stopPropagation();
     await sendMessage({ type: 'DELETE_STEP', stepNumber: step.stepNumber });
@@ -181,7 +181,6 @@ async function performUpload() {
   progressBar.classList.remove('hidden');
   uploadStatus.textContent = 'Preparing upload...';
 
-  // Simulate progress
   let progress = 0;
   const progressInterval = setInterval(() => {
     progress += 10;
@@ -203,7 +202,6 @@ async function performUpload() {
     uploadActions.classList.add('hidden');
     uploadDoneActions.classList.remove('hidden');
 
-    // Clear steps after successful upload
     await sendMessage({ type: 'CLEAR_STEPS' });
     steps = [];
   } else {
@@ -229,16 +227,22 @@ pauseBtn.addEventListener('click', async () => {
   await refreshState();
 });
 
+deleteAllBtn.addEventListener('click', async () => {
+  if (confirm('Delete this entire capture?')) {
+    await sendMessage({ type: 'STOP_RECORDING' });
+    await sendMessage({ type: 'CLEAR_STEPS' });
+    await refreshState();
+  }
+});
+
 completeBtn.addEventListener('click', async () => {
   await sendMessage({ type: 'STOP_RECORDING' });
   showUploadPanel();
 });
 
 backBtn.addEventListener('click', async () => {
-  // Resume recording and go back
   const state = await sendMessage({ type: 'GET_STATE' });
   if (!state.isRecording && steps.length > 0) {
-    // Don't restart recording, just show the steps
     hideUploadPanel();
   } else {
     await sendMessage({
@@ -254,13 +258,12 @@ uploadBtn.addEventListener('click', performUpload);
 
 newCaptureBtn.addEventListener('click', async () => {
   hideUploadPanel();
-  // Reset UI to empty state
   stepsList.innerHTML = '';
   const emptyStateEl = document.getElementById('emptyState');
   if (emptyStateEl) {
     emptyStateEl.style.display = 'flex';
   }
-  stepCountEl.textContent = '0';
+  badgeStepCount.textContent = '';
   recordingTimeEl.textContent = '00:00';
 });
 
@@ -268,7 +271,7 @@ newCaptureBtn.addEventListener('click', async () => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'STEP_ADDED') {
     steps.push(message.step);
-    stepCountEl.textContent = steps.length;
+    badgeStepCount.textContent = `· ${steps.length} steps`;
     renderSteps();
   } else if (message.type === 'RECORDING_STATE_CHANGED') {
     refreshState();

@@ -1,4 +1,19 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const DEFAULT_API_BASE_URL = 'http://localhost:8000/api/v1';
+const MAX_STEPS = 100;
+const DEBUG = false;
+
+function debugLog(...args) {
+  if (DEBUG) console.log('[Ondoki]', ...args);
+}
+
+// Get API base URL from storage
+async function getApiBaseUrl() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['apiBaseUrl'], (result) => {
+      resolve(result.apiBaseUrl || DEFAULT_API_BASE_URL);
+    });
+  });
+}
 
 // State management
 let state = {
@@ -56,8 +71,55 @@ function base64UrlEncode(array) {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+// Token refresh helper
+async function refreshAccessToken() {
+  if (!state.refreshToken) return false;
+  const API_BASE_URL = await getApiBaseUrl();
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: state.refreshToken,
+      }),
+    });
+
+    if (response.ok) {
+      const tokenData = await response.json();
+      state.accessToken = tokenData.access_token;
+      state.refreshToken = tokenData.refresh_token;
+      await chrome.storage.local.set({ refreshToken: state.refreshToken });
+      return true;
+    }
+  } catch (error) {
+    debugLog('Token refresh failed:', error);
+  }
+  return false;
+}
+
+// Authenticated fetch with automatic token refresh on 401
+async function authedFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  options.headers['Authorization'] = `Bearer ${state.accessToken}`;
+
+  let response = await fetch(url, options);
+
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      options.headers['Authorization'] = `Bearer ${state.accessToken}`;
+      response = await fetch(url, options);
+    }
+  }
+
+  return response;
+}
+
 // Authentication
 async function initiateLogin() {
+  const API_BASE_URL = await getApiBaseUrl();
   state.codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(state.codeVerifier);
   state.authState = generateState();
@@ -93,6 +155,7 @@ async function initiateLogin() {
 }
 
 async function handleAuthCallback(callbackUrl) {
+  const API_BASE_URL = await getApiBaseUrl();
   const url = new URL(callbackUrl);
   const code = url.searchParams.get('code');
   const returnedState = url.searchParams.get('state');
@@ -127,14 +190,11 @@ async function handleAuthCallback(callbackUrl) {
   state.refreshToken = tokenData.refresh_token;
   state.isAuthenticated = true;
 
-  // Store refresh token
   await chrome.storage.local.set({ refreshToken: state.refreshToken });
 
-  // Clear PKCE state
   state.codeVerifier = null;
   state.authState = null;
 
-  // Fetch user info and projects
   await fetchUserInfo();
   await fetchUserProjects();
 
@@ -145,6 +205,7 @@ async function tryAutoLogin() {
   if (!state.refreshToken) return false;
 
   try {
+    const API_BASE_URL = await getApiBaseUrl();
     const response = await fetch(`${API_BASE_URL}/auth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -166,10 +227,9 @@ async function tryAutoLogin() {
       return true;
     }
   } catch (error) {
-    console.error('Auto-login failed:', error);
+    debugLog('Auto-login failed:', error);
   }
 
-  // Clear invalid token
   await chrome.storage.local.remove('refreshToken');
   state.refreshToken = null;
   return false;
@@ -178,6 +238,7 @@ async function tryAutoLogin() {
 async function logout() {
   try {
     if (state.refreshToken) {
+      const API_BASE_URL = await getApiBaseUrl();
       await fetch(`${API_BASE_URL}/auth/revoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,7 +246,7 @@ async function logout() {
       });
     }
   } catch (error) {
-    console.error('Revoke error:', error);
+    debugLog('Revoke error:', error);
   }
 
   state.isAuthenticated = false;
@@ -202,15 +263,14 @@ async function fetchUserInfo() {
   if (!state.accessToken) return;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${state.accessToken}` },
-    });
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await authedFetch(`${API_BASE_URL}/auth/me`);
 
     if (response.ok) {
       state.currentUser = await response.json();
     }
   } catch (error) {
-    console.error('Failed to fetch user info:', error);
+    debugLog('Failed to fetch user info:', error);
   }
 }
 
@@ -218,18 +278,16 @@ async function fetchUserProjects() {
   if (!state.accessToken || !state.currentUser) return;
 
   try {
-    const response = await fetch(
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await authedFetch(
       `${API_BASE_URL}/projects/${state.currentUser.id}`,
-      {
-        headers: { Authorization: `Bearer ${state.accessToken}` },
-      },
     );
 
     if (response.ok) {
       state.userProjects = await response.json();
     }
   } catch (error) {
-    console.error('Failed to fetch projects:', error);
+    debugLog('Failed to fetch projects:', error);
   }
 }
 
@@ -244,10 +302,8 @@ function startRecording(projectId) {
 
   chrome.storage.local.set({ selectedProjectId: projectId });
 
-  // Notify all tabs to start capturing
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
-      // Only send to http/https pages
       if (
         tab.id &&
         tab.url &&
@@ -260,11 +316,9 @@ function startRecording(projectId) {
     });
   });
 
-  // Update badge
   chrome.action.setBadgeText({ text: 'REC' });
-  chrome.action.setBadgeBackgroundColor({ color: '#EF4444' });
+  chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
 
-  // Open side panel
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]?.id) {
       chrome.sidePanel.open({ tabId: tabs[0].id }).catch(() => {});
@@ -276,7 +330,6 @@ function stopRecording() {
   state.isRecording = false;
   state.isPaused = false;
 
-  // Notify all tabs to stop capturing
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (
@@ -291,7 +344,6 @@ function stopRecording() {
     });
   });
 
-  // Clear badge
   chrome.action.setBadgeText({ text: '' });
 }
 
@@ -304,17 +356,14 @@ function pauseRecording() {
 function resumeRecording() {
   state.isPaused = false;
   chrome.action.setBadgeText({ text: 'REC' });
-  chrome.action.setBadgeBackgroundColor({ color: '#EF4444' });
+  chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
 }
 
 async function captureScreenshot() {
   return new Promise((resolve) => {
-    chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+    chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 70 }, (dataUrl) => {
       if (chrome.runtime.lastError) {
-        console.error(
-          'Screenshot capture failed:',
-          chrome.runtime.lastError.message,
-        );
+        debugLog('Screenshot capture failed:', chrome.runtime.lastError.message);
         resolve(null);
         return;
       }
@@ -324,14 +373,15 @@ async function captureScreenshot() {
 }
 
 async function addStep(stepData) {
-  if (!state.isRecording || state.isPaused) {
-    console.log('Not recording or paused, skipping step');
+  if (!state.isRecording || state.isPaused) return;
+
+  if (state.steps.length >= MAX_STEPS) {
+    debugLog(`Max steps (${MAX_STEPS}) reached, ignoring new step`);
     return;
   }
 
   state.stepCounter++;
 
-  // Capture screenshot
   const screenshot = await captureScreenshot();
 
   const step = {
@@ -352,9 +402,8 @@ async function addStep(stepData) {
   };
 
   state.steps.push(step);
-  console.log('Step added:', step.stepNumber, step.actionType);
+  debugLog('Step added:', step.stepNumber, step.actionType);
 
-  // Notify popup and side panel of new step
   chrome.runtime
     .sendMessage({ type: 'STEP_ADDED', step: step })
     .catch(() => {});
@@ -362,7 +411,6 @@ async function addStep(stepData) {
 
 function deleteStep(stepNumber) {
   state.steps = state.steps.filter((s) => s.stepNumber !== stepNumber);
-  // Renumber remaining steps
   state.steps.forEach((step, index) => {
     step.stepNumber = index + 1;
   });
@@ -375,19 +423,19 @@ async function uploadCapture() {
     return { success: false, error: 'No steps to upload or not authenticated' };
   }
 
+  const API_BASE_URL = await getApiBaseUrl();
+
   try {
-    // Create session
-    const sessionResponse = await fetch(
+    const sessionResponse = await authedFetch(
       `${API_BASE_URL}/process-recording/session/create`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${state.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           timestamp: new Date().toISOString(),
-          client: 'SnaprowChromeExtension',
+          client: 'OndokiChromeExtension',
           user_id: state.currentUser?.id,
           project_id: state.selectedProjectId,
         }),
@@ -400,7 +448,6 @@ async function uploadCapture() {
 
     const { sessionId } = await sessionResponse.json();
 
-    // Upload metadata
     const metadata = state.steps.map((s) => ({
       stepNumber: s.stepNumber,
       timestamp: s.timestamp,
@@ -417,12 +464,11 @@ async function uploadCapture() {
       elementInfo: s.elementInfo,
     }));
 
-    const metadataResponse = await fetch(
+    const metadataResponse = await authedFetch(
       `${API_BASE_URL}/process-recording/session/${sessionId}/metadata`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${state.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(metadata),
@@ -433,7 +479,6 @@ async function uploadCapture() {
       throw new Error('Failed to upload metadata');
     }
 
-    // Upload images
     for (const step of state.steps) {
       if (step.screenshotDataUrl) {
         const blob = await dataUrlToBlob(step.screenshotDataUrl);
@@ -441,13 +486,10 @@ async function uploadCapture() {
         formData.append('file', blob, `step_${step.stepNumber}.png`);
         formData.append('stepNumber', step.stepNumber.toString());
 
-        const imageResponse = await fetch(
+        const imageResponse = await authedFetch(
           `${API_BASE_URL}/process-recording/session/${sessionId}/image`,
           {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${state.accessToken}`,
-            },
             body: formData,
           },
         );
@@ -458,14 +500,10 @@ async function uploadCapture() {
       }
     }
 
-    // Finalize
-    await fetch(
+    await authedFetch(
       `${API_BASE_URL}/process-recording/session/${sessionId}/finalize`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${state.accessToken}`,
-        },
       },
     );
 
@@ -570,11 +608,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
         break;
 
+      case 'GET_SETTINGS':
+        chrome.storage.local.get(['apiBaseUrl'], (result) => {
+          sendResponse({ apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL });
+        });
+        return; // keep channel open
+
+      case 'SET_SETTINGS':
+        if (message.apiBaseUrl) {
+          await chrome.storage.local.set({ apiBaseUrl: message.apiBaseUrl });
+        }
+        sendResponse({ success: true });
+        break;
+
       default:
         sendResponse({ error: 'Unknown message type' });
     }
   })();
-  return true; // Keep channel open for async response
+  return true;
 });
 
 // Listen for tab updates to inject content script

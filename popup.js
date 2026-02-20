@@ -24,13 +24,23 @@ const closePreviewBtn = document.getElementById('closePreviewBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 const progressFill = document.getElementById('progressFill');
 const uploadStatus = document.getElementById('uploadStatus');
+const apiUrlInput = document.getElementById('apiUrlInput');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
 let recordingInterval = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadSettings();
   await refreshState();
 });
+
+async function loadSettings() {
+  const settings = await sendMessage({ type: 'GET_SETTINGS' });
+  if (settings.apiBaseUrl) {
+    apiUrlInput.value = settings.apiBaseUrl;
+  }
+}
 
 // Refresh state from background
 async function refreshState() {
@@ -44,15 +54,12 @@ function updateUI(state) {
     loginPanel.classList.add('hidden');
     userPanel.classList.remove('hidden');
 
-    // Update greeting
     const displayName =
       state.currentUser?.name || state.currentUser?.email || 'User';
     greeting.textContent = `Hello, ${displayName}!`;
 
-    // Populate projects
     populateProjects(state.userProjects, state.selectedProjectId);
 
-    // Show correct panel
     if (state.isRecording) {
       showRecordingPanel(state);
     } else {
@@ -209,7 +216,7 @@ startBtn.addEventListener('click', async () => {
 
   await sendMessage({ type: 'START_RECORDING', projectId });
   await sendMessage({ type: 'OPEN_SIDE_PANEL' });
-  window.close(); // Close popup after starting
+  window.close();
 });
 
 pauseBtn.addEventListener('click', async () => {
@@ -248,7 +255,6 @@ uploadBtn.addEventListener('click', async () => {
   progressFill.style.width = '0%';
   uploadStatus.textContent = 'Starting upload...';
 
-  // Simulate progress (actual progress would need websocket or polling)
   let progress = 0;
   const progressInterval = setInterval(() => {
     progress += 10;
@@ -271,6 +277,15 @@ uploadBtn.addEventListener('click', async () => {
   } else {
     uploadStatus.textContent =
       'Upload failed: ' + (result.error || 'Unknown error');
+  }
+});
+
+saveSettingsBtn.addEventListener('click', async () => {
+  const url = apiUrlInput.value.trim();
+  if (url) {
+    await sendMessage({ type: 'SET_SETTINGS', apiBaseUrl: url });
+    saveSettingsBtn.textContent = 'Saved!';
+    setTimeout(() => { saveSettingsBtn.textContent = 'Save'; }, 1500);
   }
 });
 

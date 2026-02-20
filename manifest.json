@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Snaprow Process Recorder",
+  "name": "Ondoki Process Recorder",
   "version": "1.0.0",
-  "description": "Record process steps with screenshots and metadata",
+  "description": "Record browser process steps with screenshots — powered by Ondoki",
   "permissions": [
     "tabs",
     "activeTab",
@@ -11,7 +11,11 @@
     "scripting",
     "sidePanel"
   ],
-  "host_permissions": ["http://localhost:8000/*", "<all_urls>"],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://app.ondoki.com/*",
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

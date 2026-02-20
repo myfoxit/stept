@@ -3,15 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snaprow Process Recorder</title>
+  <title>Ondoki Process Recorder</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <!-- Logo -->
     <div class="logo">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2">
-        <path d="M3 12h4l3 9l4-18l3 9h4"/>
+      <svg width="38" height="30" viewBox="0 0 38 30" fill="none">
+        <rect y="2" width="13" height="5" rx="2.5" fill="#D94F3D"/>
+        <rect y="12" width="22" height="5" rx="2.5" fill="#D94F3D"/>
+        <rect y="22" width="17" height="5" rx="2.5" fill="#D94F3D"/>
+        <path d="M32 0 L33.8 5.6 L38 7.5 L33.8 9.4 L32 15 L30.2 9.4 L26 7.5 L30.2 5.6 Z" fill="#D94F3D"/>
       </svg>
     </div>
 
@@ -32,6 +36,16 @@
       <select id="projectSelector" class="select">
         <option value="">Select project</option>
       </select>
+
+      <!-- Settings -->
+      <details class="settings-details">
+        <summary class="settings-toggle">⚙ Settings</summary>
+        <div class="settings-content">
+          <label class="settings-label" for="apiUrlInput">API URL</label>
+          <input id="apiUrlInput" class="settings-input" type="url" placeholder="https://app.ondoki.com/api/v1">
+          <button id="saveSettingsBtn" class="btn btn-outline btn-sm">Save</button>
+        </div>
+      </details>
 
       <!-- Idle State -->
       <div id="idlePanel">
@@ -76,7 +90,7 @@
         </div>
 
         <!-- Complete button -->
-        <button id="completeBtn" class="btn btn-primary">
+        <button id="completeBtn" class="btn btn-complete">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
