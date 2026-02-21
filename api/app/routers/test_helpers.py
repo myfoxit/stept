@@ -13,8 +13,8 @@ from app.crud.user import create_user
 
 router = APIRouter(prefix="/test", tags=["test"])
 
-TEST_EMAIL = "e2e@test.com"
-TEST_PASSWORD = "E2eTest123!"
+TEST_EMAIL = "e2e-test@ondoki.com"
+TEST_PASSWORD = "TestPass123!"
 TEST_NAME = "E2E Test User"
 TEST_PROJECT_NAME = "E2E Test Project"
 

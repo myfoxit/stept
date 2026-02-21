@@ -1,4 +1,4 @@
-.PHONY: dev dev-down dev-logs build test test-backend test-frontend test-db lint migrate clean restart-backend generate-key
+.PHONY: dev dev-down dev-logs build test test-backend test-frontend test-e2e test-db lint migrate clean restart-backend generate-key
 
 COMPOSE_DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
@@ -52,6 +52,15 @@ test-db:
 		"SELECT 1 FROM pg_database WHERE datname = '$(TEST_DB_NAME)'" | grep -q 1 || \
 		$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -c "CREATE DATABASE $(TEST_DB_NAME)"
 	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -d $(TEST_DB_NAME) -c "CREATE EXTENSION IF NOT EXISTS vector" 2>/dev/null || true
+
+# E2E tests against Docker dev environment
+test-e2e: test-db
+	@echo "Running E2E tests against Docker dev environment..."
+	@echo "Ensure 'make dev' is running first."
+	cd app && PLAYWRIGHT_NO_SERVER=1 \
+		API_URL=http://localhost:8000 \
+		PLAYWRIGHT_BASE_URL=http://localhost:5173 \
+		npx playwright test $(ARGS)
 
 # Frontend tests (local, no Docker needed)
 test-frontend:
