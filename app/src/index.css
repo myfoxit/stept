@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&display=swap');
-@import 'tailwindcss';
-@import 'tw-animate-css';
-@import './styles/_variables.scss';
-@import './styles/_keyframe-animations.scss';
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./styles/_variables.scss";
+@import "./styles/_keyframe-animations.scss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -47,12 +47,12 @@
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
-  --foreground: #57534E;
+  --foreground: #57534e;
   --card: oklch(1 0 0);
-  --card-foreground: #57534E;
+  --card-foreground: #57534e;
   --popover: oklch(1 0 0);
-  --popover-foreground: #57534E;
-  --primary: #6C5CE7;
+  --popover-foreground: #57534e;
+  --primary: #6c5ce7;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.9674 0.0029 84.56);
   --secondary-foreground: oklch(0.4444 0.0096 73.64);
@@ -63,20 +63,20 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.9444 0.0025 48.72);
   --input: oklch(0.9444 0.0025 48.72);
-  --ring: #6C5CE7;
-  --chart-1: oklch(0.6117 0.1765 30.30);
-  --chart-2: oklch(0.7227 0.1920 149.58);
+  --ring: #6c5ce7;
+  --chart-1: oklch(0.6117 0.1765 30.3);
+  --chart-2: oklch(0.7227 0.192 149.58);
   --chart-3: oklch(0.5647 0.1653 30.16);
   --chart-4: oklch(0.7686 0.1647 70.08);
   --chart-5: oklch(0.6959 0.1491 162.48);
   --sidebar: oklch(1 0 0);
-  --sidebar-foreground: #57534E;
-  --sidebar-primary: #6C5CE7;
+  --sidebar-foreground: #57534e;
+  --sidebar-primary: #6c5ce7;
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: #5f4ee216;
-  --sidebar-accent-foreground: #6C5CE7;
+  --sidebar-accent-foreground: #6c5ce7;
   --sidebar-border: oklch(0.9479 0.0042 56.37);
-  --sidebar-ring: #6C5CE7;
+  --sidebar-ring: #6c5ce7;
 }
 
 .dark {
@@ -86,7 +86,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0.005 60);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #6C5CE7;
+  --primary: #6c5ce7;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.269 0.005 60);
   --secondary-foreground: oklch(0.985 0 0);
@@ -97,20 +97,20 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: #6C5CE7;
-  --chart-1: oklch(0.6117 0.1765 30.30);
-  --chart-2: oklch(0.7227 0.1920 149.58);
+  --ring: #6c5ce7;
+  --chart-1: oklch(0.6117 0.1765 30.3);
+  --chart-2: oklch(0.7227 0.192 149.58);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.5647 0.1653 30.16);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0.005 60);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #6C5CE7;
+  --sidebar-primary: #6c5ce7;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0.005 60);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.6117 0.1765 30.30);
+  --sidebar-ring: oklch(0.6117 0.1765 30.3);
 }
 
 @layer base {
@@ -119,7 +119,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Manrope', sans-serif;
+    font-family: "Arial", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -182,7 +182,10 @@
 
 /* Only allow dragging from the drag handle */
 .react-grid-item:not(.react-draggable-dragging) {
-  transition: transform 200ms ease, width 200ms ease, height 200ms ease;
+  transition:
+    transform 200ms ease,
+    width 200ms ease,
+    height 200ms ease;
 }
 
 /* Ensure drag handle is visible and works */

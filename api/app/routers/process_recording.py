@@ -1519,7 +1519,7 @@ async def list_deleted_workflows(
     current_user: User = Depends(get_current_user),
 ):
     """Get all soft-deleted workflows for a project"""
-    await check_project_permission(db, project_id, current_user, ProjectRole.VIEWER)
+    await check_project_permission(db, current_user.id, project_id, ProjectRole.VIEWER)
     workflows = await get_deleted_workflows(db, project_id, user_id=current_user.id)
     return workflows
 
