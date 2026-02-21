@@ -148,6 +148,7 @@ export function RegisterForm({
   ...props
 }: AuthFormProps) {
   const { register: doRegister } = useAuth();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -157,7 +158,7 @@ export function RegisterForm({
     e.preventDefault();
     setLoading(true);
     try {
-      await doRegister({ email, password });
+      await doRegister({ email, password, name });
       
       // Check for return_to parameter for OAuth flow
       const returnTo = searchParams.get('return_to');
@@ -185,6 +186,17 @@ export function RegisterForm({
         </p>
       </div>
       <div className="grid gap-6">
+        <div className="grid gap-3">
+          <Label htmlFor="reg-name">Name</Label>
+          <Input
+            id="reg-name"
+            type="text"
+            required
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
         <div className="grid gap-3">
           <Label htmlFor="reg-email">Email</Label>
           <Input
