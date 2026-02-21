@@ -33,11 +33,14 @@ export const test = base.extend<AuthFixtures>({
 
     // Login via UI
     await page.goto(`${appUrl}/login`);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    await page.fill('input[type="email"]', data.email);
-    await page.fill('input[type="password"]', data.password);
-    await page.click('button[type="submit"]');
+    // Wait for the form to be interactive
+    const emailInput = page.locator('input[type="email"]');
+    await emailInput.waitFor({ state: 'visible', timeout: 10000 });
+    await emailInput.fill(data.email);
+    await page.locator('input[type="password"]').fill(data.password);
+    await page.locator('button[type="submit"]').click();
 
     // Wait for redirect away from login
     await page.waitForURL((url) => !url.pathname.includes('/login'), {
