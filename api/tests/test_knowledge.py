@@ -114,11 +114,15 @@ async def test_delete_knowledge_source(
 async def test_upload_requires_auth(
     async_client: AsyncClient, test_project: dict
 ):
-    resp = await async_client.post(
-        "/api/v1/knowledge/upload",
-        files={"file": ("noauth.txt", b"no auth", "text/plain")},
-        data={"project_id": test_project["id"]},
-    )
+    # Use a fresh client without session cookies to test unauthenticated access
+    from httpx import AsyncClient as AC, ASGITransport
+    from main import app
+    async with AC(transport=ASGITransport(app=app), base_url="http://test") as anon:
+        resp = await anon.post(
+            "/api/v1/knowledge/upload",
+            files={"file": ("noauth.txt", b"no auth", "text/plain")},
+            data={"project_id": test_project["id"]},
+        )
     assert resp.status_code in (401, 403)
 
 
