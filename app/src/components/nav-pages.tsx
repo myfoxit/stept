@@ -33,7 +33,8 @@ import {
 import {
   FileText,
   File,
-  Plus,
+  FolderPlus,
+  Inbox,
   ChevronRight,
   ChevronDown,
   FolderOpen,
@@ -46,7 +47,7 @@ import {
   Play,
   ClipboardCheck,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 import {
   DropdownMenu,
@@ -118,6 +119,7 @@ function NavPageItem({
   isPrivateSection?: boolean; // NEW
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { selectedProjectId } = useProject();
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -158,6 +160,13 @@ function NavPageItem({
   const hasChildren = doc.children && doc.children.length > 0;
   const isFolder = doc.is_folder;
   const isWorkflow = doc.is_workflow;
+
+  // Active state: check if current URL matches this item
+  const isActive = React.useMemo(() => {
+    if (isFolder) return false;
+    if (isWorkflow) return location.pathname === `/workflow/${doc.id}`;
+    return location.pathname === `/editor/${doc.id}`;
+  }, [isFolder, isWorkflow, doc.id, location.pathname]);
 
   // Count total nested documents for deletion warning
   const countNestedDocs = React.useCallback((node: DocumentNode): number => {
@@ -361,6 +370,7 @@ function NavPageItem({
         <div
           className={cn(
             "flex items-center group/item relative transition-all h-7 rounded-md mx-1 hover:bg-sidebar-accent",
+            isActive && "bg-sidebar-accent",
             isDragging && "opacity-50",
           )}
           data-testid="folder-row"
@@ -462,7 +472,7 @@ function NavPageItem({
                     strokeWidth={1.5}
                   />
                 )}
-                <span className="truncate">{doc.name || "Untitled"}</span>
+                <span className="truncate font-semibold">{doc.name || "Untitled"}</span>
               </div>
             ) : (
               <Link
@@ -848,6 +858,7 @@ function NavPageItem({
 
 export function NavPages({ userRole }: { userRole: string }) {
   const { selectedProjectId } = useProject();
+  const location = useLocation();
 
   // NEW: Fetch shared and private trees separately
   const { data: sharedTree = [], isLoading: sharedLoading } = useFolderTree(
@@ -989,7 +1000,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         </SidebarGroupLabel>
         <SidebarMenu className="gap-0.5">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton asChild data-active={location.pathname === '/documents/pages' || undefined}>
               <Link
                 to="/documents/pages"
                 className="flex items-center gap-2 h-7 px-2"
@@ -1000,7 +1011,7 @@ export function NavPages({ userRole }: { userRole: string }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton asChild data-active={location.pathname === '/documents/workflows' || undefined}>
               <Link
                 to="/documents/workflows"
                 className="flex items-center gap-2 h-7 px-2"
@@ -1011,7 +1022,7 @@ export function NavPages({ userRole }: { userRole: string }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton asChild data-active={location.pathname === '/documents/all' || undefined}>
               <Link
                 to="/documents/all"
                 className="flex items-center gap-2 h-7 px-2"
@@ -1026,7 +1037,7 @@ export function NavPages({ userRole }: { userRole: string }) {
 
       <SidebarSeparator />
 
-      {/* NEW: Shared Section */}
+      {/* Shared Section */}
       <SidebarGroup
         className="py-2"
         onDragOver={(e) => {
@@ -1036,8 +1047,20 @@ export function NavPages({ userRole }: { userRole: string }) {
         onDragLeave={() => setIsDraggingOverShared(false)}
         onDrop={handleSharedDrop}
       >
-        <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center gap-1">
-          Shared
+        <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center justify-between">
+          <span>Shared</span>
+          {canCreatePage && (
+            <button
+              onClick={() => {
+                setCreateIsPrivate(false);
+                setOpen(true);
+              }}
+              className="rounded-sm p-0.5 hover:bg-sidebar-accent transition-colors"
+              title="New Folder"
+            >
+              <FolderPlus className="size-3.5 text-[#D6D3D1]" strokeWidth={1.5} />
+            </button>
+          )}
         </SidebarGroupLabel>
         <SidebarMenu
           className={cn(
@@ -1046,7 +1069,8 @@ export function NavPages({ userRole }: { userRole: string }) {
           )}
           key={`shared-${dragCounter}`}
         >
-          {sharedTree.map((doc) => (
+          {/* Folders first */}
+          {sharedTree.filter((doc) => doc.is_folder).map((doc) => (
             <NavPageItem
               key={doc.id}
               doc={doc}
@@ -1056,6 +1080,29 @@ export function NavPages({ userRole }: { userRole: string }) {
             />
           ))}
 
+          {/* Unsorted: root-level non-folder items */}
+          {sharedTree.filter((doc) => !doc.is_folder).length > 0 && (
+            <>
+              <SidebarMenuItem>
+                <div className="flex items-center gap-1 h-7 px-2 mx-1">
+                  <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
+                  <span className="text-[0.82rem] font-semibold text-muted-foreground">Unsorted</span>
+                </div>
+              </SidebarMenuItem>
+              <div className="ml-3 pl-1">
+                {sharedTree.filter((doc) => !doc.is_folder).map((doc) => (
+                  <NavPageItem
+                    key={doc.id}
+                    doc={doc}
+                    userRole={userRole}
+                    onDragEnd={handleDragEnd}
+                    isPrivateSection={false}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
           {isDraggingOverShared && (
             <div className="h-8 mx-2 border-2 border-dashed border-primary/50 rounded-md flex items-center justify-center">
               <span className="text-xs text-muted-foreground">
@@ -1063,27 +1110,12 @@ export function NavPages({ userRole }: { userRole: string }) {
               </span>
             </div>
           )}
-
-          {canCreatePage && (
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => {
-                  setCreateIsPrivate(false);
-                  setOpen(true);
-                }}
-                className="h-7 px-2 text-gray-400"
-              >
-                <Plus className="mr-2 size-3.5" />
-                <span className="text-sm">New Shared Folder</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
         </SidebarMenu>
       </SidebarGroup>
 
       <SidebarSeparator />
 
-      {/* NEW: Private Section — only show when there are private items or user can create */}
+      {/* Private Section */}
       {(privateTree.length > 0 || canCreatePage) && (
         <SidebarGroup
           className="py-2"
@@ -1094,8 +1126,20 @@ export function NavPages({ userRole }: { userRole: string }) {
           onDragLeave={() => setIsDraggingOverPrivate(false)}
           onDrop={handlePrivateDrop}
         >
-          <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center gap-1">
-            Private
+          <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center justify-between">
+            <span>Private</span>
+            {canCreatePage && (
+              <button
+                onClick={() => {
+                  setCreateIsPrivate(true);
+                  setOpen(true);
+                }}
+                className="rounded-sm p-0.5 hover:bg-sidebar-accent transition-colors"
+                title="New Folder"
+              >
+                <FolderPlus className="size-3.5 text-[#D6D3D1]" strokeWidth={1.5} />
+              </button>
+            )}
           </SidebarGroupLabel>
           <SidebarMenu
             className={cn(
@@ -1104,7 +1148,8 @@ export function NavPages({ userRole }: { userRole: string }) {
             )}
             key={`private-${dragCounter}`}
           >
-            {privateTree.map((doc) => (
+            {/* Folders first */}
+            {privateTree.filter((doc) => doc.is_folder).map((doc) => (
               <NavPageItem
                 key={doc.id}
                 doc={doc}
@@ -1114,27 +1159,35 @@ export function NavPages({ userRole }: { userRole: string }) {
               />
             ))}
 
+            {/* Unsorted: root-level non-folder items */}
+            {privateTree.filter((doc) => !doc.is_folder).length > 0 && (
+              <>
+                <SidebarMenuItem>
+                  <div className="flex items-center gap-1 h-7 px-2 mx-1">
+                    <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
+                    <span className="text-[0.82rem] font-semibold text-muted-foreground">Unsorted</span>
+                  </div>
+                </SidebarMenuItem>
+                <div className="ml-3 pl-1">
+                  {privateTree.filter((doc) => !doc.is_folder).map((doc) => (
+                    <NavPageItem
+                      key={doc.id}
+                      doc={doc}
+                      userRole={userRole}
+                      onDragEnd={handleDragEnd}
+                      isPrivateSection={true}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
             {isDraggingOverPrivate && (
               <div className="h-8 mx-2 border-2 border-dashed border-primary/50 rounded-md flex items-center justify-center">
                 <span className="text-xs text-muted-foreground">
                   Drop here to make private
                 </span>
               </div>
-            )}
-
-            {canCreatePage && (
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => {
-                    setCreateIsPrivate(true);
-                    setOpen(true);
-                  }}
-                  className="h-7 px-2  text-gray-400"
-                >
-                  <Plus className="mr-2 size-3.5" />
-                  <span className="text-sm">New Private Folder</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             )}
           </SidebarMenu>
         </SidebarGroup>

@@ -12,13 +12,6 @@ import {
 
 import {
   Eye,
-  Link2,
-  Users,
-  BookOpen,
-  TrendingUp,
-  Target,
-  Video,
-  PenLine,
   Settings,
   HelpCircle,
   Search,
@@ -76,49 +69,6 @@ const data = {
       title: "Shared with me",
       url: "/shared",
       icon: Eye,
-      group: "main",
-    },
-    {
-      title: "Context Links",
-      url: "/context-links",
-      icon: Link2,
-      group: "main",
-    },
-    {
-      title: "Team",
-      url: "/team",
-      icon: Users,
-      group: "main",
-    },
-    {
-      title: "Knowledge Base",
-      url: "/knowledge",
-      icon: BookOpen,
-      group: "main",
-    },
-    {
-      title: "Analytics",
-      url: "/analytics",
-      icon: TrendingUp,
-      group: "insights",
-    },
-    {
-      title: "Knowledge Graph",
-      url: "/knowledge-graph",
-      icon: Target,
-      group: "insights",
-    },
-    {
-      title: "Video → Guide",
-      url: "/video-import",
-      icon: Video,
-      group: "insights",
-    },
-    {
-      title: "Audit Log",
-      url: "/audit",
-      icon: PenLine,
-      group: "insights",
     },
   ],
   navSecondary: [

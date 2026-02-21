@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import {
   SidebarGroup,
@@ -24,6 +24,7 @@ export function NavSecondary({
   }[];
   projectId?: string | null;
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  const location = useLocation();
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
@@ -48,9 +49,10 @@ export function NavSecondary({
               const settingsUrl = projectId
                 ? `/projects/${projectId}/settings`
                 : '#';
+              const isActive = projectId ? location.pathname.startsWith(`/projects/${projectId}/settings`) : false;
               return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild={!!projectId}>
+                  <SidebarMenuButton asChild={!!projectId} data-active={isActive || undefined}>
                     {projectId ? (
                       <Link to={settingsUrl}>
                         <item.icon />
