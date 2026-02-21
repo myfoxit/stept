@@ -1,75 +1,23 @@
-version: '3.8'
-
+# docker-compose.test.yml — E2E test overlay
+# Runs a separate backend on port 8001 against the test database.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.test.yml up -d test-backend
 services:
-  test-db:
-    image: postgres:15-alpine
-    container_name: ondoki-test-db
-    environment:
-      POSTGRES_USER: testuser
-      POSTGRES_PASSWORD: testpass
-      POSTGRES_DB: ondoki_test
-    ports:
-      - '5433:5432' # host:container
-    volumes:
-      - test-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U testuser -d ondoki_test']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - test-network
-
   test-backend:
     build:
       context: ./api
-      dockerfile: Dockerfile.test
-    container_name: ondoki-test-backend
-    environment:
-      NODE_ENV: test
-      PORT: 8000
-      USE_POSTGRES: 'True'
-      DATABASE_URL: postgresql+asyncpg://testuser:testpass@test-db:5432/ondoki_test
-      JWT_SECRET: test-jwt-secret-key-for-e2e-testing
-      CORS_ORIGIN: http://localhost:5173
+      dockerfile: Dockerfile
+    volumes:
+      - ./api:/app
     ports:
-      - '8000:8000'
-    depends_on:
-      test-db:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - test-network
-
-  test-frontend:
-    build:
-      context: ./app
-      dockerfile: Dockerfile.test
-    container_name: ondoki-test-frontend
+      - "8001:8000"
     environment:
-      VITE_API_URL: http://test-backend:8000
-      VITE_NODE_ENV: test
-    ports:
-      - '5173:5173'
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ondoki}:${POSTGRES_PASSWORD:-postgres}@db:5432/ondoki_test
+      ENVIRONMENT: test
+      JWT_SECRET: ${JWT_SECRET:-test-secret}
+      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-test-key-for-testing-only-32bytes}
+      REDIS_URL: redis://redis:6379/1
     depends_on:
-      test-backend:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:5173']
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    networks:
-      - test-network
-
-networks:
-  test-network:
-    driver: bridge
-
-volumes:
-  test-db-data:
+      - db
+      - redis
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app

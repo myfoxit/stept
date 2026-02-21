@@ -27,12 +27,14 @@ export default defineConfig({
   ],
 
   webServer: process.env.PLAYWRIGHT_NO_SERVER ? undefined : {
-    command: 'npm run dev',
+    command: 'pnpm dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
     env: {
-      VITE_API_URL: process.env.API_URL || 'http://localhost:8000',
+      ...process.env,
+      VITE_API_URL: process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:8000',
+      VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || (process.env.API_URL ? `${process.env.API_URL}/api/v1` : 'http://localhost:8000/api/v1'),
       ENVIRONMENT: 'test',
     },
   },

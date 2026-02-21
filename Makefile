@@ -54,13 +54,28 @@ test-db:
 	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -d $(TEST_DB_NAME) -c "CREATE EXTENSION IF NOT EXISTS vector" 2>/dev/null || true
 
 # E2E tests against Docker dev environment
+COMPOSE_TEST = docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.test.yml
+
 test-e2e: test-db
-	@echo "Running E2E tests against Docker dev environment..."
-	@echo "Ensure 'make dev' is running first."
-	cd app && PLAYWRIGHT_NO_SERVER=1 \
-		API_URL=http://localhost:8000 \
-		PLAYWRIGHT_BASE_URL=http://localhost:5173 \
-		npx playwright test $(ARGS)
+	@echo "Starting test backend on port 8001 (test database)..."
+	$(COMPOSE_TEST) up -d test-backend
+	@echo "Waiting for test backend..."
+	@for i in $$(seq 1 30); do \
+		curl -s http://localhost:8001/health > /dev/null 2>&1 && break; \
+		sleep 1; \
+	done
+	@curl -s http://localhost:8001/health > /dev/null 2>&1 || { echo "❌ Test backend failed to start"; $(COMPOSE_TEST) logs test-backend; exit 1; }
+	@echo "✅ Test backend ready on :8001"
+	@echo "Running E2E tests (Playwright starts its own frontend)..."
+	cd app && \
+		API_URL=http://localhost:8001 \
+		VITE_API_URL=http://localhost:8001 \
+		VITE_API_BASE_URL=http://localhost:8001/api/v1 \
+		npx playwright test $(ARGS); \
+	EXIT_CODE=$$?; \
+	echo "Stopping test backend..."; \
+	$(COMPOSE_TEST) stop test-backend; \
+	exit $$EXIT_CODE
 
 # Frontend tests (local, no Docker needed)
 test-frontend:
