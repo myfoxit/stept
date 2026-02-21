@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SettingsTabs } from '@/components/settings-tabs';
 import {
   IconChartBar,
   IconClock,
@@ -44,6 +45,7 @@ export function AnalyticsDashboardPage() {
     <>
       <SiteHeader />
       <div className="p-6 space-y-6">
+        <SettingsTabs />
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <IconChartBar className="h-6 w-6" />

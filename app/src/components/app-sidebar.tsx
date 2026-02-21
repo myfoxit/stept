@@ -12,6 +12,7 @@ import {
 
 import {
   Eye,
+  Users,
   Settings,
   HelpCircle,
   Search,
@@ -69,6 +70,11 @@ const data = {
       title: "Shared with me",
       url: "/shared",
       icon: Eye,
+    },
+    {
+      title: "Team",
+      url: "/team",
+      icon: Users,
     },
   ],
   navSecondary: [

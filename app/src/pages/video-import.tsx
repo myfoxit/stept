@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { SettingsTabs } from '@/components/settings-tabs';
 import { apiClient } from "@/lib/apiClient";
 
 interface ImportJob {
@@ -106,6 +107,7 @@ export default function VideoImportPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      <SettingsTabs />
       <h1 className="text-2xl font-bold mb-6">Video → Guide</h1>
       <p className="text-gray-500 mb-8">
         Upload a screen recording and get a step-by-step guide with screenshots.

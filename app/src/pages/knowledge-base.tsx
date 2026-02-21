@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { SettingsTabs } from '@/components/settings-tabs';
 import {
   IconUpload,
   IconTrash,
@@ -82,6 +83,7 @@ export function KnowledgeBasePage() {
     <>
       <SiteHeader />
       <div className="p-6 space-y-6">
+        <SettingsTabs />
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <IconDatabase className="h-6 w-6" />

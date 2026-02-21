@@ -54,6 +54,7 @@ import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWi
 import { AiUsageCard } from '@/components/Settings/AiUsageCard';
 import { ProviderLogin } from '@/components/Settings/ProviderLogin';
 import { GitSyncCard } from '@/components/Settings/GitSyncCard';
+import { SettingsTabs } from '@/components/settings-tabs';
 import { McpSettingsCard } from '@/components/Settings/McpSettingsCard';
 import { ReindexCard } from '@/components/Settings/ReindexCard';
 
@@ -200,6 +201,9 @@ export function ProjectSettingsPage() {
             Manage your project members and settings
           </p>
         </div>
+
+        {/* Settings Tabs */}
+        <SettingsTabs />
         
         {/* Members Card */}
         <Card>

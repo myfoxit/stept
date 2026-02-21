@@ -369,8 +369,8 @@ function NavPageItem({
       <SidebarMenuItem>
         <div
           className={cn(
-            "flex items-center group/item relative transition-all h-7 rounded-md mx-1 hover:bg-sidebar-accent",
-            isActive && "bg-sidebar-accent",
+            "flex items-center group/item relative transition-all h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
             isDragging && "opacity-50",
           )}
           data-testid="folder-row"
