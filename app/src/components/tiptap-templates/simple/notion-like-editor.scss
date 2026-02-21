@@ -83,35 +83,35 @@ body,
 }
 
 .tiptap.ProseMirror a {
-  color: #D94F3D;
+  color: #6C5CE7;
   text-decoration: underline;
-  text-decoration-color: #E8A49A;
+  text-decoration-color: #a89bf2;
   text-underline-offset: 3px;
 }
 
 .tiptap.ProseMirror a:hover {
-  text-decoration-color: #D94F3D;
+  text-decoration-color: #6C5CE7;
 }
 
 .tiptap.ProseMirror code {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.86em;
-  background: #FFF5F3;
-  border: 1px solid #FEEAE6;
+  background: #F5F3FF;
+  border: 1px solid #E8E5FE;
   padding: 2px 7px;
   border-radius: 5px;
-  color: #D94F3D;
+  color: #6C5CE7;
 }
 
 .tiptap.ProseMirror blockquote {
-  border-left: 3px solid #D94F3D;
+  border-left: 3px solid #6C5CE7;
   padding-left: 18px;
   color: #A8A29E;
   font-style: italic;
 }
 
 .tiptap.ProseMirror li::marker {
-  color: #E8A49A;
+  color: #a89bf2;
 }
 
 :root[data-page-layout='a4'] .notion-like-editor-wrapper {

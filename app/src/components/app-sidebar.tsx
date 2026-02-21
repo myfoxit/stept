@@ -155,7 +155,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     width="32"
                     height="32"
                     rx="9"
-                    fill="#D94F3D"
+                    fill="#6C5CE7"
                   />
                   <rect
                     x="7"
@@ -183,7 +183,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                   <path
                     d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#D94F3D"
+                    fill="#00D2D3"
                   />
                 </svg>
                 <span

@@ -28,3 +28,4 @@ dist-ssr
 /playwright-report/
 /playwright/api/dev.db
 .env
+uploads/
