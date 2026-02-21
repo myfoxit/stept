@@ -66,6 +66,8 @@ test-e2e: test-db
 	done
 	@curl -s http://localhost:8001/health > /dev/null 2>&1 || { echo "❌ Test backend failed to start"; $(COMPOSE_TEST) logs test-backend; exit 1; }
 	@echo "✅ Test backend ready on :8001"
+	@echo "Running migrations on test database..."
+	$(COMPOSE_TEST) exec test-backend alembic upgrade head
 	@echo "Running E2E tests (Playwright starts its own frontend)..."
 	cd app && \
 		API_URL=http://localhost:8001 \
