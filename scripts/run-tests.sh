@@ -1,42 +1,28 @@
 #!/bin/bash
 set -e
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$(dirname "$0")/.."
 
-echo "🚀 Running Full Test Suite"
+echo "═══════════════════════════════════════"
+echo "  ondoki-web — Full Test Suite"
+echo "═══════════════════════════════════════"
 echo ""
-echo "This script runs all tests against the Docker dev environment."
-echo "Make sure 'make dev' is running first!"
+echo "Prerequisites: make dev (Docker services running)"
 echo ""
 
-# --- 1. Backend unit tests ---
-if [ -z "$SKIP_UNIT" ]; then
-    echo "═══════════════════════════════════════"
-    echo "  Running Backend Tests (Docker)"
-    echo "═══════════════════════════════════════"
-    cd "$ROOT_DIR"
-    make test-backend
-fi
-
-# --- 2. Frontend unit tests ---
-if [ -z "$SKIP_UNIT" ]; then
-    echo ""
-    echo "═══════════════════════════════════════"
-    echo "  Running Frontend Tests"
-    echo "═══════════════════════════════════════"
-    cd "$ROOT_DIR"
-    make test-frontend
-fi
-
-# --- 3. E2E Tests ---
-if [ -z "$SKIP_E2E" ]; then
-    echo ""
-    echo "═══════════════════════════════════════"
-    echo "  Running E2E Tests (Playwright)"
-    echo "═══════════════════════════════════════"
-    cd "$ROOT_DIR"
-    make test-e2e ARGS="$*"
-fi
-
+# Backend unit tests (runs inside Docker against ondoki_test)
+echo "── Backend Tests ──────────────────────"
+make test-backend
 echo ""
-echo "✅ All tests complete!"
+
+# Frontend unit tests (local, no Docker needed)
+echo "── Frontend Tests ─────────────────────"
+make test-frontend
+echo ""
+
+# E2E tests (separate test backend + Playwright frontend)
+echo "── E2E Tests ──────────────────────────"
+make test-e2e
+echo ""
+
+echo "✅ All tests passed!"

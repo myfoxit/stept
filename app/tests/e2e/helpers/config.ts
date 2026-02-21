@@ -1,27 +1,18 @@
-import * as fs from 'fs';
-
 export interface TestUrls {
   apiUrl: string;
   appUrl: string;
 }
 
+/**
+ * Resolve test URLs from environment variables.
+ *
+ * E2E tests run against a dedicated test backend (default :8001)
+ * and a Playwright-managed frontend (default :5174).
+ * These are set by `make test-e2e`.
+ */
 export function getTestUrls(): TestUrls {
-  const configPath = process.env.TEST_PORT_CONFIG || '/tmp/playwright-test-ports.json';
-
-  try {
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      return {
-        apiUrl: `http://localhost:${config.apiPort}`,
-        appUrl: `http://localhost:${config.appPort}`
-      };
-    }
-  } catch (error) {
-    console.warn('Could not read port config file, using environment/defaults');
-  }
-
   return {
-    apiUrl: process.env.API_URL || 'http://localhost:8000',
-    appUrl: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173'
+    apiUrl: process.env.API_URL || 'http://localhost:8001',
+    appUrl: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5174',
   };
 }
