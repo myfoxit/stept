@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SettingsLayout } from '@/components/settings-layout';
 import { useProject } from '@/providers/project-provider';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/lib/apiClient';
 import { Shield, ShieldCheck, ShieldOff, Eye, AlertTriangle } from 'lucide-react';
 
 interface PrivacyStats {

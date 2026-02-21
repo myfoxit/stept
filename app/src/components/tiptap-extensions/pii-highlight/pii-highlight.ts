@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { apiClient } from '@/api/client';
+import { apiClient } from '@/lib/apiClient';
 
 export interface PiiEntity {
   start: number;
