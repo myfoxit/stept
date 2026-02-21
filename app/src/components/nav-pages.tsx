@@ -34,6 +34,7 @@ import {
   FileText,
   File,
   FolderPlus,
+  Plus,
   Inbox,
   ChevronRight,
   ChevronDown,
@@ -859,6 +860,7 @@ function NavPageItem({
 export function NavPages({ userRole }: { userRole: string }) {
   const { selectedProjectId } = useProject();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // NEW: Fetch shared and private trees separately
   const { data: sharedTree = [], isLoading: sharedLoading } = useFolderTree(
@@ -871,6 +873,7 @@ export function NavPages({ userRole }: { userRole: string }) {
   );
 
   const createFolder = useCreateFolder();
+  const createDoc = useCreateDocument();
   const moveFolder = useMoveFolder();
   const moveDoc = useMoveDocument();
   const moveWorkflow = useMoveWorkflow();
@@ -995,6 +998,43 @@ export function NavPages({ userRole }: { userRole: string }) {
 
   return (
     <>
+      {/* Quick Create Button */}
+      {canCreatePage && selectedProjectId && (
+        <SidebarGroup className="py-2 pb-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full gap-2 h-8 text-sm">
+                <Plus className="size-4" />
+                New
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem
+                onSelect={async () => {
+                  const newDoc = await createDoc.mutateAsync({
+                    title: "Untitled",
+                    projectId: selectedProjectId,
+                  });
+                  navigate(`/editor/${newDoc.id}`);
+                }}
+              >
+                <FileText className="mr-2 size-4" />
+                Page
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setCreateIsPrivate(false);
+                  setOpen(true);
+                }}
+              >
+                <FolderPlus className="mr-2 size-4" />
+                Folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarGroup>
+      )}
+
       {/* Gallery View Links */}
       <SidebarGroup className="py-2">
         <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1]">
@@ -1095,10 +1135,38 @@ export function NavPages({ userRole }: { userRole: string }) {
                   <ChevronRight className="size-3" />
                 )}
               </button>
-              <div className="flex items-center gap-1 flex-1 h-7 px-1.5">
+              <SidebarMenuButton className="flex-1 h-7 px-1.5 hover:bg-transparent">
                 <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
-                <span className="truncate font-semibold">Unsorted</span>
-              </div>
+                <span className="truncate text-sm font-semibold">Unsorted</span>
+              </SidebarMenuButton>
+              {canCreatePage && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="rounded-sm size-5 mr-1 flex items-center justify-center hover:bg-sidebar-accent-foreground/10 opacity-0 group-hover/item:opacity-100 outline-none"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start" className="w-44">
+                    <DropdownMenuItem
+                      onSelect={async () => {
+                        if (!selectedProjectId) return;
+                        const newDoc = await createDoc.mutateAsync({
+                          title: "Untitled",
+                          projectId: selectedProjectId,
+                          isPrivate: false,
+                        });
+                        navigate(`/editor/${newDoc.id}`);
+                      }}
+                    >
+                      <FileText className="mr-2 size-4" />
+                      New Page
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </SidebarMenuItem>
           {unsortedSharedExpanded && (
@@ -1184,10 +1252,38 @@ export function NavPages({ userRole }: { userRole: string }) {
                     <ChevronRight className="size-3" />
                   )}
                 </button>
-                <div className="flex items-center gap-1 flex-1 h-7 px-1.5">
+                <SidebarMenuButton className="flex-1 h-7 px-1.5 hover:bg-transparent">
                   <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
-                  <span className="truncate font-semibold">Unsorted</span>
-                </div>
+                  <span className="truncate text-sm font-semibold">Unsorted</span>
+                </SidebarMenuButton>
+                {canCreatePage && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="rounded-sm size-5 mr-1 flex items-center justify-center hover:bg-sidebar-accent-foreground/10 opacity-0 group-hover/item:opacity-100 outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" className="w-44">
+                      <DropdownMenuItem
+                        onSelect={async () => {
+                          if (!selectedProjectId) return;
+                          const newDoc = await createDoc.mutateAsync({
+                            title: "Untitled",
+                            projectId: selectedProjectId,
+                            isPrivate: true,
+                          });
+                          navigate(`/editor/${newDoc.id}`);
+                        }}
+                      >
+                        <FileText className="mr-2 size-4" />
+                        New Page
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </SidebarMenuItem>
             {unsortedPrivateExpanded && (
