@@ -409,8 +409,7 @@ export class RecordingService extends EventEmitter {
         this.handleNativeKey(event as NativeKeyEvent);
         break;
       case 'scroll':
-        if (this.isPaused) return;
-        this.handleNativeScroll(event as NativeScrollEvent);
+        // Scroll events are intentionally not tracked (matches Scribe behavior)
         break;
     }
   }
