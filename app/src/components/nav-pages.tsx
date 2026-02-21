@@ -136,6 +136,7 @@ function NavPageItem({
   const [dropPosition, setDropPosition] = React.useState<
     "before" | "after" | "inside" | null
   >(null);
+  const dragOverThrottleRef = React.useRef(0);
 
   const saveFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
@@ -190,6 +191,18 @@ function NavPageItem({
 
     setIsDragging(true);
     e.dataTransfer.effectAllowed = "move";
+
+    // Set a proper drag image to reduce Chrome edge-snap triggers
+    const el = e.currentTarget as HTMLElement;
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.style.width = `${el.offsetWidth}px`;
+    clone.style.position = "absolute";
+    clone.style.top = "-9999px";
+    clone.style.opacity = "0.8";
+    document.body.appendChild(clone);
+    e.dataTransfer.setDragImage(clone, 10, 10);
+    requestAnimationFrame(() => document.body.removeChild(clone));
+
     e.dataTransfer.setData(
       "application/json",
       JSON.stringify({
@@ -198,7 +211,7 @@ function NavPageItem({
         position: doc.position,
         isFolder: isFolder,
         isWorkflow: isWorkflow,
-        isPrivate: doc.is_private, // NEW
+        isPrivate: doc.is_private,
       }),
     );
   };
@@ -213,6 +226,14 @@ function NavPageItem({
 
     e.preventDefault();
     e.stopPropagation();
+
+    // Throttle position calculations to ~60fps
+    const now = Date.now();
+    if (now - dragOverThrottleRef.current < 16) {
+      setIsDragOver(true);
+      return;
+    }
+    dragOverThrottleRef.current = now;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
@@ -1001,37 +1022,24 @@ export function NavPages({ userRole }: { userRole: string }) {
       {/* Quick Create Button */}
       {canCreatePage && selectedProjectId && (
         <SidebarGroup className="py-2 pb-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="w-full gap-2 h-8 text-sm">
-                <Plus className="size-4" />
-                New
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              <DropdownMenuItem
-                onSelect={async () => {
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="h-7 px-2 gap-2 text-muted-foreground hover:text-foreground"
+                onClick={async () => {
                   const newDoc = await createDoc.mutateAsync({
                     title: "Untitled",
                     projectId: selectedProjectId,
+                    isPrivate: true,
                   });
                   navigate(`/editor/${newDoc.id}`);
                 }}
               >
-                <FileText className="mr-2 size-4" />
-                Page
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setCreateIsPrivate(false);
-                  setOpen(true);
-                }}
-              >
-                <FolderPlus className="mr-2 size-4" />
-                Folder
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Plus className="size-3.5" strokeWidth={2} />
+                <span className="text-sm">New Page</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarGroup>
       )}
 

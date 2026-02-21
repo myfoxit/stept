@@ -177,6 +177,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
                   const newDoc = await createDoc.mutateAsync({
                     title: 'Untitled',
                     projectId: selectedProjectId,
+                    isPrivate: true,
                   });
                   navigate(`/editor/${newDoc.id}`);
                 }
