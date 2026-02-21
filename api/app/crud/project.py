@@ -128,25 +128,29 @@ async def update_member_role(db: AsyncSession, project_id: str, user_id: str, ro
 
 async def get_project_members(db: AsyncSession, project_id: str):
     """
-    Get all members of a project with their roles.
+    Get all members of a project with their roles, names, and emails.
     """
     stmt = (
         select(
             project_members.c.user_id,
             project_members.c.role,
             project_members.c.joined_at,
-            project_members.c.invited_by
+            project_members.c.invited_by,
+            User.name.label("display_name"),
+            User.email,
         )
+        .join(User, User.id == project_members.c.user_id)
         .where(project_members.c.project_id == project_id)
     )
     res = await db.execute(stmt)
-    # Convert Row objects to dictionaries, handle enum values
     return [
         {
             "user_id": row.user_id,
             "role": row.role.value if hasattr(row.role, 'value') else row.role,
             "joined_at": row.joined_at,
-            "invited_by": row.invited_by
+            "invited_by": row.invited_by,
+            "display_name": row.display_name,
+            "email": row.email,
         }
         for row in res.all()
     ]

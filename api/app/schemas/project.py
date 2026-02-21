@@ -33,6 +33,8 @@ class ProjectMemberRead(BaseModel):
     role: str
     joined_at: datetime
     invited_by: Optional[str] = None
+    display_name: Optional[str] = None
+    email: Optional[str] = None
     
     class Config:
         from_attributes = True
