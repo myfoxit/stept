@@ -37,59 +37,10 @@ export interface SlashMenuConfig {
 
 const texts = {
   // AI
-  continue_writing: {
-    title: 'Continue Writing',
-    subtext: 'Continue writing from the current position',
-    aliases: ['continue', 'write', 'continue writing', 'ai'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
   ai_write: {
     title: 'AI Write',
-    subtext: 'Generate text from a prompt',
-    aliases: ['ai write', 'generate', 'compose'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
-  ai_summarize: {
-    title: 'AI Summarize',
-    subtext: 'Summarize text',
-    aliases: ['ai summarize', 'summary', 'tldr'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
-  ai_improve: {
-    title: 'AI Improve',
-    subtext: 'Rewrite text to be clearer',
-    aliases: ['ai improve', 'rewrite', 'enhance'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
-  ai_expand: {
-    title: 'AI Expand',
-    subtext: 'Expand with more detail',
-    aliases: ['ai expand', 'elaborate', 'lengthen'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
-  ai_simplify: {
-    title: 'AI Simplify',
-    subtext: 'Simplify text',
-    aliases: ['ai simplify', 'simple', 'easy'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
-  ai_translate: {
-    title: 'AI Translate',
-    subtext: 'Translate text',
-    aliases: ['ai translate', 'translation', 'language'],
-    badge: AiSparklesIcon,
-    group: 'AI',
-  },
-  ai_explain: {
-    title: 'AI Explain',
-    subtext: 'Explain a concept',
-    aliases: ['ai explain', 'explain', 'what is'],
+    subtext: 'Open AI chat to generate or edit text',
+    aliases: ['ai', 'ai write', 'generate', 'compose', 'write', 'continue'],
     badge: AiSparklesIcon,
     group: 'AI',
   },
@@ -331,53 +282,11 @@ const getItemImplementations = () => {
         editor.chain().focus().insertContent({ type: 'dataTable' }).run(),
     },
 
-    // AI commands
-    continue_writing: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'write', editor } }));
-      },
-    },
+    // AI commands — open the chat panel
     ai_write: {
       check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'write', editor } }));
-      },
-    },
-    ai_summarize: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'summarize', editor } }));
-      },
-    },
-    ai_improve: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'improve', editor } }));
-      },
-    },
-    ai_expand: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'expand', editor } }));
-      },
-    },
-    ai_simplify: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'simplify', editor } }));
-      },
-    },
-    ai_translate: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'translate', editor } }));
-      },
-    },
-    ai_explain: {
-      check: () => true,
-      action: ({ editor }: { editor: Editor }) => {
-        window.dispatchEvent(new CustomEvent('ondoki:ai-command', { detail: { command: 'explain', editor } }));
+      action: () => {
+        window.dispatchEvent(new CustomEvent('ondoki:open-chat-panel'));
       },
     },
 

@@ -20,13 +20,12 @@ import { PAGE_FORMATS } from '@/components/tiptap-extensions/pagination';
 
 
 import { IconInputCheck } from '@tabler/icons-react';
-import { AICommandPanel, AI_COMMANDS, type AICommandDef } from '@/components/tiptap-extensions/ai-commands';
-import type { AICommand } from '@/api/inlineAI';
 import { listWorkflows } from '@/api/workflows';
 import type { ProcessRecordingSession } from '@/types/openapi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
 import { queryKeys } from '@/lib/queryKeys';
+import { useChat } from '@/components/Chat/ChatContext';
 
 export interface NotionEditorProps {
   room: string;
@@ -111,30 +110,18 @@ export function NotionEditor({ docId, readOnly = false, headerSlot }: { docId: s
     });
 
   const { data: containers = [] } = useAllTextContainer();
-  // AI Command Panel state
-  const [activeAICommand, setActiveAICommand] = React.useState<AICommandDef | null>(null);
-  const [aiCoords, setAiCoords] = React.useState({ x: 0, y: 0 });
+  const { openPanel: openChatPanel } = useChat();
 
   // Workflow picker state
   const [showWorkflowPicker, setShowWorkflowPicker] = React.useState(false);
   const [availableWorkflows, setAvailableWorkflows] = React.useState<ProcessRecordingSession[]>([]);
 
-  // Listen for AI command events from slash menu
+  // Listen for AI command events from slash menu — open chat panel
   useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      const cmd = AI_COMMANDS.find((c) => c.command === detail.command);
-      if (cmd && editor) {
-        // Get cursor coordinates
-        const { from } = editor.state.selection;
-        const coords = editor.view.coordsAtPos(from);
-        setAiCoords({ x: coords.left, y: coords.bottom });
-        setActiveAICommand(cmd);
-      }
-    };
-    window.addEventListener('ondoki:ai-command', handler);
-    return () => window.removeEventListener('ondoki:ai-command', handler);
-  }, [editor]);
+    const handler = () => openChatPanel();
+    window.addEventListener('ondoki:open-chat-panel', handler);
+    return () => window.removeEventListener('ondoki:open-chat-panel', handler);
+  }, [openChatPanel]);
 
   // Listen for workflow insert events from slash menu
   useEffect(() => {
@@ -337,16 +324,6 @@ export function NotionEditor({ docId, readOnly = false, headerSlot }: { docId: s
           <SlashDropdownMenu config={slashMenuConfig} />
           <NotionToolbarFloating />
         </EditorContent>
-
-        {/* AI Command Panel */}
-        {activeAICommand && editor && (
-          <AICommandPanel
-            editor={editor}
-            command={activeAICommand}
-            coords={aiCoords}
-            onClose={() => setActiveAICommand(null)}
-          />
-        )}
 
         {/* Workflow Picker Modal */}
         {showWorkflowPicker && (

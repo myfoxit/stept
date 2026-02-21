@@ -67,7 +67,7 @@ export function ChatPanel() {
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 flex h-[520px] w-[380px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+        <div className="fixed bottom-6 right-6 z-50 flex h-[680px] w-[480px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">

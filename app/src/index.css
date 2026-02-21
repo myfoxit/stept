@@ -58,8 +58,8 @@
   --secondary-foreground: oklch(0.4444 0.0096 73.64);
   --muted: oklch(0.9674 0.0029 84.56);
   --muted-foreground: oklch(0.4444 0.0096 73.64);
-  --accent: #6C5CE7;
-  --accent-foreground: #6C5CE7;
+  --accent: oklch(0.9674 0.0029 84.56);
+  --accent-foreground: oklch(0.4444 0.0096 73.64);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.9444 0.0025 48.72);
   --input: oklch(0.9444 0.0025 48.72);
@@ -110,7 +110,7 @@
   --sidebar-accent: oklch(0.269 0.005 60);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #6C5CE7;
+  --sidebar-ring: oklch(0.6117 0.1765 30.30);
 }
 
 @layer base {
