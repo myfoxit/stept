@@ -24,7 +24,7 @@ import { isExtensionAvailable, isNodeInSchema } from '@/lib/tiptap-utils';
 import type { SuggestionItem } from '@/components/tiptap-ui-utils/suggestion-menu';
 import { addEmojiTrigger } from '@/components/tiptap-ui/emoji-trigger-button';
 import { addMentionTrigger } from '@/components/tiptap-ui/mention-trigger-button';
-import { IconCards, IconPointer, IconTextCaption, IconTable, IconLayoutList } from '@tabler/icons-react';
+import { IconLayoutList } from '@tabler/icons-react';
 
 export interface SlashMenuConfig {
   enabledItems?: SlashMenuItemType[];
@@ -108,43 +108,6 @@ const texts = {
     aliases: ['code', 'pre'],
     badge: CodeBlockIcon,
     group: 'Style',
-  },
-
-  card_list: {
-    title: 'Card list',
-    subtext: 'Responsive grid of cards',
-    aliases: ['cards', 'cardlist', 'grid'],
-    badge: IconCards,
-    group: 'Components',
-  },
-  button: {
-    title: 'Button',
-    subtext: 'Call‑to‑action button',
-    aliases: ['button', 'cta'],
-    badge: IconPointer,
-    group: 'Components',
-  },
-  hero: {
-    title: 'Hero',
-    subtext: 'Full‑width hero section',
-    aliases: ['hero', 'banner'],
-    badge: IconTextCaption,
-    group: 'Components',
-  },
-  variable: {
-    title: 'Variable',
-    subtext: 'Insert a variable',
-    aliases: ['variable', 'var', 'dynamic'],
-    badge: IconTextCaption,
-    group: 'Components',
-  },
-
-   table: {
-    title: 'Table',
-    subtext: 'Insert a table',
-    aliases: ['table', 'dataTable', 'grid'],
-    badge: IconTable,
-    group: 'Components',
   },
 
   // Insert
@@ -252,34 +215,6 @@ const getItemImplementations = () => {
       action: ({ editor }: { editor: Editor }) => {
         editor.chain().focus().toggleNode('codeBlock', 'paragraph').run();
       },
-    },
-
-    card_list: {
-      check: (editor: Editor) => isNodeInSchema('card-node', editor),
-      action: ({ editor }: { editor: Editor }) =>
-        editor.chain().focus().insertContent({ type: 'card-node' }).run(),
-    },
-    button: {
-      check: (editor: Editor) => isNodeInSchema('button-node', editor),
-      action: ({ editor }: { editor: Editor }) =>
-        editor.chain().focus().insertContent({ type: 'button-node' }).run(),
-    },
-    hero: {
-      check: (editor: Editor) => isNodeInSchema('hero-node', editor),
-      action: ({ editor }: { editor: Editor }) =>
-        editor.chain().focus().insertContent({ type: 'hero-node' }).run(),
-    },
-
-    variable: {
-      check: (editor: Editor) => isNodeInSchema('variable-node', editor),
-      action: ({ editor }: { editor: Editor }) =>
-        editor.chain().focus().insertContent({ type: 'variable-node' }).run(),
-    },
-
-      table: {
-      check: (editor: Editor) => isNodeInSchema('dataTable', editor),
-      action: ({ editor }: { editor: Editor }) =>
-        editor.chain().focus().insertContent({ type: 'dataTable' }).run(),
     },
 
     // AI commands — open the chat panel

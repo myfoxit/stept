@@ -72,14 +72,9 @@ import { handleImageUpload, MAX_FILE_SIZE } from '@/lib/tiptap-utils';
 import '@/components/tiptap-templates/simple/simple-editor.scss';
 
 import { useEffect } from 'react';
-import { VariableStore } from '@/components/Editor/Extensions/VariableStore';
-import { VariableNode } from '@/components/Editor/Nodes/VariableNode/VariableNode';
 import { Pagination } from '@/components/Editor/PaginationBreaks';
 import { SlashDropdownMenu } from '@/components/tiptap-ui/slash-dropdown-menu';
 import { Card } from '@/components/ui/card';
-import CardListNode from '@/components/Editor/Nodes/CardListNode/CardListNode';
-import ButtonNode from '@/components/Editor/Nodes/ButtonNode/ButtonNode';
-import HeroNode from '@/components/Editor/Nodes/HeroNode/HeroNode';
 import { DragContextMenu } from '@/components/tiptap-ui/drag-context-menu';
 import { Color, TextStyle } from '@tiptap/extension-text-style';
 import { UiState } from '@/components/tiptap-extensions/ui-state-extension';
@@ -249,12 +244,7 @@ export function SimpleEditor({
       Subscript,
       
       Selection,
-      CardListNode,
-      ButtonNode,
-      HeroNode,
       UiState,
-      VariableStore,
-      VariableNode,
       Placeholder.configure({
         placeholder,
       }),

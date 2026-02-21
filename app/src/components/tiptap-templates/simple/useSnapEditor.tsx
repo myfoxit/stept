@@ -1,7 +1,3 @@
-import { VariableStore } from '@/components/Editor/Extensions/VariableStore';
-import ButtonNode from '@/components/Editor/Nodes/ButtonNode/ButtonNode';
-import CardListNode from '@/components/Editor/Nodes/CardListNode/CardListNode';
-import HeroNode from '@/components/Editor/Nodes/HeroNode/HeroNode';
 import { UiState } from '@/components/tiptap-extensions/ui-state-extension';
 import { ImageUploadNode } from '@/components/tiptap-node/image-upload-node';
 import { MAX_FILE_SIZE, handleImageUpload } from '@/lib/tiptap-utils';
@@ -19,8 +15,6 @@ import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Superscript, Subscript } from 'lucide-react';
 import { Highlight } from '@tiptap/extension-highlight';
-import { VariableNode } from '@/components/Editor/Nodes/VariableNode/VariableNode';
-import DataTableNode from '@/components/Editor/Nodes/DataTableNode/DataTableNode';
 import ProcessRecordingNode from '@/components/Editor/Nodes/ProcessRecordingNode/ProcessRecordingNode';
 import { Pages } from '@/components/tiptap-extensions/pagination';
 
@@ -66,9 +60,6 @@ export function useSnapEditor({ readOnly = false }: { readOnly?: boolean } = {})
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: true }),
       Selection,
-      CardListNode,
-      ButtonNode,
-      HeroNode,
 
       Image,
       ImageUploadNode.configure({
@@ -81,9 +72,6 @@ export function useSnapEditor({ readOnly = false }: { readOnly?: boolean } = {})
       UniqueID,
       Typography,
       UiState,
-      VariableStore,
-      VariableNode,
-      DataTableNode,
       ProcessRecordingNode,
       Pages.configure({
         pageFormat: 'A4',
