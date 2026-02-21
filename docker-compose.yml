@@ -101,17 +101,12 @@ services:
   sendcloak:
     image: ghcr.io/myfoxit/sendcloak:latest
     profiles: ["privacy"]
-    command: ["start", "--port", "7590"]
+    command: ["api", "--port", "9090", "--bind", "0.0.0.0"]
     environment:
-      SENDCLOAK_MODE: gateway
-      SENDCLOAK_API_ENABLED: "true"
-      SENDCLOAK_API_PORT: "9090"
-      SENDCLOAK_API_BIND: "0.0.0.0"
       SENDCLOAK_STRATEGY: "${SENDCLOAK_STRATEGY:-semantic}"
       SENDCLOAK_LOG_LEVEL: info
     ports:
       - "9090:9090"
-      - "7591:7591"
     volumes:
       - sendcloak-data:/root/.sendcloak
     networks:
