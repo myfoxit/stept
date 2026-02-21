@@ -656,13 +656,66 @@ async def move_workflow(
     return session
 
 async def delete_workflow(db: AsyncSession, session_id: str) -> None:
-    """Delete a workflow and all its files"""
+    """Soft-delete a workflow (set deleted_at timestamp)"""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise ValueError("Workflow not found")
+    
+    from datetime import datetime, timezone
+    session.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+async def restore_workflow(db: AsyncSession, session_id: str) -> ProcessRecordingSession:
+    """Restore a soft-deleted workflow"""
+    stmt = select(ProcessRecordingSession).where(
+        and_(ProcessRecordingSession.id == session_id, ProcessRecordingSession.deleted_at.isnot(None))
+    )
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    
+    if not session:
+        raise ValueError("Workflow not found or not deleted")
+    
+    session.deleted_at = None
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+async def permanent_delete_workflow(db: AsyncSession, session_id: str) -> None:
+    """Permanently delete a workflow and all its files"""
     session = await db.get(ProcessRecordingSession, session_id)
     if not session:
         raise ValueError("Workflow not found")
     
     await db.delete(session)
     await db.commit()
+
+
+async def get_deleted_workflows(
+    db: AsyncSession,
+    project_id: str,
+    user_id: Optional[str] = None,
+) -> list:
+    """Get all soft-deleted workflows for a project (trash view)"""
+    conditions = [
+        ProcessRecordingSession.project_id == project_id,
+        ProcessRecordingSession.deleted_at.isnot(None),
+    ]
+    if user_id:
+        conditions.append(
+            or_(
+                ProcessRecordingSession.is_private == False,
+                and_(ProcessRecordingSession.is_private == True, ProcessRecordingSession.owner_id == user_id)
+            )
+        )
+    
+    stmt = select(ProcessRecordingSession).where(and_(*conditions)).order_by(
+        ProcessRecordingSession.deleted_at.desc()
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 async def duplicate_workflow(
     db: AsyncSession,
@@ -1092,8 +1145,8 @@ async def get_filtered_workflows(
     """Get filtered workflows with sorting options"""
     from sqlalchemy import select
     
-    # Base conditions - filter by project
-    conditions = [ProcessRecordingSession.project_id == project_id]
+    # Base conditions - filter by project, exclude soft-deleted
+    conditions = [ProcessRecordingSession.project_id == project_id, ProcessRecordingSession.deleted_at.is_(None)]
     
     # Apply folder filter if provided
     if folder_id is not None:

@@ -267,3 +267,24 @@ export async function exportDocumentPdfDom(
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// TRASH / SOFT DELETE
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Get all soft-deleted documents for a project */
+export const getDeletedDocuments = async (projectId: string): Promise<DocumentRead[]> => {
+  const { data } = await apiClient.get(`/documents/trash/${projectId}`);
+  return data;
+};
+
+/** Restore a soft-deleted document */
+export const restoreDocument = async (docId: string): Promise<DocumentRead> => {
+  const { data } = await apiClient.post(`/documents/${docId}/restore`);
+  return data;
+};
+
+/** Permanently delete a document (no recovery) */
+export const permanentDeleteDocument = async (docId: string): Promise<void> => {
+  await apiClient.delete(`/documents/${docId}/permanent`);
+};

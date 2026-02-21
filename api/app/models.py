@@ -209,6 +209,9 @@ class Document(Base):
     version = Column(Integer, nullable=False, default=1)
     locked_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     locked_at = Column(DateTime, nullable=True)
+    
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True, index=True)
 
     owner = relationship("User", foreign_keys=[owner_id], backref="private_documents")
 
@@ -305,6 +308,9 @@ class ProcessRecordingSession(Base):
     processing_error = Column(String, nullable=True)
     
     search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
+    
+    # Soft delete
+    deleted_at = Column(DateTime, nullable=True, index=True)
     
     # Relationships
     user = relationship("User", back_populates="recording_sessions", foreign_keys=[user_id])

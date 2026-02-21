@@ -253,3 +253,28 @@ export const exportWorkflow = async (
 
 
 
+
+// ──────────────────────────────────────────────────────────────────────────────
+// TRASH / SOFT DELETE
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Get all soft-deleted workflows for a project */
+export const getDeletedWorkflows = (projectId: string) =>
+  request<ProcessRecordingSession[]>({
+    method: 'GET',
+    url: `/process-recording/workflows/trash/${projectId}`,
+  });
+
+/** Restore a soft-deleted workflow */
+export const restoreWorkflow = (workflowId: string) =>
+  request<ProcessRecordingSession>({
+    method: 'POST',
+    url: `/process-recording/workflows/${workflowId}/restore`,
+  });
+
+/** Permanently delete a workflow (no recovery) */
+export const permanentDeleteWorkflow = (workflowId: string) =>
+  request<void>({
+    method: 'DELETE',
+    url: `/process-recording/workflows/${workflowId}/permanent`,
+  });

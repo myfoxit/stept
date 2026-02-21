@@ -23,7 +23,8 @@ from app.crud.process_recording import (
     finalize_session, get_session_status, get_file_access,
     update_workflow, move_workflow, delete_workflow, duplicate_workflow,
     create_step, update_step, delete_step, reorder_steps,
-    get_filtered_workflows  # NEW import
+    get_filtered_workflows,
+    restore_workflow, permanent_delete_workflow, get_deleted_workflows,
 )
 from app.security import get_current_user, ProjectPermissionChecker, check_project_permission
 from fastapi import Body  # NEW: accept JSON body in update endpoint
@@ -1507,3 +1508,39 @@ async def improve_step_endpoint(
             status.HTTP_502_BAD_GATEWAY,
             detail=f"Step improvement failed: {exc}",
         )
+
+
+# ── Trash endpoints ──────────────────────────────────────────────────────────
+
+@router.get("/workflows/trash/{project_id}")
+async def list_deleted_workflows(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all soft-deleted workflows for a project"""
+    await check_project_permission(db, project_id, current_user, ProjectRole.VIEWER)
+    workflows = await get_deleted_workflows(db, project_id, user_id=current_user.id)
+    return workflows
+
+
+@router.post("/workflows/{session_id}/restore")
+async def restore_workflow_endpoint(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore a soft-deleted workflow"""
+    wf = await restore_workflow(db, session_id)
+    return wf
+
+
+@router.delete("/workflows/{session_id}/permanent")
+async def permanent_delete_workflow_endpoint(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a workflow (no recovery)"""
+    await permanent_delete_workflow(db, session_id)
+    return {"ok": True}

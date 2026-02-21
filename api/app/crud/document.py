@@ -5,12 +5,15 @@ from sqlalchemy import select, and_, or_, func, delete, update
 from sqlalchemy.orm import selectinload
 from app.models import Document, project_members, Project, ProjectRole
 from app.utils import gen_suffix
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
 
 async def get_document(db: AsyncSession, doc_id: str) -> Optional[Document]:
-    stmt = select(Document).where(Document.id == doc_id).options(
+    stmt = select(Document).where(
+        and_(Document.id == doc_id, Document.deleted_at.is_(None))
+    ).options(
         selectinload(Document.folder)
     )
     result = await db.execute(stmt)
@@ -162,7 +165,9 @@ async def get_documents(
     skip: int = 0,
     limit: int = 100,
 ) -> List[Document]:
-    stmt = select(Document).options(
+    stmt = select(Document).where(
+        Document.deleted_at.is_(None)
+    ).options(
         selectinload(Document.folder)
     ).offset(skip).limit(limit)
     result = await db.execute(stmt)
@@ -353,7 +358,7 @@ async def duplicate_document(
     return result.scalar_one()
 
 async def delete_document(db: AsyncSession, doc_id: str) -> None:
-    """Delete a document"""
+    """Soft-delete a document (set deleted_at timestamp)"""
     stmt = select(Document).where(Document.id == doc_id)
     result = await db.execute(stmt)
     doc = result.scalar_one_or_none()
@@ -361,10 +366,66 @@ async def delete_document(db: AsyncSession, doc_id: str) -> None:
     if not doc:
         raise ValueError("document not found")
     
-    # Delete the document
+    doc.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    logger.info(f"Soft-deleted document {doc_id}")
+
+
+async def restore_document(db: AsyncSession, doc_id: str) -> Document:
+    """Restore a soft-deleted document"""
+    stmt = select(Document).where(
+        and_(Document.id == doc_id, Document.deleted_at.isnot(None))
+    ).options(selectinload(Document.folder))
+    result = await db.execute(stmt)
+    doc = result.scalar_one_or_none()
+    
+    if not doc:
+        raise ValueError("document not found or not deleted")
+    
+    doc.deleted_at = None
+    await db.commit()
+    await db.refresh(doc)
+    logger.info(f"Restored document {doc_id}")
+    return doc
+
+
+async def permanent_delete_document(db: AsyncSession, doc_id: str) -> None:
+    """Permanently delete a document from the database"""
+    stmt = select(Document).where(Document.id == doc_id)
+    result = await db.execute(stmt)
+    doc = result.scalar_one_or_none()
+    
+    if not doc:
+        raise ValueError("document not found")
+    
     await db.delete(doc)
     await db.commit()
-    logger.info(f"Successfully deleted document {doc_id}")
+    logger.info(f"Permanently deleted document {doc_id}")
+
+
+async def get_deleted_documents(
+    db: AsyncSession,
+    project_id: str,
+    user_id: Optional[str] = None,
+) -> List[Document]:
+    """Get all soft-deleted documents for a project (trash view)"""
+    conditions = [
+        Document.project_id == project_id,
+        Document.deleted_at.isnot(None),
+    ]
+    if user_id:
+        conditions.append(
+            or_(
+                Document.is_private == False,
+                and_(Document.is_private == True, Document.owner_id == user_id)
+            )
+        )
+    
+    stmt = select(Document).where(and_(*conditions)).order_by(
+        Document.deleted_at.desc()
+    ).options(selectinload(Document.folder))
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 async def get_documents_for_user(
     db: AsyncSession,
@@ -407,8 +468,8 @@ async def get_filtered_documents(
 ) -> List[Document]:
     """Get filtered documents with sorting options"""
     
-    # Base query
-    conditions = [Document.project_id == project_id]
+    # Base query - exclude soft-deleted
+    conditions = [Document.project_id == project_id, Document.deleted_at.is_(None)]
     
     # NEW: Apply privacy filter - only show shared OR user's own private docs
     if user_id:

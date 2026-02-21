@@ -16,6 +16,7 @@ import {
   Settings,
   HelpCircle,
   Search,
+  Trash2,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -75,6 +76,11 @@ const data = {
       title: "Team",
       url: "/team",
       icon: Users,
+    },
+    {
+      title: "Trash",
+      url: "/trash",
+      icon: Trash2,
     },
   ],
   navSecondary: [
