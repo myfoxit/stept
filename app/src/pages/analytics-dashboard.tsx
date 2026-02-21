@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SettingsTabs } from '@/components/settings-tabs';
+import { SettingsLayout } from '@/components/settings-layout';
 import {
   IconChartBar,
   IconClock,
@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SiteHeader } from '@/components/site-header';
 import { useProject } from '@/providers/project-provider';
 import {
   useTopAccessed,
@@ -42,15 +41,10 @@ export function AnalyticsDashboardPage() {
   const { data: gaps } = useKnowledgeGaps(pid);
 
   return (
-    <>
-      <SiteHeader />
-      <div className="p-6 space-y-6">
-        <SettingsTabs />
+    <SettingsLayout title="Analytics" description="Track document access, search queries, and knowledge gaps.">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <IconChartBar className="h-6 w-6" />
-            Analytics
-          </h1>
+          <div />
           <div className="flex gap-2">
             {DAYS_OPTIONS.map((d) => (
               <Button
@@ -215,6 +209,6 @@ export function AnalyticsDashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </SettingsLayout>
   );
 }

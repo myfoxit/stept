@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SettingsTabs } from '@/components/settings-tabs';
+import { SettingsLayout } from '@/components/settings-layout';
 import {
   IconShieldCheck,
   IconDownload,
@@ -23,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SiteHeader } from '@/components/site-header';
 import { useProject } from '@/providers/project-provider';
 import { useAuditLogs, useAuditStats } from '@/hooks/api/audit';
 import { exportAuditLogs } from '@/api/audit';
@@ -68,15 +67,9 @@ export function AuditLogPage() {
   };
 
   return (
-    <>
-      <SiteHeader />
-      <div className="p-6 space-y-6">
-        <SettingsTabs />
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <IconShieldCheck className="h-6 w-6" />
-            Audit Log
-          </h1>
+    <SettingsLayout title="Audit Log" description="Track all changes and actions in your project.">
+      <div className="space-y-6">
+        <div className="flex items-center justify-end">
           <Button variant="outline" onClick={handleExport}>
             <IconDownload className="h-4 w-4 mr-2" />
             Export CSV
@@ -180,6 +173,6 @@ export function AuditLogPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </SettingsLayout>
   );
 }

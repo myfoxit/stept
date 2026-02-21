@@ -4,6 +4,8 @@ import { useProject } from '@/providers/project-provider';
 
 const tabs = [
   { label: 'General', path: 'settings' },
+  { label: 'AI', path: 'settings/ai' },
+  { label: 'Integrations', path: 'settings/integrations' },
   { label: 'Context Links', path: '/context-links' },
   { label: 'Analytics', path: '/analytics' },
   { label: 'Knowledge Base', path: '/knowledge' },
@@ -19,14 +21,20 @@ export function SettingsTabs() {
   return (
     <div className="mb-6 flex gap-1 overflow-x-auto border-b">
       {tabs.map((tab) => {
-        const href =
-          tab.path === 'settings'
-            ? `/projects/${selectedProjectId}/settings`
-            : tab.path;
-        const isActive =
-          tab.path === 'settings'
-            ? location.pathname.includes('/settings')
-            : location.pathname === tab.path;
+        const href = tab.path.startsWith('/')
+          ? tab.path
+          : `/projects/${selectedProjectId}/${tab.path}`;
+
+        // Match logic: for project-relative paths, check if pathname ends with the path
+        let isActive: boolean;
+        if (tab.path === 'settings') {
+          // General tab: active only on exact settings path (not sub-tabs)
+          isActive = location.pathname === `/projects/${selectedProjectId}/settings`;
+        } else if (tab.path.startsWith('settings/')) {
+          isActive = location.pathname === href;
+        } else {
+          isActive = location.pathname === tab.path;
+        }
 
         return (
           <Link

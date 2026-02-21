@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SettingsTabs } from '@/components/settings-tabs';
+import { SettingsLayout } from '@/components/settings-layout';
 import {
   IconLink,
   IconPlus,
@@ -124,19 +124,9 @@ export function ContextLinksPage() {
   const filtered = filter === 'all' ? links : links.filter((l) => l.match_type === filter);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <SettingsTabs />
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <IconLink className="h-6 w-6" />
-            Context Links
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Attach workflows and notes to URLs, apps, and windows. They'll surface automatically when you visit those contexts.
-          </p>
-        </div>
+    <SettingsLayout title="Context Links" description="Attach workflows and notes to URLs, apps, and windows.">
+      <div className="space-y-6">
+        <div className="flex items-center justify-end">
         <Button onClick={() => setShowCreate(true)} className="gap-1">
           <IconPlus className="h-4 w-4" />
           Add Context Link
@@ -292,6 +282,7 @@ export function ContextLinksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </SettingsLayout>
   );
 }

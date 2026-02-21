@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { SettingsTabs } from '@/components/settings-tabs';
+import { SettingsLayout } from '@/components/settings-layout';
 import {
   IconUpload,
   IconTrash,
@@ -17,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SiteHeader } from '@/components/site-header';
 import { useProject } from '@/providers/project-provider';
 import {
   useKnowledgeSources,
@@ -80,16 +79,9 @@ export function KnowledgeBasePage() {
   };
 
   return (
-    <>
-      <SiteHeader />
-      <div className="p-6 space-y-6">
-        <SettingsTabs />
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <IconDatabase className="h-6 w-6" />
-            Knowledge Base
-          </h1>
-          <div>
+    <SettingsLayout title="Knowledge Base" description="Upload and manage documents for AI-powered search.">
+      <div className="space-y-6">
+        <div className="flex items-center justify-end">
             <input
               ref={fileInputRef}
               type="file"
@@ -104,7 +96,6 @@ export function KnowledgeBasePage() {
               <IconUpload className="h-4 w-4 mr-2" />
               {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
             </Button>
-          </div>
         </div>
 
         <Card>
@@ -167,6 +158,6 @@ export function KnowledgeBasePage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </SettingsLayout>
   );
 }

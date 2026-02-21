@@ -13,6 +13,8 @@ import LoginPage from './pages/LoginPage';
 import { AuthProvider } from '@/providers/auth-provider';
 import RequireAuth from '@/components/RequireAuth';
 import { ProjectSettingsPage } from './pages/project-settings';
+import { AiSettingsPage } from './pages/ai-settings';
+import { IntegrationsSettingsPage } from './pages/integrations-settings';
 import { JoinProjectPage } from './pages/join-project';
 import { FolderView } from '@/pages/folder-view';
 import { WorkflowView } from '@/pages/workflow-view';
@@ -54,6 +56,8 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="editor/:docId" element={<EditorPage />} />
                   <Route path="editor/:docId/:pageId" element={<EditorPage />} />
                   <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />} />
+                  <Route path="/projects/:projectId/settings/ai" element={<AiSettingsPage />} />
+                  <Route path="/projects/:projectId/settings/integrations" element={<IntegrationsSettingsPage />} />
                   <Route path="/folder/:folderId" element={<FolderView />} />
                   <Route path="/workflow/:workflowId" element={<WorkflowView />} />
                   <Route path="/workflow/:workflowId/edit" element={<WorkflowView />} />

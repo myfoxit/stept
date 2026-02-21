@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SettingsTabs } from '@/components/settings-tabs';
+import { SettingsLayout } from '@/components/settings-layout';
 import {
   IconTopologyStarRing3,
   IconPlus,
@@ -33,7 +33,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { SiteHeader } from '@/components/site-header';
 import { useProject } from '@/providers/project-provider';
 import {
   useKnowledgeLinks,
@@ -105,16 +104,10 @@ export function KnowledgeGraphPage() {
   const manualLinks = (links?.length ?? 0) - autoLinks;
 
   return (
-    <>
-      <SiteHeader />
-      <div className="p-6 space-y-6">
-        <SettingsTabs />
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <IconTopologyStarRing3 className="h-6 w-6" />
-            Knowledge Graph
-          </h1>
-          <div className="flex gap-2">
+    <SettingsLayout title="Knowledge Graph" description="Visualize and manage connections between your documents.">
+      <div className="space-y-6">
+        <div className="flex items-center justify-end">
+            <div className="flex gap-2">
             <Button variant="outline" onClick={handleDetect} disabled={detectMutation.isPending}>
               <IconWand className="h-4 w-4 mr-2" />
               Detect Links
@@ -306,6 +299,6 @@ export function KnowledgeGraphPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </>
+    </SettingsLayout>
   );
 }
