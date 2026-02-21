@@ -45,48 +45,17 @@ async def create_document(
                 is_private = True
                 owner_id = parent_folder.owner_id
     
-    # Validate folder exists if not provided, get or create a default folder
-    if not folder_id:
-        # Get or create a default "Documents" folder for the project
-        from app.models import Folder
-        stmt = select(Folder).where(
-            and_(
-                Folder.project_id == project_id,
-                Folder.name == "Documents",
-                Folder.parent_id.is_(None),
-                Folder.is_private == is_private,  # NEW: Match privacy
-            )
-        )
-        result = await db.execute(stmt)
-        default_folder = result.scalar_one_or_none()
-        
-        if not default_folder:
-            # Create default folder
-            default_folder = Folder(
-                id=gen_suffix(16),
-                name="Documents",
-                project_id=project_id,
-                parent_id=None,
-                path=f"{gen_suffix(16)}/",
-                depth=0,
-                position=0,
-                is_expanded=True,
-                is_private=is_private,  # NEW
-                owner_id=owner_id if is_private else None,  # NEW
-            )
-            db.add(default_folder)
-            await db.flush()
-        
-        folder_id = default_folder.id
+    # Documents without a folder_id go to "Unsorted" (root level, no folder)
     
     page_layout = page_layout or "document"
     doc_id = gen_suffix(16)
 
-    # NEW: determine position at end of siblings (same project + folder + privacy)
+    # determine position at end of siblings
+    folder_filter = Document.folder_id == folder_id if folder_id else Document.folder_id.is_(None)
     pos_stmt = select(func.coalesce(func.max(Document.position), -1) + 1).where(
         and_(
             Document.project_id == project_id,
-            Document.folder_id == folder_id,
+            folder_filter,
             Document.is_private == is_private,  # NEW
         )
     )

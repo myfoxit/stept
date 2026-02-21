@@ -227,35 +227,29 @@ function NavPageItem({
     e.preventDefault();
     e.stopPropagation();
 
-    // Throttle position calculations to ~60fps
+    // Throttle to reduce re-renders during drag
     const now = Date.now();
-    if (now - dragOverThrottleRef.current < 16) {
-      setIsDragOver(true);
-      return;
-    }
+    if (now - dragOverThrottleRef.current < 50) return;
     dragOverThrottleRef.current = now;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const x = e.clientX - rect.left;
     const height = rect.height;
 
-    // Only folders can accept drops as children
-    const canDropAsChild = isFolder;
-    const isLeftSide = x < rect.width * 0.4;
-
-    if (y < height * 0.3 && isLeftSide) {
-      setDropPosition("before");
-    } else if (y > height * 0.7 && isLeftSide) {
-      setDropPosition("after");
-    } else if (canDropAsChild) {
-      setDropPosition("inside");
+    let newPos: "before" | "after" | "inside";
+    if (y < height * 0.25) {
+      newPos = "before";
+    } else if (y > height * 0.75) {
+      newPos = "after";
+    } else if (isFolder) {
+      newPos = "inside";
     } else {
-      // If not a folder, default to after
-      setDropPosition("after");
+      newPos = "after";
     }
 
-    setIsDragOver(true);
+    // Only update state if changed
+    if (newPos !== dropPosition) setDropPosition(newPos);
+    if (!isDragOver) setIsDragOver(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -1092,7 +1086,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         className="py-2"
         onDragOver={(e) => {
           e.preventDefault();
-          setIsDraggingOverShared(true);
+          if (!isDraggingOverShared) setIsDraggingOverShared(true);
         }}
         onDragLeave={() => setIsDraggingOverShared(false)}
         onDrop={handleSharedDrop}
@@ -1209,7 +1203,7 @@ export function NavPages({ userRole }: { userRole: string }) {
           className="py-2"
           onDragOver={(e) => {
             e.preventDefault();
-            setIsDraggingOverPrivate(true);
+            if (!isDraggingOverPrivate) setIsDraggingOverPrivate(true);
           }}
           onDragLeave={() => setIsDraggingOverPrivate(false)}
           onDrop={handlePrivateDrop}
