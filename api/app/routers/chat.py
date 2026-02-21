@@ -34,6 +34,7 @@ from app.models import (
 from app.security import get_current_user
 from app.services import llm as llm_service
 from app.services import dataveil as dataveil_service
+from app.services import sendcloak
 from app.services.ai_tools import registry as tool_registry
 from app.middleware.rate_limit import chat_rate_limiter
 
@@ -503,6 +504,8 @@ async def chat_completions(
             model=body.model,
             stream=body.stream,
             base_url_override=base_url_override,
+            sendcloak_user_id=str(current_user.id) if sendcloak.is_enabled() else None,
+            sendcloak_project_id=str(project_id) if project_id and sendcloak.is_enabled() else None,
         )
     except Exception as exc:
         logger.error("LLM request failed: %s", exc)

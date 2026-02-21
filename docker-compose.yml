@@ -55,6 +55,8 @@ services:
       GOTENBERG_URL: http://gotenberg:3000
       ENVIRONMENT: production
       ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:?ONDOKI_ENCRYPTION_KEY must be set}
+      SENDCLOAK_ENABLED: "${SENDCLOAK_ENABLED:-false}"
+      SENDCLOAK_URL: "${SENDCLOAK_URL:-http://sendcloak:9090}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -96,6 +98,28 @@ services:
     networks:
       - ondoki-network
 
+  sendcloak:
+    image: ghcr.io/myfoxit/sendcloak:latest
+    profiles: ["privacy"]
+    environment:
+      SENDCLOAK_MODE: gateway
+      SENDCLOAK_API_ENABLED: "true"
+      SENDCLOAK_API_PORT: "9090"
+      SENDCLOAK_API_BIND: "0.0.0.0"
+      SENDCLOAK_STRATEGY: "${SENDCLOAK_STRATEGY:-semantic}"
+      SENDCLOAK_LOG_LEVEL: info
+    ports:
+      - "9090:9090"
+    volumes:
+      - sendcloak-data:/root/.sendcloak
+    networks:
+      - ondoki-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   video-worker:
     build:
       context: .
@@ -126,6 +150,7 @@ services:
 volumes:
   db-data:
   video-uploads:
+  sendcloak-data:
 
 networks:
   ondoki-network:

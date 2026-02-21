@@ -14,6 +14,7 @@ import { AuthProvider } from '@/providers/auth-provider';
 import RequireAuth from '@/components/RequireAuth';
 import { ProjectSettingsPage } from './pages/project-settings';
 import { AiSettingsPage } from './pages/ai-settings';
+import { PrivacySettingsPage } from './pages/privacy-settings';
 import { IntegrationsSettingsPage } from './pages/integrations-settings';
 import { JoinProjectPage } from './pages/join-project';
 import { FolderView } from '@/pages/folder-view';
@@ -58,6 +59,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="editor/:docId/:pageId" element={<EditorPage />} />
                   <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />} />
                   <Route path="/projects/:projectId/settings/ai" element={<AiSettingsPage />} />
+                  <Route path="/projects/:projectId/settings/privacy" element={<PrivacySettingsPage />} />
                   <Route path="/projects/:projectId/settings/integrations" element={<IntegrationsSettingsPage />} />
                   <Route path="/folder/:folderId" element={<FolderView />} />
                   <Route path="/workflow/:workflowId" element={<WorkflowView />} />

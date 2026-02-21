@@ -16,6 +16,7 @@ from typing import AsyncIterator, Optional
 import httpx
 
 from app.core.config import settings
+from app.services import sendcloak
 
 logger = logging.getLogger(__name__)
 
@@ -448,6 +449,48 @@ async def _iter_anthropic_stream(resp: httpx.Response) -> AsyncIterator[str]:
 
 
 # ---------------------------------------------------------------------------
+# SendCloak PII obfuscation helpers
+# ---------------------------------------------------------------------------
+
+async def _obfuscate_messages(messages: list[dict], session_id: str) -> list[dict]:
+    """Obfuscate user/assistant message content. Skip system messages."""
+    if not session_id:
+        return messages
+    result = []
+    for msg in messages:
+        msg_copy = dict(msg)
+        if msg_copy.get("role") in ("user", "assistant") and isinstance(msg_copy.get("content"), str):
+            msg_copy["content"] = await sendcloak.obfuscate(msg_copy["content"], session_id)
+        result.append(msg_copy)
+    return result
+
+
+async def _deobfuscate_stream(
+    stream: AsyncIterator[str], session_id: str
+) -> AsyncIterator[str]:
+    """Wrap an SSE stream to deobfuscate content deltas."""
+    if not session_id:
+        async for chunk in stream:
+            yield chunk
+        return
+    async for chunk in stream:
+        if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
+            try:
+                data = json.loads(chunk[6:])
+                for choice in data.get("choices", []):
+                    delta = choice.get("delta", {})
+                    if "content" in delta and delta["content"]:
+                        delta["content"] = await sendcloak.deobfuscate(
+                            delta["content"], session_id
+                        )
+                yield f"data: {json.dumps(data)}\n\n"
+            except (json.JSONDecodeError, Exception):
+                yield chunk
+        else:
+            yield chunk
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -457,6 +500,8 @@ async def chat_completion(
     stream: bool = True,
     base_url_override: Optional[str] = None,
     tools: list[dict] | None = None,
+    sendcloak_user_id: Optional[str] = None,
+    sendcloak_project_id: Optional[str] = None,
 ) -> httpx.Response | AsyncIterator[str]:
     """
     Send a chat completion request.
@@ -465,10 +510,23 @@ async def chat_completion(
     When *stream* is False, returns the raw httpx.Response (caller reads JSON).
     
     If *tools* is provided, includes tool definitions for function calling.
+    
+    If sendcloak_user_id/sendcloak_project_id are provided and SendCloak is
+    enabled, messages are obfuscated before sending and responses deobfuscated.
     """
     resolved_model = model or _model()
     resolved_url = base_url_override or _base_url()
     provider = _provider()
+
+    # --- SendCloak PII obfuscation ---
+    sc_session_id = None
+    if sendcloak.is_enabled() and sendcloak_user_id:
+        sc_session_id = await sendcloak.create_session(
+            user_id=sendcloak_user_id,
+            project_id=sendcloak_project_id or "",
+        )
+        if sc_session_id:
+            messages = await _obfuscate_messages(messages, sc_session_id)
 
     logger.info("LLM request: provider=%s model=%s stream=%s tools=%d",
                 provider, resolved_model, stream, len(tools) if tools else 0)
@@ -487,7 +545,8 @@ async def chat_completion(
             if stream:
                 resp.raise_for_status()
                 _circuit_record_success()
-                return _iter_anthropic_stream(resp)
+                it = _iter_anthropic_stream(resp)
+                return _deobfuscate_stream(it, sc_session_id) if sc_session_id else it
             _circuit_record_success()
             # Log usage for non-streaming Anthropic responses
             try:
@@ -511,7 +570,8 @@ async def chat_completion(
             if stream:
                 resp.raise_for_status()
                 _circuit_record_success()
-                return _iter_openai_stream(resp)
+                it = _iter_openai_stream(resp)
+                return _deobfuscate_stream(it, sc_session_id) if sc_session_id else it
             _circuit_record_success()
             # Log usage for non-streaming OpenAI responses
             try:

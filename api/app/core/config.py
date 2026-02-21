@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     LLM_MODEL: Optional[str] = None
     LLM_BASE_URL: Optional[str] = None          # custom endpoint URL
 
+    # ── SendCloak PII obfuscation ──────────────────────────────
+    SENDCLOAK_ENABLED: bool = False
+    SENDCLOAK_URL: str = "http://sendcloak:9090"
+
     # ── DataVeil privacy proxy ──────────────────────────────────
     DATAVEIL_ENABLED: bool = False
     DATAVEIL_URL: Optional[str] = None           # e.g. http://localhost:8080

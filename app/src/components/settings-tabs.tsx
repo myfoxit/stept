@@ -5,6 +5,7 @@ import { useProject } from '@/providers/project-provider';
 const tabs = [
   { label: 'General', path: 'settings' },
   { label: 'AI', path: 'settings/ai' },
+  { label: 'Privacy', path: 'settings/privacy' },
   { label: 'Integrations', path: 'settings/integrations' },
   { label: 'Context Links', path: '/context-links' },
   { label: 'Analytics', path: '/analytics' },

@@ -198,3 +198,25 @@
 .react-draggable-dragging {
   user-select: none;
 }
+
+/* PII Highlight — "AI View" decorations */
+.pii-highlight {
+  background-color: rgba(108, 92, 231, 0.15);
+  border-bottom: 2px solid rgba(108, 92, 231, 0.6);
+  border-radius: 2px;
+  cursor: help;
+  position: relative;
+  transition: background-color 0.15s;
+}
+.pii-highlight:hover {
+  background-color: rgba(108, 92, 231, 0.3);
+}
+@media (prefers-color-scheme: dark) {
+  .pii-highlight {
+    background-color: rgba(108, 92, 231, 0.2);
+    border-bottom-color: rgba(108, 92, 231, 0.5);
+  }
+  .pii-highlight:hover {
+    background-color: rgba(108, 92, 231, 0.35);
+  }
+}

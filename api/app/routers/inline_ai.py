@@ -19,6 +19,7 @@ from app.security import get_current_user
 from app.models import User
 from app.services import llm as llm_service
 from app.services import dataveil as dataveil_service
+from app.services import sendcloak
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,7 @@ async def inline_ai_completion(
             messages=messages,
             stream=True,
             base_url_override=base_url_override,
+            sendcloak_user_id=str(current_user.id) if sendcloak.is_enabled() else None,
         )
     except Exception as exc:
         logger.error("Inline AI request failed: %s", exc)
