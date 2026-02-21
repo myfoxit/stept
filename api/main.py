@@ -93,6 +93,6 @@ except ImportError:
     pass  # mcp package not installed — MCP endpoints disabled
 
 # Test-only endpoints (seed/cleanup) — only in test/development environments
-if os.getenv("ENVIRONMENT") in ("test", "development", "local"):
+if os.getenv("ENVIRONMENT") == "test":
     from app.routers.test_helpers import router as test_router
     app.include_router(test_router)
