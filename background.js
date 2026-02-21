@@ -309,9 +309,17 @@ function startRecording(projectId) {
         tab.url &&
         (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
       ) {
-        chrome.tabs
-          .sendMessage(tab.id, { type: 'START_RECORDING' })
-          .catch(() => {});
+        // Force-inject content script first (in case it's not loaded yet), then start
+        chrome.scripting.executeScript(
+          { target: { tabId: tab.id }, files: ['content.js'] },
+          () => {
+            // Ignore errors (e.g. chrome:// pages)
+            if (chrome.runtime.lastError) return;
+            chrome.tabs
+              .sendMessage(tab.id, { type: 'START_RECORDING' })
+              .catch(() => {});
+          }
+        );
       }
     });
   });
@@ -372,6 +380,56 @@ async function captureScreenshot() {
   });
 }
 
+// Draw a coral click marker on the screenshot at the given position
+async function drawClickMarker(screenshotDataUrl, clickPos, viewportSize) {
+  try {
+    const response = await fetch(screenshotDataUrl);
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+
+    // Scale click position from viewport to actual image size
+    const scaleX = bitmap.width / viewportSize.width;
+    const scaleY = bitmap.height / viewportSize.height;
+    const x = clickPos.x * scaleX;
+    const y = clickPos.y * scaleY;
+
+    // Outer ring
+    const radius = 18 * scaleX;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = '#D94F3D';
+    ctx.lineWidth = 3 * scaleX;
+    ctx.stroke();
+
+    // Inner dot
+    ctx.beginPath();
+    ctx.arc(x, y, 5 * scaleX, 0, Math.PI * 2);
+    ctx.fillStyle = '#D94F3D';
+    ctx.fill();
+
+    // Semi-transparent pulse ring
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 8 * scaleX, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(217, 79, 61, 0.3)';
+    ctx.lineWidth = 2 * scaleX;
+    ctx.stroke();
+
+    const resultBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(resultBlob);
+    });
+  } catch (e) {
+    debugLog('Failed to draw click marker:', e);
+    return screenshotDataUrl;
+  }
+}
+
 async function addStep(stepData) {
   if (!state.isRecording || state.isPaused) return;
 
@@ -382,7 +440,12 @@ async function addStep(stepData) {
 
   state.stepCounter++;
 
-  const screenshot = await captureScreenshot();
+  let screenshot = await captureScreenshot();
+
+  // Draw click marker on screenshot if we have click coordinates
+  if (screenshot && stepData.clickPosition && stepData.viewportSize) {
+    screenshot = await drawClickMarker(screenshot, stepData.clickPosition, stepData.viewportSize);
+  }
 
   const step = {
     stepNumber: state.stepCounter,
@@ -626,6 +689,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   })();
   return true;
+});
+
+// Unified page tracking — covers tab switches and navigations, deduplicates
+let lastTrackedPage = { tabId: null, url: null, time: 0 };
+
+async function trackPageChange(tabId, reason) {
+  if (!state.isRecording || state.isPaused) return;
+
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) return;
+
+    // Deduplicate: skip if same tab+url within 2 seconds (tab switch + navigation fire together)
+    const now = Date.now();
+    if (lastTrackedPage.tabId === tabId && lastTrackedPage.url === tab.url && now - lastTrackedPage.time < 2000) return;
+    lastTrackedPage = { tabId, url: tab.url, time: now };
+
+    // Small delay so the tab renders before screenshot
+    await new Promise(r => setTimeout(r, 300));
+
+    await addStep({
+      actionType: 'Navigate',
+      pageTitle: tab.title || '',
+      description: `Navigate to "${tab.title || tab.url}"`,
+      url: tab.url,
+      windowSize: { width: 0, height: 0 },
+      viewportSize: { width: 0, height: 0 },
+    });
+  } catch (e) {
+    debugLog('Page tracking failed:', e);
+  }
+}
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  trackPageChange(activeInfo.tabId, 'tab-switch');
+});
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  trackPageChange(details.tabId, 'navigation');
 });
 
 // Listen for tab updates to inject content script

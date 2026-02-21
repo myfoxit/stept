@@ -208,6 +208,31 @@ body {
   background: #F5F4F2;
   border-top: 1px solid #EEECEB;
   display: block;
+  cursor: zoom-in;
+}
+
+/* Fullscreen zoom overlay */
+.screenshot-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 16px;
+}
+
+.screenshot-overlay img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .step-delete {

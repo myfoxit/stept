@@ -119,6 +119,19 @@ function createStepCard(step, isNew) {
     await refreshState();
   });
 
+  // Zoom screenshot on click
+  const screenshotEl = card.querySelector('.step-screenshot');
+  if (screenshotEl) {
+    screenshotEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const overlay = document.createElement('div');
+      overlay.className = 'screenshot-overlay';
+      overlay.innerHTML = `<img src="${step.screenshotDataUrl}" alt="Step ${step.stepNumber}">`;
+      overlay.addEventListener('click', () => overlay.remove());
+      document.body.appendChild(overlay);
+    });
+  }
+
   return card;
 }
 
