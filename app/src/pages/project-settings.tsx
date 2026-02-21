@@ -160,10 +160,15 @@ export function ProjectSettingsPage() {
                     <TableRow key={member.user_id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                            <IconUser className="h-4 w-4" />
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                            {(member.display_name || member.email || '?')[0].toUpperCase()}
                           </div>
-                          <span>{member.user_id}</span>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{member.display_name || member.email || member.user_id}</span>
+                            {member.email && member.display_name && (
+                              <span className="text-xs text-muted-foreground">{member.email}</span>
+                            )}
+                          </div>
                           {isCurrentUser && (
                             <span className="text-xs text-muted-foreground">(You)</span>
                           )}
