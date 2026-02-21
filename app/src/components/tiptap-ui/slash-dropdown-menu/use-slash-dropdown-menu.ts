@@ -217,11 +217,16 @@ const getItemImplementations = () => {
       },
     },
 
-    // AI commands — open the chat panel
+    // AI commands — open inline AI writer at cursor
     ai_write: {
       check: () => true,
-      action: () => {
-        window.dispatchEvent(new CustomEvent('ondoki:open-chat-panel'));
+      action: ({ editor }: { editor: Editor }) => {
+        // Get cursor coordinates for positioning the inline prompt
+        const { from } = editor.state.selection;
+        const coords = editor.view.coordsAtPos(from);
+        window.dispatchEvent(new CustomEvent('ondoki:ai-inline-write', {
+          detail: { x: coords.left, y: coords.bottom },
+        }));
       },
     },
 

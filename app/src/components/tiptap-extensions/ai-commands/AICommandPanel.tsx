@@ -82,9 +82,10 @@ export const AICommandPanel: React.FC<AICommandPanelProps> = ({
     >
       <div
         className={cn(
-          'flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-lg',
-          'min-w-[280px] max-w-[400px]',
+          'flex items-center gap-2 rounded-lg border border-[#6C5CE7]/30 bg-background px-3 py-2 shadow-lg',
+          'min-w-[320px] max-w-[440px]',
           'animate-in fade-in-0 zoom-in-95 duration-150',
+          'ring-1 ring-[#6C5CE7]/20',
         )}
       >
         {/* AI badge */}
@@ -98,14 +99,14 @@ export const AICommandPanel: React.FC<AICommandPanelProps> = ({
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="What should I write?"
+              placeholder="Ask AI to write..."
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               autoComplete="off"
             />
             <button
               type="submit"
               disabled={!prompt.trim()}
-              className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="rounded-md bg-[#6C5CE7] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#5A4BD1] disabled:opacity-50"
             >
               Go
             </button>
@@ -157,11 +158,11 @@ function StatusBadge({ status }: { status: AIStatus }) {
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium',
-        status === 'streaming' && 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
+        status === 'streaming' && 'bg-[#6C5CE7]/10 text-[#6C5CE7] dark:bg-[#6C5CE7]/20 dark:text-[#A594FF]',
         status === 'done' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
         status === 'error' && 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-        status === 'idle' && 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
-        status === 'prompting' && 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
+        status === 'idle' && 'bg-[#6C5CE7]/10 text-[#6C5CE7] dark:bg-[#6C5CE7]/20 dark:text-[#A594FF]',
+        status === 'prompting' && 'bg-[#6C5CE7]/10 text-[#6C5CE7] dark:bg-[#6C5CE7]/20 dark:text-[#A594FF]',
       )}
     >
       <span className={cn(

@@ -25,7 +25,8 @@ import type { ProcessRecordingSession } from '@/types/openapi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
 import { queryKeys } from '@/lib/queryKeys';
-import { useChat } from '@/components/Chat/ChatContext';
+import { AICommandPanel } from '@/components/tiptap-extensions/ai-commands/AICommandPanel';
+import { AI_COMMANDS } from '@/components/tiptap-extensions/ai-commands/commands';
 
 export interface NotionEditorProps {
   room: string;
@@ -110,18 +111,26 @@ export function NotionEditor({ docId, readOnly = false, headerSlot }: { docId: s
     });
 
   const { data: containers = [] } = useAllTextContainer();
-  const { openPanel: openChatPanel } = useChat();
 
   // Workflow picker state
   const [showWorkflowPicker, setShowWorkflowPicker] = React.useState(false);
   const [availableWorkflows, setAvailableWorkflows] = React.useState<ProcessRecordingSession[]>([]);
 
-  // Listen for AI command events from slash menu — open chat panel
+  // Inline AI writer state
+  const [aiCommandCoords, setAiCommandCoords] = React.useState<{ x: number; y: number } | null>(null);
+  const aiWriteCommand = React.useMemo(() => AI_COMMANDS.find(c => c.command === 'write') ?? null, []);
+
+  // Listen for inline AI write events from slash menu
   useEffect(() => {
-    const handler = () => openChatPanel();
-    window.addEventListener('ondoki:open-chat-panel', handler);
-    return () => window.removeEventListener('ondoki:open-chat-panel', handler);
-  }, [openChatPanel]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.x != null && detail?.y != null) {
+        setAiCommandCoords({ x: detail.x, y: detail.y });
+      }
+    };
+    window.addEventListener('ondoki:ai-inline-write', handler);
+    return () => window.removeEventListener('ondoki:ai-inline-write', handler);
+  }, []);
 
   // Listen for workflow insert events from slash menu
   useEffect(() => {
@@ -323,6 +332,16 @@ export function NotionEditor({ docId, readOnly = false, headerSlot }: { docId: s
 
           <SlashDropdownMenu config={slashMenuConfig} />
           <NotionToolbarFloating />
+
+          {/* Inline AI Writer */}
+          {editor && aiCommandCoords && aiWriteCommand && (
+            <AICommandPanel
+              editor={editor}
+              command={aiWriteCommand}
+              coords={aiCommandCoords}
+              onClose={() => setAiCommandCoords(null)}
+            />
+          )}
         </EditorContent>
 
         {/* Workflow Picker Modal */}
