@@ -249,7 +249,8 @@ export function isNodeTypeSelected(
 }
 
 /**
- * Handles image upload with progress tracking and abort capability
+ * Handles image upload with progress tracking and abort capability.
+ * Uploads to the backend /api/v1/uploads/image endpoint.
  * @param file The file to upload
  * @param onProgress Optional callback for tracking upload progress
  * @param abortSignal Optional AbortSignal for cancelling the upload
@@ -260,7 +261,6 @@ export const handleImageUpload = async (
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
-  // Validate file
   if (!file) {
     throw new Error('No file provided');
   }
@@ -271,17 +271,48 @@ export const handleImageUpload = async (
     );
   }
 
-  // For demo/testing: Simulate upload progress. In production, replace the following code
-  // with your own upload implementation.
-  for (let progress = 0; progress <= 100; progress += 10) {
-    if (abortSignal?.aborted) {
-      throw new Error('Upload cancelled');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    onProgress?.({ progress });
-  }
+  const formData = new FormData();
+  formData.append('file', file);
 
-  return '/images/tiptap-ui-placeholder-image.jpg';
+  // Get auth token from localStorage
+  const token = localStorage.getItem('access_token');
+
+  const xhr = new XMLHttpRequest();
+
+  return new Promise<string>((resolve, reject) => {
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const progress = Math.round((event.loaded / event.total) * 100);
+        onProgress?.({ progress });
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response.url);
+        } catch {
+          reject(new Error('Invalid response from server'));
+        }
+      } else {
+        reject(new Error(`Upload failed with status ${xhr.status}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', () => xhr.abort());
+    }
+
+    xhr.open('POST', '/api/v1/uploads/image');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    xhr.send(formData);
+  });
 };
 
 type ProtocolOptions = {
