@@ -86,18 +86,16 @@ async def test_status(db: AsyncSession = Depends(get_db)):
 
 
 async def _cleanup(db: AsyncSession):
-    """Truncate all existing tables. Skips tables that don't exist (pending migrations)."""
-    # Query actual tables in the database
-    result = await db.execute(text(
-        "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-    ))
-    existing = {row[0] for row in result.fetchall()}
+    """Delete only test-created data. NEVER truncate all tables."""
+    from sqlalchemy import select, delete
 
-    # Only truncate tables that actually exist
-    to_truncate = [
-        f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
-        if t.name in existing
-    ]
-    if to_truncate:
-        await db.execute(text(f"TRUNCATE TABLE {', '.join(to_truncate)} CASCADE"))
+    # Find the test user
+    user = await db.scalar(select(User).where(User.email == TEST_EMAIL))
+    if not user:
+        return
+
+    # Delete projects owned by test user (cascades to project_members, documents, etc.)
+    await db.execute(delete(Project).where(Project.owner_id == user.id))
+    # Delete the test user
+    await db.execute(delete(User).where(User.id == user.id))
     await db.commit()
