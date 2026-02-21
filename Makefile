@@ -71,6 +71,7 @@ test-e2e: test-db
 	@echo "Running E2E tests (Playwright starts its own frontend on :5174)..."
 	cd app && \
 		API_URL=http://localhost:8001 \
+		PLAYWRIGHT_BASE_URL=http://localhost:5174 \
 		VITE_API_URL=http://localhost:8001 \
 		VITE_API_BASE_URL=http://localhost:8001/api/v1 \
 		npx playwright test $(ARGS); \
