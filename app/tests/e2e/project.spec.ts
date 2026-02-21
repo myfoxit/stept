@@ -4,7 +4,6 @@ test.describe('Project Operations', () => {
   test('should display sidebar with project', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
-    // Sidebar should be visible
     const sidebar = page.locator('[data-testid="sidebar"]');
     await expect(sidebar).toBeVisible({ timeout: 10000 });
   });
@@ -12,34 +11,30 @@ test.describe('Project Operations', () => {
   test('should show project selector', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
-    // Project selector trigger should exist
+    // Wait for sidebar to load fully
+    const sidebar = page.locator('[data-testid="sidebar"]');
+    await expect(sidebar).toBeVisible({ timeout: 10000 });
+
+    // Project selector should be visible (seed creates a project)
     const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
-    // Either project selector OR create-first-project button should be visible
-    const createFirstProject = page.locator('[data-testid="create-first-project-btn"]');
-
-    const hasSelector = await projectSelector.isVisible({ timeout: 5000 }).catch(() => false);
-    const hasCreate = await createFirstProject.isVisible({ timeout: 2000 }).catch(() => false);
-
-    expect(hasSelector || hasCreate).toBe(true);
+    await expect(projectSelector).toBeVisible({ timeout: 15000 });
   });
 
   test('should open new project dialog', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
-    // First check if we already have a project selector (project exists from seed)
-    const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
-    if (await projectSelector.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await projectSelector.click();
+    const sidebar = page.locator('[data-testid="sidebar"]');
+    await expect(sidebar).toBeVisible({ timeout: 10000 });
 
-      // Click "New Project" in dropdown
-      const newProjectBtn = page.locator('[data-testid="new-project-dropdown-btn"]');
-      await expect(newProjectBtn).toBeVisible({ timeout: 5000 });
-      await newProjectBtn.click();
-    } else {
-      // No projects yet — click "Create first project"
-      const createBtn = page.locator('[data-testid="create-first-project-btn"]');
-      await createBtn.click();
-    }
+    // Open project dropdown
+    const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
+    await expect(projectSelector).toBeVisible({ timeout: 15000 });
+    await projectSelector.click();
+
+    // Click "New Project" in dropdown
+    const newProjectBtn = page.locator('[data-testid="new-project-dropdown-btn"]');
+    await expect(newProjectBtn).toBeVisible({ timeout: 5000 });
+    await newProjectBtn.click();
 
     // Dialog should appear
     const dialog = page.locator('[data-testid="new-project-dialog"]');
@@ -53,16 +48,18 @@ test.describe('Project Operations', () => {
   test('should create a new project', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
+    const sidebar = page.locator('[data-testid="sidebar"]');
+    await expect(sidebar).toBeVisible({ timeout: 10000 });
+
+    // Open project dropdown
     const projectSelector = page.locator('[data-testid="project-selector-trigger"]');
-    if (await projectSelector.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await projectSelector.click();
-      const newProjectBtn = page.locator('[data-testid="new-project-dropdown-btn"]');
-      await expect(newProjectBtn).toBeVisible({ timeout: 5000 });
-      await newProjectBtn.click();
-    } else {
-      const createBtn = page.locator('[data-testid="create-first-project-btn"]');
-      await createBtn.click();
-    }
+    await expect(projectSelector).toBeVisible({ timeout: 15000 });
+    await projectSelector.click();
+
+    // Click "New Project"
+    const newProjectBtn = page.locator('[data-testid="new-project-dropdown-btn"]');
+    await expect(newProjectBtn).toBeVisible({ timeout: 5000 });
+    await newProjectBtn.click();
 
     const dialog = page.locator('[data-testid="new-project-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
