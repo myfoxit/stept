@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link, useNavigate } from "react-router-dom";
 import { useUpdateProject } from "@/hooks/api/projects";
+import { useCreateDocument } from "@/hooks/api/documents";
 import { useSpotlight } from "@/components/spotlight/SpotlightProvider";
 import { toast } from "sonner";
 
@@ -111,6 +112,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   } = useProject();
   const updateProjectMutation = useUpdateProject();
   const { openSpotlight } = useSpotlight();
+  const createDoc = useCreateDocument();
 
   const [newProjectDialogOpen, setNewProjectDialogOpen] = React.useState(false);
   const [newProjectName, setNewProjectName] = React.useState("");
@@ -200,7 +202,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </span>
               </Link>
             </SidebarMenuButton>
-            <SidebarTrigger className="size-7 ml-auto" />
+            <div className="flex items-center gap-0.5 ml-auto">
+              {selectedProjectId && (
+                <button
+                  onClick={async () => {
+                    const newDoc = await createDoc.mutateAsync({
+                      title: "Untitled",
+                      projectId: selectedProjectId,
+                      isPrivate: true,
+                    });
+                    navigate(`/editor/${newDoc.id}`);
+                  }}
+                  className="size-7 flex items-center justify-center rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title="New Page"
+                >
+                  <IconPlus className="size-4" stroke={2} />
+                </button>
+              )}
+              <SidebarTrigger className="size-7" />
+            </div>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <div className="px-1.5 py-1">

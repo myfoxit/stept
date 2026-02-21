@@ -1013,30 +1013,6 @@ export function NavPages({ userRole }: { userRole: string }) {
 
   return (
     <>
-      {/* Quick Create Button */}
-      {canCreatePage && selectedProjectId && (
-        <SidebarGroup className="py-2 pb-0">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="h-7 px-2 gap-2 text-muted-foreground hover:text-foreground"
-                onClick={async () => {
-                  const newDoc = await createDoc.mutateAsync({
-                    title: "Untitled",
-                    projectId: selectedProjectId,
-                    isPrivate: true,
-                  });
-                  navigate(`/editor/${newDoc.id}`);
-                }}
-              >
-                <Plus className="size-3.5" strokeWidth={2} />
-                <span className="text-sm">New Page</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
       {/* Gallery View Links */}
       <SidebarGroup className="py-2">
         <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1]">
