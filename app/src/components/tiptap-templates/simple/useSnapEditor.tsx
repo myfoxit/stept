@@ -6,6 +6,7 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Mathematics from '@tiptap/extension-mathematics';
 import Mention from '@tiptap/extension-mention';
+import { mentionSuggestion } from '@/components/tiptap-extensions/mention-suggestion';
 import TextAlign from '@tiptap/extension-text-align';
 import { Color, TextStyle } from '@tiptap/extension-text-style';
 import Typography from '@tiptap/extension-typography';
@@ -44,7 +45,10 @@ export function useSnapEditor({ readOnly = false }: { readOnly?: boolean } = {})
         placeholder: 'Start writing...',
         emptyNodeClass: 'is-empty with-slash',
       }),
-      Mention,
+      Mention.configure({
+        HTMLAttributes: { class: 'mention' },
+        suggestion: mentionSuggestion,
+      }),
       Emoji.configure({
         emojis: gitHubEmojis.filter(
           (emoji) => !emoji.name.includes('regional')
