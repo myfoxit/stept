@@ -68,7 +68,7 @@ test-e2e: test-db
 	@echo "✅ Test backend ready on :8001"
 	@echo "Running migrations on test database..."
 	$(COMPOSE_TEST) exec test-backend alembic upgrade head
-	@echo "Running E2E tests (Playwright starts its own frontend)..."
+	@echo "Running E2E tests (Playwright starts its own frontend on :5174)..."
 	cd app && \
 		API_URL=http://localhost:8001 \
 		VITE_API_URL=http://localhost:8001 \
@@ -76,7 +76,7 @@ test-e2e: test-db
 		npx playwright test $(ARGS); \
 	EXIT_CODE=$$?; \
 	echo "Stopping test backend..."; \
-	$(COMPOSE_TEST) stop test-backend; \
+	cd .. && $(COMPOSE_TEST) stop test-backend; \
 	exit $$EXIT_CODE
 
 # Frontend tests (local, no Docker needed)
