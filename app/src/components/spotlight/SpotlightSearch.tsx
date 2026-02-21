@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useProject } from '@/providers/project-provider';
 import { useChat } from '@/components/Chat/ChatContext';
+import { useCreateDocument } from '@/hooks/api/documents';
 import {
   unifiedSearch,
   unifiedSemanticSearch,
@@ -42,6 +43,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   const navigate = useNavigate();
   const { selectedProject, selectedProjectId } = useProject();
   const { openPanel, sendMessage } = useChat();
+  const createDoc = useCreateDocument();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -169,9 +171,15 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
         {!hasQuery && (
           <CommandGroup heading="Quick Actions">
             <CommandItem
-              onSelect={() => {
+              onSelect={async () => {
                 onOpenChange(false);
-                navigate('/editor/new');
+                if (selectedProjectId) {
+                  const newDoc = await createDoc.mutateAsync({
+                    title: 'Untitled',
+                    projectId: selectedProjectId,
+                  });
+                  navigate(`/editor/${newDoc.id}`);
+                }
               }}
             >
               <IconFileText className="mr-2 h-4 w-4" />

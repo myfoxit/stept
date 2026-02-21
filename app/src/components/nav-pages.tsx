@@ -702,12 +702,13 @@ function NavPageItem({
                         isPrivate: doc.is_private, // NEW: Inherit privacy from parent folder
                       });
                     } else {
-                      await createDoc.mutateAsync({
+                      const newDoc = await createDoc.mutateAsync({
                         title: childTitle.trim() || "Untitled",
                         projectId: selectedProjectId,
                         folderId: doc.id,
-                        isPrivate: doc.is_private, // NEW: Inherit privacy from parent folder
+                        isPrivate: doc.is_private,
                       });
+                      navigate(`/editor/${newDoc.id}`);
                     }
                     setChildTitle("");
                     setChildType("document");
@@ -837,9 +838,8 @@ function NavPageItem({
                     });
                   }
                   setDeleteOpen(false);
-                  if (window.location.pathname.includes(doc.id)) {
-                    navigate("/");
-                  }
+                  // Always navigate away after deletion to avoid 404
+                  navigate("/");
                 } catch (error) {
                   console.error("Failed to delete:", error);
                 }
@@ -881,7 +881,9 @@ export function NavPages({ userRole }: { userRole: string }) {
     React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [title, setTitle] = React.useState("");
-  const [createIsPrivate, setCreateIsPrivate] = React.useState(false); // NEW
+  const [createIsPrivate, setCreateIsPrivate] = React.useState(false);
+  const [unsortedSharedExpanded, setUnsortedSharedExpanded] = React.useState(true);
+  const [unsortedPrivateExpanded, setUnsortedPrivateExpanded] = React.useState(true); // NEW
 
   const canCreatePage =
     userRole === "owner" || userRole === "admin" || userRole === "editor";
@@ -1080,27 +1082,37 @@ export function NavPages({ userRole }: { userRole: string }) {
             />
           ))}
 
-          {/* Unsorted: root-level non-folder items */}
-          {sharedTree.filter((doc) => !doc.is_folder).length > 0 && (
-            <>
-              <SidebarMenuItem>
-                <div className="flex items-center gap-1 h-7 px-2 mx-1">
-                  <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
-                  <span className="text-[0.82rem] font-semibold text-muted-foreground">Unsorted</span>
-                </div>
-              </SidebarMenuItem>
-              <div className="ml-3 pl-1">
-                {sharedTree.filter((doc) => !doc.is_folder).map((doc) => (
-                  <NavPageItem
-                    key={doc.id}
-                    doc={doc}
-                    userRole={userRole}
-                    onDragEnd={handleDragEnd}
-                    isPrivateSection={false}
-                  />
-                ))}
+          {/* Unsorted: root-level non-folder items (always visible) */}
+          <SidebarMenuItem>
+            <div
+              className="flex items-center group/item h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
+              onClick={() => setUnsortedSharedExpanded(!unsortedSharedExpanded)}
+            >
+              <button className="flex items-center justify-center size-5 rounded-sm ml-0.5 outline-none">
+                {unsortedSharedExpanded ? (
+                  <ChevronDown className="size-3" />
+                ) : (
+                  <ChevronRight className="size-3" />
+                )}
+              </button>
+              <div className="flex items-center gap-1 flex-1 h-7 px-1.5">
+                <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
+                <span className="truncate font-semibold">Unsorted</span>
               </div>
-            </>
+            </div>
+          </SidebarMenuItem>
+          {unsortedSharedExpanded && (
+            <div className="ml-3 pl-1">
+              {sharedTree.filter((doc) => !doc.is_folder).map((doc) => (
+                <NavPageItem
+                  key={doc.id}
+                  doc={doc}
+                  userRole={userRole}
+                  onDragEnd={handleDragEnd}
+                  isPrivateSection={false}
+                />
+              ))}
+            </div>
           )}
 
           {isDraggingOverShared && (
@@ -1159,27 +1171,37 @@ export function NavPages({ userRole }: { userRole: string }) {
               />
             ))}
 
-            {/* Unsorted: root-level non-folder items */}
-            {privateTree.filter((doc) => !doc.is_folder).length > 0 && (
-              <>
-                <SidebarMenuItem>
-                  <div className="flex items-center gap-1 h-7 px-2 mx-1">
-                    <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
-                    <span className="text-[0.82rem] font-semibold text-muted-foreground">Unsorted</span>
-                  </div>
-                </SidebarMenuItem>
-                <div className="ml-3 pl-1">
-                  {privateTree.filter((doc) => !doc.is_folder).map((doc) => (
-                    <NavPageItem
-                      key={doc.id}
-                      doc={doc}
-                      userRole={userRole}
-                      onDragEnd={handleDragEnd}
-                      isPrivateSection={true}
-                    />
-                  ))}
+            {/* Unsorted: root-level non-folder items (always visible) */}
+            <SidebarMenuItem>
+              <div
+                className="flex items-center group/item h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
+                onClick={() => setUnsortedPrivateExpanded(!unsortedPrivateExpanded)}
+              >
+                <button className="flex items-center justify-center size-5 rounded-sm ml-0.5 outline-none">
+                  {unsortedPrivateExpanded ? (
+                    <ChevronDown className="size-3" />
+                  ) : (
+                    <ChevronRight className="size-3" />
+                  )}
+                </button>
+                <div className="flex items-center gap-1 flex-1 h-7 px-1.5">
+                  <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
+                  <span className="truncate font-semibold">Unsorted</span>
                 </div>
-              </>
+              </div>
+            </SidebarMenuItem>
+            {unsortedPrivateExpanded && (
+              <div className="ml-3 pl-1">
+                {privateTree.filter((doc) => !doc.is_folder).map((doc) => (
+                  <NavPageItem
+                    key={doc.id}
+                    doc={doc}
+                    userRole={userRole}
+                    onDragEnd={handleDragEnd}
+                    isPrivateSection={true}
+                  />
+                ))}
+              </div>
             )}
 
             {isDraggingOverPrivate && (

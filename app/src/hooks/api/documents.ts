@@ -38,6 +38,7 @@ export const useSaveDocument = (docId: string) => {
         ...data,
       }));
       qc.invalidateQueries({ queryKey: ['documents'] });
+      qc.invalidateQueries({ queryKey: ['folderTree'] });
     },
   });
 };
