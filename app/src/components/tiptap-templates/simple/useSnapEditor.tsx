@@ -1,4 +1,5 @@
 import { UiState } from '@/components/tiptap-extensions/ui-state-extension';
+import { PiiHighlight } from '@/components/tiptap-extensions/pii-highlight/pii-highlight';
 import { ImageUploadNode } from '@/components/tiptap-node/image-upload-node';
 import { MAX_FILE_SIZE, handleImageUpload } from '@/lib/tiptap-utils';
 import Emoji, { gitHubEmojis } from '@tiptap/extension-emoji';
@@ -76,6 +77,7 @@ export function useSnapEditor({ readOnly = false }: { readOnly?: boolean } = {})
       UniqueID,
       Typography,
       UiState,
+      PiiHighlight,
       ProcessRecordingNode,
       Pages.configure({
         pageFormat: 'A4',
