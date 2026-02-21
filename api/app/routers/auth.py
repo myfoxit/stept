@@ -87,8 +87,8 @@ _RATE_LIMITS = {
 }
 
 def _rate_limit(request: Request, bucket_name: str):
-    if os.getenv("ENVIRONMENT") == "test":
-        return  # Skip rate limiting in test environment
+    if os.getenv("ENVIRONMENT") in ("test", "local"):
+        return  # Skip rate limiting in test/local environment
     # key by client IP (best-effort)
     key = request.client.host if request.client else "unknown"
     cfg = _RATE_LIMITS[bucket_name]
