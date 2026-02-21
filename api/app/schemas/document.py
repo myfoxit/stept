@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class DocumentBase(BaseModel):
     name: Optional[str] = None
     content: Dict[str, Any] = {}
-    page_layout: str = "full"
+    page_layout: str = "document"
 
 class DocumentCreate(DocumentBase):
     project_id: str

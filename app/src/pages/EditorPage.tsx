@@ -88,7 +88,7 @@ export default function EditorPage() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
 
-  const [pageLayout, setPageLayout] = useState<PageLayout>("full");
+  const [pageLayout, setPageLayout] = useState<PageLayout>("document");
   const updateLayout = useUpdateDocumentLayout(docId!);
 
   const isPermissionReadOnly = useMemo(() => {

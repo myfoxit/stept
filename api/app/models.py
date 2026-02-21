@@ -181,7 +181,7 @@ class Document(Base):
     updated_at  = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     # Page layout: 'full', 'document', 'a4', 'letter'
-    page_layout = Column(String(20), nullable=False, server_default="'full'")
+    page_layout = Column(String(20), nullable=False, server_default="document")
     
     # Link document to a project
     project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
