@@ -100,11 +100,11 @@ async def test_delete_document(
     )
     doc_id = create_resp.json()["id"]
 
-    resp = await async_client.delete(f"/api/v1/documents/{doc_id}")
+    resp = await async_client.delete(f"/api/v1/documents/{doc_id}", headers=auth_headers)
     assert resp.status_code == 204
 
-    # Verify gone
-    get_resp = await async_client.get(f"/api/v1/documents/{doc_id}")
+    # Verify gone (soft-deleted, should return 404)
+    get_resp = await async_client.get(f"/api/v1/documents/{doc_id}", headers=auth_headers)
     assert get_resp.status_code == 404
 
 

@@ -5,7 +5,7 @@ from sqlalchemy import select, and_, or_, func, delete, update
 from sqlalchemy.orm import selectinload
 from app.models import Document, project_members, Project, ProjectRole
 from app.utils import gen_suffix
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -366,7 +366,7 @@ async def delete_document(db: AsyncSession, doc_id: str) -> None:
     if not doc:
         raise ValueError("document not found")
     
-    doc.deleted_at = datetime.now(timezone.utc)
+    doc.deleted_at = datetime.utcnow()
     await db.commit()
     logger.info(f"Soft-deleted document {doc_id}")
 

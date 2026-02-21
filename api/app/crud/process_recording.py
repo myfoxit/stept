@@ -661,8 +661,8 @@ async def delete_workflow(db: AsyncSession, session_id: str) -> None:
     if not session:
         raise ValueError("Workflow not found")
     
-    from datetime import datetime, timezone
-    session.deleted_at = datetime.now(timezone.utc)
+    from datetime import datetime
+    session.deleted_at = datetime.utcnow()
     await db.commit()
 
 
@@ -779,7 +779,12 @@ async def get_session_status(
     stmt = select(ProcessRecordingSession).options(
         selectinload(ProcessRecordingSession.files),
         selectinload(ProcessRecordingSession.steps)
-    ).where(ProcessRecordingSession.id == session_id)
+    ).where(
+        and_(
+            ProcessRecordingSession.id == session_id,
+            ProcessRecordingSession.deleted_at.is_(None),
+        )
+    )
     
     result = await db.execute(stmt)
     session = result.scalar_one_or_none()

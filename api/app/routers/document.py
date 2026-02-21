@@ -141,6 +141,21 @@ async def api_create_document(
 
     return doc
 
+
+# ── Trash endpoints (must be before /{doc_id} routes to avoid path conflicts) ─
+
+@router.get("/trash/{project_id}")
+async def list_deleted_documents(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all soft-deleted documents for a project"""
+    await check_project_permission(db, current_user.id, project_id, ProjectRole.VIEWER)
+    docs = await get_deleted_documents(db, project_id, user_id=current_user.id)
+    return docs
+
+
 # Get single document
 @router.get("/{doc_id}")
 async def api_get_document(
@@ -623,6 +638,34 @@ async def api_delete_document(doc_id: str, request: Request, db: AsyncSession = 
     return Response(status_code=204)
 
 
+@router.post("/{doc_id}/restore")
+async def restore_document_endpoint(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore a soft-deleted document"""
+    try:
+        doc = await restore_document(db, doc_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return doc
+
+
+@router.delete("/{doc_id}/permanent")
+async def permanent_delete_document_endpoint(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a document (no recovery)"""
+    try:
+        await permanent_delete_document(db, doc_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return {"ok": True}
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # SHARING ENDPOINTS
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1061,39 +1104,3 @@ async def export_document_docx(
             "Content-Disposition": f'attachment; filename="{filename}"',
         }
     )
-
-
-# ── Trash endpoints ──────────────────────────────────────────────────────────
-
-@router.get("/trash/{project_id}")
-async def list_deleted_documents(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get all soft-deleted documents for a project"""
-    await check_project_permission(db, project_id, current_user, ProjectRole.VIEWER)
-    docs = await get_deleted_documents(db, project_id, user_id=current_user.id)
-    return docs
-
-
-@router.post("/{doc_id}/restore")
-async def restore_document_endpoint(
-    doc_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Restore a soft-deleted document"""
-    doc = await restore_document(db, doc_id)
-    return doc
-
-
-@router.delete("/{doc_id}/permanent")
-async def permanent_delete_document_endpoint(
-    doc_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Permanently delete a document (no recovery)"""
-    await permanent_delete_document(db, doc_id)
-    return {"ok": True}
