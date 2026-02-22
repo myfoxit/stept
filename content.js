@@ -123,23 +123,59 @@ function handleKeydown(event) {
   const el = document.activeElement;
   if (el && (el.type === 'password' || el.autocomplete === 'cc-number' || el.autocomplete === 'cc-cvc' || el.autocomplete === 'cc-exp')) return;
 
-  if (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') {
+  // Modifier combos (Ctrl+A, Ctrl+C, etc.) — flush text first, then record combo
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    if (event.key.length === 1 || ['Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      flushTypedText();
+      const mods = [];
+      if (event.ctrlKey) mods.push('Ctrl');
+      if (event.metaKey) mods.push('Cmd');
+      if (event.altKey) mods.push('Alt');
+      if (event.shiftKey) mods.push('Shift');
+      const keyName = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+      sendKeyStep(`Press ${mods.join('+')}+${keyName}`);
+      return;
+    }
+  }
+
+  // Special action keys — flush typed text, then record the key press
+  if (['Enter', 'Tab', 'Escape', 'Delete', 'Backspace'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
     flushTypedText();
+    // Only record Enter/Tab/Escape/Delete as separate steps (Backspace is part of editing, skip)
+    if (event.key !== 'Backspace') {
+      sendKeyStep(`Press ${event.key}`);
+    }
     return;
   }
 
+  // Skip lone modifier keys
   if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) {
     return;
   }
 
-  if (event.key === 'Backspace') {
-    typedText = typedText.slice(0, -1);
-  } else if (event.key.length === 1) {
+  // Regular character typing — accumulate
+  if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
     typedText += event.key;
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(flushTypedText, TYPING_DELAY);
   }
+}
 
-  clearTimeout(typingTimer);
-  typingTimer = setTimeout(flushTypedText, TYPING_DELAY);
+function sendKeyStep(description) {
+  const stepData = {
+    actionType: 'Key',
+    pageTitle: document.title,
+    description: description,
+    url: window.location.href,
+    windowSize: { width: window.outerWidth, height: window.outerHeight },
+    viewportSize: { width: window.innerWidth, height: window.innerHeight },
+  };
+
+  chrome.runtime
+    .sendMessage({ type: 'TYPE_EVENT', data: stepData })
+    .catch((err) => {
+      debugLog('Failed to send key event', err);
+    });
 }
 
 function flushTypedText() {

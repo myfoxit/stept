@@ -203,8 +203,6 @@ body {
 
 .step-screenshot {
   width: 100%;
-  max-height: 140px;
-  object-fit: cover;
   background: #F5F4F2;
   border-top: 1px solid #EEECEB;
   display: block;
