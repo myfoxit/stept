@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # JWT Configuration
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     
@@ -32,3 +32,9 @@ class Settings(BaseSettings):
         extra = "allow"  # Allow extra fields from environment
 
 settings = Settings()
+
+if not settings.JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET environment variable is required. "
+        "Set it to a strong random string (e.g. `openssl rand -hex 32`)."
+    )

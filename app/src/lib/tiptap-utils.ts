@@ -274,9 +274,6 @@ export const handleImageUpload = async (
   const formData = new FormData();
   formData.append('file', file);
 
-  // Get auth token from localStorage
-  const token = localStorage.getItem('access_token');
-
   const xhr = new XMLHttpRequest();
 
   return new Promise<string>((resolve, reject) => {
@@ -308,9 +305,7 @@ export const handleImageUpload = async (
     }
 
     xhr.open('POST', '/api/v1/uploads/image');
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    }
+    xhr.withCredentials = true;
     xhr.send(formData);
   });
 };
