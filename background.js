@@ -32,19 +32,67 @@ let state = {
   authState: null,
 };
 
-// Initialize state from storage
+// Track whether initial auth restore is done
+let authReady = false;
+let authReadyPromise;
+let authReadyResolve;
+authReadyPromise = new Promise(resolve => { authReadyResolve = resolve; });
+
+// Initialize state from storage — restore ALL auth state
 chrome.storage.local.get(
-  ['refreshToken', 'selectedProjectId'],
+  ['accessToken', 'refreshToken', 'currentUser', 'userProjects', 'selectedProjectId', 'isRecording', 'recordingStartTime', 'stepCounter'],
   async (result) => {
-    if (result.refreshToken) {
-      state.refreshToken = result.refreshToken;
-      await tryAutoLogin();
-    }
     if (result.selectedProjectId) {
       state.selectedProjectId = result.selectedProjectId;
     }
+    if (result.isRecording) {
+      state.isRecording = true;
+      state.recordingStartTime = result.recordingStartTime || Date.now();
+      state.stepCounter = result.stepCounter || 0;
+      chrome.action.setBadgeText({ text: 'REC' });
+      chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
+    }
+
+    if (result.refreshToken) {
+      state.refreshToken = result.refreshToken;
+      state.accessToken = result.accessToken || null;
+      state.currentUser = result.currentUser || null;
+      state.userProjects = result.userProjects || [];
+
+      if (state.accessToken && state.currentUser) {
+        // We have cached auth — assume valid, will refresh on 401
+        state.isAuthenticated = true;
+        debugLog('Auth restored from storage');
+      } else {
+        // Only have refresh token — do a full refresh
+        await tryAutoLogin();
+      }
+    }
+
+    authReady = true;
+    authReadyResolve();
   },
 );
+
+// Helper to persist auth state
+async function persistAuth() {
+  await chrome.storage.local.set({
+    accessToken: state.accessToken,
+    refreshToken: state.refreshToken,
+    currentUser: state.currentUser,
+    userProjects: state.userProjects,
+  });
+}
+
+// Helper to persist recording state
+async function persistRecordingState() {
+  await chrome.storage.local.set({
+    isRecording: state.isRecording,
+    recordingStartTime: state.recordingStartTime,
+    stepCounter: state.stepCounter,
+    selectedProjectId: state.selectedProjectId,
+  });
+}
 
 // PKCE helpers
 function generateCodeVerifier() {
@@ -90,7 +138,8 @@ async function refreshAccessToken() {
       const tokenData = await response.json();
       state.accessToken = tokenData.access_token;
       state.refreshToken = tokenData.refresh_token;
-      await chrome.storage.local.set({ refreshToken: state.refreshToken });
+      state.isAuthenticated = true;
+      await persistAuth();
       return true;
     }
   } catch (error) {
@@ -101,6 +150,14 @@ async function refreshAccessToken() {
 
 // Authenticated fetch with automatic token refresh on 401
 async function authedFetch(url, options = {}) {
+  // Ensure we have a token before making the request
+  if (!state.accessToken && state.refreshToken) {
+    await refreshAccessToken();
+  }
+  if (!state.accessToken) {
+    throw new Error('Not authenticated');
+  }
+
   options.headers = options.headers || {};
   options.headers['Authorization'] = `Bearer ${state.accessToken}`;
 
@@ -190,13 +247,12 @@ async function handleAuthCallback(callbackUrl) {
   state.refreshToken = tokenData.refresh_token;
   state.isAuthenticated = true;
 
-  await chrome.storage.local.set({ refreshToken: state.refreshToken });
-
   state.codeVerifier = null;
   state.authState = null;
 
   await fetchUserInfo();
   await fetchUserProjects();
+  await persistAuth();
 
   return true;
 }
@@ -221,17 +277,19 @@ async function tryAutoLogin() {
       state.refreshToken = tokenData.refresh_token;
       state.isAuthenticated = true;
 
-      await chrome.storage.local.set({ refreshToken: state.refreshToken });
       await fetchUserInfo();
       await fetchUserProjects();
+      await persistAuth();
       return true;
     }
   } catch (error) {
     debugLog('Auto-login failed:', error);
   }
 
-  await chrome.storage.local.remove('refreshToken');
+  await chrome.storage.local.remove(['refreshToken', 'accessToken', 'currentUser', 'userProjects']);
   state.refreshToken = null;
+  state.accessToken = null;
+  state.isAuthenticated = false;
   return false;
 }
 
@@ -256,7 +314,7 @@ async function logout() {
   state.userProjects = [];
   state.selectedProjectId = null;
 
-  await chrome.storage.local.remove(['refreshToken', 'selectedProjectId']);
+  await chrome.storage.local.remove(['refreshToken', 'accessToken', 'currentUser', 'userProjects', 'selectedProjectId']);
 }
 
 async function fetchUserInfo() {
@@ -325,6 +383,7 @@ function startRecording(projectId) {
   state.recordingStartTime = Date.now();
 
   chrome.storage.local.set({ selectedProjectId: projectId });
+  persistRecordingState();
 
   // Inject content script into ALL open http/https tabs
   chrome.tabs.query({}, async (tabs) => {
@@ -355,6 +414,7 @@ function startRecording(projectId) {
 function stopRecording() {
   state.isRecording = false;
   state.isPaused = false;
+  persistRecordingState();
 
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
@@ -608,6 +668,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     switch (message.type) {
       case 'GET_STATE':
+        // Wait for auth restore to complete before responding
+        if (!authReady) await authReadyPromise;
         sendResponse({
           isAuthenticated: state.isAuthenticated,
           isRecording: state.isRecording,
