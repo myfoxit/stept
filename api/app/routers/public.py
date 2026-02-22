@@ -215,6 +215,10 @@ async def get_embedded_workflow(
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
 
+    # Verify the workflow belongs to the same project as the document (prevent IDOR)
+    if doc.project_id and session.project_id and doc.project_id != session.project_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
     return _serialize_workflow(session, "view")
 
 
@@ -246,6 +250,10 @@ async def get_embedded_workflow_image(
     result = await db.execute(stmt)
     session = result.scalar_one_or_none()
     if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+
+    # Verify the workflow belongs to the same project as the document (prevent IDOR)
+    if doc.project_id and session.project_id and doc.project_id != session.project_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
 
     file_record = next((f for f in session.files if f.step_number == step_number), None)

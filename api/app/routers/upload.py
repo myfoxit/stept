@@ -53,6 +53,9 @@ async def upload_image(
 @router.get("/image/{filename}")
 async def get_image(filename: str):
     """Serve an uploaded image."""
+    # Reject path traversal attempts
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(400, "Invalid filename")
     # Sanitize filename to prevent path traversal
     safe_name = os.path.basename(filename)
     file_path = os.path.join(IMAGE_UPLOAD_DIR, safe_name)

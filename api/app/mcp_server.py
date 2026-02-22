@@ -86,15 +86,18 @@ async def _auth_project_id(ctx) -> str | None:
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-async def list_projects() -> list[dict[str, Any]]:
+async def list_projects(ctx=None) -> list[dict[str, Any]]:
     """List projects accessible to the API key."""
     from sqlalchemy import select
     from app.models import Project
 
+    project_id = await _auth_project_id(ctx or {})
+    if not project_id:
+        return [{"error": "Authentication required. Provide a valid API key."}]
+
     session, gen = await _db()
     try:
-        # For now, return all projects (scoping happens via API key's project_id)
-        result = await session.execute(select(Project))
+        result = await session.execute(select(Project).where(Project.id == project_id))
         projects = result.scalars().all()
         return [
             {"id": p.id, "name": p.name, "created_at": str(p.created_at)}
@@ -105,10 +108,16 @@ async def list_projects() -> list[dict[str, Any]]:
 
 
 @mcp.tool()
-async def search_pages(query: str, project_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+async def search_pages(query: str, project_id: str | None = None, limit: int = 20, ctx=None) -> list[dict[str, Any]]:
     """Search pages/documents by query using full-text search with ILIKE fallback."""
     from sqlalchemy import select, or_, and_
     from app.models import Document, Folder
+
+    auth_project_id = await _auth_project_id(ctx or {})
+    if not auth_project_id:
+        return [{"error": "Authentication required. Provide a valid API key."}]
+    # Scope to authenticated project
+    project_id = auth_project_id
 
     session, gen = await _db()
     try:
@@ -191,11 +200,15 @@ async def search_pages(query: str, project_id: str | None = None, limit: int = 2
 
 
 @mcp.tool()
-async def get_page(page_id: str) -> dict[str, Any]:
+async def get_page(page_id: str, ctx=None) -> dict[str, Any]:
     """Get full page content as Markdown."""
     from sqlalchemy import select
     from app.models import Document, Folder
     from app.services.git_sync_service import tiptap_to_markdown
+
+    auth_project_id = await _auth_project_id(ctx or {})
+    if not auth_project_id:
+        return {"error": "Authentication required. Provide a valid API key."}
 
     session, gen = await _db()
     try:
@@ -203,6 +216,8 @@ async def get_page(page_id: str) -> dict[str, Any]:
         doc = result.scalar_one_or_none()
         if not doc:
             return {"error": "Page not found"}
+        if doc.project_id != auth_project_id:
+            return {"error": "Access denied"}
 
         folder_name = None
         if doc.folder_id:
@@ -226,11 +241,17 @@ async def get_page(page_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def search_workflows(query: str, project_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+async def search_workflows(query: str, project_id: str | None = None, limit: int = 20, ctx=None) -> list[dict[str, Any]]:
     """Search recorded workflows by query."""
     from sqlalchemy import select, or_, and_
     from sqlalchemy.orm import selectinload
     from app.models import ProcessRecordingSession
+
+    auth_project_id = await _auth_project_id(ctx or {})
+    if not auth_project_id:
+        return [{"error": "Authentication required. Provide a valid API key."}]
+    # Scope to authenticated project
+    project_id = auth_project_id
 
     session, gen = await _db()
     try:
@@ -271,11 +292,15 @@ async def search_workflows(query: str, project_id: str | None = None, limit: int
 
 
 @mcp.tool()
-async def get_workflow(workflow_id: str) -> dict[str, Any]:
+async def get_workflow(workflow_id: str, ctx=None) -> dict[str, Any]:
     """Get workflow with all steps."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from app.models import ProcessRecordingSession
+
+    auth_project_id = await _auth_project_id(ctx or {})
+    if not auth_project_id:
+        return {"error": "Authentication required. Provide a valid API key."}
 
     session, gen = await _db()
     try:
@@ -287,6 +312,8 @@ async def get_workflow(workflow_id: str) -> dict[str, Any]:
         wf = result.scalar_one_or_none()
         if not wf:
             return {"error": "Workflow not found"}
+        if wf.project_id != auth_project_id:
+            return {"error": "Access denied"}
 
         steps = sorted(wf.steps, key=lambda s: s.step_number)
         return {
@@ -316,10 +343,17 @@ async def get_context(
     app_name: str | None = None,
     window_title: str | None = None,
     project_id: str | None = None,
+    ctx=None,
 ) -> list[dict[str, Any]]:
     """Find relevant docs/workflows based on current context (URL, app name, window title)."""
     from sqlalchemy import select
     from app.models import ContextLink, ProcessRecordingSession, Document
+
+    auth_project_id = await _auth_project_id(ctx or {})
+    if not auth_project_id:
+        return [{"error": "Authentication required. Provide a valid API key."}]
+    # Scope to authenticated project
+    project_id = auth_project_id
 
     session, gen = await _db()
     try:
@@ -399,8 +433,12 @@ async def workflow_resource(workflow_id: str) -> str:
 
 
 @mcp.tool()
-async def get_related_knowledge(resource_id: str, resource_type: str = "document") -> list[dict]:
+async def get_related_knowledge(resource_id: str, resource_type: str = "document", ctx=None) -> list[dict]:
     """Get knowledge related to a document or workflow, following the knowledge graph."""
+    auth_project_id = await _auth_project_id(ctx or {})
+    if not auth_project_id:
+        return [{"error": "Authentication required. Provide a valid API key."}]
+
     session, gen = await _db()
     try:
         from app.models import KnowledgeLink

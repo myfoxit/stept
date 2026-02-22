@@ -16,5 +16,8 @@ async def api_create_user(
     return await create_user(db, u.email, u.password, u.name)
 
 @router.get("/", response_model=list[UserRead])
-async def api_list_users(db: AsyncSession = Depends(get_db)):
+async def api_list_users(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
     return await get_users(db)

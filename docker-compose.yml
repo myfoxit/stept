@@ -53,6 +53,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       ENVIRONMENT: production
       ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:?ONDOKI_ENCRYPTION_KEY must be set}
       SENDCLOAK_ENABLED: "${SENDCLOAK_ENABLED:-false}"
