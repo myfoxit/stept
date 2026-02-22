@@ -2,8 +2,10 @@ let isRecording = false;
 let typedText = '';
 let typingTimer = null;
 let lastClickTime = 0;
+let lastClickTarget = null;
+let pendingClick = null;
 const TYPING_DELAY = 1000;
-const CLICK_DEBOUNCE_MS = 300; // Ignore clicks within 300ms of each other (double-click → 1 step)
+const DOUBLE_CLICK_MS = 400;
 const DEBUG = false;
 
 function debugLog(...args) {
@@ -79,15 +81,11 @@ function preventDoubleCapture(event) {
 function handleClick(event) {
   if (!isRecording) return;
 
-  // Debounce: ignore clicks within 300ms (handles double-click → single step)
-  const now = Date.now();
-  if (now - lastClickTime < CLICK_DEBOUNCE_MS) return;
-  lastClickTime = now;
-
   flushTypedText();
 
   const target = event.target;
   const rect = target.getBoundingClientRect();
+  const now = Date.now();
 
   const elementInfo = {
     tagName: target.tagName.toLowerCase(),
@@ -104,20 +102,10 @@ function handleClick(event) {
   const relativeX = event.clientX - rect.left;
   const relativeY = event.clientY - rect.top;
 
-  const buttonName =
-    event.button === 0 ? 'Left' : event.button === 2 ? 'Right' : 'Middle';
-
-  const actionType = event.button === 2 ? 'Right Click' : `${buttonName} Click`;
-
-  const stepData = {
-    actionType: actionType,
+  const buildStepData = (actionType, description) => ({
+    actionType,
     pageTitle: document.title,
-    description: generateClickDescription(
-      elementInfo,
-      event.clientX,
-      event.clientY,
-      event.button === 2,
-    ),
+    description,
     globalPosition: { x: event.screenX, y: event.screenY },
     relativePosition: { x: relativeX, y: relativeY },
     clickPosition: { x: event.clientX, y: event.clientY },
@@ -125,8 +113,36 @@ function handleClick(event) {
     viewportSize: { width: window.innerWidth, height: window.innerHeight },
     url: window.location.href,
     elementInfo: elementInfo,
-  };
+  });
 
+  // Right-click: send immediately (no double-click possible)
+  if (event.button === 2) {
+    sendClickStep(buildStepData('Right Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Right-click')));
+    return;
+  }
+
+  // Left click: detect double-click
+  if (now - lastClickTime < DOUBLE_CLICK_MS && lastClickTarget === target) {
+    // Double-click detected — cancel pending single click, send double click
+    clearTimeout(pendingClick);
+    pendingClick = null;
+    lastClickTime = 0;
+    lastClickTarget = null;
+    sendClickStep(buildStepData('Double Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Double-click')));
+  } else {
+    // Potential single click — delay to see if a second click follows
+    lastClickTime = now;
+    lastClickTarget = target;
+    const stepData = buildStepData('Left Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Click'));
+    clearTimeout(pendingClick);
+    pendingClick = setTimeout(() => {
+      sendClickStep(stepData);
+      pendingClick = null;
+    }, DOUBLE_CLICK_MS);
+  }
+}
+
+function sendClickStep(stepData) {
   chrome.runtime
     .sendMessage({ type: 'CLICK_EVENT', data: stepData })
     .catch((err) => {
@@ -157,15 +173,10 @@ function handleKeydown(event) {
   }
 
   // Special action keys — flush typed text, then record the key press
-  if (['Enter', 'Tab', 'Escape', 'Delete'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
+  if (['Enter', 'Tab', 'Escape', 'Delete', 'Backspace'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
     flushTypedText();
-    sendKeyStep(`Press ${event.key}`);
-    return;
-  }
-
-  // Backspace just edits the buffer
-  if (event.key === 'Backspace' && !event.ctrlKey && !event.metaKey) {
-    typedText = typedText.slice(0, -1);
+    const keyLabel = event.key === 'Backspace' ? 'Delete' : event.key;
+    sendKeyStep(`Press ${keyLabel}`);
     return;
   }
 
@@ -249,8 +260,7 @@ function getElementText(element) {
   return text.trim().substring(0, 100);
 }
 
-function generateClickDescription(elementInfo, x, y, isRightClick) {
-  const prefix = isRightClick ? 'Right-click' : 'Click';
+function generateClickDescription(elementInfo, x, y, prefix) {
   if (elementInfo.tagName === 'button' || elementInfo.type === 'submit') {
     const label = elementInfo.text || elementInfo.ariaLabel || 'button';
     return `${prefix} "${label}"`;

@@ -758,6 +758,38 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
   trackPageChange(activeInfo.tabId, 'tab-switch');
 });
 
+// Detect new tab creation
+chrome.tabs.onCreated.addListener((tab) => {
+  if (!state.isRecording || state.isPaused) return;
+
+  state.stepCounter++;
+  const step = {
+    stepNumber: state.stepCounter,
+    timestamp: new Date().toISOString(),
+    actionType: 'Navigate',
+    windowTitle: 'New Tab',
+    description: 'Open new tab',
+    screenshotDataUrl: null,
+    url: tab.url || 'chrome://newtab',
+  };
+  state.steps.push(step);
+  chrome.runtime.sendMessage({ type: 'STEP_ADDED', step }).catch(() => {});
+
+  // Inject content script into new tab once it loads
+  if (tab.id) {
+    const injectWhenReady = async (tabId, changeInfo) => {
+      if (tabId === tab.id && changeInfo.status === 'complete') {
+        chrome.tabs.onUpdated.removeListener(injectWhenReady);
+        const injected = await ensureContentScript(tab.id);
+        if (injected) {
+          chrome.tabs.sendMessage(tab.id, { type: 'START_RECORDING' }).catch(() => {});
+        }
+      }
+    };
+    chrome.tabs.onUpdated.addListener(injectWhenReady);
+  }
+});
+
 chrome.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId !== 0) return;
   trackPageChange(details.tabId, 'navigation');
