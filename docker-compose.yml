@@ -102,14 +102,19 @@ services:
   sendcloak:
     image: ghcr.io/myfoxit/sendcloak:latest
     profiles: ["privacy"]
-    command: ["api", "--port", "9090", "--bind", "0.0.0.0"]
+    command: ["api", "--port", "9090", "--bind", "0.0.0.0", "--config", "/data/config.yaml"]
     environment:
+      SENDCLOAK_CONFIG: /data/config.yaml
       SENDCLOAK_STRATEGY: "${SENDCLOAK_STRATEGY:-semantic}"
       SENDCLOAK_LOG_LEVEL: info
     ports:
       - "9090:9090"
     volumes:
       - sendcloak-data:/root/.sendcloak
+      - ./sendcloak-config.yaml:/data/config.yaml:ro
+    depends_on:
+      presidio:
+        condition: service_started
     networks:
       - ondoki-network
     healthcheck:
@@ -117,6 +122,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  presidio:
+    build:
+      context: .
+      dockerfile: presidio/Dockerfile
+      args:
+        PRESIDIO_LANG_PACK: "${PRESIDIO_LANG_PACK:-en}"
+    image: "ondoki-presidio:${PRESIDIO_LANG_PACK:-en}"
+    container_name: ondoki-presidio
+    profiles: ["privacy"]
+    environment:
+      DEFAULT_LANGUAGE: "${PRESIDIO_LANGUAGE:-en}"
+      NLP_CONF_FILE: "/app/presidio_nlp_${PRESIDIO_LANG_PACK:-en}.yaml"
+    ports:
+      - "5002:3000"
+    networks:
+      - ondoki-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   video-worker:
     build:

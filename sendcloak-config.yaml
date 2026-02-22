@@ -1,0 +1,14 @@
+proxy:
+  port: 9090
+
+obfuscation:
+  strategy: semantic
+  levels: [regex, pii]
+  pii:
+    backend: presidio
+    presidio:
+      endpoint: "http://presidio:3000"
+      language: en
+
+logging:
+  level: info
