@@ -260,8 +260,8 @@ export function setupIpcHandlers(
       // Show native notification so user sees matches even when Ondoki is in background
       if (Notification.isSupported() && matches.length > 0) {
         const title = matches.length === 1
-          ? `📋 ${matches[0].resource_name}`
-          : `📋 ${matches.length} context suggestions`;
+          ? `${matches[0].resource_name}`
+          : `${matches.length} context suggestions`;
         const body = matches
           .slice(0, 3)
           .map((m: any) => m.note ? `${m.resource_name}: ${m.note}` : m.resource_name)
