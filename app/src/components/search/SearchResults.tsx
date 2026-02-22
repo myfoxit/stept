@@ -1,4 +1,5 @@
 import * as React from 'react';
+import DOMPurify from 'dompurify';
 import { useNavigate } from 'react-router-dom';
 import {
   IconSearch,
@@ -206,7 +207,7 @@ function SearchResultItem({
           <div className="flex items-center gap-1.5">
             <span
               className="text-sm font-medium truncate"
-              dangerouslySetInnerHTML={{ __html: result.name_highlighted || result.name }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.name_highlighted || result.name) }}
             />
             {result.is_processed && (
               <IconSparkles className="h-3 w-3 text-primary flex-shrink-0" />
@@ -215,7 +216,7 @@ function SearchResultItem({
           {result.summary_highlighted && result.summary && (
             <p
               className="text-xs text-muted-foreground line-clamp-1 mt-0.5"
-              dangerouslySetInnerHTML={{ __html: result.summary_highlighted }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.summary_highlighted) }}
             />
           )}
           {result.tags && result.tags.length > 0 && (
@@ -246,7 +247,7 @@ function SearchResultItem({
               <span
                 className="truncate"
                 dangerouslySetInnerHTML={{
-                  __html: step.generated_title_highlighted || step.description_highlighted || step.description || '',
+                  __html: DOMPurify.sanitize(step.generated_title_highlighted || step.description_highlighted || step.description || ''),
                 }}
               />
             </button>

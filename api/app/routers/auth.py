@@ -798,58 +798,10 @@ async def test_delete_user(
     host = request.url.hostname
     is_local = host in {"localhost", "127.0.0.1"}
     if not (is_local or os.getenv("E2E_ENABLE_DELETE_USER") == "1"):
-        raise HTTPException(status_code=403, detail="FORBIDDEN")# remove both new and legacy cookies
-    deleted = await user_crud.delete_user_by_email(db, email, path="/")
-    return {"deleted": deleted}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# OAuth 2.0 PKCE Flow Endpoints@router.post("/verify")
-# ─────────────────────────────────────────────────────────────────────────────VerifyIn, db: AsyncSession = Depends(get_db)):
-    if not await auth_crud.verify_email(db, body.token):
-        raise HTTPException(status_code=400, detail="INVALID_TOKEN")
-    return {"ok": True}
-
-@router.post("/password-reset/request")
-async def password_reset_request(body: PasswordResetRequestIn, db: AsyncSession = Depends(get_db), request: Request = None):
-    # Apply rate limiting
-    _rate_limit(request, "password_reset")
-    # Always return a generic response to prevent email enumeration
-    try:
-        await auth_crud.request_password_reset(db, body.email)
-    except Exception:
-        # Intentionally swallow errors to keep response generic
-        pass
-    return {"ok": True}
-
-@router.post("/password-reset/confirm")
-async def password_reset_confirm(body: PasswordResetConfirmIn, db: AsyncSession = Depends(get_db)):
-    if not await auth_crud.reset_password(db, body.token, body.new_password):
-        raise HTTPException(status_code=400, detail="INVALID_TOKEN")
-    return {"ok": True}
-
-@router.get("/me", response_model=UserRead)
-async def me(current_user: User = Depends(get_current_user)):
-    return current_user
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test utilities (E2E only)
-# DELETE /api/v1/auth/test-utils/users/{email}
-# Protected: only allowed on localhost or when E2E_ENABLE_DELETE_USER=1
-# ─────────────────────────────────────────────────────────────────────────────
-@router.delete("/test-utils/users/{email}")
-async def test_delete_user(
-    email: str,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    host = request.url.hostname
-    is_local = host in {"localhost", "127.0.0.1"}
-    if not (is_local or os.getenv("E2E_ENABLE_DELETE_USER") == "1"):
         raise HTTPException(status_code=403, detail="FORBIDDEN")
     deleted = await user_crud.delete_user_by_email(db, email)
     return {"deleted": deleted}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OAuth 2.0 PKCE Flow Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────

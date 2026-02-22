@@ -1,4 +1,5 @@
 import * as React from 'react';
+import DOMPurify from 'dompurify';
 import {
   IconX,
   IconCopy,
@@ -168,7 +169,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
           ) : guideContent ? (
             <div
               className="text-sm text-slate-700 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(guideContent) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(guideContent)) }}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">

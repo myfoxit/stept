@@ -39,7 +39,8 @@ apiClient.interceptors.response.use(
     console.error('[API error]', error);
 
     if (error.response?.status === 401) {
-      const error = new Error('UNAUTHORIZED');
+      const unauthorizedError = new Error('UNAUTHORIZED');
+      return Promise.reject(unauthorizedError);
     }
 
     return Promise.reject(error);

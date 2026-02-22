@@ -64,7 +64,11 @@ async def api_create_folder(
 
 # Get single folder
 @router.get("/{folder_id}", response_model=FolderRead)
-async def api_get_folder(folder_id: str, db: AsyncSession = Depends(get_db)):
+async def api_get_folder(
+    folder_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     folder = await get_folder(db, folder_id)
     if not folder:
         raise HTTPException(404, "Folder not found")

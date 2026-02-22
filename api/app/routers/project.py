@@ -34,7 +34,14 @@ class ProjectPublicInfo(BaseModel):
     name: str
 
 @router.post("/", response_model=ProjectRead)
-async def api_create_project(p: ProjectCreate, db: AsyncSession = Depends(get_db)):
+async def api_create_project(
+    p: ProjectCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Ensure user can only create projects for themselves
+    if p.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot create projects for other users")
     # Check for duplicate project name for this user
     from app.models import project_members
     stmt = (
@@ -50,8 +57,14 @@ async def api_create_project(p: ProjectCreate, db: AsyncSession = Depends(get_db
     return await create_project(db, p.name, p.user_id)
 
 @router.get("/{user_id}", response_model=list[ProjectRead])
-async def api_list_projects(db: AsyncSession = Depends(get_db), user_id: str = None):
+async def api_list_projects(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = None,
+    current_user: User = Depends(get_current_user),
+):
     """Get all projects where user is a member (backward compatible)."""
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot list projects for other users")
     return await get_projects(db, user_id)
 
 @router.delete("/{project_id}")

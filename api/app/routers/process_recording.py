@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Header, UploadFile, File, Form, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -106,7 +106,7 @@ async def upload_session_metadata(
     session_id: str,
     metadata: List[StepMetadata],
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Upload metadata for all steps in a session"""
     try:
@@ -124,7 +124,7 @@ async def upload_image(
     stepNumber: int = Form(...),
     replace: Optional[bool] = Form(default=False),  # Make it Optional[bool]
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Upload a single image for a step"""
     try:
@@ -271,7 +271,7 @@ async def get_session_status_endpoint(
     step_offset: int = Query(default=0, ge=0),
     step_limit: int = Query(default=0, ge=0, description="0 means all steps (backward compat)"),
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Get status of an upload session (augmented with icon fields and title)"""
     try:
@@ -329,7 +329,7 @@ async def get_image(
     session_id: str,
     step_number: int,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Retrieve an uploaded image (local file or redirect to signed URL)"""
     access = await get_file_access(db, session_id, step_number, expires_in=3600)
@@ -358,15 +358,16 @@ async def get_image(
 @router.get("/sessions")
 async def list_sessions(
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None),
+    current_user: User = Depends(get_current_user),
     limit: int = 20,
     offset: int = 0
 ):
-    """List recording sessions"""
+    """List recording sessions for the current user"""
     try:
         from sqlalchemy import select
         stmt = (
             select(ProcessRecordingSession)
+            .where(ProcessRecordingSession.user_id == current_user.id)
             .order_by(ProcessRecordingSession.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -383,41 +384,6 @@ async def list_sessions(
         return response
     except Exception as e:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Error listing sessions: {str(e)}")
-    
-
-    """Get status of an upload session"""
-    try:
-        status_data = await get_session_status(db, session_id)
-        return status_data
-    except ValueError as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-
-@router.get("/sessions")
-async def list_sessions(
-    db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None),
-    limit: int = 20,
-    offset: int = 0
-):
-    """List recording sessions"""
-    # For now, list all sessions (you can add user filtering later)
-    from sqlalchemy import select
-    stmt = (
-        select(ProcessRecordingSession)
-        .order_by(ProcessRecordingSession.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-    
-    result = await db.execute(stmt)
-    sessions = result.scalars().all()
-    
-    response = []
-    for session in sessions:
-        status_data = await get_session_status(db, session.id)
-        response.append(status_data)
-    
-    return response
 
 # NEW: Workflow management endpoints
 @router.put("/workflow/{session_id}")
@@ -432,10 +398,20 @@ async def update_workflow_endpoint(
     # Preferred: JSON body
     payload: Optional[dict] = Body(default=None),
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Update workflow details"""
     try:
+        # Verify ownership/access
+        session = await db.get(ProcessRecordingSession, session_id)
+        if not session:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+        if session.project_id:
+            await check_project_permission(
+                db=db, user_id=current_user.id,
+                project_id=session.project_id, required_role=ProjectRole.EDITOR,
+            )
+
         # Prefer values from JSON body when provided
         body = payload or {}
         eff_name = body.get("name", name)
@@ -494,10 +470,18 @@ async def move_workflow_endpoint(
 async def delete_workflow_endpoint(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a workflow"""
     try:
+        session = await db.get(ProcessRecordingSession, session_id)
+        if not session:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+        if session.project_id:
+            await check_project_permission(
+                db=db, user_id=current_user.id,
+                project_id=session.project_id, required_role=ProjectRole.EDITOR,
+            )
         await delete_workflow(db, session_id)
         return {"status": "success", "message": "Workflow deleted"}
     except ValueError as e:
@@ -507,10 +491,18 @@ async def delete_workflow_endpoint(
 async def duplicate_workflow_endpoint(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Duplicate a workflow"""
     try:
+        session = await db.get(ProcessRecordingSession, session_id)
+        if not session:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+        if session.project_id:
+            await check_project_permission(
+                db=db, user_id=current_user.id,
+                project_id=session.project_id, required_role=ProjectRole.VIEWER,
+            )
         new_workflow = await duplicate_workflow(db, session_id)
         return new_workflow
     except ValueError as e:
@@ -652,7 +644,7 @@ async def export_workflow_markdown(
     session_id: str,
     include_images: bool = Query(default=False, description="Include image URLs in markdown"),
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Export workflow as Markdown"""
     from app.workflow_export import generate_markdown
@@ -721,7 +713,7 @@ async def export_workflow_html(
     session_id: str,
     embed_images: bool = Query(default=True, description="Embed images as base64"),
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Export workflow as HTML"""
     from app.workflow_export import generate_html
@@ -783,7 +775,7 @@ async def export_workflow_html(
 async def export_workflow_pdf(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Export workflow as PDF using Gotenberg"""
     from app.workflow_export import generate_pdf_gotenberg, _generate_pdf_reportlab
@@ -869,7 +861,7 @@ async def export_workflow_pdf(
 async def export_workflow_confluence(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Export workflow as Confluence Storage Format"""
     from app.workflow_export import generate_confluence_storage
@@ -898,7 +890,7 @@ async def export_workflow_confluence(
 async def export_workflow_notion(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Export workflow as Notion-compatible Markdown"""
     from app.workflow_export import generate_notion_markdown
@@ -927,7 +919,7 @@ async def export_workflow_notion(
 async def export_workflow_docx(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(get_current_user),
 ):
     """Export workflow as Microsoft Word document"""
     from app.workflow_export import generate_docx
