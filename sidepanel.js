@@ -103,7 +103,18 @@ function createStepCard(step, isNew) {
         ${step.url ? `<p class="step-url">${escapeHtml(step.url)}</p>` : ''}
       </div>
     </div>
-    ${step.screenshotDataUrl ? `<img class="step-screenshot" src="${step.screenshotDataUrl}" alt="Step ${step.stepNumber}">` : ''}
+    ${step.screenshotDataUrl ? `
+      <div class="step-screenshot-container">
+        <img class="step-screenshot" src="${step.screenshotDataUrl}" alt="Step ${step.stepNumber}">
+        ${step.screenshotRelativeMousePosition && step.screenshotSize ? `
+          <div class="click-marker" style="left: ${(step.screenshotRelativeMousePosition.x / step.screenshotSize.width) * 100}%; top: ${(step.screenshotRelativeMousePosition.y / step.screenshotSize.height) * 100}%;">
+            <div class="click-marker-pulse"></div>
+            <div class="click-marker-ring"></div>
+            <div class="click-marker-dot"></div>
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
     <button class="step-delete" data-step="${step.stepNumber}" title="Delete step">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="2">
         <polyline points="3 6 5 6 21 6"/>

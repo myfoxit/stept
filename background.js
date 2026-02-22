@@ -291,6 +291,30 @@ async function fetchUserProjects() {
   }
 }
 
+// Ensure content script is injected and alive in a tab
+async function ensureContentScript(tabId) {
+  try {
+    // First try pinging the existing content script
+    const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' }).catch(() => null);
+    if (response && response.alive) return true;
+  } catch (e) {
+    // No content script, need to inject
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js'],
+    });
+    // Small delay for script to initialize
+    await new Promise(r => setTimeout(r, 50));
+    return true;
+  } catch (e) {
+    debugLog('Failed to inject content script into tab', tabId, e);
+    return false;
+  }
+}
+
 // Recording functions
 function startRecording(projectId) {
   state.isRecording = true;
@@ -302,26 +326,20 @@ function startRecording(projectId) {
 
   chrome.storage.local.set({ selectedProjectId: projectId });
 
-  chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
+  // Inject content script into ALL open http/https tabs
+  chrome.tabs.query({}, async (tabs) => {
+    for (const tab of tabs) {
       if (
         tab.id &&
         tab.url &&
         (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
       ) {
-        // Force-inject content script first (in case it's not loaded yet), then start
-        chrome.scripting.executeScript(
-          { target: { tabId: tab.id }, files: ['content.js'] },
-          () => {
-            // Ignore errors (e.g. chrome:// pages)
-            if (chrome.runtime.lastError) return;
-            chrome.tabs
-              .sendMessage(tab.id, { type: 'START_RECORDING' })
-              .catch(() => {});
-          }
-        );
+        const injected = await ensureContentScript(tab.id);
+        if (injected) {
+          chrome.tabs.sendMessage(tab.id, { type: 'START_RECORDING' }).catch(() => {});
+        }
       }
-    });
+    }
   });
 
   chrome.action.setBadgeText({ text: 'REC' });
@@ -397,26 +415,29 @@ async function drawClickMarker(screenshotDataUrl, clickPos, viewportSize) {
     const x = clickPos.x * scaleX;
     const y = clickPos.y * scaleY;
 
+    // Green click marker matching ondoki-web style
+    const radius = 16 * scaleX;
+
+    // Outer glow
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 8 * scaleX, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+    ctx.fill();
+
     // Outer ring
-    const radius = 18 * scaleX;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = '#D94F3D';
-    ctx.lineWidth = 3 * scaleX;
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+    ctx.fill();
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2 * scaleX;
     ctx.stroke();
 
     // Inner dot
     ctx.beginPath();
-    ctx.arc(x, y, 5 * scaleX, 0, Math.PI * 2);
-    ctx.fillStyle = '#D94F3D';
+    ctx.arc(x, y, 4 * scaleX, 0, Math.PI * 2);
+    ctx.fillStyle = '#22c55e';
     ctx.fill();
-
-    // Semi-transparent pulse ring
-    ctx.beginPath();
-    ctx.arc(x, y, radius + 8 * scaleX, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(217, 79, 61, 0.3)';
-    ctx.lineWidth = 2 * scaleX;
-    ctx.stroke();
 
     const resultBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
     return new Promise((resolve) => {
@@ -440,11 +461,17 @@ async function addStep(stepData) {
 
   state.stepCounter++;
 
-  let screenshot = await captureScreenshot();
+  // Only capture screenshot for click events, not navigations or typing
+  let screenshot = null;
+  const isClickAction = stepData.actionType && stepData.actionType.includes('Click');
 
-  // Draw click marker on screenshot if we have click coordinates
-  if (screenshot && stepData.clickPosition && stepData.viewportSize) {
-    screenshot = await drawClickMarker(screenshot, stepData.clickPosition, stepData.viewportSize);
+  if (isClickAction) {
+    screenshot = await captureScreenshot();
+
+    // Draw click marker on screenshot if we have click coordinates
+    if (screenshot && stepData.clickPosition && stepData.viewportSize) {
+      screenshot = await drawClickMarker(screenshot, stepData.clickPosition, stepData.viewportSize);
+    }
   }
 
   const step = {
@@ -731,18 +758,19 @@ chrome.webNavigation.onCompleted.addListener((details) => {
   trackPageChange(details.tabId, 'navigation');
 });
 
-// Listen for tab updates to inject content script
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+// Listen for tab updates to inject content script into newly loaded pages
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (
     changeInfo.status === 'complete' &&
     state.isRecording &&
     tab.url &&
     (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
   ) {
-    chrome.tabs
-      .sendMessage(tabId, {
+    const injected = await ensureContentScript(tabId);
+    if (injected) {
+      chrome.tabs.sendMessage(tabId, {
         type: state.isPaused ? 'PAUSE_RECORDING' : 'START_RECORDING',
-      })
-      .catch(() => {});
+      }).catch(() => {});
+    }
   }
 });

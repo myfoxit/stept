@@ -8,25 +8,45 @@ function debugLog(...args) {
   if (DEBUG) console.log('[Ondoki]', ...args);
 }
 
-// Listen for messages from background
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  debugLog('Content script received message:', message.type);
-  switch (message.type) {
-    case 'START_RECORDING':
-      startCapturing();
-      sendResponse({ success: true });
-      break;
-    case 'STOP_RECORDING':
-      stopCapturing();
-      sendResponse({ success: true });
-      break;
-    case 'PAUSE_RECORDING':
-      isRecording = false;
-      sendResponse({ success: true });
-      break;
-  }
-  return true;
-});
+// Guard against double-injection: if already loaded, skip
+if (window.__ondokiContentLoaded) {
+  debugLog('Content script already loaded, skipping');
+} else {
+  window.__ondokiContentLoaded = true;
+
+  // Listen for messages from background
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    debugLog('Content script received message:', message.type);
+    switch (message.type) {
+      case 'START_RECORDING':
+        startCapturing();
+        sendResponse({ success: true });
+        break;
+      case 'STOP_RECORDING':
+        stopCapturing();
+        sendResponse({ success: true });
+        break;
+      case 'PAUSE_RECORDING':
+        isRecording = false;
+        sendResponse({ success: true });
+        break;
+      case 'PING':
+        sendResponse({ alive: true });
+        break;
+    }
+    return true;
+  });
+
+  // Check initial recording state
+  setTimeout(() => {
+    chrome.runtime.sendMessage({ type: 'GET_STATE' }, (response) => {
+      if (chrome.runtime.lastError) return;
+      if (response && response.isRecording && !response.isPaused) {
+        startCapturing();
+      }
+    });
+  }, 100);
+}
 
 function startCapturing() {
   if (isRecording) return;
@@ -98,6 +118,10 @@ function handleClick(event) {
 
 function handleKeydown(event) {
   if (!isRecording) return;
+
+  // Skip password and sensitive fields
+  const el = document.activeElement;
+  if (el && (el.type === 'password' || el.autocomplete === 'cc-number' || el.autocomplete === 'cc-cvc' || el.autocomplete === 'cc-exp')) return;
 
   if (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') {
     flushTypedText();
@@ -188,13 +212,3 @@ function generateClickDescription(elementInfo, x, y) {
     return `Click on ${elementInfo.tagName} element`;
   }
 }
-
-// Check initial recording state
-setTimeout(() => {
-  chrome.runtime.sendMessage({ type: 'GET_STATE' }, (response) => {
-    if (chrome.runtime.lastError) return;
-    if (response && response.isRecording && !response.isPaused) {
-      startCapturing();
-    }
-  });
-}, 100);
