@@ -467,11 +467,6 @@ async function addStep(stepData) {
 
   if (isClickAction) {
     screenshot = await captureScreenshot();
-
-    // Draw click marker on screenshot if we have click coordinates
-    if (screenshot && stepData.clickPosition && stepData.viewportSize) {
-      screenshot = await drawClickMarker(screenshot, stepData.clickPosition, stepData.viewportSize);
-    }
   }
 
   const step = {
