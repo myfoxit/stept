@@ -728,8 +728,18 @@ async function trackPageChange(tabId, reason) {
     if (lastTrackedPage.tabId === tabId && lastTrackedPage.url === tab.url && now - lastTrackedPage.time < 2000) return;
     lastTrackedPage = { tabId, url: tab.url, time: now };
 
-    // Small delay so the tab renders before screenshot
-    await new Promise(r => setTimeout(r, 300));
+    // Suppress navigate step if the last step was a click or Enter within 3s
+    // (the navigation was caused by that action, recording it is redundant)
+    if (state.steps.length > 0) {
+      const lastStep = state.steps[state.steps.length - 1];
+      const lastStepAge = now - new Date(lastStep.timestamp).getTime();
+      const wasUserAction = lastStep.actionType?.includes('Click') ||
+        (lastStep.actionType === 'Key' && lastStep.description?.includes('Enter'));
+      if (wasUserAction && lastStepAge < 3000) {
+        debugLog('Suppressing navigate step (caused by recent user action)');
+        return;
+      }
+    }
 
     await addStep({
       actionType: 'Navigate',

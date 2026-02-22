@@ -1,7 +1,9 @@
 let isRecording = false;
 let typedText = '';
 let typingTimer = null;
+let lastClickTime = 0;
 const TYPING_DELAY = 1000;
+const CLICK_DEBOUNCE_MS = 300; // Ignore clicks within 300ms of each other (double-click → 1 step)
 const DEBUG = false;
 
 function debugLog(...args) {
@@ -53,7 +55,9 @@ function startCapturing() {
   isRecording = true;
   debugLog('Started capturing events');
 
-  document.addEventListener('click', handleClick, true);
+  // Use mousedown instead of click to capture all button types including right-click
+  document.addEventListener('mousedown', handleClick, true);
+  document.addEventListener('contextmenu', preventDoubleCapture, true);
   document.addEventListener('keydown', handleKeydown, true);
 }
 
@@ -62,12 +66,23 @@ function stopCapturing() {
   flushTypedText();
   debugLog('Stopped capturing events');
 
-  document.removeEventListener('click', handleClick, true);
+  document.removeEventListener('mousedown', handleClick, true);
+  document.removeEventListener('contextmenu', preventDoubleCapture, true);
   document.removeEventListener('keydown', handleKeydown, true);
+}
+
+// Prevent contextmenu from creating a duplicate step (mousedown already captured it)
+function preventDoubleCapture(event) {
+  // Do nothing — just here so we don't need a separate contextmenu handler
 }
 
 function handleClick(event) {
   if (!isRecording) return;
+
+  // Debounce: ignore clicks within 300ms (handles double-click → single step)
+  const now = Date.now();
+  if (now - lastClickTime < CLICK_DEBOUNCE_MS) return;
+  lastClickTime = now;
 
   flushTypedText();
 
@@ -92,13 +107,16 @@ function handleClick(event) {
   const buttonName =
     event.button === 0 ? 'Left' : event.button === 2 ? 'Right' : 'Middle';
 
+  const actionType = event.button === 2 ? 'Right Click' : `${buttonName} Click`;
+
   const stepData = {
-    actionType: `${buttonName} Click`,
+    actionType: actionType,
     pageTitle: document.title,
     description: generateClickDescription(
       elementInfo,
       event.clientX,
       event.clientY,
+      event.button === 2,
     ),
     globalPosition: { x: event.screenX, y: event.screenY },
     relativePosition: { x: relativeX, y: relativeY },
@@ -139,12 +157,15 @@ function handleKeydown(event) {
   }
 
   // Special action keys — flush typed text, then record the key press
-  if (['Enter', 'Tab', 'Escape', 'Delete', 'Backspace'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
+  if (['Enter', 'Tab', 'Escape', 'Delete'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
     flushTypedText();
-    // Only record Enter/Tab/Escape/Delete as separate steps (Backspace is part of editing, skip)
-    if (event.key !== 'Backspace') {
-      sendKeyStep(`Press ${event.key}`);
-    }
+    sendKeyStep(`Press ${event.key}`);
+    return;
+  }
+
+  // Backspace just edits the buffer
+  if (event.key === 'Backspace' && !event.ctrlKey && !event.metaKey) {
+    typedText = typedText.slice(0, -1);
     return;
   }
 
@@ -228,23 +249,24 @@ function getElementText(element) {
   return text.trim().substring(0, 100);
 }
 
-function generateClickDescription(elementInfo, x, y) {
+function generateClickDescription(elementInfo, x, y, isRightClick) {
+  const prefix = isRightClick ? 'Right-click' : 'Click';
   if (elementInfo.tagName === 'button' || elementInfo.type === 'submit') {
     const label = elementInfo.text || elementInfo.ariaLabel || 'button';
-    return `Click "${label}"`;
+    return `${prefix} "${label}"`;
   } else if (elementInfo.tagName === 'a') {
     const label = elementInfo.text || 'link';
-    return `Click "${label}"`;
+    return `${prefix} "${label}"`;
   } else if (elementInfo.tagName === 'input') {
     const inputType = elementInfo.type || 'text';
     const label = elementInfo.placeholder || elementInfo.name || inputType + ' field';
-    return `Click "${label}"`;
+    return `${prefix} "${label}"`;
   } else if (elementInfo.tagName === 'select') {
     const label = elementInfo.name || elementInfo.ariaLabel || 'dropdown';
-    return `Click "${label}"`;
+    return `${prefix} "${label}"`;
   } else if (elementInfo.text && elementInfo.text.length > 0) {
-    return `Click "${elementInfo.text.substring(0, 50)}"`;
+    return `${prefix} "${elementInfo.text.substring(0, 50)}"`;
   } else {
-    return `Click on ${elementInfo.tagName} element`;
+    return `${prefix} on ${elementInfo.tagName} element`;
   }
 }

@@ -281,14 +281,25 @@ backBtn.addEventListener('click', async () => {
 uploadBtn.addEventListener('click', performUpload);
 
 newCaptureBtn.addEventListener('click', async () => {
+  // Get the last used project ID and start a fresh recording
+  const state = await sendMessage({ type: 'GET_STATE' });
+  const projectId = state.selectedProjectId;
+
+  if (projectId) {
+    await sendMessage({ type: 'CLEAR_STEPS' });
+    await sendMessage({ type: 'START_RECORDING', projectId });
+  }
+
   hideUploadPanel();
   stepsList.innerHTML = '';
+  steps = [];
   const emptyStateEl = document.getElementById('emptyState');
   if (emptyStateEl) {
     emptyStateEl.style.display = 'flex';
   }
   badgeStepCount.textContent = '';
   recordingTimeEl.textContent = '00:00';
+  await refreshState();
 });
 
 // Listen for step updates from background
