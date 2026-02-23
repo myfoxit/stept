@@ -25,6 +25,12 @@ def parse_cors(v: Any) -> list[str] | str:
     raise ValueError(v)
 
 
+def parse_bool_env(v: Any) -> Any:
+    if isinstance(v, str):
+        return v.strip()
+    return v
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         # Use top level .env file (one level above ./backend/)
@@ -109,13 +115,13 @@ class Settings(BaseSettings):
     LLM_BASE_URL: Optional[str] = None          # custom endpoint URL
 
     # ── SendCloak PII obfuscation ──────────────────────────────
-    SENDCLOAK_ENABLED: bool = False
+    SENDCLOAK_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
     SENDCLOAK_URL: str = "http://sendcloak:9090"
 
     # ── DataVeil privacy proxy ──────────────────────────────────
-    DATAVEIL_ENABLED: bool = False
+    DATAVEIL_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
     DATAVEIL_URL: Optional[str] = None           # e.g. http://localhost:8080
-    DATAVEIL_FALLBACK: bool = True               # fall back to direct if proxy is down
+    DATAVEIL_FALLBACK: Annotated[bool, BeforeValidator(parse_bool_env)] = True  # fall back to direct if proxy is down
 
 # Instantiate once and share across the application
 settings = Settings()  # noqa: E305

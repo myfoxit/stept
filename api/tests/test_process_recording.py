@@ -138,7 +138,7 @@ async def test_upload_metadata(
 
 
 @pytest.mark.asyncio
-async def test_upload_metadata_nonexistent_session(async_client: AsyncClient):
+async def test_upload_metadata_nonexistent_session(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.post(
         "/api/v1/process-recording/session/nonexistent/metadata",
         json=[
@@ -148,6 +148,7 @@ async def test_upload_metadata_nonexistent_session(async_client: AsyncClient):
                 "actionType": "click",
             }
         ],
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 
@@ -234,9 +235,10 @@ async def test_get_session_status(
 
 
 @pytest.mark.asyncio
-async def test_get_session_status_not_found(async_client: AsyncClient):
+async def test_get_session_status_not_found(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.get(
-        "/api/v1/process-recording/session/nonexistent/status"
+        "/api/v1/process-recording/session/nonexistent/status",
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 
@@ -360,10 +362,11 @@ async def test_update_workflow_icon(
 
 
 @pytest.mark.asyncio
-async def test_update_workflow_not_found(async_client: AsyncClient):
+async def test_update_workflow_not_found(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.put(
         "/api/v1/process-recording/workflow/nonexistent",
         json={"name": "Ghost"},
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 
@@ -432,9 +435,10 @@ async def test_delete_workflow(
 
 
 @pytest.mark.asyncio
-async def test_delete_workflow_not_found(async_client: AsyncClient):
+async def test_delete_workflow_not_found(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.delete(
-        "/api/v1/process-recording/workflow/nonexistent"
+        "/api/v1/process-recording/workflow/nonexistent",
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 
@@ -470,9 +474,10 @@ async def test_duplicate_workflow(
 
 
 @pytest.mark.asyncio
-async def test_duplicate_workflow_not_found(async_client: AsyncClient):
+async def test_duplicate_workflow_not_found(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.post(
-        "/api/v1/process-recording/workflow/nonexistent/duplicate"
+        "/api/v1/process-recording/workflow/nonexistent/duplicate",
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 
@@ -655,17 +660,19 @@ async def test_export_html(
 
 
 @pytest.mark.asyncio
-async def test_export_markdown_not_found(async_client: AsyncClient):
+async def test_export_markdown_not_found(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.get(
-        "/api/v1/process-recording/workflow/nonexistent/export/markdown"
+        "/api/v1/process-recording/workflow/nonexistent/export/markdown",
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_export_html_not_found(async_client: AsyncClient):
+async def test_export_html_not_found(async_client: AsyncClient, auth_headers: dict):
     resp = await async_client.get(
-        "/api/v1/process-recording/workflow/nonexistent/export/html"
+        "/api/v1/process-recording/workflow/nonexistent/export/html",
+        headers=auth_headers,
     )
     assert resp.status_code == 404
 

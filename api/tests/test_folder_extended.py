@@ -284,8 +284,8 @@ async def test_get_folder(
 
 
 @pytest.mark.asyncio
-async def test_get_nonexistent_folder(async_client: AsyncClient):
-    resp = await async_client.get("/api/v1/folders/nonexistent")
+async def test_get_nonexistent_folder(async_client: AsyncClient, auth_headers: dict):
+    resp = await async_client.get("/api/v1/folders/nonexistent", headers=auth_headers)
     assert resp.status_code == 404
 
 
