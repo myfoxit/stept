@@ -67,6 +67,8 @@ services:
       ENVIRONMENT: production
       JWT_SECRET: ${JWT_SECRET}
       ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY}
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
     volumes:
       - file-storage:/app/storage
     healthcheck:
@@ -75,6 +77,30 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - ondoki-network
+
+  media-worker:
+    image: ghcr.io/myfoxit/ondoki-web-api:latest
+    container_name: ondoki-media-worker
+    restart: unless-stopped
+    command: celery -A app.tasks worker --loglevel=info --queues=celery,media --concurrency=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ondoki}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      ONDOKI_UPLOAD_DIR: /app/storage/videos
+    volumes:
+      - file-storage:/app/storage
     networks:
       - ondoki-network
 
