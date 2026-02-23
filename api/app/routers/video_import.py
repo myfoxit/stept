@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_session as get_db
-from app.models import ProcessRecordingSession, User
+from app.models import ProcessRecordingSession, MediaProcessingJob, User
+from app.crud.media_jobs import enqueue_or_get_job
 from app.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -67,23 +68,31 @@ async def upload_video(
     session.video_size_bytes = total_size
     session.status = "processing"
     session.processing_stage = "queued"
+
+    job = await enqueue_or_get_job(db, session.id, "video_import")
     await db.commit()
 
     from app.tasks import is_celery_available
     if is_celery_available():
         from app.tasks.ai_tasks import process_video_import_task
-        task = process_video_import_task.delay(session.id)
+        task = process_video_import_task.delay(session.id, job.id)
+        job.task_id = task.id
+        await db.commit()
         return {
             "session_id": session.id,
+            "job_id": job.id,
             "task_id": task.id,
             "status": "queued",
             "message": "Video uploaded and queued for processing",
         }
     else:
+        job.status = "failed"
+        job.stage = "failed"
+        job.error = "Media worker not available. Start the ondoki-media-worker container."
         session.processing_stage = "failed"
-        session.processing_error = "Video worker not available. Start the ondoki-video-worker container."
+        session.processing_error = "Media worker not available. Start the ondoki-media-worker container."
         await db.commit()
-        raise HTTPException(503, "Video processing worker not available. Deploy the ondoki-video-worker container.")
+        raise HTTPException(503, "Video processing worker not available. Deploy the ondoki-media-worker container.")
 
 
 @router.get("/status/{session_id}")
@@ -103,6 +112,11 @@ async def get_import_status(
     if not session:
         raise HTTPException(404, "Import not found")
 
+    job_result = await db.execute(
+        select(MediaProcessingJob).where(MediaProcessingJob.session_id == session.id, MediaProcessingJob.job_type == "video_import")
+    )
+    job = job_result.scalar_one_or_none()
+
     return {
         "session_id": session.id,
         "status": session.status,
@@ -114,6 +128,47 @@ async def get_import_status(
         "video_size_bytes": session.video_size_bytes,
         "has_guide": session.guide_markdown is not None,
         "created_at": session.created_at.isoformat() if session.created_at else None,
+        "job": {
+            "id": job.id,
+            "status": job.status,
+            "stage": job.stage,
+            "progress": job.progress,
+            "task_id": job.task_id,
+            "attempts": job.attempts,
+            "max_attempts": job.max_attempts,
+            "error": job.error,
+        } if job else None,
+    }
+
+
+@router.get("/jobs/{job_id}")
+async def get_media_job_status(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(MediaProcessingJob)
+        .join(ProcessRecordingSession, ProcessRecordingSession.id == MediaProcessingJob.session_id)
+        .where(
+            MediaProcessingJob.id == job_id,
+            ProcessRecordingSession.user_id == current_user.id,
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    return {
+        "job_id": job.id,
+        "session_id": job.session_id,
+        "status": job.status,
+        "progress": job.progress,
+        "stage": job.stage,
+        "attempts": job.attempts,
+        "max_attempts": job.max_attempts,
+        "error": job.error,
+        "task_id": job.task_id,
     }
 
 
