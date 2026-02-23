@@ -20,6 +20,7 @@ if CELERY_BROKER_URL:
             accept_content=["json"],
             task_track_started=True,
             result_expires=3600,
+            imports=("app.tasks.ai_tasks",),
         )
         logger.info("Celery configured with broker: %s", CELERY_BROKER_URL)
     except ImportError:
