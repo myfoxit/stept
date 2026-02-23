@@ -10,14 +10,7 @@ import {
   IconDotsVertical,
 } from "@tabler/icons-react";
 
-import {
-  Eye,
-  Users,
-  Settings,
-  HelpCircle,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { Eye, Users, Settings, HelpCircle, Search, Trash2 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -163,7 +156,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     width="32"
                     height="32"
                     rx="9"
-                    fill="#6C5CE7"
+                    fill="#3a7a52"
                   />
                   <rect
                     x="7"
@@ -191,7 +184,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                   <path
                     d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#00D2D3"
+                    fill="#c4854a"
                   />
                 </svg>
                 <span

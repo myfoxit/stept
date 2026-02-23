@@ -46,37 +46,37 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: #f6f5f2;
   --foreground: #57534e;
   --card: oklch(1 0 0);
   --card-foreground: #57534e;
   --popover: oklch(1 0 0);
   --popover-foreground: #57534e;
-  --primary: #6c5ce7;
+  --primary: #3a7a52;
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.9674 0.0029 84.56);
+  --secondary: #f0ede6;
   --secondary-foreground: oklch(0.4444 0.0096 73.64);
   --muted: oklch(0.9674 0.0029 84.56);
-  --muted-foreground: oklch(0.4444 0.0096 73.64);
+  --muted-foreground: #7d7a6f;
   --accent: oklch(0.9674 0.0029 84.56);
-  --accent-foreground: oklch(0.4444 0.0096 73.64);
+  --accent-foreground: #c4854a;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.9444 0.0025 48.72);
+  --border: #e8e5de;
   --input: oklch(0.9444 0.0025 48.72);
-  --ring: #6c5ce7;
+  --ring: #3a7a52;
   --chart-1: oklch(0.6117 0.1765 30.3);
   --chart-2: oklch(0.7227 0.192 149.58);
   --chart-3: oklch(0.5647 0.1653 30.16);
   --chart-4: oklch(0.7686 0.1647 70.08);
   --chart-5: oklch(0.6959 0.1491 162.48);
-  --sidebar: oklch(1 0 0);
+  --sidebar: #fafaf8;
   --sidebar-foreground: #57534e;
-  --sidebar-primary: #6c5ce7;
+  --sidebar-primary: #3a7a52;
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: #5f4ee216;
-  --sidebar-accent-foreground: #6c5ce7;
+  --sidebar-accent: #3a7a5212;
+  --sidebar-accent-foreground: #3a7a52;
   --sidebar-border: oklch(0.9479 0.0042 56.37);
-  --sidebar-ring: #6c5ce7;
+  --sidebar-ring: #3a7a52;
 }
 
 .dark {
@@ -86,7 +86,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0.005 60);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #6c5ce7;
+  --primary: #3a7a52;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.269 0.005 60);
   --secondary-foreground: oklch(0.985 0 0);
@@ -97,7 +97,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: #6c5ce7;
+  --ring: #3a7a52;
   --chart-1: oklch(0.6117 0.1765 30.3);
   --chart-2: oklch(0.7227 0.192 149.58);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -105,7 +105,7 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0.005 60);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #6c5ce7;
+  --sidebar-primary: #3a7a52;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0.005 60);
   --sidebar-accent-foreground: oklch(0.985 0 0);
@@ -119,7 +119,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: "Arial", sans-serif;
+    font-family: "Manrope", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -197,26 +197,4 @@
 /* Prevent text selection during drag */
 .react-draggable-dragging {
   user-select: none;
-}
-
-/* PII Highlight — "AI View" decorations */
-.pii-highlight {
-  background-color: rgba(108, 92, 231, 0.15);
-  border-bottom: 2px solid rgba(108, 92, 231, 0.6);
-  border-radius: 2px;
-  cursor: help;
-  position: relative;
-  transition: background-color 0.15s;
-}
-.pii-highlight:hover {
-  background-color: rgba(108, 92, 231, 0.3);
-}
-@media (prefers-color-scheme: dark) {
-  .pii-highlight {
-    background-color: rgba(108, 92, 231, 0.2);
-    border-bottom-color: rgba(108, 92, 231, 0.5);
-  }
-  .pii-highlight:hover {
-    background-color: rgba(108, 92, 231, 0.35);
-  }
 }
