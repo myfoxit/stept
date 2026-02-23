@@ -8,6 +8,7 @@ services:
     volumes:
       - ./api:/app
       - recordings-storage:/app/storage/recordings
+      - video-uploads:/data/uploads/videos
     environment:
       ENVIRONMENT: local
       GOTENBERG_URL: http://gotenberg:3000
