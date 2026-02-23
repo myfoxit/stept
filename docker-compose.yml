@@ -134,6 +134,7 @@ services:
     profiles: ["privacy"]
     environment:
       DEFAULT_LANGUAGE: "${PRESIDIO_LANGUAGE:-en}"
+      ANALYZER_CONF_FILE: "/app/presidio_analyzer_${PRESIDIO_LANG_PACK:-en}.yaml"
       NLP_CONF_FILE: "/app/presidio_nlp_${PRESIDIO_LANG_PACK:-en}.yaml"
     ports:
       - "5002:3000"
