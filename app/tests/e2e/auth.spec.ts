@@ -61,4 +61,17 @@ test.describe('Authentication', () => {
     // Should redirect to login
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
   });
+
+  test('should preserve authenticated session after page reload', async ({ authenticatedPage }) => {
+    const page = authenticatedPage;
+
+    const userMenu = page.locator('[data-testid="user-menu-trigger"]');
+    await expect(userMenu).toBeVisible({ timeout: 10000 });
+
+    await page.reload();
+
+    await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
+    await expect(page.locator('[data-testid="sidebar"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="user-menu-trigger"]')).toBeVisible({ timeout: 10000 });
+  });
 });
