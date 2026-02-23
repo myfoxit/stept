@@ -320,6 +320,31 @@ class ProcessRecordingSession(Base):
     folder = relationship("Folder", backref="recording_sessions")
     owner = relationship("User", foreign_keys=[owner_id], backref="private_workflows")
 
+class MediaProcessingJob(Base):
+    __tablename__ = "media_processing_jobs"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    session_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_type = Column(String(32), nullable=False, default="video_import")
+    status = Column(String(16), nullable=False, default="queued", index=True)  # queued, running, succeeded, failed
+    progress = Column(Integer, nullable=False, default=0)
+    stage = Column(String(64), nullable=True)
+    error = Column(String, nullable=True)
+    task_id = Column(String(64), nullable=True, unique=True, index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    session = relationship("ProcessRecordingSession", backref=backref("media_jobs", cascade="all, delete-orphan"))
+
+    __table_args__ = (
+        UniqueConstraint('session_id', 'job_type', name='_media_job_session_type_unique'),
+    )
+
+
 class ProcessRecordingStep(Base):
     __tablename__ = "process_recording_steps"
     
