@@ -148,7 +148,15 @@ export class ContextWatcherService extends EventEmitter {
 
   private async queryMatches(ctx: ActiveContext): Promise<ContextMatch[]> {
     const params = new URLSearchParams();
-    if (ctx.url) params.set('url', ctx.url);
+    if (ctx.url) {
+      params.set('url', ctx.url);
+      try {
+        const host = new URL(ctx.url).hostname;
+        params.set('hostname', host);
+        const hostNoWww = host.replace(/^www\./, '');
+        if (hostNoWww !== host) params.set('hostname_base', hostNoWww);
+      } catch {}
+    }
     if (ctx.appName) params.set('app_name', ctx.appName);
     if (ctx.windowTitle) params.set('window_title', ctx.windowTitle);
     if (this.projectId) params.set('project_id', this.projectId);

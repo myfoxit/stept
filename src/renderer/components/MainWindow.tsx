@@ -8,7 +8,6 @@ import CaptureSelector from './CaptureSelector';
 import ChatWindow from './ChatWindow';
 import ExportDialog from './ExportDialog';
 import SettingsWindow from './SettingsWindow';
-import LlmSetupWizard from './LlmSetupWizard';
 import GuidePreview from './GuidePreview';
 import { OndokiLogo } from './OndokiLogo';
 
@@ -30,7 +29,6 @@ const MainWindow: React.FC = () => {
   const [showChatWindow, setShowChatWindow] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showSettingsWindow, setShowSettingsWindow] = useState(false);
-  const [showLlmSetup, setShowLlmSetup] = useState(false);
   const [showGuidePreview, setShowGuidePreview] = useState(false);
   const [appVersion, setAppVersion] = useState('');
 
@@ -56,6 +54,12 @@ const MainWindow: React.FC = () => {
       setSelectedProjectId(projects[0].id);
     }
   }, [hasProjects, projects, selectedProjectId]);
+
+  useEffect(() => {
+    if (isAuthenticated && selectedProjectId) {
+      window.electronAPI?.contextStart?.(selectedProjectId);
+    }
+  }, [isAuthenticated, selectedProjectId]);
 
   const handleLogin = async () => {
     try { await login(); } catch (error) { console.error('Login failed:', error); }
@@ -293,9 +297,6 @@ const MainWindow: React.FC = () => {
       )}
       {showSettingsWindow && (
         <SettingsWindow onClose={() => setShowSettingsWindow(false)} onSettingsChange={(newSettings) => setSettings(newSettings)} />
-      )}
-      {showLlmSetup && (
-        <LlmSetupWizard onClose={() => setShowLlmSetup(false)} onComplete={(newSettings) => { setSettings(newSettings); setShowLlmSetup(false); }} />
       )}
       {showGuidePreview && (
         <GuidePreview steps={steps} onClose={() => setShowGuidePreview(false)} />
