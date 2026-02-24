@@ -118,19 +118,19 @@ body,
   background: #fbfbfb;
 }
 
-.ondoki-editor .ProseMirror p,
-.ondoki-editor .ProseMirror h1,
-.ondoki-editor .ProseMirror h2,
-.ondoki-editor .ProseMirror h3,
-.ondoki-editor .ProseMirror h4,
-.ondoki-editor .ProseMirror h5,
-.ondoki-editor .ProseMirror h6,
-.ondoki-editor .ProseMirror ul,
-.ondoki-editor .ProseMirror ol,
-.ondoki-editor .ProseMirror blockquote,
-.ondoki-editor .ProseMirror pre,
-.ondoki-editor .ProseMirror code,
-.ondoki-editor .ProseMirror hr {
+.ondoki-editor p,
+.ondoki-editor h1,
+.ondoki-editor h2,
+.ondoki-editor h3,
+.ondoki-editor h4,
+.ondoki-editor h5,
+.ondoki-editor h6,
+.ondoki-editor ul,
+.ondoki-editor ol,
+.ondoki-editor blockquote,
+.ondoki-editor pre,
+.ondoki-editor code,
+.ondoki-editor hr {
   margin-top: 0 !important;           /* kill the offender */
 }
 
