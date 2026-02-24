@@ -146,23 +146,46 @@ function TurnIntoDropdown({ editor }: { editor: any }) {
 function LinkButton({ editor }: { editor: any }) {
   const [url, setUrl] = useState('');
   const [open, setOpen] = useState(false);
+  const savedSelection = React.useRef<{ from: number; to: number } | null>(null);
   const isActive = editor.isActive('link');
 
+  const handleOpen = (v: boolean) => {
+    if (v) {
+      // Save selection before popover steals focus
+      const { from, to } = editor.state.selection;
+      savedSelection.current = { from, to };
+      if (isActive) setUrl(editor.getAttributes('link')?.href || '');
+    }
+    setOpen(v);
+  };
+
   const handleSetLink = () => {
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
+    if (url && savedSelection.current) {
+      const { from, to } = savedSelection.current;
+      editor.chain().focus()
+        .setTextSelection({ from, to })
+        .setLink({ href: url })
+        .run();
     }
     setOpen(false);
     setUrl('');
+    savedSelection.current = null;
   };
 
   const handleUnlink = () => {
-    editor.chain().focus().unsetLink().run();
+    if (savedSelection.current) {
+      const { from, to } = savedSelection.current;
+      editor.chain().focus()
+        .setTextSelection({ from, to })
+        .unsetLink()
+        .run();
+    }
     setOpen(false);
+    savedSelection.current = null;
   };
 
   return (
-    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v && isActive) setUrl(editor.getAttributes('link')?.href || ''); }}>
+    <Popover open={open} onOpenChange={handleOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -180,7 +203,7 @@ function LinkButton({ editor }: { editor: any }) {
             placeholder="https://..."
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSetLink()}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSetLink(); } }}
             className="flex-1 rounded-md border bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
             autoFocus
           />

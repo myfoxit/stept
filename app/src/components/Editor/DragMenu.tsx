@@ -141,9 +141,20 @@ export function DragMenu() {
   }, [editor]);
 
   const resetFormatting = useCallback(() => {
-    if (!editor) return;
-    editor.chain().focus().clearNodes().unsetAllMarks().run();
-  }, [editor]);
+    if (!editor || nodePos < 0) return;
+    // Select all text in the node first, then clear
+    const resolvedPos = editor.state.doc.resolve(nodePos);
+    const nodeAfter = resolvedPos.nodeAfter;
+    if (nodeAfter && nodeAfter.isTextblock) {
+      editor.chain().focus()
+        .setTextSelection({ from: nodePos + 1, to: nodePos + nodeAfter.nodeSize - 1 })
+        .unsetAllMarks()
+        .clearNodes()
+        .run();
+    } else {
+      editor.chain().focus().clearNodes().unsetAllMarks().run();
+    }
+  }, [editor, nodePos]);
 
   const handleSlashInsert = useCallback(() => {
     if (!editor || nodePos < 0) return;
@@ -168,16 +179,19 @@ export function DragMenu() {
 
   const isImageNode = node?.type.name === 'image' || node?.type.name === 'imageUpload';
 
-  // Dynamic positioning like original
+  // Dynamic positioning — align to first line for multiline, center for single line
   const computePositionConfig = React.useMemo(() => ({
     middleware: [
       offset(({ rects }: any) => {
         const nodeHeight = rects.reference.height;
-        const handleHeight = 32;
-        const crossAxis = nodeHeight / 2 - handleHeight / 2;
+        const handleHeight = 24; // our handle is h-6 = 24px
+        const lineHeight = 24; // approximate single line height
         return {
-          mainAxis: 16,
-          crossAxis: nodeHeight > 40 ? 0 : crossAxis,
+          mainAxis: 8,
+          // For multiline: align with first line center. For single line: center vertically.
+          crossAxis: nodeHeight > lineHeight * 1.5
+            ? (lineHeight - handleHeight) / 2  // first line center
+            : (nodeHeight - handleHeight) / 2, // vertical center
         };
       }),
     ],
@@ -200,18 +214,18 @@ export function DragMenu() {
       >
         {/* + Button (slash command trigger) */}
         <button
-          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          className="flex h-6 w-6 items-center justify-center rounded-sm border border-transparent text-muted-foreground/60 hover:border-border hover:bg-accent hover:text-foreground transition-all"
           onClick={handleSlashInsert}
           title="Add block below"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
         </button>
 
         {/* Drag handle + context menu */}
         <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing transition-colors"
+              className="flex h-6 w-6 cursor-grab items-center justify-center rounded-sm border border-transparent text-muted-foreground/60 hover:border-border hover:bg-accent hover:text-foreground active:cursor-grabbing transition-all"
               onMouseDown={() => {
                 if (editor && nodePos >= 0) {
                   editor.commands.setNodeSelection(nodePos);
@@ -219,7 +233,7 @@ export function DragMenu() {
               }}
               title="Drag to move · Click for options"
             >
-              <GripVertical className="h-4 w-4" />
+              <GripVertical className="h-3.5 w-3.5" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
