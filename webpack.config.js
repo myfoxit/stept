@@ -3,10 +3,13 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
-  
+
   return {
     target: 'electron-renderer',
-    entry: './src/renderer/index.tsx',
+    entry: {
+      bundle: './src/renderer/index.tsx',
+      spotlight: './src/renderer/spotlight-entry.tsx',
+    },
     module: {
       rules: [
         {
@@ -47,7 +50,7 @@ module.exports = (env, argv) => {
       },
     },
     output: {
-      filename: 'bundle.js',
+      filename: '[name].js',
       path: path.resolve(__dirname, 'lib/renderer'),
       clean: true,
     },
@@ -55,6 +58,12 @@ module.exports = (env, argv) => {
       new HtmlWebpackPlugin({
         template: './src/renderer/index.html',
         filename: 'index.html',
+        chunks: ['bundle'],
+      }),
+      new HtmlWebpackPlugin({
+        template: './src/renderer/spotlight.html',
+        filename: 'spotlight.html',
+        chunks: ['spotlight'],
       }),
     ],
     devServer: {

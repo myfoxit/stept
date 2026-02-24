@@ -48,6 +48,12 @@ export interface ElectronAPI {
   contextAddLink: (data: { project_id: string; match_type: string; match_value: string; resource_type: string; resource_id: string; note?: string }) => Promise<any>;
   contextListLinks: (projectId?: string) => Promise<any[]>;
   contextDeleteLink: (linkId: string) => Promise<any>;
+  contextAddManual: (item: { type: string; content: string; label?: string }) => Promise<any>;
+  contextRemoveManual: (index: number) => Promise<any>;
+  contextGetManual: () => Promise<{ type: string; content: string; label?: string }[]>;
+  contextGetClipboard: () => Promise<string>;
+  contextSetClipboardWatching: (enabled: boolean) => Promise<any>;
+  contextTakeScreenshot: () => Promise<string | null>;
   onContextMatches: (callback: (matches: any[], ctx: any) => void) => () => void;
   onContextNoMatches: (callback: (ctx: any) => void) => () => void;
   onShowAddContextNote: (callback: () => void) => () => void;
@@ -56,6 +62,8 @@ export interface ElectronAPI {
   spotlightOpen: (projectId?: string) => Promise<any>;
   spotlightSearch: (query: string, projectId: string) => Promise<any>;
   spotlightSemanticSearch: (query: string, projectId: string) => Promise<any>;
+  spotlightPreview: (resourceId: string, resourceType: string) => Promise<any>;
+  spotlightDismiss: () => Promise<any>;
   onSpotlightOpenOverlay: (callback: (projectId: string) => void) => () => void;
 
   // Utility
@@ -257,6 +265,12 @@ const electronAPI: ElectronAPI = {
   contextAddLink: (data) => ipcRenderer.invoke('context:add-link', data),
   contextListLinks: (projectId?: string) => ipcRenderer.invoke('context:list-links', projectId),
   contextDeleteLink: (linkId: string) => ipcRenderer.invoke('context:delete-link', linkId),
+  contextAddManual: (item: { type: string; content: string; label?: string }) => ipcRenderer.invoke('context:add-manual', item),
+  contextRemoveManual: (index: number) => ipcRenderer.invoke('context:remove-manual', index),
+  contextGetManual: () => ipcRenderer.invoke('context:get-manual'),
+  contextGetClipboard: () => ipcRenderer.invoke('context:get-clipboard'),
+  contextSetClipboardWatching: (enabled: boolean) => ipcRenderer.invoke('context:set-clipboard-watching', enabled),
+  contextTakeScreenshot: () => ipcRenderer.invoke('context:take-screenshot'),
   onContextMatches: (callback: (matches: any[], ctx: any) => void) => {
     const handler = (_event: IpcRendererEvent, matches: any[], ctx: any) => callback(matches, ctx);
     ipcRenderer.on('context:matches', handler);
@@ -277,6 +291,8 @@ const electronAPI: ElectronAPI = {
   spotlightOpen: (projectId?: string) => ipcRenderer.invoke('spotlight:open', projectId),
   spotlightSearch: (query: string, projectId: string) => ipcRenderer.invoke('spotlight:search', query, projectId),
   spotlightSemanticSearch: (query: string, projectId: string) => ipcRenderer.invoke('spotlight:semantic-search', query, projectId),
+  spotlightPreview: (resourceId: string, resourceType: string) => ipcRenderer.invoke('spotlight:preview', resourceId, resourceType),
+  spotlightDismiss: () => ipcRenderer.invoke('spotlight:dismiss'),
   onSpotlightOpenOverlay: (callback: (projectId: string) => void) => {
     const handler = (_event: IpcRendererEvent, projectId: string) => callback(projectId);
     ipcRenderer.on('spotlight:open-overlay', handler);

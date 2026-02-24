@@ -21,7 +21,25 @@ export class ChatService extends EventEmitter {
     messages: ChatMessage[],
     recordingContext?: string
   ): Promise<string> {
-    return this.sendBackendProxiedMessage(messages, recordingContext);
+    // Try backend-proxied first, fall back to direct LLM
+    try {
+      return await this.sendBackendProxiedMessage(messages, recordingContext);
+    } catch (backendError) {
+      console.warn('[Chat] Backend proxied failed, trying direct LLM:', backendError instanceof Error ? backendError.message : backendError);
+
+      const llmConfig = this.settingsManager.getLlmConfig();
+      if (llmConfig.isConfigured) {
+        try {
+          return await this.sendDirectLlmMessage(messages, recordingContext);
+        } catch (directError) {
+          console.error('[Chat] Direct LLM also failed:', directError instanceof Error ? directError.message : directError);
+          throw new Error(`Chat unavailable. Backend: ${backendError instanceof Error ? backendError.message : backendError}. Direct LLM: ${directError instanceof Error ? directError.message : directError}`);
+        }
+      }
+
+      // No direct LLM configured — re-throw original error
+      throw backendError;
+    }
   }
 
   private async sendBackendProxiedMessage(

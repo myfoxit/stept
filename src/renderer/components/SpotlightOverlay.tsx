@@ -16,6 +16,18 @@ interface SpotlightResult {
   step_count?: number;
 }
 
+interface PreviewData {
+  title?: string;
+  name?: string;
+  summary?: string;
+  content?: string;
+  steps?: { stepNumber: number; description: string; generatedTitle?: string }[];
+  word_count?: number;
+  step_count?: number;
+  updated_at?: string;
+  created_at?: string;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -65,9 +77,12 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
   const [isSearching, setIsSearching] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Focus input when opened
   useEffect(() => {
@@ -76,8 +91,60 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
       setQuery('');
       setResults([]);
       setHighlightIndex(0);
+      setPreviewData(null);
     }
   }, [isOpen]);
+
+  // Fetch preview when highlighted result changes
+  useEffect(() => {
+    if (mode !== 'search' || results.length === 0) {
+      setPreviewData(null);
+      return;
+    }
+
+    const highlighted = results[highlightIndex];
+    if (!highlighted) {
+      setPreviewData(null);
+      return;
+    }
+
+    // Show inline data immediately from search result
+    const inlinePreview: PreviewData = {
+      title: highlighted.name || highlighted.resource_name,
+      summary: highlighted.preview || highlighted.summary || highlighted.resource_summary || highlighted.note || '',
+      step_count: highlighted.step_count,
+      word_count: highlighted.word_count,
+      updated_at: highlighted.updated_at,
+    };
+    setPreviewData(inlinePreview);
+
+    // Fetch full preview with debounce
+    if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    previewTimeoutRef.current = setTimeout(async () => {
+      const api = window.electronAPI;
+      if (!api?.spotlightPreview) return;
+
+      const id = highlighted.id || (highlighted as any).resource_id;
+      const type = highlighted.type || highlighted.resource_type || 'document';
+      if (!id) return;
+
+      setIsLoadingPreview(true);
+      try {
+        const result = await api.spotlightPreview(id, type);
+        if (result?.preview) {
+          setPreviewData(prev => ({ ...prev, ...result.preview }));
+        }
+      } catch {
+        // Keep inline preview
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }, 300);
+
+    return () => {
+      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    };
+  }, [highlightIndex, results, mode]);
 
   // Search as user types (debounced)
   const performSearch = useCallback(async (text: string) => {
@@ -91,14 +158,12 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
       const api = window.electronAPI;
       if (!api) return;
 
-      // Keyword search
       const kwResult = await api.spotlightSearch(text, projectId);
       let list: SpotlightResult[] = (kwResult?.results || []).map((r: any) => ({
         ...r,
         name: r.name || r.resource_name || 'Untitled',
       }));
 
-      // If query looks like a question, also do semantic search
       if (text.length > 20 || QUESTION_PATTERN.test(text)) {
         try {
           const semResult = await api.spotlightSemanticSearch(text, projectId);
@@ -107,8 +172,6 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
             name: r.name || r.resource_name || 'Untitled',
           }));
           if (semResults.length > 0) {
-            const existingIds = new Set(list.map((r) => r.id));
-            const newSemantic = semResults.filter((r: SpotlightResult) => !existingIds.has(r.id));
             list = [...semResults, ...list.filter((r) => !new Set(semResults.map((s: SpotlightResult) => s.id)).has(r.id))];
           }
         } catch {
@@ -220,6 +283,8 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
   if (!isOpen) return null;
 
   const grouped = groupResults(results);
+  const hasResults = results.length > 0;
+  const highlightedResult = results[highlightIndex];
 
   return (
     <div
@@ -240,13 +305,14 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
     >
       {/* Spotlight Card */}
       <div style={{
-        width: 580,
+        width: hasResults && mode === 'search' ? 780 : 580,
         maxWidth: '92vw',
         background: 'var(--card)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2), 0 0 0 1px var(--border)',
         overflow: 'hidden',
         animation: 'spotlightIn 0.15s ease-out',
+        transition: 'width 0.2s ease',
       }}>
         {/* Search Input */}
         <div style={{
@@ -306,22 +372,12 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
           <button
             onClick={() => setMode('search')}
             style={{
-              flex: 1,
-              padding: 7,
-              border: 'none',
-              fontFamily: "'Outfit', sans-serif",
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              textAlign: 'center',
-              borderRadius: 8,
+              flex: 1, padding: 7, border: 'none',
+              fontFamily: "'Outfit', sans-serif", fontSize: '0.72rem', fontWeight: 600,
+              cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', borderRadius: 8,
               color: mode === 'search' ? 'var(--purple)' : 'var(--text-muted)',
               background: mode === 'search' ? 'var(--purple-light)' : 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 5,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -332,22 +388,12 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
           <button
             onClick={() => setMode('ai')}
             style={{
-              flex: 1,
-              padding: 7,
-              border: 'none',
-              fontFamily: "'Outfit', sans-serif",
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              textAlign: 'center',
-              borderRadius: 8,
+              flex: 1, padding: 7, border: 'none',
+              fontFamily: "'Outfit', sans-serif", fontSize: '0.72rem', fontWeight: 600,
+              cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', borderRadius: 8,
               color: mode === 'ai' ? 'var(--purple)' : 'var(--text-muted)',
               background: mode === 'ai' ? 'var(--purple-light)' : 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 5,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -359,126 +405,279 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
 
         {/* Content Area */}
         {mode === 'search' ? (
-          /* Search Results */
-          <div ref={resultsRef} style={{ padding: '8px 12px', maxHeight: 300, overflowY: 'auto' }} className="scrollbar-thin">
-            {isSearching && results.length === 0 && (
-              <div style={{ padding: '20px 8px', textAlign: 'center' }}>
-                <div style={{
-                  width: 16, height: 16,
-                  border: '2px solid rgba(108,92,231,0.15)',
-                  borderTop: '2px solid var(--purple)',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                  margin: '0 auto 8px',
-                }} />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Searching...</span>
-              </div>
-            )}
-
-            {!isSearching && query.trim() && results.length === 0 && (
-              <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                No results found for "{query}"
-              </div>
-            )}
-
-            {!query.trim() && !isSearching && (
-              <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Start typing to search your workflows and pages...
-              </div>
-            )}
-
-            {(() => {
-              let globalIndex = 0;
-              return Object.entries(grouped).map(([label, items]) => (
-                <div key={label}>
+          /* Search Results with Preview */
+          <div style={{ display: 'flex', maxHeight: 340 }}>
+            {/* Results List */}
+            <div ref={resultsRef} style={{
+              flex: hasResults ? '0 0 55%' : '1 1 100%',
+              padding: '8px 12px',
+              overflowY: 'auto',
+              borderRight: hasResults ? '1px solid var(--border)' : 'none',
+            }} className="scrollbar-thin">
+              {isSearching && results.length === 0 && (
+                <div style={{ padding: '20px 8px', textAlign: 'center' }}>
                   <div style={{
-                    fontSize: '0.56rem',
-                    fontWeight: 600,
-                    color: 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    padding: '6px 6px 4px',
-                  }}>{label}</div>
-                  {items.map((result) => {
-                    const idx = globalIndex++;
-                    const isHighlighted = idx === highlightIndex;
-                    const rType = result.type || result.resource_type;
-                    const isWorkflow = rType === 'workflow';
-                    const desc = result.preview || result.summary || result.resource_summary || result.note || '';
-                    const meta: string[] = [];
-                    if (result.step_count) meta.push(`${result.step_count} steps`);
-                    if (result.word_count) meta.push(`${result.word_count} words`);
-                    if (result.updated_at) meta.push(formatRelativeTime(result.updated_at));
-                    const metaStr = meta.length > 0 ? meta.join(' · ') : desc;
+                    width: 16, height: 16,
+                    border: '2px solid rgba(108,92,231,0.15)',
+                    borderTop: '2px solid var(--purple)',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                    margin: '0 auto 8px',
+                  }} />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Searching...</span>
+                </div>
+              )}
 
-                    return (
-                      <div
-                        key={result.id}
-                        data-result-item
-                        onClick={() => openResult(result)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          padding: '9px 10px',
-                          borderRadius: 8,
-                          cursor: 'pointer',
-                          transition: 'all 0.12s',
-                          background: isHighlighted ? 'var(--purple-light)' : 'transparent',
-                          boxShadow: isHighlighted ? 'inset 0 0 0 1.5px rgba(108,92,231,0.18)' : 'none',
-                        }}
-                        onMouseEnter={() => setHighlightIndex(idx)}
-                      >
-                        <div style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 7,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          background: isWorkflow ? 'var(--purple-light)' : 'var(--teal-light)',
-                        }}>
-                          {isWorkflow ? (
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3"/>
-                            </svg>
-                          ) : (
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-                            </svg>
+              {!isSearching && query.trim() && results.length === 0 && (
+                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  No results found for &ldquo;{query}&rdquo;
+                </div>
+              )}
+
+              {!query.trim() && !isSearching && (
+                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Start typing to search your workflows and pages...
+                </div>
+              )}
+
+              {(() => {
+                let globalIndex = 0;
+                return Object.entries(grouped).map(([label, items]) => (
+                  <div key={label}>
+                    <div style={{
+                      fontSize: '0.56rem', fontWeight: 600, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px',
+                    }}>{label}</div>
+                    {items.map((result) => {
+                      const idx = globalIndex++;
+                      const isHighlighted = idx === highlightIndex;
+                      const rType = result.type || result.resource_type;
+                      const isWorkflow = rType === 'workflow';
+                      const meta: string[] = [];
+                      if (result.step_count) meta.push(`${result.step_count} steps`);
+                      if (result.word_count) meta.push(`${result.word_count} words`);
+                      if (result.updated_at) meta.push(formatRelativeTime(result.updated_at));
+                      const metaStr = meta.join(' · ');
+
+                      return (
+                        <div
+                          key={result.id}
+                          data-result-item
+                          onClick={() => openResult(result)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
+                            transition: 'all 0.12s',
+                            background: isHighlighted ? 'var(--purple-light)' : 'transparent',
+                            boxShadow: isHighlighted ? 'inset 0 0 0 1.5px rgba(108,92,231,0.18)' : 'none',
+                          }}
+                          onMouseEnter={() => setHighlightIndex(idx)}
+                        >
+                          <div style={{
+                            width: 28, height: 28, borderRadius: 7,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            background: isWorkflow ? 'var(--purple-light)' : 'var(--teal-light)',
+                          }}>
+                            {isWorkflow ? (
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3"/>
+                              </svg>
+                            ) : (
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                              </svg>
+                            )}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>{result.name || result.resource_name || 'Untitled'}</div>
+                            <div style={{
+                              fontSize: '0.6rem', color: 'var(--text-muted)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>{metaStr}</div>
+                          </div>
+                          {isHighlighted && (
+                            <span style={{ fontSize: '0.56rem', color: 'var(--text-muted)', flexShrink: 0 }}>↵</span>
                           )}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Preview Panel */}
+            {hasResults && (
+              <div style={{
+                flex: '0 0 45%',
+                padding: '14px 16px',
+                overflowY: 'auto',
+                background: 'var(--bg)',
+              }} className="scrollbar-thin">
+                {previewData ? (
+                  <div>
+                    {/* Preview Header */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+                      }}>
+                        {(() => {
+                          const rType = highlightedResult?.type || highlightedResult?.resource_type;
+                          const isWorkflow = rType === 'workflow';
+                          return (
+                            <span style={{
+                              display: 'inline-flex', padding: '2px 7px', borderRadius: 4,
+                              fontSize: '0.52rem', fontWeight: 600, textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              background: isWorkflow ? 'var(--purple-light)' : 'var(--teal-light)',
+                              color: isWorkflow ? 'var(--purple)' : 'var(--teal)',
+                            }}>
+                              {isWorkflow ? 'Workflow' : 'Page'}
+                            </span>
+                          );
+                        })()}
+                        {isLoadingPreview && (
                           <div style={{
-                            fontSize: '0.76rem',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}>{result.name || result.resource_name || 'Untitled'}</div>
-                          <div style={{
-                            fontSize: '0.6rem',
-                            color: 'var(--text-muted)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}>{metaStr}</div>
-                        </div>
-                        {isHighlighted && (
-                          <span style={{
-                            fontSize: '0.56rem',
-                            color: 'var(--text-muted)',
-                            flexShrink: 0,
-                          }}>↵</span>
+                            width: 10, height: 10,
+                            border: '1.5px solid rgba(108,92,231,0.15)',
+                            borderTop: '1.5px solid var(--purple)',
+                            borderRadius: '50%',
+                            animation: 'spin 0.8s linear infinite',
+                          }} />
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              ));
-            })()}
+                      <div style={{
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '0.88rem', fontWeight: 700,
+                        color: 'var(--dark)', lineHeight: 1.3,
+                      }}>
+                        {previewData.title || previewData.name || highlightedResult?.name || 'Untitled'}
+                      </div>
+                      {/* Meta info */}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        {previewData.step_count && (
+                          <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+                            {previewData.step_count} steps
+                          </span>
+                        )}
+                        {previewData.word_count && (
+                          <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+                            {previewData.word_count} words
+                          </span>
+                        )}
+                        {previewData.updated_at && (
+                          <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                            {formatRelativeTime(previewData.updated_at)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    {previewData.summary && (
+                      <div style={{
+                        fontSize: '0.72rem', lineHeight: 1.6,
+                        color: 'var(--text-secondary)',
+                        marginBottom: 12,
+                        padding: '10px 12px',
+                        background: 'var(--card)',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                      }}>
+                        {previewData.summary.length > 300
+                          ? previewData.summary.slice(0, 300) + '...'
+                          : previewData.summary}
+                      </div>
+                    )}
+
+                    {/* Steps preview for workflows */}
+                    {previewData.steps && previewData.steps.length > 0 && (
+                      <div>
+                        <div style={{
+                          fontSize: '0.56rem', fontWeight: 600, color: 'var(--text-muted)',
+                          textTransform: 'uppercase', letterSpacing: '0.08em',
+                          marginBottom: 6,
+                        }}>Steps</div>
+                        {previewData.steps.slice(0, 5).map((step, i) => (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 8,
+                            padding: '6px 0',
+                            borderBottom: i < Math.min(previewData.steps!.length, 5) - 1 ? '1px solid var(--border)' : 'none',
+                          }}>
+                            <span style={{
+                              width: 18, height: 18, borderRadius: 5,
+                              background: 'var(--card)', border: '1px solid var(--border)',
+                              fontSize: '0.56rem', fontWeight: 600, color: 'var(--text-muted)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              flexShrink: 0, marginTop: 1,
+                            }}>{step.stepNumber || i + 1}</span>
+                            <span style={{
+                              fontSize: '0.68rem', color: 'var(--text-primary)', lineHeight: 1.4,
+                            }}>
+                              {step.generatedTitle || step.description || `Step ${step.stepNumber || i + 1}`}
+                            </span>
+                          </div>
+                        ))}
+                        {previewData.steps.length > 5 && (
+                          <div style={{
+                            fontSize: '0.6rem', color: 'var(--text-muted)', padding: '6px 0',
+                          }}>+{previewData.steps.length - 5} more steps</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Content preview for documents */}
+                    {previewData.content && !previewData.steps && (
+                      <div style={{
+                        fontSize: '0.68rem', lineHeight: 1.6,
+                        color: 'var(--text-secondary)',
+                        whiteSpace: 'pre-wrap',
+                        maxHeight: 160,
+                        overflow: 'hidden',
+                        maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)',
+                        WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)',
+                      }}>
+                        {previewData.content.slice(0, 500)}
+                      </div>
+                    )}
+
+                    {/* Open button */}
+                    <button
+                      onClick={() => highlightedResult && openResult(highlightedResult)}
+                      style={{
+                        marginTop: 14, width: '100%', padding: '8px 12px',
+                        borderRadius: 8, border: '1.5px solid var(--purple)',
+                        background: 'var(--purple-light)',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '0.7rem', fontWeight: 600,
+                        color: 'var(--purple)', cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--purple)'; e.currentTarget.style.color = 'white'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--purple-light)'; e.currentTarget.style.color = 'var(--purple)'; }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                      Open in Browser
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{
+                    height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-muted)', fontSize: '0.72rem',
+                  }}>
+                    Select a result to preview
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           /* AI Chat */
@@ -491,37 +690,27 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
               )}
               {chatMessages.map((msg, i) => (
                 <div key={i} style={{
-                  display: 'flex',
-                  marginBottom: 8,
+                  display: 'flex', marginBottom: 8,
                   justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
                   gap: msg.role === 'assistant' ? 8 : 0,
                 }}>
                   {msg.role === 'assistant' && (
                     <div style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: 6,
-                      flexShrink: 0,
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                       background: 'var(--purple-light)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginTop: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2,
                     }}>
                       <OndokiLogoSmall />
                     </div>
                   )}
                   <div style={{
-                    padding: '9px 13px',
-                    fontSize: '0.76rem',
-                    lineHeight: 1.5,
+                    padding: '9px 13px', fontSize: '0.76rem', lineHeight: 1.5,
                     maxWidth: '88%',
                     borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
                     background: msg.role === 'user' ? 'var(--purple)' : 'var(--bg)',
                     color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
                     border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {msg.content}
                   </div>
@@ -550,13 +739,9 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
             {/* AI Input Row */}
             <div style={{ padding: '10px 18px' }}>
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 14px',
-                border: '1.5px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--bg)',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 14px', border: '1.5px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', background: 'var(--bg)',
               }}>
                 <input
                   value={query}
@@ -564,30 +749,19 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
                   onKeyDown={handleKeyDown}
                   placeholder="Follow up..."
                   style={{
-                    flex: 1,
-                    border: 'none',
-                    background: 'none',
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: '0.78rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
+                    flex: 1, border: 'none', background: 'none',
+                    fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem',
+                    color: 'var(--text-primary)', outline: 'none',
                   }}
                 />
                 <button
                   onClick={sendAiMessage}
                   disabled={!query.trim() || isChatLoading}
                   style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 7,
-                    background: 'var(--purple)',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                    flexShrink: 0,
+                    width: 26, height: 26, borderRadius: 7,
+                    background: 'var(--purple)', border: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
                     opacity: !query.trim() || isChatLoading ? 0.5 : 1,
                   }}
                 >
@@ -602,12 +776,8 @@ const SpotlightOverlay: React.FC<SpotlightOverlayProps> = ({ isOpen, onClose, pr
 
         {/* Footer */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '8px 18px',
-          background: 'var(--bg)',
-          borderTop: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 18px', background: 'var(--bg)', borderTop: '1px solid var(--border)',
         }}>
           <div style={{ display: 'flex', gap: 10 }}>
             {mode === 'search' ? (

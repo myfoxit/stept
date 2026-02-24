@@ -206,7 +206,42 @@ export function setupIpcHandlers(
   // Chat IPC handlers
   ipcMain.handle('chat:send-message', async (event, messages, context) => {
     try {
-      return await chatService.sendMessage(messages, context);
+      // Auto-enrich context with active window info and manual context
+      let enrichedContext = context;
+      try {
+        const activeCtx = await contextWatcher.getActiveContext();
+        const contextParts: string[] = [];
+
+        if (context) contextParts.push(context);
+
+        if (activeCtx) {
+          contextParts.push(`Active context: ${activeCtx.appName}${activeCtx.windowTitle ? ' — ' + activeCtx.windowTitle : ''}${activeCtx.url ? ' (' + activeCtx.url + ')' : ''}`);
+        }
+
+        if (manualContextItems.length > 0) {
+          const manualStr = manualContextItems.map(item =>
+            `[${item.type}${item.label ? ': ' + item.label : ''}] ${item.content.slice(0, 500)}`
+          ).join('\n');
+          contextParts.push(`User-provided context:\n${manualStr}`);
+        }
+
+        if (clipboardWatchingEnabled) {
+          const { clipboard } = require('electron');
+          const currentClipboard = clipboard.readText();
+          if (currentClipboard && currentClipboard !== lastClipboardText) {
+            lastClipboardText = currentClipboard;
+            contextParts.push(`Recent clipboard: ${currentClipboard.slice(0, 300)}`);
+          }
+        }
+
+        if (contextParts.length > 0) {
+          enrichedContext = contextParts.join('\n\n');
+        }
+      } catch {
+        // Use original context if enrichment fails
+      }
+
+      return await chatService.sendMessage(messages, enrichedContext);
     } catch (error) {
       throw new Error(`Failed to send chat message: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -353,6 +388,51 @@ export function setupIpcHandlers(
     return { success: true };
   });
 
+  // Manual context items (in-memory store, shared across windows)
+  let manualContextItems: { type: string; content: string; label?: string }[] = [];
+  let clipboardWatchingEnabled = false;
+  let lastClipboardText = '';
+
+  ipcMain.handle('context:add-manual', async (_event, item: { type: string; content: string; label?: string }) => {
+    manualContextItems.push(item);
+    return { success: true, items: manualContextItems };
+  });
+
+  ipcMain.handle('context:remove-manual', async (_event, index: number) => {
+    if (index >= 0 && index < manualContextItems.length) {
+      manualContextItems.splice(index, 1);
+    }
+    return { success: true, items: manualContextItems };
+  });
+
+  ipcMain.handle('context:get-manual', async () => {
+    return manualContextItems;
+  });
+
+  ipcMain.handle('context:get-clipboard', async () => {
+    const { clipboard } = require('electron');
+    return clipboard.readText();
+  });
+
+  ipcMain.handle('context:set-clipboard-watching', async (_event, enabled: boolean) => {
+    clipboardWatchingEnabled = enabled;
+    if (enabled) {
+      const { clipboard } = require('electron');
+      lastClipboardText = clipboard.readText();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('context:take-screenshot', async () => {
+    try {
+      const screenshot = require('screenshot-desktop');
+      const imgBuffer = await screenshot();
+      return imgBuffer.toString('base64');
+    } catch (err) {
+      console.error('Failed to take context screenshot:', err);
+      return null;
+    }
+  });
 
   // Spotlight IPC
   ipcMain.handle('spotlight:search', async (event, query: string, projectId: string) => {
@@ -381,6 +461,23 @@ export function setupIpcHandlers(
     const res = await fetch(u.toString(), { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return { results: [] };
     return await res.json();
+  });
+
+  ipcMain.handle('spotlight:preview', async (_event, resourceId: string, resourceType: string) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { preview: null };
+    const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
+    try {
+      const endpoint = resourceType === 'workflow'
+        ? `${apiBase}/workflows/${resourceId}`
+        : `${apiBase}/documents/${resourceId}`;
+      const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return { preview: null };
+      return { preview: await res.json() };
+    } catch {
+      return { preview: null };
+    }
   });
 
   ipcMain.handle('spotlight:open', async (event, projectId?: string) => {

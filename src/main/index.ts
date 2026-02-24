@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, shell, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, protocol, screen, shell, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
@@ -7,14 +7,17 @@ import { AuthService } from './auth';
 // Resolve paths for renderer and preload
 const isDev = process.argv.includes('--development');
 const RENDERER_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
+const SPOTLIGHT_PATH = path.join(__dirname, '..', 'renderer', 'spotlight.html');
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
 class OndokiApp {
   private mainWindow: BrowserWindow | null = null;
+  private spotlightWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private authService: AuthService;
   private settingsManager: SettingsManager;
   private isQuitting = false;
+  private lastProjectId: string = '';
 
   constructor() {
     this.settingsManager = new SettingsManager();
@@ -36,6 +39,9 @@ class OndokiApp {
     // Set up IPC handlers
     setupIpcHandlers(this.authService, this.settingsManager);
 
+    // Set up spotlight IPC
+    this.setupSpotlightIpc();
+
     // Wait for app to be ready
     await app.whenReady();
 
@@ -48,29 +54,142 @@ class OndokiApp {
     // Create tray icon
     this.createTray();
 
-    // Spotlight trigger — send to main renderer window instead of opening a separate window
-    app.on('spotlight:open' as any, (_projectId: string) => {
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.show();
-        this.mainWindow.focus();
-        this.mainWindow.webContents.send('spotlight:open-overlay', _projectId);
-      }
+    // Register global shortcuts
+    this.registerGlobalShortcuts();
+
+    // Spotlight trigger — opens the global spotlight window
+    app.on('spotlight:open' as any, (projectId: string) => {
+      this.lastProjectId = projectId || this.lastProjectId;
+      this.showSpotlightWindow();
     });
 
     // Handle protocol on startup (if launched via protocol)
     this.handleStartupProtocol();
   }
 
+  // ─── Global Shortcuts ──────────────────────────────────────────────────────
+
+  private registerGlobalShortcuts(): void {
+    // Ctrl+Shift+Space — works on both Mac and Windows
+    globalShortcut.register('Ctrl+Shift+Space', () => {
+      this.toggleSpotlightWindow();
+    });
+
+    // Cmd+Shift+Space — Mac alternative
+    if (process.platform === 'darwin') {
+      globalShortcut.register('Cmd+Shift+Space', () => {
+        this.toggleSpotlightWindow();
+      });
+    }
+
+    console.log('[Spotlight] Global shortcuts registered (Ctrl+Shift+Space' + (process.platform === 'darwin' ? ', Cmd+Shift+Space' : '') + ')');
+  }
+
+  // ─── Spotlight Window ──────────────────────────────────────────────────────
+
+  private toggleSpotlightWindow(): void {
+    if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
+      this.hideSpotlightWindow();
+    } else {
+      this.showSpotlightWindow();
+    }
+  }
+
+  private showSpotlightWindow(): void {
+    if (!this.spotlightWindow || this.spotlightWindow.isDestroyed()) {
+      this.createSpotlightWindow();
+    }
+
+    // Position center of the primary display
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+    const winWidth = 800;
+    const winHeight = 520;
+    const x = Math.round((screenW - winWidth) / 2);
+    const y = Math.round(screenH * 0.18); // ~18% from top, like macOS Spotlight
+
+    this.spotlightWindow!.setBounds({ x, y, width: winWidth, height: winHeight });
+    this.spotlightWindow!.show();
+    this.spotlightWindow!.focus();
+
+    // Send project ID to spotlight renderer
+    this.spotlightWindow!.webContents.send('spotlight:open-overlay', this.lastProjectId);
+  }
+
+  private hideSpotlightWindow(): void {
+    if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
+      this.spotlightWindow.hide();
+    }
+  }
+
+  private createSpotlightWindow(): void {
+    this.spotlightWindow = new BrowserWindow({
+      width: 800,
+      height: 520,
+      show: false,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      fullscreenable: false,
+      hasShadow: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: PRELOAD_PATH,
+      },
+    });
+
+    // Show on all workspaces (macOS Spaces)
+    this.spotlightWindow.setVisibleOnAllWorkspaces(true);
+
+    // Hide on blur (clicking outside)
+    this.spotlightWindow.on('blur', () => {
+      // Small delay to allow for window interactions
+      setTimeout(() => {
+        if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
+          this.hideSpotlightWindow();
+        }
+      }, 100);
+    });
+
+    this.spotlightWindow.on('closed', () => {
+      this.spotlightWindow = null;
+    });
+
+    // Load the spotlight HTML
+    this.spotlightWindow.loadFile(SPOTLIGHT_PATH).catch((err: Error) => {
+      console.error('Failed to load spotlight renderer:', err);
+    });
+
+    // External links
+    this.spotlightWindow.webContents.setWindowOpenHandler(({ url }) => {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    });
+  }
+
+  private setupSpotlightIpc(): void {
+    // Dismiss spotlight from renderer
+    ipcMain.handle('spotlight:dismiss', () => {
+      this.hideSpotlightWindow();
+      return { ok: true };
+    });
+  }
+
+  // ─── Single Instance ───────────────────────────────────────────────────────
+
   private handleSingleInstance(): boolean {
     const gotTheLock = app.requestSingleInstanceLock();
-    
+
     if (!gotTheLock) {
       app.quit();
       return false;
     }
 
     app.on('second-instance', (event, commandLine) => {
-      // Someone tried to run a second instance, focus our window instead
       if (this.mainWindow) {
         if (this.mainWindow.isMinimized()) {
           this.mainWindow.restore();
@@ -78,7 +197,6 @@ class OndokiApp {
         this.mainWindow.focus();
       }
 
-      // Handle protocol URL if passed
       const protocolUrl = commandLine.find(arg => arg.startsWith('ondoki://'));
       if (protocolUrl && this.mainWindow) {
         this.handleProtocolUrl(protocolUrl);
@@ -88,8 +206,9 @@ class OndokiApp {
     return true;
   }
 
+  // ─── Protocol ──────────────────────────────────────────────────────────────
+
   private registerProtocol(): void {
-    // Register the protocol for OAuth callbacks
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
         app.setAsDefaultProtocolClient('ondoki', process.execPath, [path.resolve(process.argv[1])]);
@@ -98,23 +217,22 @@ class OndokiApp {
       app.setAsDefaultProtocolClient('ondoki');
     }
 
-    // Handle protocol URLs on macOS
     app.on('open-url', (event, url) => {
       event.preventDefault();
       this.handleProtocolUrl(url);
     });
   }
 
+  // ─── App Events ────────────────────────────────────────────────────────────
+
   private setupAppEventListeners(): void {
     app.on('window-all-closed', () => {
-      // On macOS, keep the app running even when all windows are closed
       if (process.platform !== 'darwin') {
         app.quit();
       }
     });
 
     app.on('activate', () => {
-      // On macOS, re-create the window when the dock icon is clicked
       if (BrowserWindow.getAllWindows().length === 0) {
         this.createMainWindow();
       }
@@ -122,6 +240,10 @@ class OndokiApp {
 
     app.on('before-quit', () => {
       this.isQuitting = true;
+    });
+
+    app.on('will-quit', () => {
+      globalShortcut.unregisterAll();
     });
 
     // Security: Prevent new window creation
@@ -132,6 +254,8 @@ class OndokiApp {
       });
     });
   }
+
+  // ─── Main Window ───────────────────────────────────────────────────────────
 
   private createMainWindow(): void {
     const windowState = this.settingsManager.getWindowState();
@@ -147,7 +271,6 @@ class OndokiApp {
       autoHideMenuBar: true,
       backgroundColor: '#f8fafc',
       icon: this.getAppIcon(),
-      // titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -155,18 +278,14 @@ class OndokiApp {
       },
     });
 
-    // Force show window
     this.mainWindow.show();
     this.mainWindow.focus();
-    console.log('Window bounds:', JSON.stringify(this.mainWindow.getBounds()));
-    console.log('Window visible:', this.mainWindow.isVisible());
-    console.log('Window minimized:', this.mainWindow.isMinimized());
-    
+
     // Load the renderer
     console.log('Loading renderer from:', RENDERER_PATH);
     this.mainWindow.loadFile(RENDERER_PATH).then(async () => {
       console.log('Renderer loaded successfully');
-      
+
       // Try auto-login after renderer is loaded
       try {
         const success = await this.authService.tryAutoLogin();
@@ -182,23 +301,18 @@ class OndokiApp {
       console.error('Failed to load renderer:', err);
     });
 
-    // Show window when ready
     this.mainWindow.once('ready-to-show', () => {
       if (this.mainWindow) {
         this.mainWindow.show();
-
         if (windowState?.isMaximized) {
           this.mainWindow.maximize();
         }
-
-        // Open DevTools in development
         if (isDev) {
           this.mainWindow.webContents.openDevTools({ mode: 'detach' });
         }
       }
     });
 
-    // Save window state when closing
     this.mainWindow.on('close', (event) => {
       if (!this.isQuitting && process.platform === 'darwin') {
         event.preventDefault();
@@ -208,7 +322,6 @@ class OndokiApp {
       }
     });
 
-    // Save window state on move/resize
     this.mainWindow.on('moved', () => this.saveWindowState());
     this.mainWindow.on('resized', () => this.saveWindowState());
 
@@ -216,27 +329,25 @@ class OndokiApp {
       this.mainWindow = null;
     });
 
-    // Handle external links
     this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
       return { action: 'deny' };
     });
   }
 
+  // ─── Tray ──────────────────────────────────────────────────────────────────
+
   private normalTrayIcon: Electron.NativeImage | null = null;
   private badgeTrayIcon: Electron.NativeImage | null = null;
 
   private createTray(): void {
-    // Use actual app icon for tray
     const iconPath = path.join(__dirname, '..', '..', 'assets');
     const icon16 = nativeImage.createFromPath(path.join(iconPath, 'icon.png'));
-    
-    // Create template version (macOS auto-adjusts for dark/light menu bar)
+
     const trayIcon = icon16.resize({ width: 16, height: 16 });
     trayIcon.setTemplateImage(true);
     this.normalTrayIcon = trayIcon;
 
-    // Badge icon: same icon but NOT template (renders in color = stands out)
     const badgeBase = nativeImage.createFromPath(path.join(iconPath, 'icon.png'));
     const badge = badgeBase.resize({ width: 16, height: 16 });
     badge.setTemplateImage(false);
@@ -246,12 +357,10 @@ class OndokiApp {
     this.tray.setToolTip('Ondoki');
     this.updateTrayMenu();
 
-    // Listen for context match events from ipc-handlers
     app.on('context-matches-updated' as any, (matches: any[], ctx: any) => {
       if (this.badgeTrayIcon) {
         this.tray?.setImage(this.badgeTrayIcon);
       }
-      // Show match count next to tray icon
       this.tray?.setTitle(` ${matches.length}`);
       const contextLabel = ctx.url
         ? `${ctx.appName} — ${new URL(ctx.url).hostname}`
@@ -273,16 +382,18 @@ class OndokiApp {
 
     const template: Electron.MenuItemConstructorOptions[] = [
       { label: 'Open Ondoki', click: () => this.showMainWindow() },
+      {
+        label: 'Open Spotlight',
+        accelerator: process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space',
+        click: () => this.showSpotlightWindow(),
+      },
       { type: 'separator' },
     ];
 
     if (contextInfo) {
+      template.push({ label: contextInfo, enabled: false });
       template.push({
-        label: `📍 ${contextInfo}`,
-        enabled: false,
-      });
-      template.push({
-        label: `➕ Add context for "${contextInfo}"...`,
+        label: 'Add context note...',
         click: () => {
           this.showMainWindow();
           if (this.mainWindow) {
@@ -294,10 +405,10 @@ class OndokiApp {
 
     if (matches && matches.length > 0) {
       template.push({ type: 'separator' });
-      template.push({ label: `📋 ${matches.length} suggestion${matches.length > 1 ? 's' : ''}`, enabled: false });
+      template.push({ label: `${matches.length} suggestion${matches.length > 1 ? 's' : ''}`, enabled: false });
       for (const m of matches.slice(0, 5)) {
         template.push({
-          label: `  ${m.resource_type === 'workflow' ? '🔄' : '📄'} ${m.resource_name}`,
+          label: `${m.resource_type === 'workflow' ? 'Workflow' : 'Page'}: ${m.resource_name}`,
           click: () => {
             const settings = this.settingsManager.getSettings();
             const frontendUrl = settings.frontendUrl || 'http://localhost:5173';
@@ -309,12 +420,12 @@ class OndokiApp {
     }
 
     if (!contextInfo && (!matches || matches.length === 0)) {
-      template.push({ label: '📍 No context detected', enabled: false });
+      template.push({ label: 'No context detected', enabled: false });
     }
 
     template.push({ type: 'separator' });
     template.push({
-      label: '📝 Add Context Note...',
+      label: 'Add Context Note...',
       click: () => {
         this.showMainWindow();
         if (this.mainWindow) {
@@ -328,6 +439,7 @@ class OndokiApp {
     this.tray.setContextMenu(Menu.buildFromTemplate(template));
   }
 
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private showMainWindow(): void {
     if (!this.mainWindow) {
@@ -340,7 +452,7 @@ class OndokiApp {
 
   private getAppIcon(): string | undefined {
     const iconPath = path.join(__dirname, '..', '..', 'assets');
-    
+
     switch (process.platform) {
       case 'win32':
         return path.join(iconPath, 'icon.ico');
@@ -367,25 +479,21 @@ class OndokiApp {
   }
 
   private handleStartupProtocol(): void {
-    // Check if the app was launched with a protocol URL
     const protocolUrl = process.argv.find(arg => arg.startsWith('ondoki://'));
     if (protocolUrl) {
-      // Delay handling to ensure the window is ready
       setTimeout(() => this.handleProtocolUrl(protocolUrl), 1000);
     }
   }
 
   private async handleProtocolUrl(url: string): Promise<void> {
     console.log('Handling protocol URL:', url);
-    
-    // Handle auth callback directly in main process
+
     if (url.startsWith('ondoki://auth/callback')) {
       try {
         const success = await this.authService.handleCallback(url);
         console.log('Auth callback result:', success);
-        
+
         if (success && this.mainWindow) {
-          // Notify renderer of auth status change
           const status = await this.authService.getStatus();
           this.mainWindow.webContents.send('auth-status-changed', status);
         }
@@ -393,9 +501,8 @@ class OndokiApp {
         console.error('Auth callback error:', error);
       }
     }
-    
+
     if (this.mainWindow) {
-      // Bring the window to front
       if (this.mainWindow.isMinimized()) {
         this.mainWindow.restore();
       }
