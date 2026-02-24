@@ -184,3 +184,4 @@ types/
 # Native compiled binaries
 native/macos/window-info
 native/windows/*.exe
+pnpm-lock.yaml
