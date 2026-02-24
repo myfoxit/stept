@@ -1,5 +1,5 @@
 import * as React from "react"
-import { fetchAiToken, getUrlParam } from "@/lib/tiptap-collab-utils"
+import { fetchAiToken, getUrlParam } from "@/components/Editor/utils/editor-helpers"
 
 export type AiContextValue = {
   aiToken: string | null

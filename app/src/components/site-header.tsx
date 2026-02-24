@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { ThemeToggle } from "./tiptap-templates/simple/notion-like-editor-theme-toggle";
+import { ThemeToggle } from "./Editor/ThemeToggle";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 
 export function SiteHeader({

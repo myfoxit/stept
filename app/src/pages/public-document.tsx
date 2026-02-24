@@ -5,7 +5,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
-import { TipTapRenderer } from '@/components/tiptap-renderer';
+import { EditorRenderer } from '@/components/Editor/Renderer';
 
 async function fetchPublicDocument(token: string) {
   const baseUrl = getApiBaseUrl();
@@ -69,7 +69,7 @@ export function PublicDocumentPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">{doc.name || 'Untitled Document'}</h1>
-        <TipTapRenderer content={doc.content} documentShareToken={token} />
+        <EditorRenderer content={doc.content} documentShareToken={token} />
         <div className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>
             Made with{' '}

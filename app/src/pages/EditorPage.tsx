@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { NotionEditor } from "@/components/tiptap-templates/simple/notion-editor";
+import { OndokiEditor } from "@/components/Editor/OndokiEditor";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import {
@@ -252,7 +252,7 @@ export default function EditorPage() {
           </Alert>
         </div>
       )}
-      <NotionEditor
+      <OndokiEditor
         docId={docId as string}
         readOnly={isReadOnly}
         headerSlot={(saveStatus, errorMessage) => (

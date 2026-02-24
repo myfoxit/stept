@@ -1,5 +1,5 @@
 import * as React from "react"
-import { getAvatar } from "@/lib/tiptap-collab-utils"
+import { getAvatar } from "@/components/Editor/utils/editor-helpers"
 
 export type User = {
   id: string

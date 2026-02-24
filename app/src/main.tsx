@@ -7,7 +7,7 @@ import { Layout } from '@/components/Layout';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EditorPage from './pages/EditorPage';
-import { TextContainerEditor } from './components/tiptap-templates/simple/text-container-editor';
+import { TextContainerEditor } from './components/Editor/TextContainerEditor';
 import { ProjectProvider } from './providers/project-provider';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider } from '@/providers/auth-provider';

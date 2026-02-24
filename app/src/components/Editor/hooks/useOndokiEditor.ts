@@ -1,4 +1,4 @@
-import { ImageUploadNode } from '@/components/tiptap-node/image-upload-node'
+import { ImageUploadNode } from '@/components/Editor/nodes/image-upload-node'
 import { MAX_FILE_SIZE, handleImageUpload } from '@/components/Editor/utils/editor-utils'
 import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import { TaskList, TaskItem } from '@tiptap/extension-list'
@@ -12,7 +12,8 @@ import { useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Highlight } from '@tiptap/extension-highlight'
 import ProcessRecordingNode from '@/components/Editor/Nodes/ProcessRecordingNode/ProcessRecordingNode'
-import { Pages } from '@/components/tiptap-extensions/pagination'
+import { Pages } from '@/components/Editor/extensions/pagination'
+import { createSlashMenuExtension } from '@/components/Editor/SlashMenu'
 
 export function useOndokiEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   return useEditor({
@@ -59,6 +60,7 @@ export function useOndokiEditor({ readOnly = false }: { readOnly?: boolean } = {
       UniqueID,
       Typography,
       ProcessRecordingNode,
+      createSlashMenuExtension(),
       Pages.configure({
         pageFormat: 'A4',
         headerHeight: 1,

@@ -189,3 +189,18 @@ export function findSelectionPosition(params: {
   const selectedNode = resolvedPos.node(nodeDepth)
   return selectedNode ? resolvedPos.before(nodeDepth) : null
 }
+
+// --- Re-exported for backward compatibility ---
+
+export const getUrlParam = (param: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return params.get(param);
+};
+
+export const fetchAiToken = async (): Promise<string> => {
+  const appId = import.meta.env.VITE_TIPTAP_AI_APP_ID || '';
+  const token = import.meta.env.VITE_TIPTAP_AI_TOKEN || '';
+  if (!appId || !token) return '';
+  return token;
+};
