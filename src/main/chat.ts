@@ -8,7 +8,6 @@ export interface ChatMessage {
 }
 
 export class ChatService extends EventEmitter {
-  private static readonly API_BASE_URL = 'http://localhost:8000/api/v1';
   private supportsVision?: boolean;
 
   constructor(
@@ -22,14 +21,7 @@ export class ChatService extends EventEmitter {
     messages: ChatMessage[],
     recordingContext?: string
   ): Promise<string> {
-    const settings = this.settingsManager.getSettings();
-    
-    // Check if we should use backend proxy or direct LLM
-    if (settings.llmProvider && settings.llmModel) {
-      return this.sendDirectLlmMessage(messages, recordingContext);
-    } else {
-      return this.sendBackendProxiedMessage(messages, recordingContext);
-    }
+    return this.sendBackendProxiedMessage(messages, recordingContext);
   }
 
   private async sendBackendProxiedMessage(
@@ -42,7 +34,9 @@ export class ChatService extends EventEmitter {
     }
 
     try {
-      const response = await fetch(`${ChatService.API_BASE_URL}/chat`, {
+      const settings = this.settingsManager.getSettings();
+      const apiBaseUrl = (settings.chatApiUrl || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+      const response = await fetch(`${apiBaseUrl}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -27,8 +27,8 @@ export class ContextWatcherService extends EventEmitter {
   private interval: NodeJS.Timeout | null = null;
   private lastContext: string = '';
   private cache: Map<string, { matches: ContextMatch[]; time: number }> = new Map();
-  private readonly CACHE_TTL = 5 * 60 * 1000;
-  private readonly POLL_INTERVAL = 3000;
+  private readonly CACHE_TTL = 10 * 60 * 1000;
+  private readonly POLL_INTERVAL = 5000;
 
   private apiBaseUrl: string = '';
   private accessToken: string = '';
@@ -72,7 +72,7 @@ export class ContextWatcherService extends EventEmitter {
       const ctx = await this.getActiveContext();
       if (!ctx) return;
 
-      const ctxKey = JSON.stringify(ctx);
+      const ctxKey = JSON.stringify({ app: ctx.appName, host: ctx.url ? new URL(ctx.url).hostname : '', title: (ctx.windowTitle || '').slice(0, 120) });
       if (ctxKey === this.lastContext) return;
       this.lastContext = ctxKey;
 

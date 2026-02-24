@@ -44,9 +44,6 @@ const MainWindow: React.FC = () => {
         ]);
         setSettings(settingsData);
         setAppVersion(version);
-        if (isAuthenticated && !settingsData.llmApiKey) {
-          setTimeout(() => setShowLlmSetup(true), 1000);
-        }
       } catch (error) {
         console.error('Failed to load initial data:', error);
       }
@@ -87,10 +84,6 @@ const MainWindow: React.FC = () => {
   };
   const handleGenerateGuide = () => {
     if (steps.length === 0) { alert('No steps recorded. Record some steps first.'); return; }
-    if (!settings?.llmApiKey) {
-      if (confirm('No AI provider configured. Would you like to set one up now?')) setShowLlmSetup(true);
-      return;
-    }
     setShowGuidePreview(true);
   };
 

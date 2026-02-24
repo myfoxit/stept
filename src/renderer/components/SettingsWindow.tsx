@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings } from '../../main/preload';
 import { useElectronAPI } from '../hooks/useElectronAPI';
-import { OndokiLogoSmall } from './OndokiLogo';
 
 interface SettingsWindowProps {
   onClose: () => void;
@@ -11,7 +10,7 @@ interface SettingsWindowProps {
 type LlmProvider = 'ondoki' | 'openai' | 'anthropic' | 'gemini' | 'custom';
 
 const MODEL_OPTIONS: { id: LlmProvider; name: string; desc: string; iconBg: string; iconColor: string; iconContent: React.ReactNode }[] = [
-  { id: 'ondoki', name: 'Ondoki', desc: 'Default · Built-in', iconBg: 'rgba(108,92,231,0.08)', iconColor: '#6C5CE7', iconContent: <OndokiLogoSmall /> },
+  { id: 'ondoki', name: 'Ondoki', desc: 'Managed by Ondoki Web', iconBg: 'rgba(108,92,231,0.08)', iconColor: '#6C5CE7', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>O</span> },
   { id: 'openai', name: 'OpenAI', desc: 'GPT-4o, GPT-4', iconBg: '#E8F5E8', iconColor: '#10A37F', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>G</span> },
   { id: 'anthropic', name: 'Claude', desc: 'Sonnet, Opus, Haiku', iconBg: '#FFF0E6', iconColor: '#D97706', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>C</span> },
   { id: 'gemini', name: 'Gemini', desc: 'Pro, Flash, Ultra', iconBg: '#E8F0FE', iconColor: '#4285F4', iconContent: <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>G</span> },
@@ -29,7 +28,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showLlmSetup, setShowLlmSetup] = useState(false);
+  
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -60,7 +59,6 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
   };
 
   const selectedModel = (settings.llmProvider || 'ondoki') as LlmProvider;
-  const showConfig = selectedModel !== 'ondoki';
 
   const getEndpointDefaults = (provider: LlmProvider) => {
     switch (provider) {
@@ -95,12 +93,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
           <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <span className="section-title">AI Model</span>
-              <button className="btn-wizard" onClick={() => setShowLlmSetup(true)}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                </svg>
-                Setup Wizard
-              </button>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Managed from Ondoki Web</span>
             </div>
 
             <div className="model-grid">
@@ -109,7 +102,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
                   key={model.id}
                   className={`model-card ${selectedModel === model.id ? 'selected' : ''}`}
                   style={model.id === 'custom' ? { gridColumn: 'span 2' } : undefined}
-                  onClick={() => handleInputChange('llmProvider', model.id)}
+                  onClick={() => {}}
                 >
                   <div className="model-icon" style={{ background: model.iconBg, color: model.iconColor }}>
                     {model.iconContent}
@@ -128,7 +121,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
             </div>
 
             {/* Dynamic config panel */}
-            {showConfig && (
+            {false && (
               <div style={{
                 marginTop: 10, padding: 12, background: 'var(--bg)',
                 borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
