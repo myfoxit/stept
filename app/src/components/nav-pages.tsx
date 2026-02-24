@@ -356,10 +356,15 @@ function NavPageItem({
     }
     if (isWorkflow) {
       return (
-        <Monitor
-          className="size-3.5 flex-shrink-0 opacity-50"
-          strokeWidth={1.5}
-        />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
+        </svg>
       );
     }
     return (
@@ -488,7 +493,9 @@ function NavPageItem({
                     strokeWidth={1.5}
                   />
                 )}
-                <span className="truncate font-semibold">{doc.name || "Untitled"}</span>
+                <span className="truncate font-semibold">
+                  {doc.name || "Untitled"}
+                </span>
               </div>
             ) : (
               <Link
@@ -496,10 +503,15 @@ function NavPageItem({
                 className="flex items-center gap-1"
               >
                 {isWorkflow ? (
-                  <Monitor
-                    className="size-3.5 flex-shrink-0 opacity-50"
-                    strokeWidth={1.5}
-                  />
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
+                  </svg>
                 ) : (
                   <File
                     className="size-3.5 flex-shrink-0 opacity-50"
@@ -900,8 +912,10 @@ export function NavPages({ userRole }: { userRole: string }) {
   const [open, setOpen] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [createIsPrivate, setCreateIsPrivate] = React.useState(false);
-  const [unsortedSharedExpanded, setUnsortedSharedExpanded] = React.useState(true);
-  const [unsortedPrivateExpanded, setUnsortedPrivateExpanded] = React.useState(true); // NEW
+  const [unsortedSharedExpanded, setUnsortedSharedExpanded] =
+    React.useState(true);
+  const [unsortedPrivateExpanded, setUnsortedPrivateExpanded] =
+    React.useState(true); // NEW
 
   const canCreatePage =
     userRole === "owner" || userRole === "admin" || userRole === "editor";
@@ -1020,7 +1034,12 @@ export function NavPages({ userRole }: { userRole: string }) {
         </SidebarGroupLabel>
         <SidebarMenu className="gap-0.5">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild data-active={location.pathname === '/documents/pages' || undefined}>
+            <SidebarMenuButton
+              asChild
+              data-active={
+                location.pathname === "/documents/pages" || undefined
+              }
+            >
               <Link
                 to="/documents/pages"
                 className="flex items-center gap-2 h-7 px-2"
@@ -1031,18 +1050,35 @@ export function NavPages({ userRole }: { userRole: string }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild data-active={location.pathname === '/documents/workflows' || undefined}>
+            <SidebarMenuButton
+              asChild
+              data-active={
+                location.pathname === "/documents/workflows" || undefined
+              }
+            >
               <Link
                 to="/documents/workflows"
                 className="flex items-center gap-2 h-7 px-2"
               >
-                <Monitor className="size-3.5 opacity-50" strokeWidth={1.5} />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
+                </svg>
+
                 <span className="text-sm">Workflows</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild data-active={location.pathname === '/documents/all' || undefined}>
+            <SidebarMenuButton
+              asChild
+              data-active={location.pathname === "/documents/all" || undefined}
+            >
               <Link
                 to="/documents/all"
                 className="flex items-center gap-2 h-7 px-2"
@@ -1078,7 +1114,10 @@ export function NavPages({ userRole }: { userRole: string }) {
               className="rounded-sm p-0.5 hover:bg-sidebar-accent transition-colors"
               title="New Folder"
             >
-              <FolderPlus className="size-3.5 text-[#D6D3D1]" strokeWidth={1.5} />
+              <FolderPlus
+                className="size-3.5 text-[#D6D3D1]"
+                strokeWidth={1.5}
+              />
             </button>
           )}
         </SidebarGroupLabel>
@@ -1090,15 +1129,17 @@ export function NavPages({ userRole }: { userRole: string }) {
           key={`shared-${dragCounter}`}
         >
           {/* Folders first */}
-          {sharedTree.filter((doc) => doc.is_folder).map((doc) => (
-            <NavPageItem
-              key={doc.id}
-              doc={doc}
-              userRole={userRole}
-              onDragEnd={handleDragEnd}
-              isPrivateSection={false}
-            />
-          ))}
+          {sharedTree
+            .filter((doc) => doc.is_folder)
+            .map((doc) => (
+              <NavPageItem
+                key={doc.id}
+                doc={doc}
+                userRole={userRole}
+                onDragEnd={handleDragEnd}
+                isPrivateSection={false}
+              />
+            ))}
 
           {/* Unsorted: root-level non-folder items (always visible) */}
           <SidebarMenuItem>
@@ -1114,7 +1155,10 @@ export function NavPages({ userRole }: { userRole: string }) {
                 )}
               </button>
               <SidebarMenuButton className="flex-1 h-7 px-1.5 hover:bg-transparent">
-                <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
+                <Inbox
+                  className="size-3.5 flex-shrink-0 opacity-50"
+                  strokeWidth={1.5}
+                />
                 <span className="truncate text-sm font-semibold">Unsorted</span>
               </SidebarMenuButton>
               {canCreatePage && (
@@ -1127,7 +1171,11 @@ export function NavPages({ userRole }: { userRole: string }) {
                       <Plus className="size-3.5" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent side="right" align="start" className="w-44">
+                  <DropdownMenuContent
+                    side="right"
+                    align="start"
+                    className="w-44"
+                  >
                     <DropdownMenuItem
                       onSelect={async () => {
                         if (!selectedProjectId) return;
@@ -1149,15 +1197,17 @@ export function NavPages({ userRole }: { userRole: string }) {
           </SidebarMenuItem>
           {unsortedSharedExpanded && (
             <div className="ml-3 pl-1">
-              {sharedTree.filter((doc) => !doc.is_folder).map((doc) => (
-                <NavPageItem
-                  key={doc.id}
-                  doc={doc}
-                  userRole={userRole}
-                  onDragEnd={handleDragEnd}
-                  isPrivateSection={false}
-                />
-              ))}
+              {sharedTree
+                .filter((doc) => !doc.is_folder)
+                .map((doc) => (
+                  <NavPageItem
+                    key={doc.id}
+                    doc={doc}
+                    userRole={userRole}
+                    onDragEnd={handleDragEnd}
+                    isPrivateSection={false}
+                  />
+                ))}
             </div>
           )}
 
@@ -1195,7 +1245,10 @@ export function NavPages({ userRole }: { userRole: string }) {
                 className="rounded-sm p-0.5 hover:bg-sidebar-accent transition-colors"
                 title="New Folder"
               >
-                <FolderPlus className="size-3.5 text-[#D6D3D1]" strokeWidth={1.5} />
+                <FolderPlus
+                  className="size-3.5 text-[#D6D3D1]"
+                  strokeWidth={1.5}
+                />
               </button>
             )}
           </SidebarGroupLabel>
@@ -1207,21 +1260,25 @@ export function NavPages({ userRole }: { userRole: string }) {
             key={`private-${dragCounter}`}
           >
             {/* Folders first */}
-            {privateTree.filter((doc) => doc.is_folder).map((doc) => (
-              <NavPageItem
-                key={doc.id}
-                doc={doc}
-                userRole={userRole}
-                onDragEnd={handleDragEnd}
-                isPrivateSection={true}
-              />
-            ))}
+            {privateTree
+              .filter((doc) => doc.is_folder)
+              .map((doc) => (
+                <NavPageItem
+                  key={doc.id}
+                  doc={doc}
+                  userRole={userRole}
+                  onDragEnd={handleDragEnd}
+                  isPrivateSection={true}
+                />
+              ))}
 
             {/* Unsorted: root-level non-folder items (always visible) */}
             <SidebarMenuItem>
               <div
                 className="flex items-center group/item h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
-                onClick={() => setUnsortedPrivateExpanded(!unsortedPrivateExpanded)}
+                onClick={() =>
+                  setUnsortedPrivateExpanded(!unsortedPrivateExpanded)
+                }
               >
                 <button className="flex items-center justify-center size-5 rounded-sm ml-0.5 outline-none">
                   {unsortedPrivateExpanded ? (
@@ -1231,8 +1288,13 @@ export function NavPages({ userRole }: { userRole: string }) {
                   )}
                 </button>
                 <SidebarMenuButton className="flex-1 h-7 px-1.5 hover:bg-transparent">
-                  <Inbox className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
-                  <span className="truncate text-sm font-semibold">Unsorted</span>
+                  <Inbox
+                    className="size-3.5 flex-shrink-0 opacity-50"
+                    strokeWidth={1.5}
+                  />
+                  <span className="truncate text-sm font-semibold">
+                    Unsorted
+                  </span>
                 </SidebarMenuButton>
                 {canCreatePage && (
                   <DropdownMenu>
@@ -1244,7 +1306,11 @@ export function NavPages({ userRole }: { userRole: string }) {
                         <Plus className="size-3.5" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent side="right" align="start" className="w-44">
+                    <DropdownMenuContent
+                      side="right"
+                      align="start"
+                      className="w-44"
+                    >
                       <DropdownMenuItem
                         onSelect={async () => {
                           if (!selectedProjectId) return;
@@ -1266,15 +1332,17 @@ export function NavPages({ userRole }: { userRole: string }) {
             </SidebarMenuItem>
             {unsortedPrivateExpanded && (
               <div className="ml-3 pl-1">
-                {privateTree.filter((doc) => !doc.is_folder).map((doc) => (
-                  <NavPageItem
-                    key={doc.id}
-                    doc={doc}
-                    userRole={userRole}
-                    onDragEnd={handleDragEnd}
-                    isPrivateSection={true}
-                  />
-                ))}
+                {privateTree
+                  .filter((doc) => !doc.is_folder)
+                  .map((doc) => (
+                    <NavPageItem
+                      key={doc.id}
+                      doc={doc}
+                      userRole={userRole}
+                      onDragEnd={handleDragEnd}
+                      isPrivateSection={true}
+                    />
+                  ))}
               </div>
             )}
 
