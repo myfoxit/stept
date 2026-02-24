@@ -56,6 +56,7 @@ export interface ElectronAPI {
   spotlightOpen: (projectId?: string) => Promise<any>;
   spotlightSearch: (query: string, projectId: string) => Promise<any>;
   spotlightSemanticSearch: (query: string, projectId: string) => Promise<any>;
+  onSpotlightOpenOverlay: (callback: (projectId: string) => void) => () => void;
 
   // Utility
   openExternal: (url: string) => Promise<void>;
@@ -276,6 +277,11 @@ const electronAPI: ElectronAPI = {
   spotlightOpen: (projectId?: string) => ipcRenderer.invoke('spotlight:open', projectId),
   spotlightSearch: (query: string, projectId: string) => ipcRenderer.invoke('spotlight:search', query, projectId),
   spotlightSemanticSearch: (query: string, projectId: string) => ipcRenderer.invoke('spotlight:semantic-search', query, projectId),
+  onSpotlightOpenOverlay: (callback: (projectId: string) => void) => {
+    const handler = (_event: IpcRendererEvent, projectId: string) => callback(projectId);
+    ipcRenderer.on('spotlight:open-overlay', handler);
+    return () => ipcRenderer.removeListener('spotlight:open-overlay', handler);
+  },
 
   // Utility
   openExternal: (url: string) => ipcRenderer.invoke('utility:open-external', url),

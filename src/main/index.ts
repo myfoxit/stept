@@ -15,7 +15,6 @@ class OndokiApp {
   private authService: AuthService;
   private settingsManager: SettingsManager;
   private isQuitting = false;
-  private spotlightWindow: BrowserWindow | null = null;
 
   constructor() {
     this.settingsManager = new SettingsManager();
@@ -49,8 +48,14 @@ class OndokiApp {
     // Create tray icon
     this.createTray();
 
-    // Spotlight floating window trigger
-    app.on('spotlight:open' as any, (_projectId: string) => this.openSpotlightWindow(_projectId));
+    // Spotlight trigger — send to main renderer window instead of opening a separate window
+    app.on('spotlight:open' as any, (_projectId: string) => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.show();
+        this.mainWindow.focus();
+        this.mainWindow.webContents.send('spotlight:open-overlay', _projectId);
+      }
+    });
 
     // Handle protocol on startup (if launched via protocol)
     this.handleStartupProtocol();
@@ -323,78 +328,6 @@ class OndokiApp {
     this.tray.setContextMenu(Menu.buildFromTemplate(template));
   }
 
-
-  private openSpotlightWindow(projectId?: string): void {
-    if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
-      this.spotlightWindow.show();
-      this.spotlightWindow.focus();
-      this.spotlightWindow.webContents.send('spotlight:set-project', projectId || '');
-      return;
-    }
-
-    this.spotlightWindow = new BrowserWindow({
-      width: 860,
-      height: 560,
-      center: true,
-      frame: false,
-      transparent: false,
-      alwaysOnTop: true,
-      movable: true,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      show: false,
-      backgroundColor: '#ffffff',
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-      },
-    });
-
-    const html = `<!doctype html><html><body style="margin:0;font-family:-apple-system,Inter,sans-serif;background:#f8fafc">
-      <div style="padding:12px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
-        <b>⌘K Spotlight</b><button onclick="window.close()" style="border:0;background:none;font-size:18px;cursor:pointer">×</button>
-      </div>
-      <div style="padding:12px">
-        <div style="display:flex;gap:8px;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;background:white">
-          <span id='icon'>🔎</span><input id='q' placeholder='Search workflows/pages or ask AI…' style='flex:1;border:0;outline:none;font-size:14px' />
-          <span style='font-size:10px;border:1px solid #d1d5db;border-radius:6px;padding:2px 4px;color:#6b7280'>ESC</span>
-        </div>
-        <div style='display:flex;gap:8px;margin-top:8px'>
-          <button id='bSearch' style='flex:1;padding:8px;border-radius:8px;border:1px solid #6C5CE7;background:#f4f1ff'>Search</button>
-          <button id='bAi' style='flex:1;padding:8px;border-radius:8px;border:1px solid #e5e7eb;background:#fff'>Ask AI</button>
-        </div>
-        <div id='results' style='margin-top:10px;max-height:390px;overflow:auto'></div>
-      </div>
-      <script>
-        const { ipcRenderer, shell } = require('electron');
-        let mode='search'; let projectId='${projectId || ''}';
-        ipcRenderer.on('spotlight:set-project', (_, p)=>projectId=p||projectId);
-        const q=document.getElementById('q'); const r=document.getElementById('results');
-        const bS=document.getElementById('bSearch'); const bA=document.getElementById('bAi'); const icon=document.getElementById('icon');
-        function draw(list){ r.innerHTML=''; if(!list?.length){ r.innerHTML='<div style="color:#6b7280;font-size:12px;padding:8px">No results</div>'; return;}
-          for(const it of list){ const d=document.createElement('div'); d.style='padding:9px 10px;border:1px solid #eef2f7;border-radius:8px;margin-bottom:6px;background:white;cursor:pointer';
-            d.innerHTML='<div style=\"font-size:12px;font-weight:600\">'+(it.type==='workflow'?'🔄':'📄')+' '+(it.name||it.resource_name||'Untitled')+'</div><div style=\"font-size:11px;color:#6b7280\">'+(it.preview||it.summary||'')+'</div>';
-            d.onclick=()=>{ const id=it.id||it.resource_id; const path=(it.type==='workflow'||it.resource_type==='workflow')?('/workflow/'+id):('/editor/'+id); ipcRenderer.invoke('settings:get').then(s=>shell.openExternal(((s.frontendUrl||'http://localhost:5173').replace(/\/+$/,''))+path)); };
-            r.appendChild(d);
-          }
-        }
-        async function search(){ const text=q.value.trim(); if(!text||!projectId){r.innerHTML='<div style="font-size:12px;color:#6b7280;padding:8px">Select a project first.</div>';return;}
-          if(mode==='search'){ const kw=await ipcRenderer.invoke('spotlight:search', text, projectId); let list=kw.results||[]; if(text.length>20||/^(how|what|why|when|where|who|which|can|does|is|are|do|should|could|would)\b/i.test(text)){ try{const sem=await ipcRenderer.invoke('spotlight:semantic-search', text, projectId); if((sem.results||[]).length) list=[...sem.results,...list.filter(k=>!(new Set(sem.results.map(x=>x.id))).has(k.id))];}catch{}} draw(list); }
-          else { const ans=await ipcRenderer.invoke('chat:send-message', [{role:'user',content:text}], JSON.stringify({project_id:projectId})); r.innerHTML='<div style=\"font-size:12px;background:white;border:1px solid #eef2f7;border-radius:8px;padding:10px;white-space:pre-wrap\">'+ans+'</div>'; }
-        }
-        q.addEventListener('input',()=>{ if(mode==='search') search();}); q.addEventListener('keydown',e=>{if(e.key==='Escape')window.close(); if(e.key==='Enter'&&mode==='ai')search();});
-        bS.onclick=()=>{mode='search';icon.textContent='🔎';bS.style='flex:1;padding:8px;border-radius:8px;border:1px solid #6C5CE7;background:#f4f1ff';bA.style='flex:1;padding:8px;border-radius:8px;border:1px solid #e5e7eb;background:#fff';q.placeholder='Search workflows/pages…';search();};
-        bA.onclick=()=>{mode='ai';icon.textContent='✨';bA.style='flex:1;padding:8px;border-radius:8px;border:1px solid #6C5CE7;background:#f4f1ff';bS.style='flex:1;padding:8px;border-radius:8px;border:1px solid #e5e7eb;background:#fff';q.placeholder='Ask AI about this project…';};
-        q.focus();
-      </script>
-    </body></html>`;
-
-    this.spotlightWindow.loadURL('data:text/html;charset=UTF-8,' + encodeURIComponent(html));
-    this.spotlightWindow.once('ready-to-show', () => this.spotlightWindow?.show());
-    this.spotlightWindow.on('blur', () => this.spotlightWindow?.hide());
-    this.spotlightWindow.on('closed', () => { this.spotlightWindow = null; });
-  }
 
   private showMainWindow(): void {
     if (!this.mainWindow) {

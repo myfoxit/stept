@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import MainWindow from './components/MainWindow';
-import { ContextSuggestions } from './components/ContextSuggestions';
+import SpotlightOverlay from './components/SpotlightOverlay';
 import { AddContextNoteDialog } from './components/AddContextNoteDialog';
 import useAuth from './hooks/useAuth';
 
 const App: React.FC = () => {
   const [ready, setReady] = useState(false);
   const [showAddContext, setShowAddContext] = useState(false);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const [spotlightProjectId, setSpotlightProjectId] = useState('');
   const auth = useAuth();
 
   useEffect(() => {
@@ -21,9 +23,40 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Listen for add-context-note events
   useEffect(() => {
     const unsub = window.electronAPI?.onShowAddContextNote?.(() => setShowAddContext(true));
     return () => { unsub?.(); };
+  }, []);
+
+  // Global keyboard shortcut for spotlight (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSpotlightOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Listen for spotlight:open-overlay from main process (tray, global shortcut, etc.)
+  useEffect(() => {
+    const unsub = window.electronAPI?.onSpotlightOpenOverlay?.((projectId: string) => {
+      if (projectId) setSpotlightProjectId(projectId);
+      setSpotlightOpen(true);
+    });
+    return () => { unsub?.(); };
+  }, []);
+
+  const openSpotlight = useCallback((projectId: string) => {
+    setSpotlightProjectId(projectId);
+    setSpotlightOpen(true);
+  }, []);
+
+  const closeSpotlight = useCallback(() => {
+    setSpotlightOpen(false);
   }, []);
 
   if (!ready) {
@@ -51,8 +84,12 @@ const App: React.FC = () => {
 
   return (
     <div style={{ height: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <MainWindow />
-      <ContextSuggestions />
+      <MainWindow onOpenSpotlight={openSpotlight} />
+      <SpotlightOverlay
+        isOpen={spotlightOpen}
+        onClose={closeSpotlight}
+        projectId={spotlightProjectId}
+      />
       <AddContextNoteDialog
         isOpen={showAddContext}
         onClose={() => setShowAddContext(false)}

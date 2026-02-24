@@ -11,7 +11,11 @@ import SettingsWindow from './SettingsWindow';
 import GuidePreview from './GuidePreview';
 import { OndokiLogo } from './OndokiLogo';
 
-const MainWindow: React.FC = () => {
+interface MainWindowProps {
+  onOpenSpotlight?: (projectId: string) => void;
+}
+
+const MainWindow: React.FC<MainWindowProps> = ({ onOpenSpotlight }) => {
   const electronAPI = useElectronAPI();
   const {
     isAuthenticated, user, projects, hasProjects, isLoading: authLoading, login, logout,
@@ -144,25 +148,71 @@ const MainWindow: React.FC = () => {
                 {user?.email}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="icon-btn" title="Chat" onClick={() => setShowChatWindow(true)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              </button>
-              <button className="icon-btn" title="Settings" onClick={() => setShowSettingsWindow(true)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-              </button>
+            <button className="icon-btn" title="Settings" onClick={() => setShowSettingsWindow(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+          </div>
+
+          {/* AI Status */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
+              </svg>
+              <span style={{ fontSize: '0.64rem', fontWeight: 600, color: 'var(--text-secondary)' }}>AI: Cloud</span>
             </div>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '3px 8px', borderRadius: 100,
+              fontSize: '0.56rem', fontWeight: 600,
+              background: 'var(--green-light)', color: '#16a34a',
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)' }} />
+              Synced
+            </span>
           </div>
 
 
-          {/* Lean Spotlight trigger */}
+          {/* Spotlight trigger - matches v2 design shortcut-hint */}
           <button
-            className="btn-sm ghost"
-            style={{ width: '100%', justifyContent: 'space-between' } as any}
-            onClick={() => window.electronAPI?.spotlightOpen?.(selectedProjectId)}
+            onClick={() => onOpenSpotlight?.(selectedProjectId)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '10px 12px',
+              border: '1.5px dashed rgba(108,92,231,0.2)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--purple-light)',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--purple)';
+              e.currentTarget.style.background = 'rgba(108,92,231,0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(108,92,231,0.2)';
+              e.currentTarget.style.background = 'var(--purple-light)';
+            }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>🔎 Spotlight Search & AI</span>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>⌘K</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+            <span style={{ fontSize: '0.72rem', color: 'var(--purple)', fontWeight: 500, flex: 1, textAlign: 'left' }}>Search & AI</span>
+            <span style={{
+              display: 'inline-flex',
+              padding: '2px 5px',
+              borderRadius: 4,
+              background: 'rgba(108,92,231,0.12)',
+              border: '1px solid rgba(108,92,231,0.18)',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: '0.58rem',
+              fontWeight: 500,
+              color: 'var(--purple)',
+              lineHeight: 1.3,
+            }}>⌘K</span>
           </button>
 
           {/* Project selector */}
