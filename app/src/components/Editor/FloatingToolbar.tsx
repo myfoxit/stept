@@ -1,37 +1,57 @@
 import * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useCurrentEditor } from '@tiptap/react';
+import { useState } from 'react';
+import { BubbleMenu } from '@tiptap/react/menus';
+import { isNodeSelection } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  Bold, Italic, Underline, Strikethrough, Code,
-  Link, AlignLeft, AlignCenter, AlignRight,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Bold, Italic, Strikethrough, Code,
+  Link2, Link2Off,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Heading1, Heading2, Heading3,
-  Highlighter, Palette,
+  Highlighter, Palette, Type, X,
+  List, ListOrdered, ListTodo, TextQuote, FileCode,
+  ChevronDown,
 } from 'lucide-react';
-import { useEditorState } from '@/components/Editor/hooks/useEditorState';
-import { isSelectionValid, getSelectionBoundingRect } from '@/components/Editor/utils/editor-helpers';
-import { ColorPicker } from '@/components/Editor/ColorPicker';
-import { LinkPopover } from '@/components/Editor/LinkPopover';
+import { cn } from '@/lib/utils';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 interface ToolbarButtonProps {
   icon: React.ElementType;
   label: string;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   shortcut?: string;
 }
 
-function ToolbarButton({ icon: Icon, label, active, onClick, shortcut }: ToolbarButtonProps) {
+function ToolbarButton({ icon: Icon, label, active, disabled, onClick, shortcut }: ToolbarButtonProps) {
   return (
-    <Tooltip delayDuration={300}>
+    <Tooltip delayDuration={200}>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
-          className={`h-7 w-7 p-0 ${active ? 'bg-accent text-accent-foreground' : ''}`}
+          disabled={disabled}
+          className={cn('h-8 w-8 p-0', active && 'bg-accent text-accent-foreground')}
           onClick={onClick}
+          onMouseDown={(e) => e.preventDefault()}
         >
           <Icon className="h-4 w-4" />
         </Button>
@@ -43,107 +63,256 @@ function ToolbarButton({ icon: Icon, label, active, onClick, shortcut }: Toolbar
   );
 }
 
+// ---------------------------------------------------------------------------
+// Color Picker (inline)
+// ---------------------------------------------------------------------------
+
+const TEXT_COLORS = [
+  { label: 'Default', value: '' },
+  { label: 'Red', value: '#e11d48' },
+  { label: 'Orange', value: '#ea580c' },
+  { label: 'Yellow', value: '#ca8a04' },
+  { label: 'Green', value: '#16a34a' },
+  { label: 'Blue', value: '#2563eb' },
+  { label: 'Purple', value: '#9333ea' },
+  { label: 'Pink', value: '#db2777' },
+  { label: 'Gray', value: '#6b7280' },
+];
+
+const HIGHLIGHT_COLORS = [
+  { label: 'None', value: '' },
+  { label: 'Yellow', value: '#fef08a' },
+  { label: 'Green', value: '#bbf7d0' },
+  { label: 'Blue', value: '#bfdbfe' },
+  { label: 'Purple', value: '#e9d5ff' },
+  { label: 'Pink', value: '#fce7f3' },
+  { label: 'Red', value: '#fecaca' },
+  { label: 'Orange', value: '#fed7aa' },
+  { label: 'Gray', value: '#e5e7eb' },
+];
+
+// ---------------------------------------------------------------------------
+// Turn-into dropdown
+// ---------------------------------------------------------------------------
+
+function TurnIntoDropdown({ editor }: { editor: any }) {
+  const getCurrentType = () => {
+    if (editor.isActive('heading', { level: 1 })) return 'Heading 1';
+    if (editor.isActive('heading', { level: 2 })) return 'Heading 2';
+    if (editor.isActive('heading', { level: 3 })) return 'Heading 3';
+    if (editor.isActive('bulletList')) return 'Bullet List';
+    if (editor.isActive('orderedList')) return 'Ordered List';
+    if (editor.isActive('taskList')) return 'Task List';
+    if (editor.isActive('blockquote')) return 'Quote';
+    if (editor.isActive('codeBlock')) return 'Code';
+    return 'Text';
+  };
+
+  const items = [
+    { label: 'Text', icon: Type, action: () => editor.chain().focus().setParagraph().run() },
+    { label: 'Heading 1', icon: Heading1, action: () => editor.chain().focus().toggleHeading({ level: 1 }).run() },
+    { label: 'Heading 2', icon: Heading2, action: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
+    { label: 'Heading 3', icon: Heading3, action: () => editor.chain().focus().toggleHeading({ level: 3 }).run() },
+    { label: 'Bullet List', icon: List, action: () => editor.chain().focus().toggleBulletList().run() },
+    { label: 'Ordered List', icon: ListOrdered, action: () => editor.chain().focus().toggleOrderedList().run() },
+    { label: 'Task List', icon: ListTodo, action: () => editor.chain().focus().toggleTaskList().run() },
+    { label: 'Quote', icon: TextQuote, action: () => editor.chain().focus().toggleBlockquote().run() },
+    { label: 'Code', icon: FileCode, action: () => editor.chain().focus().toggleCodeBlock().run() },
+  ];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs font-medium" onMouseDown={(e) => e.preventDefault()}>
+          {getCurrentType()}
+          <ChevronDown className="h-3 w-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44">
+        {items.map(({ label, icon: Icon, action }) => (
+          <DropdownMenuItem key={label} onClick={action}>
+            <Icon className="mr-2 h-4 w-4" /> {label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Link Popover
+// ---------------------------------------------------------------------------
+
+function LinkButton({ editor }: { editor: any }) {
+  const [url, setUrl] = useState('');
+  const [open, setOpen] = useState(false);
+  const isActive = editor.isActive('link');
+
+  const handleSetLink = () => {
+    if (url) {
+      editor.chain().focus().setLink({ href: url }).run();
+    }
+    setOpen(false);
+    setUrl('');
+  };
+
+  const handleUnlink = () => {
+    editor.chain().focus().unsetLink().run();
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v && isActive) setUrl(editor.getAttributes('link')?.href || ''); }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('h-8 w-8 p-0', isActive && 'bg-accent text-accent-foreground')}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <Link2 className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" side="top" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            placeholder="https://..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSetLink()}
+            className="flex-1 rounded-md border bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+            autoFocus
+          />
+          <Button size="sm" className="h-8" onClick={handleSetLink}>Set</Button>
+          {isActive && (
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleUnlink}>
+              <Link2Off className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Floating Toolbar
+// ---------------------------------------------------------------------------
+
 export function FloatingToolbar() {
-  const { editor } = useCurrentEditor();
-  const state = useEditorState(editor);
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  return null; // Rendered via BubbleMenu in OndokiEditor
+}
 
-  const updatePosition = useCallback(() => {
-    if (!editor || !toolbarRef.current) return;
-
-    const valid = isSelectionValid(editor);
-    const { from, to } = editor.state.selection;
-    const hasSelection = from !== to && valid;
-
-    if (!hasSelection) {
-      setVisible(false);
-      return;
-    }
-
-    const rect = getSelectionBoundingRect(editor);
-    if (!rect) {
-      setVisible(false);
-      return;
-    }
-
-    const toolbar = toolbarRef.current;
-    const toolbarWidth = toolbar.offsetWidth || 400;
-    const toolbarHeight = toolbar.offsetHeight || 40;
-
-    let top = rect.top - toolbarHeight - 8 + window.scrollY;
-    let left = rect.left + rect.width / 2 - toolbarWidth / 2 + window.scrollX;
-
-    // Keep in viewport
-    left = Math.max(8, Math.min(left, window.innerWidth - toolbarWidth - 8));
-    if (top < 8) top = rect.bottom + 8 + window.scrollY;
-
-    setPosition({ top, left });
-    setVisible(true);
-  }, [editor]);
-
-  useEffect(() => {
-    if (!editor) return;
-
-    const onSelectionUpdate = () => {
-      requestAnimationFrame(updatePosition);
-    };
-
-    editor.on('selectionUpdate', onSelectionUpdate);
-    editor.on('blur', () => setVisible(false));
-
-    return () => {
-      editor.off('selectionUpdate', onSelectionUpdate);
-    };
-  }, [editor, updatePosition]);
-
-  if (!editor || !visible) return null;
+export function FloatingToolbarContent({ editor }: { editor: any }) {
+  const [textColorOpen, setTextColorOpen] = useState(false);
+  const [highlightOpen, setHighlightOpen] = useState(false);
 
   const chain = () => editor.chain().focus();
 
   return (
-    <div
-      ref={toolbarRef}
-      className="fixed z-50 flex items-center gap-0.5 rounded-lg border bg-popover p-1 shadow-md"
-      style={{ top: position.top, left: position.left }}
-      onMouseDown={(e) => e.preventDefault()}
+    <BubbleMenu
+      editor={editor}
+      options={{
+        placement: 'top',
+        offset: 8,
+      }}
+      shouldShow={({ editor: ed, state }) => {
+        const { selection } = state;
+        const { from, to, empty } = selection;
+        if (empty) return false;
+        if (isNodeSelection(selection) && selection.node.type.name !== 'image') return false;
+        // Don't show on code blocks
+        if (ed.isActive('codeBlock')) return false;
+        return from !== to;
+      }}
     >
-      <ToolbarButton icon={Bold} label="Bold" shortcut="⌘B" active={state.isBold} onClick={() => chain().toggleBold().run()} />
-      <ToolbarButton icon={Italic} label="Italic" shortcut="⌘I" active={state.isItalic} onClick={() => chain().toggleItalic().run()} />
-      <ToolbarButton icon={Underline} label="Underline" shortcut="⌘U" active={state.isUnderline} onClick={() => chain().toggleUnderline().run()} />
-      <ToolbarButton icon={Strikethrough} label="Strikethrough" active={state.isStrikethrough} onClick={() => chain().toggleStrike().run()} />
-      <ToolbarButton icon={Code} label="Inline Code" active={state.isCode} onClick={() => chain().toggleCode().run()} />
+      <div className="flex items-center gap-0.5 rounded-xl border bg-popover p-1 shadow-lg" onMouseDown={(e) => e.preventDefault()}>
+        {/* Turn Into */}
+        <TurnIntoDropdown editor={editor} />
 
-      <Separator orientation="vertical" className="mx-0.5 h-5" />
+        <Separator orientation="vertical" className="mx-0.5 h-5" />
 
-      <LinkPopover editor={editor} />
+        {/* Marks */}
+        <ToolbarButton icon={Bold} label="Bold" shortcut="⌘B" active={editor.isActive('bold')} onClick={() => chain().toggleBold().run()} />
+        <ToolbarButton icon={Italic} label="Italic" shortcut="⌘I" active={editor.isActive('italic')} onClick={() => chain().toggleItalic().run()} />
+        <ToolbarButton icon={Strikethrough} label="Strikethrough" active={editor.isActive('strike')} onClick={() => chain().toggleStrike().run()} />
+        <ToolbarButton icon={Code} label="Code" active={editor.isActive('code')} onClick={() => chain().toggleCode().run()} />
 
-      <Separator orientation="vertical" className="mx-0.5 h-5" />
+        <Separator orientation="vertical" className="mx-0.5 h-5" />
 
-      <ToolbarButton icon={AlignLeft} label="Align Left" active={state.textAlign === 'left'} onClick={() => chain().setTextAlign('left').run()} />
-      <ToolbarButton icon={AlignCenter} label="Align Center" active={state.textAlign === 'center'} onClick={() => chain().setTextAlign('center').run()} />
-      <ToolbarButton icon={AlignRight} label="Align Right" active={state.textAlign === 'right'} onClick={() => chain().setTextAlign('right').run()} />
+        {/* Link */}
+        <LinkButton editor={editor} />
 
-      <Separator orientation="vertical" className="mx-0.5 h-5" />
+        {/* Text Color */}
+        <Popover open={textColorOpen} onOpenChange={setTextColorOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onMouseDown={(e) => e.preventDefault()}>
+              <Palette className="h-4 w-4" style={{ color: editor.getAttributes('textStyle')?.color || undefined }} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-fit p-2" side="top" align="center">
+            <div className="grid grid-cols-5 gap-1.5">
+              {TEXT_COLORS.map((c) => (
+                <button
+                  key={c.value || 'default'}
+                  title={c.label}
+                  className={cn(
+                    'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110',
+                    editor.getAttributes('textStyle')?.color === c.value ? 'border-ring' : 'border-transparent',
+                  )}
+                  style={{ backgroundColor: c.value || 'currentColor' }}
+                  onClick={() => {
+                    if (c.value) editor.chain().focus().setColor(c.value).run();
+                    else editor.chain().focus().unsetColor().run();
+                    setTextColorOpen(false);
+                  }}
+                />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
 
-      <ToolbarButton icon={Heading1} label="Heading 1" active={state.headingLevel === 1} onClick={() => chain().toggleHeading({ level: 1 }).run()} />
-      <ToolbarButton icon={Heading2} label="Heading 2" active={state.headingLevel === 2} onClick={() => chain().toggleHeading({ level: 2 }).run()} />
-      <ToolbarButton icon={Heading3} label="Heading 3" active={state.headingLevel === 3} onClick={() => chain().toggleHeading({ level: 3 }).run()} />
+        {/* Highlight */}
+        <Popover open={highlightOpen} onOpenChange={setHighlightOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className={cn('h-8 w-8 p-0', editor.isActive('highlight') && 'bg-accent')} onMouseDown={(e) => e.preventDefault()}>
+              <Highlighter className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-fit p-2" side="top" align="center">
+            <div className="grid grid-cols-5 gap-1.5">
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.value || 'none'}
+                  title={c.label}
+                  className={cn(
+                    'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110',
+                    c.value === '' ? 'flex items-center justify-center' : '',
+                    editor.isActive('highlight', { color: c.value }) ? 'border-ring' : 'border-transparent',
+                  )}
+                  style={{ backgroundColor: c.value || '#f3f4f6' }}
+                  onClick={() => {
+                    if (c.value) editor.chain().focus().toggleHighlight({ color: c.value }).run();
+                    else editor.chain().focus().unsetHighlight().run();
+                    setHighlightOpen(false);
+                  }}
+                >
+                  {c.value === '' && <X className="h-3 w-3 text-muted-foreground" />}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
 
-      <Separator orientation="vertical" className="mx-0.5 h-5" />
+        <Separator orientation="vertical" className="mx-0.5 h-5" />
 
-      <ColorPicker type="text" editor={editor}>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-          <Palette className="h-4 w-4" />
-        </Button>
-      </ColorPicker>
-
-      <ColorPicker type="highlight" editor={editor}>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-          <Highlighter className="h-4 w-4" />
-        </Button>
-      </ColorPicker>
-    </div>
+        {/* Alignment */}
+        <ToolbarButton icon={AlignLeft} label="Align Left" active={editor.isActive({ textAlign: 'left' })} onClick={() => chain().setTextAlign('left').run()} />
+        <ToolbarButton icon={AlignCenter} label="Align Center" active={editor.isActive({ textAlign: 'center' })} onClick={() => chain().setTextAlign('center').run()} />
+        <ToolbarButton icon={AlignRight} label="Align Right" active={editor.isActive({ textAlign: 'right' })} onClick={() => chain().setTextAlign('right').run()} />
+        <ToolbarButton icon={AlignJustify} label="Justify" active={editor.isActive({ textAlign: 'justify' })} onClick={() => chain().setTextAlign('justify').run()} />
+      </div>
+    </BubbleMenu>
   );
 }

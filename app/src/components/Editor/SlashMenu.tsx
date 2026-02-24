@@ -125,7 +125,7 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
       // Trigger image upload via the ImageUploadNode if available
-      editor.chain().focus().setImageUpload().run();
+      editor.chain().focus().setImageUploadNode().run();
     },
   },
   {

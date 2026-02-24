@@ -13,7 +13,7 @@ import '@/components/Editor/styles/paragraph.scss';
 import '@/components/Editor/styles/editor.scss';
 
 // Editor components
-import { FloatingToolbar } from '@/components/Editor/FloatingToolbar';
+import { FloatingToolbarContent } from '@/components/Editor/FloatingToolbar';
 import { MobileToolbar } from '@/components/Editor/MobileToolbar';
 import { DragMenu } from '@/components/Editor/DragMenu';
 
@@ -21,19 +21,17 @@ import { DragMenu } from '@/components/Editor/DragMenu';
 import { useOndokiEditor } from '@/components/Editor/hooks/useOndokiEditor';
 import { useAutoSave } from '@/components/Editor/hooks/useAutoSave';
 
-// Extensions
-import type { PageLayout } from '@/components/page-layout-selector';
-import { PAGE_FORMATS } from '@/components/Editor/extensions/pagination';
 
-// API & data
-import { IconInputCheck } from '@tabler/icons-react';
+import { PAGE_FORMATS } from '@/components/Editor/Extensions/pagination';
+
+
 import { listWorkflows } from '@/api/workflows';
 import type { ProcessRecordingSession } from '@/types/openapi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
 import { queryKeys } from '@/lib/queryKeys';
-import { AICommandPanel } from '@/components/Editor/extensions/ai-commands/AICommandPanel';
-import { AI_COMMANDS } from '@/components/Editor/extensions/ai-commands/commands';
+import { AICommandPanel, AI_COMMANDS } from '@/components/Editor/Extensions/ai-commands';
+
 
 export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
   docId: string;
@@ -159,7 +157,7 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
   // Set document content when ready
   useEffect(() => {
     if (editor && doc && !contentInitialized) {
-      editor.commands.setContent(doc!.content, false);
+      editor.commands.setContent(doc!.content, { emitUpdate: false });
       setContentInitialized(true);
     }
   }, [editor, doc, contentInitialized]);
@@ -273,7 +271,7 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
       <EditorContext.Provider value={{ editor }}>
         <EditorContent editor={editor} role="presentation" className="ondoki-editor-content">
           <DragMenu />
-          <FloatingToolbar />
+          {editor && <FloatingToolbarContent editor={editor} />}
           <MobileToolbar />
 
           {/* Inline AI Writer */}
