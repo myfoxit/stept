@@ -1,0 +1,428 @@
+@media print {
+  .tiptap-pages-* { border: 0 !important; }
+  html, body { margin: 0 !important; }
+}
+
+html,
+body,
+#root,
+#app {
+  height: 100%;
+  background-color: var(--tt-bg-color);
+}
+
+::-webkit-scrollbar {
+  width: 0.25rem;
+}
+
+:root {
+  /* Screen approximations (96dpi baseline) */
+  --page-a4-width-px: 796px; /* 210mm */
+  --page-a4-height-px: 1100px; /* 297mm */
+  --page-letter-width-px: 816px; /* 8.5in  */
+  --page-letter-height-px: 1056px; /* 11in */
+
+  /* Content paddings */
+  --page-pad-x: 3rem;
+  --page-pad-y: 2rem;
+
+  /* Document centered width */
+  --page-doc-width: 768px;
+
+  /* Mobile scale - will be overridden by media queries */
+  --page-scale: 1;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tt-scrollbar-color) transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--tt-scrollbar-color);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tiptap.ProseMirror {
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: #57534E;
+  font-size: 1.08rem;
+  line-height: 1.9;
+}
+
+.tiptap.ProseMirror h1,
+.tiptap.ProseMirror h2,
+.tiptap.ProseMirror h3,
+.tiptap.ProseMirror h4,
+.tiptap.ProseMirror h5,
+.tiptap.ProseMirror h6 {
+  font-family: 'Manrope', sans-serif;
+  color: #1C1917;
+}
+
+.tiptap.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.tiptap.ProseMirror h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tiptap.ProseMirror strong {
+  color: #1C1917;
+  font-weight: 600;
+}
+
+.tiptap.ProseMirror a {
+  color: #3a7a52;
+  text-decoration: underline;
+  text-decoration-color: #3a7a5212;
+  text-underline-offset: 3px;
+}
+
+.tiptap.ProseMirror a:hover {
+  text-decoration-color: #3a7a52;
+}
+
+.tiptap.ProseMirror code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.86em;
+  background: #F5F3FF;
+  border: 1px solid #E8E5FE;
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: #3a7a52;
+}
+
+.tiptap.ProseMirror blockquote {
+  border-left: 3px solid #3a7a52;
+  padding-left: 18px;
+  color: #A8A29E;
+  font-style: italic;
+}
+
+.tiptap.ProseMirror li::marker {
+  color: #a89bf2;
+}
+
+:root[data-page-layout='a4'] .ondoki-editor-wrapper {
+  background: #fbfbfb;
+}
+
+.ondoki-editor .ProseMirror p,
+.ondoki-editor .ProseMirror h1,
+.ondoki-editor .ProseMirror h2,
+.ondoki-editor .ProseMirror h3,
+.ondoki-editor .ProseMirror h4,
+.ondoki-editor .ProseMirror h5,
+.ondoki-editor .ProseMirror h6,
+.ondoki-editor .ProseMirror ul,
+.ondoki-editor .ProseMirror ol,
+.ondoki-editor .ProseMirror blockquote,
+.ondoki-editor .ProseMirror pre,
+.ondoki-editor .ProseMirror code,
+.ondoki-editor .ProseMirror hr {
+  margin-top: 0 !important;           /* kill the offender */
+}
+
+
+/* Default editor styles remain */
+.ondoki-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+
+  .ondoki-page-meta,
+  .ondoki-page-title {
+    max-width: 768px;
+    width: 100%;
+    padding-left: 4rem;
+    margin: 0 auto;
+  }
+
+  .ondoki-page-meta {
+    padding-top: 0.5rem;
+  }
+
+  .ondoki-page-title {
+    /* visual */
+    font-family: 'Manrope', sans-serif;
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #1C1917;
+    background: transparent;
+    border: none;
+
+    padding-top: 1rem;
+    margin-bottom: 0.75rem;
+
+    /* UX */
+    outline: none;
+  }
+
+  .ondoki-page-title::placeholder {
+    color: var(--tt-gray-light-300);
+  }
+}
+
+
+:root[data-page-layout='full'] .ondoki-editor-wrapper {
+  /* Keep existing look, just ensure shadows are not intrusive */
+  overflow-x: hidden; /* prevent horizontal scroll flash */
+}
+:root[data-page-layout='full'] .ondoki-editor-content {
+  max-width: 100%;
+  box-shadow: none;
+  overflow-x: hidden; /* contain oversized nodes */
+}
+:root[data-page-layout='full']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor {
+  padding: 1rem var(--page-pad-x) 30vh;
+  /* add a small symmetric offset in full layout */
+  padding-left: calc(var(--page-pad-x) + 2rem);
+  padding-right: calc(var(--page-pad-x) + 2rem);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+:root[data-page-layout='full']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor img,
+:root[data-page-layout='full']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor video,
+:root[data-page-layout='full']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor table {
+  max-width: 100%;
+  height: auto;
+}
+:root[data-page-layout='full']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor pre {
+  max-width: 100%;
+  overflow-x: auto; /* keep code scrolling inside container */
+}
+:root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-meta,
+:root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-title {
+  max-width: 100%;
+  padding: 4% var(--page-pad-x) 0;
+  /* align title with content edges in full layout */
+  padding-left: calc(var(--page-pad-x) + 2rem);
+  padding-right: calc(var(--page-pad-x) + 2rem);
+}
+
+/* Document layout: A4 width, centered, no borders/pagination; title aligns with content */
+:root[data-page-layout='document'] .ondoki-editor-content {
+  max-width: var(--page-a4-width-px);
+  margin: 0 auto;
+  box-shadow: none;
+  width: var(--page-a4-width-px);
+  overflow-x: hidden; /* prevent horizontal scroll */
+}
+:root[data-page-layout='document']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor {
+  padding: 1rem var(--page-pad-x) 30vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+:root[data-page-layout='document']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor img,
+:root[data-page-layout='document']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor video,
+:root[data-page-layout='document']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor table {
+  max-width: 100%;
+  height: auto;
+}
+:root[data-page-layout='document']
+  .ondoki-editor-content
+  .tiptap.ProseMirror.ondoki-editor pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+:root[data-page-layout='document'] .ondoki-page-meta,
+:root[data-page-layout='document'] .ondoki-page-title {
+  max-width: var(--page-a4-width-px);
+  width: 100%;
+  margin: 0 auto 0.75rem;
+  padding: 2rem var(--page-pad-x) 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Paginated layouts: align title with page content using CSS vars provided by React */
+:root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-meta,
+:root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-meta,
+:root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-title,
+:root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-title {
+  max-width: var(--page-width); /* set by React based on PAGE_FORMATS */
+  width: 100%;
+  margin: 0 auto 0.75rem;
+  padding: 2rem 0 0 var(--page-left-margin); /* set by React to match left margin inside page */
+  background: transparent;
+  border: none;
+}
+
+/* Optional subtle background behind paginated pages */
+:root[data-page-layout='a4'] .ondoki-editor-wrapper,
+:root[data-page-layout='letter'] .ondoki-editor-wrapper {
+  background: #fbfbfb;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE PAGINATION
+   ======================================== */
+
+/* Container for scaled pagination on mobile */
+.ondoki-editor-wrapper.layout-a4,
+.ondoki-editor-wrapper.layout-letter {
+  --page-scale: 1;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+/* Scaling wrapper for the editor content - desktop (no scaling) */
+.ondoki-editor-wrapper.layout-a4 .ondoki-editor-content,
+.ondoki-editor-wrapper.layout-letter .ondoki-editor-content {
+  transform-origin: top center;
+}
+
+/* Mobile breakpoints for A4 */
+@media screen and (max-width: 850px) {
+  :root[data-page-layout='a4'] .ondoki-editor-wrapper {
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  
+  :root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-editor-content {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    /* Set the actual width so transform scales from correct size */
+    width: var(--page-a4-width-px);
+    min-width: var(--page-a4-width-px);
+    max-width: var(--page-a4-width-px);
+    /* Center the scaled content by adjusting margin */
+    margin-left: calc((100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+  }
+  
+  :root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-meta,
+  :root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-title {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    width: var(--page-width);
+    min-width: var(--page-width);
+    max-width: var(--page-width);
+    padding-left: var(--page-left-margin);
+    margin-left: calc((100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Mobile breakpoints for Letter */
+@media screen and (max-width: 870px) {
+  :root[data-page-layout='letter'] .ondoki-editor-wrapper {
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  
+  :root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-editor-content {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    /* Set the actual width so transform scales from correct size */
+    width: var(--page-letter-width-px);
+    min-width: var(--page-letter-width-px);
+    max-width: var(--page-letter-width-px);
+    /* Center the scaled content by adjusting margin */
+    margin-left: calc((100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+  }
+  
+  :root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-meta,
+  :root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-title {
+    transform: scale(var(--page-scale));
+    transform-origin: top left;
+    width: var(--page-width);
+    min-width: var(--page-width);
+    max-width: var(--page-width);
+    padding-left: var(--page-left-margin);
+    margin-left: calc((100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2);
+    margin-right: auto;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Ensure minimum scale doesn't go too small on very narrow screens */
+@media screen and (max-width: 400px) {
+  :root[data-page-layout='a4'] .ondoki-editor-wrapper,
+  :root[data-page-layout='letter'] .ondoki-editor-wrapper {
+    --page-scale: 0.45;
+  }
+}
+
+/* Document layout mobile adjustments - simpler, just reduce padding */
+@media screen and (max-width: 850px) {
+  :root[data-page-layout='document'] .ondoki-editor-content {
+    max-width: 100%;
+    width: 100%;
+  }
+  
+  :root[data-page-layout='document']
+    .ondoki-editor-content
+    .tiptap.ProseMirror.ondoki-editor {
+    padding: 1rem 1rem 30vh;
+  }
+  
+  :root[data-page-layout='document'] .ondoki-page-meta,
+  :root[data-page-layout='document'] .ondoki-page-title {
+    max-width: 100%;
+    padding: 1.5rem 1rem 0;
+  }
+}
+
+/* Full layout mobile adjustments */
+@media screen and (max-width: 600px) {
+  :root[data-page-layout='full']
+    .ondoki-editor-content
+    .tiptap.ProseMirror.ondoki-editor {
+    padding: 1rem 1rem 30vh;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  :root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-meta,
+  :root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-title {
+    padding: 1.5rem 1rem 0;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
