@@ -179,19 +179,19 @@ export function DragMenu() {
 
   const isImageNode = node?.type.name === 'image' || node?.type.name === 'imageUpload';
 
-  // Dynamic positioning — align to first line for multiline, center for single line
+  // Dynamic positioning — center handle on the node, capped for very tall multi-line blocks
   const computePositionConfig = React.useMemo(() => ({
     middleware: [
       offset(({ rects }: any) => {
         const nodeHeight = rects.reference.height;
-        const handleHeight = 24; // our handle is h-6 = 24px
-        const lineHeight = 24; // approximate single line height
+        const handleHeight = 24; // h-6 = 24px
+        // Center vertically, but for very tall blocks (3+ lines, >80px),
+        // cap it so handle stays near the top (first ~line area)
+        const centered = (nodeHeight - handleHeight) / 2;
+        const maxOffset = 20; // don't go further than ~20px from top
         return {
           mainAxis: 8,
-          // For multiline: align with first line center. For single line: center vertically.
-          crossAxis: nodeHeight > lineHeight * 1.5
-            ? (lineHeight - handleHeight) / 2  // first line center
-            : (nodeHeight - handleHeight) / 2, // vertical center
+          crossAxis: Math.min(centered, maxOffset),
         };
       }),
     ],
