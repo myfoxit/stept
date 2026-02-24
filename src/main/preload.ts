@@ -52,6 +52,11 @@ export interface ElectronAPI {
   onContextNoMatches: (callback: (ctx: any) => void) => () => void;
   onShowAddContextNote: (callback: () => void) => () => void;
 
+  // Spotlight
+  spotlightOpen: (projectId?: string) => Promise<any>;
+  spotlightSearch: (query: string, projectId: string) => Promise<any>;
+  spotlightSemanticSearch: (query: string, projectId: string) => Promise<any>;
+
   // Utility
   openExternal: (url: string) => Promise<void>;
   showItemInFolder: (path: string) => Promise<void>;
@@ -266,6 +271,11 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.on('show-add-context-note', handler);
     return () => ipcRenderer.removeListener('show-add-context-note', handler);
   },
+
+  // Spotlight
+  spotlightOpen: (projectId?: string) => ipcRenderer.invoke('spotlight:open', projectId),
+  spotlightSearch: (query: string, projectId: string) => ipcRenderer.invoke('spotlight:search', query, projectId),
+  spotlightSemanticSearch: (query: string, projectId: string) => ipcRenderer.invoke('spotlight:semantic-search', query, projectId),
 
   // Utility
   openExternal: (url: string) => ipcRenderer.invoke('utility:open-external', url),

@@ -154,6 +154,17 @@ const MainWindow: React.FC = () => {
             </div>
           </div>
 
+
+          {/* Lean Spotlight trigger */}
+          <button
+            className="btn-sm ghost"
+            style={{ width: '100%', justifyContent: 'space-between' } as any}
+            onClick={() => window.electronAPI?.spotlightOpen?.(selectedProjectId)}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>🔎 Spotlight Search & AI</span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>⌘K</span>
+          </button>
+
           {/* Project selector */}
           <div>
             <div className="field-label">Project</div>

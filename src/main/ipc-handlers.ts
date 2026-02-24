@@ -353,6 +353,41 @@ export function setupIpcHandlers(
     return { success: true };
   });
 
+
+  // Spotlight IPC
+  ipcMain.handle('spotlight:search', async (event, query: string, projectId: string) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { results: [] };
+    const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
+    const u = new URL(`${apiBase}/search/unified`);
+    u.searchParams.set('q', query);
+    u.searchParams.set('project_id', projectId);
+    u.searchParams.set('limit', '20');
+    const res = await fetch(u.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return { results: [] };
+    return await res.json();
+  });
+
+  ipcMain.handle('spotlight:semantic-search', async (event, query: string, projectId: string) => {
+    const settings = settingsManager.getSettings();
+    const token = authService.getAccessToken();
+    if (!token) return { results: [] };
+    const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
+    const u = new URL(`${apiBase}/search/unified-semantic`);
+    u.searchParams.set('q', query);
+    u.searchParams.set('project_id', projectId);
+    u.searchParams.set('limit', '20');
+    const res = await fetch(u.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return { results: [] };
+    return await res.json();
+  });
+
+  ipcMain.handle('spotlight:open', async (event, projectId?: string) => {
+    app.emit('spotlight:open', projectId || '');
+    return { ok: true };
+  });
+
   // Utility IPC handlers
   ipcMain.handle('utility:open-external', async (event, url) => {
     try {
