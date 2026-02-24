@@ -3,8 +3,8 @@
 import * as React from "react"
 import type { NodeViewProps } from "@tiptap/react"
 import { NodeViewWrapper } from "@tiptap/react"
-import { Button } from "@/components/tiptap-ui-primitive/button"
-import { CloseIcon } from "@/components/tiptap-icons/close-icon"
+import { Button } from "@/components/ui/button"
+import { X as CloseIcon } from "lucide-react"
 import "@/components/Editor/Nodes/image-upload-node/image-upload-node.scss"
 import { isValidPosition } from "@/components/Editor/utils/editor-utils"
 
@@ -394,13 +394,15 @@ const ImageUploadPreview: React.FC<ImageUploadPreviewProps> = ({
           )}
           <Button
             type="button"
-            data-style="ghost"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
             onClick={(e) => {
               e.stopPropagation()
               onRemove()
             }}
           >
-            <CloseIcon className="tiptap-button-icon" />
+            <CloseIcon className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -513,7 +515,8 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
               <span>Uploading {fileItems.length} files</span>
               <Button
                 type="button"
-                data-style="ghost"
+                variant="ghost"
+                size="sm"
                 onClick={(e) => {
                   e.stopPropagation()
                   clearAllFiles()

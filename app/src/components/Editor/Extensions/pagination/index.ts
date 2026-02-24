@@ -309,7 +309,7 @@ function injectStyles({ view, options, storage }: { view: EditorView; options: P
   })
 
   const style = document.createElement('style')
-  style.dataset.tiptapPaginationStyle = storage.uniqueId
+  style.dataset.ondokiPaginationStyle = storage.uniqueId
 
   const scope = `.${storage.uniqueId}`
   style.textContent = `
@@ -449,7 +449,7 @@ function pageDecorations({ options, isInitial = false, storage }: { options: Pag
       const pageWidth = cfg.width
 
       const container = document.createElement('div')
-      container.dataset.tiptapPagination = 'true'
+      container.dataset.ondokiPagination = 'true'
 
       const pageBreak = ({ firstPage = false, pageNumber = 0, totalPages = 0 }: { firstPage?: boolean; pageNumber?: number; totalPages?: number }) => {
         const wrapper = document.createElement('div')

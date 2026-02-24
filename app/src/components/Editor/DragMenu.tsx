@@ -125,11 +125,15 @@ export function DragMenu() {
   }, [editor]);
 
   const duplicateNode = useCallback(() => {
-    if (!editor) return;
-    const { from, to } = editor.state.selection;
-    const slice = editor.state.doc.slice(from, to);
-    editor.chain().focus().insertContentAt(to, slice.content.toJSON()).run();
-  }, [editor]);
+    if (!editor || nodePos < 0 || !node) return;
+    // Get the full node at the tracked position and insert a copy after it
+    const resolvedPos = editor.state.doc.resolve(nodePos);
+    const endOfNode = nodePos + (resolvedPos.nodeAfter?.nodeSize || 0);
+    const nodeJSON = resolvedPos.nodeAfter?.toJSON();
+    if (nodeJSON) {
+      editor.chain().focus().insertContentAt(endOfNode, nodeJSON).run();
+    }
+  }, [editor, nodePos, node]);
 
   const deleteNode = useCallback(() => {
     if (!editor) return;
@@ -240,6 +244,16 @@ export function DragMenu() {
                       className="h-6 w-6 rounded-full border-2 border-transparent hover:border-ring transition-all hover:scale-110"
                       style={{ backgroundColor: c.value || 'currentColor' }}
                       onClick={() => {
+                        // Select entire node content before applying color
+                        if (nodePos >= 0) {
+                          const resolvedPos = editor.state.doc.resolve(nodePos);
+                          const nodeAfter = resolvedPos.nodeAfter;
+                          if (nodeAfter) {
+                            editor.chain().focus()
+                              .setTextSelection({ from: nodePos + 1, to: nodePos + nodeAfter.nodeSize - 1 })
+                              .run();
+                          }
+                        }
                         if (c.value) editor.chain().focus().setColor(c.value).run();
                         else editor.chain().focus().unsetColor().run();
                       }}
@@ -260,6 +274,16 @@ export function DragMenu() {
                       )}
                       style={{ backgroundColor: c.value || '#f3f4f6' }}
                       onClick={() => {
+                        // Select entire node content before applying highlight
+                        if (nodePos >= 0) {
+                          const resolvedPos = editor.state.doc.resolve(nodePos);
+                          const nodeAfter = resolvedPos.nodeAfter;
+                          if (nodeAfter) {
+                            editor.chain().focus()
+                              .setTextSelection({ from: nodePos + 1, to: nodePos + nodeAfter.nodeSize - 1 })
+                              .run();
+                          }
+                        }
                         if (c.value) editor.chain().focus().toggleHighlight({ color: c.value }).run();
                         else editor.chain().focus().unsetHighlight().run();
                       }}
