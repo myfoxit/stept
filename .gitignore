@@ -29,3 +29,4 @@ dist-ssr
 /playwright/api/dev.db
 .env
 uploads/
+app/playwright/downloads
