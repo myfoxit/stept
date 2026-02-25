@@ -722,7 +722,6 @@ async def generate_pdf_from_captured_html(
         }}
         /* Match ProseMirror styles from paragraph-node.scss */
         *, *::before, *::after {{ box-sizing: border-box; }}
-        .ProseMirror, [data-node-type] {{ white-space: pre-wrap; }}
         p {{ margin: 0; font-size: 1rem; line-height: 1.6; }}
         h1 {{ font-size: 2rem; margin-bottom: 0.5rem; margin-top: 0; }}
         h2 {{ font-size: 1.75rem; margin-top: 1rem; margin-bottom: 0.5rem; }}

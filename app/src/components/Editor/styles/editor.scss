@@ -5,7 +5,10 @@
   [class*=" tiptap-pages-"] {
     border: 0 !important;
   }
-  html, body { margin: 0 !important; }
+  html,
+  body {
+    margin: 0 !important;
+  }
 
   .ondoki-page-break,
   .ondoki-pagination-gap,
@@ -70,8 +73,8 @@ body,
 }
 
 .tiptap.ProseMirror {
-  font-family: 'Source Serif 4', Georgia, serif;
-  color: #57534E;
+  font-family: "Arial", Georgia, serif;
+  color: #57534e;
   font-size: 1.08rem;
   line-height: 1.9;
 }
@@ -82,8 +85,8 @@ body,
 .tiptap.ProseMirror h4,
 .tiptap.ProseMirror h5,
 .tiptap.ProseMirror h6 {
-  font-family: 'Arial', sans-serif;
-  color: #1C1917;
+  font-family: "Arial", sans-serif;
+  color: #1c1917;
 }
 
 .tiptap.ProseMirror h2 {
@@ -100,7 +103,7 @@ body,
 }
 
 .tiptap.ProseMirror strong {
-  color: #1C1917;
+  color: #1c1917;
   font-weight: 600;
 }
 
@@ -116,10 +119,10 @@ body,
 }
 
 .tiptap.ProseMirror code {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   font-size: 0.86em;
-  background: #F5F3FF;
-  border: 1px solid #E8E5FE;
+  background: #f5f3ff;
+  border: 1px solid #e8e5fe;
   padding: 2px 7px;
   border-radius: 5px;
   color: #3a7a52;
@@ -128,7 +131,7 @@ body,
 .tiptap.ProseMirror blockquote {
   border-left: 3px solid #3a7a52;
   padding-left: 18px;
-  color: #A8A29E;
+  color: #a8a29e;
   font-style: italic;
 }
 
@@ -136,7 +139,7 @@ body,
   color: #a89bf2;
 }
 
-:root[data-page-layout='a4'] .ondoki-editor-wrapper {
+:root[data-page-layout="a4"] .ondoki-editor-wrapper {
   background: #fbfbfb;
 }
 
@@ -153,9 +156,8 @@ body,
 .ondoki-editor pre,
 .ondoki-editor code,
 .ondoki-editor hr {
-  margin-top: 0 !important;           /* kill the offender */
+  margin-top: 0 !important; /* kill the offender */
 }
-
 
 /* Default editor styles remain */
 .ondoki-editor-wrapper {
@@ -176,12 +178,12 @@ body,
 
   .ondoki-page-title {
     /* visual */
-    font-family: 'Arial', sans-serif;
+    font-family: "Arial", sans-serif;
     font-size: 2.75rem;
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: -0.03em;
-    color: #1C1917;
+    color: #1c1917;
     background: transparent;
     border: none;
 
@@ -197,17 +199,16 @@ body,
   }
 }
 
-
-:root[data-page-layout='full'] .ondoki-editor-wrapper {
+:root[data-page-layout="full"] .ondoki-editor-wrapper {
   /* Keep existing look, just ensure shadows are not intrusive */
   overflow-x: hidden; /* prevent horizontal scroll flash */
 }
-:root[data-page-layout='full'] .ondoki-editor-content {
+:root[data-page-layout="full"] .ondoki-editor-content {
   max-width: 100%;
   box-shadow: none;
   overflow-x: hidden; /* contain oversized nodes */
 }
-:root[data-page-layout='full']
+:root[data-page-layout="full"]
   .ondoki-editor-content
   .tiptap.ProseMirror.ondoki-editor {
   padding: 1rem var(--page-pad-x) 30vh;
@@ -219,26 +220,30 @@ body,
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-:root[data-page-layout='full']
+:root[data-page-layout="full"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor img,
-:root[data-page-layout='full']
+  .tiptap.ProseMirror.ondoki-editor
+  img,
+:root[data-page-layout="full"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor video,
-:root[data-page-layout='full']
+  .tiptap.ProseMirror.ondoki-editor
+  video,
+:root[data-page-layout="full"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor table {
+  .tiptap.ProseMirror.ondoki-editor
+  table {
   max-width: 100%;
   height: auto;
 }
-:root[data-page-layout='full']
+:root[data-page-layout="full"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor pre {
+  .tiptap.ProseMirror.ondoki-editor
+  pre {
   max-width: 100%;
   overflow-x: auto; /* keep code scrolling inside container */
 }
-:root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-meta,
-:root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-title {
+:root[data-page-layout="full"] .ondoki-editor-wrapper .ondoki-page-meta,
+:root[data-page-layout="full"] .ondoki-editor-wrapper .ondoki-page-title {
   max-width: 100%;
   padding: 4% var(--page-pad-x) 0;
   /* align title with content edges in full layout */
@@ -247,14 +252,14 @@ body,
 }
 
 /* Document layout: A4 width, centered, no borders/pagination; title aligns with content */
-:root[data-page-layout='document'] .ondoki-editor-content {
+:root[data-page-layout="document"] .ondoki-editor-content {
   max-width: var(--page-a4-width-px);
   margin: 0 auto;
   box-shadow: none;
   width: var(--page-a4-width-px);
   overflow-x: hidden; /* prevent horizontal scroll */
 }
-:root[data-page-layout='document']
+:root[data-page-layout="document"]
   .ondoki-editor-content
   .tiptap.ProseMirror.ondoki-editor {
   padding: 1rem var(--page-pad-x) 30vh;
@@ -263,26 +268,30 @@ body,
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-:root[data-page-layout='document']
+:root[data-page-layout="document"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor img,
-:root[data-page-layout='document']
+  .tiptap.ProseMirror.ondoki-editor
+  img,
+:root[data-page-layout="document"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor video,
-:root[data-page-layout='document']
+  .tiptap.ProseMirror.ondoki-editor
+  video,
+:root[data-page-layout="document"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor table {
+  .tiptap.ProseMirror.ondoki-editor
+  table {
   max-width: 100%;
   height: auto;
 }
-:root[data-page-layout='document']
+:root[data-page-layout="document"]
   .ondoki-editor-content
-  .tiptap.ProseMirror.ondoki-editor pre {
+  .tiptap.ProseMirror.ondoki-editor
+  pre {
   max-width: 100%;
   overflow-x: auto;
 }
-:root[data-page-layout='document'] .ondoki-page-meta,
-:root[data-page-layout='document'] .ondoki-page-title {
+:root[data-page-layout="document"] .ondoki-page-meta,
+:root[data-page-layout="document"] .ondoki-page-title {
   max-width: var(--page-a4-width-px);
   width: 100%;
   margin: 0 auto 0.75rem;
@@ -292,10 +301,10 @@ body,
 }
 
 /* Paginated layouts: align title with page content using CSS vars provided by React */
-:root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-meta,
-:root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-meta,
-:root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-title,
-:root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-title {
+:root[data-page-layout="a4"] .ondoki-editor-wrapper .ondoki-page-meta,
+:root[data-page-layout="letter"] .ondoki-editor-wrapper .ondoki-page-meta,
+:root[data-page-layout="a4"] .ondoki-editor-wrapper .ondoki-page-title,
+:root[data-page-layout="letter"] .ondoki-editor-wrapper .ondoki-page-title {
   max-width: var(--page-width); /* set by React based on PAGE_FORMATS */
   width: 100%;
   margin: 0 auto 0.75rem;
@@ -305,8 +314,8 @@ body,
 }
 
 /* Optional subtle background behind paginated pages */
-:root[data-page-layout='a4'] .ondoki-editor-wrapper,
-:root[data-page-layout='letter'] .ondoki-editor-wrapper {
+:root[data-page-layout="a4"] .ondoki-editor-wrapper,
+:root[data-page-layout="letter"] .ondoki-editor-wrapper {
   background: #fbfbfb;
 }
 
@@ -331,7 +340,7 @@ body,
 
 /* Mobile breakpoints for A4 */
 @media screen and (max-width: 850px) {
-  :root[data-page-layout='a4'] .ondoki-editor-wrapper {
+  :root[data-page-layout="a4"] .ondoki-editor-wrapper {
     overflow-x: hidden;
     overflow-y: auto;
     display: flex;
@@ -339,8 +348,8 @@ body,
     align-items: center;
     width: 100%;
   }
-  
-  :root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-editor-content {
+
+  :root[data-page-layout="a4"] .ondoki-editor-wrapper .ondoki-editor-content {
     transform: scale(var(--page-scale));
     transform-origin: top left;
     /* Set the actual width so transform scales from correct size */
@@ -348,19 +357,23 @@ body,
     min-width: var(--page-a4-width-px);
     max-width: var(--page-a4-width-px);
     /* Center the scaled content by adjusting margin */
-    margin-left: calc((100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2);
+    margin-left: calc(
+      (100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2
+    );
     margin-right: auto;
   }
-  
-  :root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-meta,
-  :root[data-page-layout='a4'] .ondoki-editor-wrapper .ondoki-page-title {
+
+  :root[data-page-layout="a4"] .ondoki-editor-wrapper .ondoki-page-meta,
+  :root[data-page-layout="a4"] .ondoki-editor-wrapper .ondoki-page-title {
     transform: scale(var(--page-scale));
     transform-origin: top left;
     width: var(--page-width);
     min-width: var(--page-width);
     max-width: var(--page-width);
     padding-left: var(--page-left-margin);
-    margin-left: calc((100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2);
+    margin-left: calc(
+      (100vw - (var(--page-a4-width-px) * var(--page-scale))) / 2
+    );
     margin-right: auto;
     margin-bottom: 0.5rem;
   }
@@ -368,7 +381,7 @@ body,
 
 /* Mobile breakpoints for Letter */
 @media screen and (max-width: 870px) {
-  :root[data-page-layout='letter'] .ondoki-editor-wrapper {
+  :root[data-page-layout="letter"] .ondoki-editor-wrapper {
     overflow-x: hidden;
     overflow-y: auto;
     display: flex;
@@ -376,8 +389,10 @@ body,
     align-items: center;
     width: 100%;
   }
-  
-  :root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-editor-content {
+
+  :root[data-page-layout="letter"]
+    .ondoki-editor-wrapper
+    .ondoki-editor-content {
     transform: scale(var(--page-scale));
     transform-origin: top left;
     /* Set the actual width so transform scales from correct size */
@@ -385,19 +400,23 @@ body,
     min-width: var(--page-letter-width-px);
     max-width: var(--page-letter-width-px);
     /* Center the scaled content by adjusting margin */
-    margin-left: calc((100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2);
+    margin-left: calc(
+      (100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2
+    );
     margin-right: auto;
   }
-  
-  :root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-meta,
-  :root[data-page-layout='letter'] .ondoki-editor-wrapper .ondoki-page-title {
+
+  :root[data-page-layout="letter"] .ondoki-editor-wrapper .ondoki-page-meta,
+  :root[data-page-layout="letter"] .ondoki-editor-wrapper .ondoki-page-title {
     transform: scale(var(--page-scale));
     transform-origin: top left;
     width: var(--page-width);
     min-width: var(--page-width);
     max-width: var(--page-width);
     padding-left: var(--page-left-margin);
-    margin-left: calc((100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2);
+    margin-left: calc(
+      (100vw - (var(--page-letter-width-px) * var(--page-scale))) / 2
+    );
     margin-right: auto;
     margin-bottom: 0.5rem;
   }
@@ -405,27 +424,27 @@ body,
 
 /* Ensure minimum scale doesn't go too small on very narrow screens */
 @media screen and (max-width: 400px) {
-  :root[data-page-layout='a4'] .ondoki-editor-wrapper,
-  :root[data-page-layout='letter'] .ondoki-editor-wrapper {
+  :root[data-page-layout="a4"] .ondoki-editor-wrapper,
+  :root[data-page-layout="letter"] .ondoki-editor-wrapper {
     --page-scale: 0.45;
   }
 }
 
 /* Document layout mobile adjustments - simpler, just reduce padding */
 @media screen and (max-width: 850px) {
-  :root[data-page-layout='document'] .ondoki-editor-content {
+  :root[data-page-layout="document"] .ondoki-editor-content {
     max-width: 100%;
     width: 100%;
   }
-  
-  :root[data-page-layout='document']
+
+  :root[data-page-layout="document"]
     .ondoki-editor-content
     .tiptap.ProseMirror.ondoki-editor {
     padding: 1rem 1rem 30vh;
   }
-  
-  :root[data-page-layout='document'] .ondoki-page-meta,
-  :root[data-page-layout='document'] .ondoki-page-title {
+
+  :root[data-page-layout="document"] .ondoki-page-meta,
+  :root[data-page-layout="document"] .ondoki-page-title {
     max-width: 100%;
     padding: 1.5rem 1rem 0;
   }
@@ -433,16 +452,16 @@ body,
 
 /* Full layout mobile adjustments */
 @media screen and (max-width: 600px) {
-  :root[data-page-layout='full']
+  :root[data-page-layout="full"]
     .ondoki-editor-content
     .tiptap.ProseMirror.ondoki-editor {
     padding: 1rem 1rem 30vh;
     padding-left: 1rem;
     padding-right: 1rem;
   }
-  
-  :root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-meta,
-  :root[data-page-layout='full'] .ondoki-editor-wrapper .ondoki-page-title {
+
+  :root[data-page-layout="full"] .ondoki-editor-wrapper .ondoki-page-meta,
+  :root[data-page-layout="full"] .ondoki-editor-wrapper .ondoki-page-title {
     padding: 1.5rem 1rem 0;
     padding-left: 1rem;
     padding-right: 1rem;
