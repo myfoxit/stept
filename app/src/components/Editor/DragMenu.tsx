@@ -136,9 +136,13 @@ export function DragMenu() {
   }, [editor, nodePos, node]);
 
   const deleteNode = useCallback(() => {
-    if (!editor) return;
-    editor.chain().focus().deleteSelection().run();
-  }, [editor]);
+    if (!editor || nodePos < 0) return;
+    const resolvedPos = editor.state.doc.resolve(nodePos);
+    const nodeAfter = resolvedPos.nodeAfter;
+    if (nodeAfter) {
+      editor.chain().focus().deleteRange({ from: nodePos, to: nodePos + nodeAfter.nodeSize }).run();
+    }
+  }, [editor, nodePos]);
 
   const resetFormatting = useCallback(() => {
     if (!editor || nodePos < 0) return;
@@ -187,11 +191,16 @@ export function DragMenu() {
         const handleHeight = 24; // h-6 = 24px
         // Center vertically, but for very tall blocks (3+ lines, >80px),
         // cap it so handle stays near the top (first ~line area)
-        const centered = (nodeHeight - handleHeight) / 2;
-        const maxOffset = 20; // don't go further than ~20px from top
+        // For tall blocks (multi-line text, lists), align with the first line
+        // instead of centering on the entire block.
+        // Default floating-ui centers the handle vertically on the reference.
+        // Negative crossAxis moves it up toward the first line.
+        const halfNode = nodeHeight / 2;
+        const firstLineCenter = handleHeight / 2 + 4; // ~16px from top
+        const shift = nodeHeight > 48 ? -(halfNode - firstLineCenter) : 0;
         return {
           mainAxis: 8,
-          crossAxis: Math.min(centered, maxOffset),
+          crossAxis: shift,
         };
       }),
     ],

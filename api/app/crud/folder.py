@@ -202,6 +202,9 @@ async def get_folder_tree(
             )
         )
     
+    # Exclude soft-deleted documents
+    doc_conditions.append(Document.deleted_at.is_(None))
+
     # Get documents at this level
     doc_stmt = select(Document).where(and_(*doc_conditions)).order_by(Document.position)
     doc_result = await db.execute(doc_stmt)
@@ -228,6 +231,9 @@ async def get_folder_tree(
             )
         )
     
+    # Exclude soft-deleted workflows
+    workflow_conditions.append(ProcessRecordingSession.deleted_at.is_(None))
+
     # Get workflows at this level
     workflow_stmt = select(ProcessRecordingSession).where(
         and_(*workflow_conditions)

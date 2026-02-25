@@ -20,4 +20,16 @@ async def api_list_users(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
-    return await get_users(db)
+    # Scope to project members only — never return all users
+    from sqlalchemy import select
+    from app.models import project_members, User
+    # Get all project IDs this user is a member of
+    member_project_ids = select(project_members.c.project_id).where(
+        project_members.c.user_id == current_user.id
+    )
+    # Get all user IDs that share at least one project
+    peer_user_ids = select(project_members.c.user_id).where(
+        project_members.c.project_id.in_(member_project_ids)
+    ).distinct()
+    result = await db.execute(select(User).where(User.id.in_(peer_user_ids)))
+    return result.scalars().all()

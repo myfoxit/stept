@@ -471,7 +471,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
         props.editor
           .chain()
           .focus()
-          .deleteRange({ from: pos, to: pos + 1 })
+          .deleteRange({ from: pos, to: pos + props.node.nodeSize })
           .insertContentAt(pos, imageNodes)
           .run()
       }

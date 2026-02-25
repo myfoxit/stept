@@ -18,7 +18,7 @@ import { createSlashMenuExtension } from '@/components/Editor/SlashMenu'
 export function useOndokiEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   return useEditor({
     immediatelyRender: false,
-    shouldRerenderOnTransaction: false,
+    shouldRerenderOnTransaction: true,
     editable: !readOnly,
     editorProps: {
       attributes: {
@@ -32,7 +32,15 @@ export function useOndokiEditor({ readOnly = false }: { readOnly?: boolean } = {
         dropcursor: {
           width: 2,
         },
-        link: { openOnClick: false },
+        link: {
+          openOnClick: false,
+          autolink: true,
+          defaultProtocol: 'https',
+          HTMLAttributes: {
+            target: '_blank',
+            rel: 'noopener noreferrer nofollow',
+          },
+        },
       }),
       HorizontalRule,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),

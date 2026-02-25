@@ -144,7 +144,7 @@ class User(Base):
 class Project(Base):
     __tablename__ = "projects"
     id = Column(String(16), primary_key=True, default=gen_suffix)
-    name = Column(String(16), index=True)
+    name = Column(String(255), index=True)
     # Keep owner_id for backward compatibility and to identify the project creator
     owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     # Deprecated: use owner relationship instead

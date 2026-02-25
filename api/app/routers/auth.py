@@ -38,14 +38,21 @@ COOKIE_NAME = "session_ondoki"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
 
 # Allowed origins for CSRF Origin-header check (mutable set; extend via env)
-_ALLOWED_ORIGINS: set[str] = {
-    "http://localhost:5173",
-    "http://localhost:5180",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5180",
-    "http://127.0.0.1:3000",
-}
+_ALLOWED_ORIGINS: set[str] = set()
+# In non-production, allow common local dev origins
+if os.getenv("ENVIRONMENT") != "production":
+    _ALLOWED_ORIGINS.update({
+        "http://localhost:5173",
+        "http://localhost:5180",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5180",
+        "http://127.0.0.1:3000",
+    })
+# Always add FRONTEND_URL and ALLOWED_ORIGINS from env
+_frontend_url = os.getenv("FRONTEND_URL", "")
+if _frontend_url:
+    _ALLOWED_ORIGINS.add(_frontend_url.rstrip("/"))
 _extra = os.getenv("ALLOWED_ORIGINS", "")
 if _extra:
     _ALLOWED_ORIGINS.update(o.strip() for o in _extra.split(",") if o.strip())
@@ -795,6 +802,9 @@ async def test_delete_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    # Hard guard: never allow in production
+    if os.getenv("ENVIRONMENT") == "production":
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
     host = request.url.hostname
     is_local = host in {"localhost", "127.0.0.1"}
     if not (is_local or os.getenv("E2E_ENABLE_DELETE_USER") == "1"):

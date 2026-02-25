@@ -8,7 +8,7 @@ import axios, {
 
 // NEW: Export a function to get the API base URL consistently
 export const getApiBaseUrl = (): string => {
-  const url = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+  const url = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
   // Debug: log the resolved URL (remove in production)
   if (import.meta.env.DEV) {
     console.log('[API] Base URL:', url, {

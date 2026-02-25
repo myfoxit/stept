@@ -22,11 +22,30 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.idea
 .venv
+__pycache__/
+*.pyc
+*.pyo
+
+# Test artifacts
 /test-results/
 /playwright-report/
 /playwright/api/dev.db
-.env
-uploads/
 app/playwright/downloads
+.pytest_cache/
+htmlcov/
+coverage/
+*.cover
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads & storage
+uploads/
+storage/
+
+# Build artifacts
+app/dist/
+*.egg-info/

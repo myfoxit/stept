@@ -51,7 +51,9 @@ async def upload_image(
 
 
 @router.get("/image/{filename}")
-async def get_image(filename: str):
+async def get_image(
+    filename: str,
+):
     """Serve an uploaded image."""
     # Reject path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:

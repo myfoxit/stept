@@ -162,12 +162,4 @@ async def logout(db: AsyncSession, session_token: str):
     if session:
         session.revoked = True
         await db.flush()
-        await db.commit()  # Commit the revocation
-    token_hash = _hash(session_token)
-    session: Optional[Session] = await db.scalar(
-        select(Session).where(Session.token_hash == token_hash, Session.revoked == False)
-    )
-    if session:
-        session.revoked = True
-        await db.flush()
-        await db.commit()  # Commit the revocation
+        await db.commit()

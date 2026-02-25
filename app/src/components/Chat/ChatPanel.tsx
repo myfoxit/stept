@@ -7,8 +7,13 @@ import { useChat } from './ChatContext';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/providers/auth-provider';
 
 export function ChatPanel() {
+  const { user } = useAuth();
+
+  // Don't render chat when not authenticated
+  if (!user) return null;
   const navigate = useNavigate();
   const {
     messages,
