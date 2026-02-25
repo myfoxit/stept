@@ -1,6 +1,28 @@
 @media print {
-  .tiptap-pages-* { border: 0 !important; }
+  [class^="ondoki-pages-"],
+  [class*=" ondoki-pages-"],
+  [class^="tiptap-pages-"],
+  [class*=" tiptap-pages-"] {
+    border: 0 !important;
+  }
   html, body { margin: 0 !important; }
+
+  .ondoki-page-break,
+  .ondoki-pagination-gap,
+  .ondoki-first-page-header,
+  .ondoki-page-header,
+  .ondoki-page-footer,
+  [data-ondoki-pagination] {
+    display: none !important;
+  }
+
+  .tiptap.ProseMirror {
+    width: auto !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
 }
 
 html,

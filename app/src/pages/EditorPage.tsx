@@ -160,7 +160,7 @@ export default function EditorPage() {
         // Strip pagination decorations
         clone
           .querySelectorAll(
-            ".tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap",
+            ".ondoki-page-break, .ondoki-first-page-header, .ondoki-pagination-gap, .tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap, [data-ondoki-pagination], [data-tiptap-pagination]",
           )
           .forEach((el) => el.remove());
         // Remove pagination wrapper padding
