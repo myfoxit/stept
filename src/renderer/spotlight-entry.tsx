@@ -584,10 +584,10 @@ const SpotlightApp: React.FC = () => {
             borderRadius: 20,
             boxShadow:
               '0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-            border: '1px solid #e4e1ed',
+            border: '1px solid #E0E0E0',
             padding: '40px 0',
             textAlign: 'center',
-            color: '#A0A0B2',
+            color: '#999999',
             fontSize: 13,
             fontFamily: "'DM Sans', sans-serif",
           }}
@@ -619,7 +619,7 @@ const SpotlightApp: React.FC = () => {
           borderRadius: 20,
           boxShadow:
             '0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-          border: '1px solid #e4e1ed',
+          border: '1px solid #E0E0E0',
           overflow: 'hidden',
           fontFamily: "'DM Sans', sans-serif",
           animation: 'spotlightIn 0.15s ease-out',
@@ -642,7 +642,7 @@ const SpotlightApp: React.FC = () => {
                 fontFamily: "'Outfit', sans-serif",
                 fontWeight: 800,
                 fontSize: 20,
-                color: '#1A1A2E',
+                color: '#1A1A1A',
                 letterSpacing: '-0.03em',
                 marginBottom: 8,
               }}
@@ -652,7 +652,7 @@ const SpotlightApp: React.FC = () => {
             <p
               style={{
                 fontSize: 13,
-                color: '#6E6E82',
+                color: '#6E6E6E',
                 lineHeight: 1.5,
                 marginBottom: 24,
               }}
@@ -736,7 +736,7 @@ const SpotlightApp: React.FC = () => {
                       fontFamily: "'DM Sans', sans-serif",
                       fontSize: 12,
                       fontWeight: 500,
-                      color: '#1A1A2E',
+                      color: '#1A1A1A',
                       appearance: 'none',
                       cursor: 'pointer',
                       outline: 'none',
@@ -763,7 +763,7 @@ const SpotlightApp: React.FC = () => {
                     height="12"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#A0A0B2"
+                    stroke="#999999"
                     strokeWidth="2.5"
                   >
                     <polyline points="6 9 12 15 18 9" />
@@ -792,7 +792,7 @@ const SpotlightApp: React.FC = () => {
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#6E6E82"
+                    stroke="#6E6E6E"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -938,7 +938,7 @@ const SpotlightApp: React.FC = () => {
                           fontFamily: "'Outfit', sans-serif",
                           fontSize: 13,
                           fontWeight: 700,
-                          color: rec.isPaused ? '#6E6E82' : '#E14D2A',
+                          color: rec.isPaused ? '#6E6E6E' : '#E14D2A',
                         }}
                       >
                         {rec.isPaused ? 'Paused' : 'Recording workflow'}
@@ -981,7 +981,7 @@ const SpotlightApp: React.FC = () => {
                         fontWeight: 500,
                         cursor: 'pointer',
                         fontFamily: "'DM Sans', sans-serif",
-                        color: '#1A1A2E',
+                        color: '#1A1A1A',
                       }}
                     >
                       {rec.isPaused ? '▶ Resume' : '⏸ Pause'}
@@ -1083,7 +1083,7 @@ const SpotlightApp: React.FC = () => {
                   background: 'none',
                   fontSize: 14,
                   fontFamily: "'DM Sans', sans-serif",
-                  color: '#1A1A2E',
+                  color: '#1A1A1A',
                   outline: 'none',
                 }}
               />
@@ -1108,7 +1108,7 @@ const SpotlightApp: React.FC = () => {
                     cursor: 'pointer',
                     background:
                       mode === 'search' ? 'rgba(26,26,26,0.08)' : '#fff',
-                    color: mode === 'search' ? '#1A1A1A' : '#A0A0B2',
+                    color: mode === 'search' ? '#1A1A1A' : '#999999',
                   }}
                 >
                   Search
@@ -1124,7 +1124,7 @@ const SpotlightApp: React.FC = () => {
                     fontFamily: "'Outfit', sans-serif",
                     cursor: 'pointer',
                     background: mode === 'ai' ? 'rgba(26,26,26,0.08)' : '#fff',
-                    color: mode === 'ai' ? '#1A1A1A' : '#A0A0B2',
+                    color: mode === 'ai' ? '#1A1A1A' : '#999999',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 3,
@@ -1168,13 +1168,13 @@ const SpotlightApp: React.FC = () => {
                     flexShrink: 0,
                   }}
                 />
-                <span style={{ color: '#1A1A2E', fontWeight: 600 }}>
+                <span style={{ color: '#1A1A1A', fontWeight: 600 }}>
                   {contextInfo.appName}
                 </span>
                 {contextInfo.url && (
                   <span
                     style={{
-                      color: '#A0A0B2',
+                      color: '#999999',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -1226,7 +1226,7 @@ const SpotlightApp: React.FC = () => {
                       style={{
                         fontSize: 10,
                         fontWeight: 600,
-                        color: '#A0A0B2',
+                        color: '#999999',
                         textTransform: 'uppercase',
                         letterSpacing: '0.08em',
                         padding: '6px 6px 4px',
@@ -1254,7 +1254,7 @@ const SpotlightApp: React.FC = () => {
                       padding: '20px 8px',
                       textAlign: 'center',
                       fontSize: 12,
-                      color: '#A0A0B2',
+                      color: '#999999',
                     }}
                   >
                     Searching...
@@ -1266,7 +1266,7 @@ const SpotlightApp: React.FC = () => {
                       padding: '20px 8px',
                       textAlign: 'center',
                       fontSize: 12,
-                      color: '#A0A0B2',
+                      color: '#999999',
                     }}
                   >
                     No results for "{query}"
@@ -1278,7 +1278,7 @@ const SpotlightApp: React.FC = () => {
                       padding: '20px 8px',
                       textAlign: 'center',
                       fontSize: 12,
-                      color: '#A0A0B2',
+                      color: '#999999',
                     }}
                   >
                     Start typing to search workflows and pages...
@@ -1294,7 +1294,7 @@ const SpotlightApp: React.FC = () => {
                         style={{
                           fontSize: 10,
                           fontWeight: 600,
-                          color: '#A0A0B2',
+                          color: '#999999',
                           textTransform: 'uppercase',
                           letterSpacing: '0.08em',
                           padding: '6px 6px 4px',
@@ -1336,7 +1336,7 @@ const SpotlightApp: React.FC = () => {
                         padding: '16px 0',
                         textAlign: 'center',
                         fontSize: 12,
-                        color: '#A0A0B2',
+                        color: '#999999',
                       }}
                     >
                       Ask about your workflows, guides, or documents...
@@ -1391,7 +1391,7 @@ const SpotlightApp: React.FC = () => {
                               : '4px 14px 14px 14px',
                           background:
                             msg.role === 'user' ? '#e14d2a' : '#F5F5F5',
-                          color: msg.role === 'user' ? '#fff' : '#1A1A2E',
+                          color: msg.role === 'user' ? '#fff' : '#1A1A1A',
                           border:
                             msg.role === 'assistant'
                               ? '1px solid rgba(0,0,0,0.07)'
@@ -1437,7 +1437,7 @@ const SpotlightApp: React.FC = () => {
                           borderRadius: '4px 14px 14px 14px',
                           background: '#F5F5F5',
                           border: '1px solid rgba(0,0,0,0.07)',
-                          color: '#A0A0B2',
+                          color: '#999999',
                         }}
                       >
                         Thinking...
@@ -1468,7 +1468,7 @@ const SpotlightApp: React.FC = () => {
                         background: 'none',
                         fontSize: 13,
                         fontFamily: "'DM Sans', sans-serif",
-                        color: '#1A1A2E',
+                        color: '#1A1A1A',
                         outline: 'none',
                       }}
                     />
@@ -1526,7 +1526,7 @@ const SpotlightApp: React.FC = () => {
                         alignItems: 'center',
                         gap: 3,
                         fontSize: 10,
-                        color: '#A0A0B2',
+                        color: '#999999',
                       }}
                     >
                       <span style={kbdStyle}>↑↓</span> Nav
@@ -1537,7 +1537,7 @@ const SpotlightApp: React.FC = () => {
                         alignItems: 'center',
                         gap: 3,
                         fontSize: 10,
-                        color: '#A0A0B2',
+                        color: '#999999',
                       }}
                     >
                       <span style={kbdStyle}>↵</span> Open
@@ -1550,7 +1550,7 @@ const SpotlightApp: React.FC = () => {
                       alignItems: 'center',
                       gap: 3,
                       fontSize: 10,
-                      color: '#A0A0B2',
+                      color: '#999999',
                     }}
                   >
                     <span style={kbdStyle}>↵</span> Send
@@ -1562,7 +1562,7 @@ const SpotlightApp: React.FC = () => {
                     alignItems: 'center',
                     gap: 3,
                     fontSize: 10,
-                    color: '#A0A0B2',
+                    color: '#999999',
                   }}
                 >
                   <span style={kbdStyle}>Tab</span>{' '}
@@ -1578,7 +1578,7 @@ const SpotlightApp: React.FC = () => {
                   <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#E14D2A" />
                 </svg>
                 <span
-                  style={{ fontSize: 10, color: '#A0A0B2', fontWeight: 500 }}
+                  style={{ fontSize: 10, color: '#999999', fontWeight: 500 }}
                 >
                   ondoki
                 </span>
@@ -1674,7 +1674,7 @@ const ResultItem: React.FC<{
           style={{
             fontSize: 13,
             fontWeight: 600,
-            color: '#1A1A2E',
+            color: '#1A1A1A',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1685,7 +1685,7 @@ const ResultItem: React.FC<{
         <div
           style={{
             fontSize: 10,
-            color: '#A0A0B2',
+            color: '#999999',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1700,7 +1700,7 @@ const ResultItem: React.FC<{
           height="14"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#A0A0B2"
+          stroke="#999999"
           strokeWidth="2"
           strokeLinecap="round"
           style={{ flexShrink: 0 }}
@@ -1743,7 +1743,7 @@ styleEl.textContent = `
   .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
 
   ::selection { background: rgba(225,77,42,0.2); }
-  input::placeholder { color: #A0A0B2; }
+  input::placeholder { color: #999999; }
 `;
 document.head.appendChild(styleEl);
 
