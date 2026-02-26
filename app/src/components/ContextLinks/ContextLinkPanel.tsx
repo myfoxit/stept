@@ -90,7 +90,7 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
   const [addOpen, setAddOpen] = useState(false);
 
   // Two-step form state
-  const [matchCategory, setMatchCategory] = useState<MatchCategory>('url');
+  const [matchCategory, setMatchCategory] = useState<MatchCategory>('app');
   const [matchHow, setMatchHow] = useState<MatchHow>('contains');
   const [matchValue, setMatchValue] = useState('');
   const [note, setNote] = useState('');
@@ -346,9 +346,9 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
                 <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">Match</div>
                 <div className="flex gap-1">
                   {([
-                    { key: 'url' as MatchCategory, label: 'URL', icon: '🌐' },
                     { key: 'app' as MatchCategory, label: 'App', icon: '💻' },
                     { key: 'window' as MatchCategory, label: 'Title', icon: '📝' },
+                    { key: 'url' as MatchCategory, label: 'URL', icon: '🌐' },
                   ]).map(({ key, label, icon }) => (
                     <button
                       key={key}
@@ -366,6 +366,13 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
                   ))}
                 </div>
               </div>
+
+              {/* Hint for URL matching */}
+              {matchCategory === 'url' && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                  💡 URL matching requires the Chrome extension. For the desktop app, use <button className="underline" onClick={() => setMatchCategory('window')}>Window Title</button> instead — browser titles include the page name.
+                </p>
+              )}
 
               {/* Step 2: HOW to match */}
               <div>
