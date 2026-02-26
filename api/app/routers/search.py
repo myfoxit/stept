@@ -4,16 +4,19 @@ Smart Search router.
 Searches across recording titles, summaries, tags, step titles and descriptions.
 Returns ranked results with highlighted matches.
 Includes semantic search via pgvector embeddings.
+Includes unified-v2 with RRF fusion, ranking boosts, context-aware scoring, and trigram fallback.
 """
 
 from __future__ import annotations
 
 import logging
+import math
+from datetime import datetime, timezone
 from typing import Optional
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from sqlalchemy import or_, and_, func, select
+from sqlalchemy import or_, and_, func, select, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +38,54 @@ def _highlight(text: str, query: str) -> str:
     return pattern.sub(lambda m: f"<mark>{m.group()}</mark>", text)
 
 
+# ---------------------------------------------------------------------------
+# FTS helpers
+# ---------------------------------------------------------------------------
+
+async def _fts_search_sessions(
+    query: str,
+    project_id: str,
+    user_id: str,
+    limit: int,
+    db: AsyncSession,
+) -> list[tuple]:
+    """Full-text search on process_recording_sessions. Returns list of (session, rank)."""
+    sql = sa_text("""
+        SELECT id, ts_rank_cd(search_tsv, plainto_tsquery('english', :q)) AS rank
+        FROM process_recording_sessions
+        WHERE project_id = :project_id
+          AND search_tsv @@ plainto_tsquery('english', :q)
+          AND (is_private = false OR owner_id = :user_id)
+        ORDER BY rank DESC
+        LIMIT :limit
+    """)
+    result = await db.execute(sql, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})
+    return result.fetchall()
+
+
+async def _fts_search_steps(
+    query: str,
+    project_id: str,
+    user_id: str,
+    limit: int,
+    db: AsyncSession,
+) -> list[tuple]:
+    """Full-text search on process_recording_steps. Returns list of (step_id, session_id, step_number, generated_title, description, window_title, rank)."""
+    sql = sa_text("""
+        SELECT s.id, s.session_id, s.step_number, s.generated_title, s.description, s.window_title,
+               ts_rank_cd(s.search_tsv, plainto_tsquery('english', :q)) AS rank
+        FROM process_recording_steps s
+        JOIN process_recording_sessions sess ON s.session_id = sess.id
+        WHERE sess.project_id = :project_id
+          AND s.search_tsv @@ plainto_tsquery('english', :q)
+          AND (sess.is_private = false OR sess.owner_id = :user_id)
+        ORDER BY rank DESC
+        LIMIT :limit
+    """)
+    result = await db.execute(sql, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})
+    return result.fetchall()
+
+
 @router.get("/search")
 async def smart_search(
     q: str = Query(..., min_length=1, description="Search query"),
@@ -45,13 +96,101 @@ async def smart_search(
 ):
     """
     Search across recordings and steps within a project.
-
-    Searches: recording name, generated_title, summary, tags,
-    step descriptions, generated_title, generated_description, window_title.
+    Uses PostgreSQL full-text search with ILIKE fallback for very short queries.
     """
+    use_fts = len(q.strip()) > 2
+
+    if use_fts:
+        return await _smart_search_fts(q, project_id, current_user, limit, db)
+    else:
+        return await _smart_search_ilike(q, project_id, current_user, limit, db)
+
+
+async def _smart_search_fts(
+    q: str, project_id: str, current_user: User, limit: int, db: AsyncSession
+) -> dict:
+    """FTS-based smart search."""
+    # Search recordings via FTS
+    session_rows = await _fts_search_sessions(q, project_id, current_user.id, limit, db)
+    # Search steps via FTS
+    step_rows = await _fts_search_steps(q, project_id, current_user.id, limit, db)
+
+    recording_results = []
+    seen_recording_ids = set()
+
+    # Fetch full session objects for matched recordings
+    for row in session_rows:
+        session_id = row[0]
+        rec = await db.get(ProcessRecordingSession, session_id)
+        if not rec:
+            continue
+        seen_recording_ids.add(rec.id)
+        recording_results.append({
+            "type": "recording",
+            "recording_id": rec.id,
+            "name": rec.name,
+            "name_highlighted": _highlight(rec.name or "", q),
+            "generated_title": rec.generated_title,
+            "generated_title_highlighted": _highlight(rec.generated_title or "", q),
+            "summary": rec.summary,
+            "summary_highlighted": _highlight(rec.summary or "", q),
+            "tags": rec.tags,
+            "is_processed": rec.is_processed,
+            "matching_steps": [],
+        })
+
+    # Group step results by recording
+    step_by_recording: dict[str, list] = {}
+    for step_row in step_rows:
+        step_id, session_id, step_number, gen_title, description, window_title, rank = step_row
+        if session_id not in step_by_recording:
+            step_by_recording[session_id] = []
+        step_by_recording[session_id].append({
+            "step_id": step_id,
+            "step_number": step_number,
+            "description": description,
+            "description_highlighted": _highlight(description or "", q),
+            "generated_title": gen_title,
+            "generated_title_highlighted": _highlight(gen_title or "", q),
+            "window_title": window_title,
+        })
+
+        if session_id not in seen_recording_ids:
+            seen_recording_ids.add(session_id)
+            rec = await db.get(ProcessRecordingSession, session_id)
+            if rec:
+                recording_results.append({
+                    "type": "recording",
+                    "recording_id": rec.id,
+                    "name": rec.name,
+                    "name_highlighted": rec.name or "",
+                    "generated_title": rec.generated_title,
+                    "generated_title_highlighted": rec.generated_title or "",
+                    "summary": rec.summary,
+                    "summary_highlighted": rec.summary or "",
+                    "tags": rec.tags,
+                    "is_processed": rec.is_processed,
+                    "matching_steps": [],
+                })
+
+    for item in recording_results:
+        rec_id = item["recording_id"]
+        if rec_id in step_by_recording:
+            item["matching_steps"] = step_by_recording[rec_id]
+
+    return {
+        "query": q,
+        "total_results": len(recording_results),
+        "results": recording_results[:limit],
+    }
+
+
+async def _smart_search_ilike(
+    q: str, project_id: str, current_user: User, limit: int, db: AsyncSession
+) -> dict:
+    """ILIKE fallback for very short queries (1-2 chars)."""
     search_term = f"%{q}%"
 
-    # 1. Search recordings
     recording_conditions = [
         ProcessRecordingSession.project_id == project_id,
         or_(
@@ -77,7 +216,6 @@ async def smart_search(
     result = await db.execute(stmt)
     matched_recordings = result.scalars().all()
 
-    # 2. Search steps (and get their parent recording)
     step_conditions = [
         ProcessRecordingStep.session_id == ProcessRecordingSession.id,
         ProcessRecordingSession.project_id == project_id,
@@ -106,7 +244,6 @@ async def smart_search(
     step_result = await db.execute(step_stmt)
     matched_steps = step_result.all()
 
-    # Build response
     recording_results = []
     seen_recording_ids = set()
 
@@ -126,7 +263,6 @@ async def smart_search(
             "matching_steps": [],
         })
 
-    # Group step results by recording
     step_by_recording: dict[str, list] = {}
     for step, recording in matched_steps:
         rec_id = recording.id
@@ -142,7 +278,6 @@ async def smart_search(
             "window_title": step.window_title,
         })
 
-        # If recording wasn't already in results, add it
         if rec_id not in seen_recording_ids:
             seen_recording_ids.add(rec_id)
             recording_results.append({
@@ -159,7 +294,6 @@ async def smart_search(
                 "matching_steps": [],
             })
 
-    # Attach matching steps
     for item in recording_results:
         rec_id = item["recording_id"]
         if rec_id in step_by_recording:
@@ -197,9 +331,6 @@ async def semantic_search(
     from app.services.embeddings import (
         generate_embedding,
         has_embedding_api,
-        keyword_similarity,
-        workflow_text,
-        step_text,
     )
 
     # Try vector search first
@@ -223,10 +354,6 @@ async def _vector_search(
     db: AsyncSession,
 ) -> dict:
     """Perform cosine similarity search using pgvector."""
-    from sqlalchemy import text as sa_text
-
-    # Build query: join embeddings with workflows, filter by user, order by cosine distance
-    # We search both workflow and step embeddings
     vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
 
     sql = sa_text("""
@@ -244,10 +371,10 @@ async def _vector_search(
         project_filter="AND e.metadata->>'project_id' = :project_id" if project_id else ""
     ))
 
-    params = {
+    params: dict = {
         "query_vector": vector_str,
         "user_id": user_id,
-        "limit": limit * 2,  # Fetch more to group steps by workflow
+        "limit": limit * 2,
     }
     if project_id:
         params["project_id"] = project_id
@@ -255,12 +382,11 @@ async def _vector_search(
     result = await db.execute(sql, params)
     rows = result.fetchall()
 
-    # Group results by workflow
     seen_workflows: dict[str, dict] = {}
     workflow_scores: dict[str, float] = {}
 
     for source_type, source_id, metadata, distance in rows:
-        score = max(0.0, 1.0 - distance)  # cosine distance → similarity
+        score = max(0.0, 1.0 - distance)
         meta = metadata or {}
 
         if source_type == "workflow":
@@ -285,7 +411,6 @@ async def _vector_search(
                 "score": round(score, 4),
             })
 
-    # Fetch full workflow data for top results
     sorted_wf_ids = sorted(workflow_scores.keys(), key=lambda k: workflow_scores[k], reverse=True)[:limit]
 
     results = []
@@ -293,7 +418,6 @@ async def _vector_search(
         session = await db.get(ProcessRecordingSession, wf_id)
         if not session:
             continue
-        # Security: verify user access
         if session.user_id != user_id:
             continue
         if session.is_private and session.owner_id != user_id:
@@ -330,7 +454,6 @@ async def _keyword_search(
     """Fallback keyword-based search with relevance scoring."""
     from app.services.embeddings import keyword_similarity, workflow_text, step_text
 
-    # Load all user workflows (within project if specified)
     conditions = [
         ProcessRecordingSession.user_id == user_id,
         ProcessRecordingSession.status == "completed",
@@ -348,14 +471,12 @@ async def _keyword_search(
 
     scored_results = []
     for wf in workflows:
-        # Security: skip private workflows not owned by user
         if wf.is_private and wf.owner_id != user_id:
             continue
 
         wf_text = workflow_text(wf)
         wf_score = keyword_similarity(query, wf_text)
 
-        # Also score steps
         step_scores = []
         for step in sorted(wf.steps, key=lambda s: s.step_number):
             s_text = step_text(step)
@@ -368,7 +489,6 @@ async def _keyword_search(
                         "score": round(s_score, 4),
                     })
 
-        # Use best score from workflow or steps
         best_step_score = max((s["score"] for s in step_scores), default=0.0)
         overall_score = max(wf_score, best_step_score)
 
@@ -385,7 +505,6 @@ async def _keyword_search(
                 "matching_steps": sorted(step_scores, key=lambda s: s["score"], reverse=True)[:5],
             })
 
-    # Sort by score descending
     scored_results.sort(key=lambda r: r["score"], reverse=True)
 
     return {
@@ -409,7 +528,7 @@ async def reindex_embeddings(
     """
     Trigger bulk reindexing of embeddings for the current user's workflows.
     """
-    from app.services.indexer import reindex_project, reindex_all_for_user, index_document
+    from app.services.indexer import reindex_project, reindex_all_for_user
     from app.services.embeddings import has_embedding_api
 
     if not has_embedding_api():
@@ -465,7 +584,6 @@ async def _search_documents_keyword(
 
     # Try tsvector search first (faster, better ranking)
     try:
-        from sqlalchemy import text as sa_text
         ts_stmt = sa_text("""
             SELECT id, name, search_text, ts_rank(search_tsv, plainto_tsquery('english', :q)) as rank
             FROM documents
@@ -483,11 +601,10 @@ async def _search_documents_keyword(
                 for row in ts_rows
             ]
     except Exception:
-        pass  # Fall through to existing search
+        pass
 
     query_lower = query.lower()
 
-    # Load project documents (filter by access)
     doc_conditions = [
         Document.project_id == project_id,
         or_(
@@ -509,18 +626,15 @@ async def _search_documents_keyword(
         text_content = _extract_tiptap_text(doc.content)
         full_text = f"{name} {text_content}"
 
-        # Quick check: does the query even appear in the extracted text?
         name_match = query_lower in name.lower()
         content_match = query_lower in text_content.lower()
 
         if not name_match and not content_match:
-            # Also try keyword_similarity for partial/fuzzy matching
             score = keyword_similarity(query, full_text)
             if score < 0.15:
                 continue
         else:
             score = keyword_similarity(query, full_text)
-            # Boost exact name matches
             if name_match:
                 score = max(score, 0.5)
 
@@ -547,11 +661,84 @@ async def unified_search(
 ):
     """
     Unified keyword search across workflows AND documents.
-    Returns results sorted by relevance score.
+    Uses FTS for queries > 2 chars, falls back to keyword_similarity.
     """
+    use_fts = len(q.strip()) > 2
+    all_results: list[dict] = []
+
+    if use_fts:
+        # FTS path for workflows
+        all_results.extend(await _fts_workflow_results(q, project_id, current_user.id, limit, db))
+    else:
+        # Short query fallback
+        all_results.extend(await _keyword_workflow_results(q, project_id, current_user, limit, db))
+
+    # Search documents
+    doc_results = await _search_documents_keyword(q, project_id, current_user.id, limit, db)
+    all_results.extend(doc_results)
+
+    all_results.sort(key=lambda r: r["score"], reverse=True)
+
+    return {
+        "query": q,
+        "results": all_results[:limit],
+        "total_results": len(all_results),
+        "search_type": "keyword",
+    }
+
+
+async def _fts_workflow_results(
+    query: str, project_id: str, user_id: str, limit: int, db: AsyncSession
+) -> list[dict]:
+    """FTS-based workflow results for unified search."""
+    session_rows = await _fts_search_sessions(query, project_id, user_id, limit, db)
+    step_rows = await _fts_search_steps(query, project_id, user_id, limit, db)
+
+    # Collect all session IDs with their FTS ranks
+    session_scores: dict[str, float] = {}
+    for row in session_rows:
+        session_scores[row[0]] = float(row[1])
+
+    step_by_session: dict[str, list] = {}
+    for step_row in step_rows:
+        step_id, session_id, step_number, gen_title, description, window_title, rank = step_row
+        if session_id not in step_by_session:
+            step_by_session[session_id] = []
+        step_by_session[session_id].append({
+            "step_id": step_id,
+            "step_number": step_number,
+            "generated_title": gen_title,
+            "score": round(float(rank), 4),
+        })
+        # Use step rank if higher
+        session_scores[session_id] = max(session_scores.get(session_id, 0), float(rank))
+
+    results = []
+    for session_id, score in sorted(session_scores.items(), key=lambda x: x[1], reverse=True)[:limit]:
+        rec = await db.get(ProcessRecordingSession, session_id)
+        if not rec:
+            continue
+        results.append({
+            "type": "workflow",
+            "id": rec.id,
+            "name": rec.name or rec.generated_title or "Untitled Workflow",
+            "summary": rec.summary,
+            "score": round(score, 4),
+            "matching_steps": sorted(
+                step_by_session.get(session_id, []),
+                key=lambda s: s["score"], reverse=True
+            )[:5],
+        })
+
+    return results
+
+
+async def _keyword_workflow_results(
+    query: str, project_id: str, current_user: User, limit: int, db: AsyncSession
+) -> list[dict]:
+    """Keyword-based workflow results for unified search (short query fallback)."""
     from app.services.embeddings import keyword_similarity, workflow_text, step_text
 
-    # Search workflows (reuse _keyword_search logic inline for unified scoring)
     wf_conditions = [
         ProcessRecordingSession.user_id == current_user.id,
         ProcessRecordingSession.status == "completed",
@@ -565,19 +752,18 @@ async def unified_search(
     result = await db.execute(stmt)
     workflows = result.scalars().all()
 
-    all_results: list[dict] = []
-
+    results: list[dict] = []
     for wf in workflows:
         if wf.is_private and wf.owner_id != current_user.id:
             continue
         wf_text_str = workflow_text(wf)
-        wf_score = keyword_similarity(q, wf_text_str)
+        wf_score = keyword_similarity(query, wf_text_str)
 
         step_scores = []
         for step in sorted(wf.steps, key=lambda s: s.step_number):
             s_text = step_text(step)
             if s_text.strip():
-                s_score = keyword_similarity(q, s_text)
+                s_score = keyword_similarity(query, s_text)
                 if s_score > 0.15:
                     step_scores.append({
                         "step_id": step.id,
@@ -590,7 +776,7 @@ async def unified_search(
         overall_score = max(wf_score, best_step_score)
 
         if overall_score > 0.15:
-            all_results.append({
+            results.append({
                 "type": "workflow",
                 "id": wf.id,
                 "name": wf.name or wf.generated_title or "Untitled Workflow",
@@ -599,19 +785,7 @@ async def unified_search(
                 "matching_steps": sorted(step_scores, key=lambda s: s["score"], reverse=True)[:5],
             })
 
-    # Search documents
-    doc_results = await _search_documents_keyword(q, project_id, current_user.id, limit, db)
-    all_results.extend(doc_results)
-
-    # Sort all by score descending
-    all_results.sort(key=lambda r: r["score"], reverse=True)
-
-    return {
-        "query": q,
-        "results": all_results[:limit],
-        "total_results": len(all_results),
-        "search_type": "keyword",
-    }
+    return results
 
 
 @router.get("/unified-semantic")
@@ -629,20 +803,15 @@ async def unified_semantic_search(
     from app.services.embeddings import (
         generate_embedding,
         has_embedding_api,
-        keyword_similarity,
-        workflow_text,
-        step_text,
     )
 
     workflow_results: list[dict] = []
     query_vector = None
 
-    # Try semantic search for workflows
     if has_embedding_api():
         query_vector = await generate_embedding(q)
         if query_vector is not None:
             sem = await _vector_search(q, query_vector, current_user.id, project_id, limit, db)
-            # Convert to unified format
             for r in sem.get("results", []):
                 workflow_results.append({
                     "type": "workflow",
@@ -653,7 +822,6 @@ async def unified_semantic_search(
                     "matching_steps": r.get("matching_steps", []),
                 })
 
-    # Fallback: keyword search for workflows if semantic returned nothing
     if not workflow_results:
         kw = await _keyword_search(q, current_user.id, project_id, limit, db)
         for r in kw.get("results", []):
@@ -666,11 +834,8 @@ async def unified_semantic_search(
                 "matching_steps": r.get("matching_steps", []),
             })
 
-    # Documents: search via embeddings if available, otherwise keyword
     doc_results: list[dict] = []
     if has_embedding_api() and query_vector is not None:
-        # Search document embeddings
-        from sqlalchemy import text as sa_text
         vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
         doc_sql = sa_text("""
             SELECT e.source_type, e.source_id, e.metadata,
@@ -714,3 +879,429 @@ async def unified_semantic_search(
         "total_results": len(all_results),
         "search_type": "semantic" if has_embedding_api() else "keyword",
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Unified V2 — RRF fusion of FTS + Semantic
+# Phase 3: Ranking signals (recency, frequency boosts)
+# Phase 4: Context-aware boost
+# Phase 5: Trigram fuzzy fallback
+# ---------------------------------------------------------------------------
+
+RRF_K = 60  # Reciprocal Rank Fusion constant
+
+
+def _recency_boost(updated_at: datetime | None) -> float:
+    """Recency boost: 0.5 + 0.5 * exp(-days_old / 30)."""
+    if not updated_at:
+        return 0.5
+    now = datetime.now(timezone.utc)
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    days_old = max(0, (now - updated_at).total_seconds() / 86400)
+    return 0.5 + 0.5 * math.exp(-days_old / 30)
+
+
+def _frequency_boost(view_count: int | None) -> float:
+    """Frequency boost: 1 + 0.2 * log(view_count + 1)."""
+    vc = view_count or 0
+    return 1 + 0.2 * math.log(vc + 1)
+
+
+def _rrf_merge(
+    keyword_ranked: list[dict],
+    semantic_ranked: list[dict],
+    k: int = RRF_K,
+) -> list[dict]:
+    """
+    Merge two ranked lists using Reciprocal Rank Fusion.
+    Each item must have 'id' and 'type' keys.
+    Returns merged list with 'rrf_score' added.
+    """
+    scores: dict[str, float] = {}
+    items: dict[str, dict] = {}
+
+    for rank, item in enumerate(keyword_ranked, start=1):
+        key = f"{item['type']}:{item['id']}"
+        scores[key] = scores.get(key, 0) + 1.0 / (k + rank)
+        items[key] = item
+
+    for rank, item in enumerate(semantic_ranked, start=1):
+        key = f"{item['type']}:{item['id']}"
+        scores[key] = scores.get(key, 0) + 1.0 / (k + rank)
+        if key not in items:
+            items[key] = item
+
+    merged = []
+    for key in sorted(scores, key=scores.get, reverse=True):
+        item = items[key].copy()
+        item["rrf_score"] = round(scores[key], 6)
+        merged.append(item)
+
+    return merged
+
+
+async def _fts_unified_results(
+    query: str, project_id: str, user_id: str, limit: int, db: AsyncSession
+) -> list[dict]:
+    """FTS results for unified-v2 (workflows + documents)."""
+    results: list[dict] = []
+
+    # Workflow FTS
+    session_rows = await _fts_search_sessions(query, project_id, user_id, limit, db)
+    step_rows = await _fts_search_steps(query, project_id, user_id, limit, db)
+
+    session_scores: dict[str, float] = {}
+    session_objects: dict[str, ProcessRecordingSession] = {}
+    step_by_session: dict[str, list] = {}
+
+    for row in session_rows:
+        session_id, rank = row[0], float(row[1])
+        session_scores[session_id] = rank
+
+    for step_row in step_rows:
+        step_id, session_id, step_number, gen_title, description, window_title, rank = step_row
+        if session_id not in step_by_session:
+            step_by_session[session_id] = []
+        step_by_session[session_id].append({
+            "step_id": step_id,
+            "step_number": step_number,
+            "generated_title": gen_title,
+            "score": round(float(rank), 4),
+        })
+        session_scores[session_id] = max(session_scores.get(session_id, 0), float(rank))
+
+    for session_id in session_scores:
+        rec = await db.get(ProcessRecordingSession, session_id)
+        if not rec:
+            continue
+        session_objects[session_id] = rec
+        results.append({
+            "type": "workflow",
+            "id": rec.id,
+            "name": rec.name or rec.generated_title or "Untitled Workflow",
+            "summary": rec.summary,
+            "score": round(session_scores[session_id], 4),
+            "matching_steps": sorted(
+                step_by_session.get(session_id, []),
+                key=lambda s: s["score"], reverse=True
+            )[:5],
+            "_session": rec,  # internal, stripped before response
+        })
+
+    results.sort(key=lambda r: r["score"], reverse=True)
+
+    # Document FTS
+    doc_results = await _search_documents_keyword(query, project_id, user_id, limit, db)
+    results.extend(doc_results)
+
+    return results
+
+
+async def _semantic_unified_results(
+    query: str, project_id: str, user_id: str, limit: int, db: AsyncSession
+) -> list[dict]:
+    """Semantic search results for unified-v2."""
+    from app.services.embeddings import generate_embedding, has_embedding_api
+
+    if not has_embedding_api():
+        return []
+
+    query_vector = await generate_embedding(query)
+    if query_vector is None:
+        return []
+
+    vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
+
+    # Search all embeddings (workflows, steps, documents)
+    sql = sa_text("""
+        SELECT e.source_type, e.source_id, e.metadata,
+               e.embedding <=> :query_vector AS distance
+        FROM embeddings e
+        WHERE e.metadata->>'project_id' = :project_id
+        ORDER BY e.embedding <=> :query_vector
+        LIMIT :limit
+    """)
+    result = await db.execute(sql, {
+        "query_vector": vector_str,
+        "project_id": project_id,
+        "limit": limit * 3,
+    })
+    rows = result.fetchall()
+
+    # Group by workflow / document
+    workflow_scores: dict[str, float] = {}
+    workflow_steps: dict[str, list] = {}
+    doc_scores: dict[str, float] = {}
+    doc_names: dict[str, str] = {}
+
+    for source_type, source_id, metadata, distance in rows:
+        score = max(0.0, 1.0 - distance)
+        meta = metadata or {}
+
+        if source_type == "workflow":
+            workflow_scores[source_id] = max(workflow_scores.get(source_id, 0), score)
+        elif source_type == "step":
+            wf_id = meta.get("session_id", "")
+            if wf_id:
+                workflow_scores[wf_id] = max(workflow_scores.get(wf_id, 0), score)
+                if wf_id not in workflow_steps:
+                    workflow_steps[wf_id] = []
+                workflow_steps[wf_id].append({
+                    "step_id": source_id,
+                    "step_number": meta.get("step_number"),
+                    "score": round(score, 4),
+                })
+        elif source_type in ("document", "document_chunk"):
+            doc_id = meta.get("doc_id", source_id)
+            doc_scores[doc_id] = max(doc_scores.get(doc_id, 0), score)
+            doc_names[doc_id] = meta.get("title", "Untitled")
+
+    results: list[dict] = []
+
+    for wf_id in sorted(workflow_scores, key=workflow_scores.get, reverse=True)[:limit]:
+        rec = await db.get(ProcessRecordingSession, wf_id)
+        if not rec:
+            continue
+        if rec.user_id != user_id:
+            continue
+        if rec.is_private and rec.owner_id != user_id:
+            continue
+
+        results.append({
+            "type": "workflow",
+            "id": rec.id,
+            "name": rec.name or rec.generated_title or "Untitled Workflow",
+            "summary": rec.summary,
+            "score": round(workflow_scores[wf_id], 4),
+            "matching_steps": sorted(
+                workflow_steps.get(wf_id, []),
+                key=lambda s: s["score"], reverse=True
+            )[:5],
+            "_session": rec,
+        })
+
+    for doc_id in sorted(doc_scores, key=doc_scores.get, reverse=True)[:limit]:
+        results.append({
+            "type": "document",
+            "id": doc_id,
+            "name": doc_names.get(doc_id, "Untitled"),
+            "preview": "",
+            "score": round(doc_scores[doc_id], 4),
+        })
+
+    return results
+
+
+async def _trigram_fallback(
+    query: str, project_id: str, user_id: str, limit: int, db: AsyncSession
+) -> list[dict]:
+    """Trigram similarity fallback when FTS returns too few results."""
+    results: list[dict] = []
+    try:
+        # Search workflow names
+        sql = sa_text("""
+            SELECT id, name, generated_title, summary,
+                   similarity(coalesce(name, ''), :q) AS sim
+            FROM process_recording_sessions
+            WHERE project_id = :project_id
+              AND (is_private = false OR owner_id = :user_id)
+              AND similarity(coalesce(name, ''), :q) > 0.3
+            ORDER BY sim DESC
+            LIMIT :limit
+        """)
+        rows = (await db.execute(sql, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})).fetchall()
+        for row in rows:
+            results.append({
+                "type": "workflow",
+                "id": row[0],
+                "name": row[1] or row[2] or "Untitled Workflow",
+                "summary": row[3],
+                "score": round(float(row[4]), 4),
+                "matching_steps": [],
+            })
+
+        # Search step titles
+        step_sql = sa_text("""
+            SELECT s.id, s.session_id, s.step_number, s.generated_title,
+                   similarity(coalesce(s.generated_title, ''), :q) AS sim
+            FROM process_recording_steps s
+            JOIN process_recording_sessions sess ON s.session_id = sess.id
+            WHERE sess.project_id = :project_id
+              AND (sess.is_private = false OR sess.owner_id = :user_id)
+              AND similarity(coalesce(s.generated_title, ''), :q) > 0.3
+            ORDER BY sim DESC
+            LIMIT :limit
+        """)
+        step_rows = (await db.execute(step_sql, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})).fetchall()
+
+        seen_wf_ids = {r["id"] for r in results}
+        for row in step_rows:
+            wf_id = row[1]
+            if wf_id not in seen_wf_ids:
+                seen_wf_ids.add(wf_id)
+                rec = await db.get(ProcessRecordingSession, wf_id)
+                if rec:
+                    results.append({
+                        "type": "workflow",
+                        "id": rec.id,
+                        "name": rec.name or rec.generated_title or "Untitled Workflow",
+                        "summary": rec.summary,
+                        "score": round(float(row[4]), 4),
+                        "matching_steps": [{
+                            "step_id": row[0],
+                            "step_number": row[2],
+                            "generated_title": row[3],
+                            "score": round(float(row[4]), 4),
+                        }],
+                    })
+
+    except Exception as exc:
+        logger.debug("Trigram fallback failed (pg_trgm may not be enabled): %s", exc)
+
+    return results
+
+
+@router.get("/unified-v2")
+async def unified_v2_search(
+    q: str = Query(..., min_length=1, description="Search query"),
+    project_id: str = Query(..., description="Project ID to search within"),
+    limit: int = Query(20, ge=1, le=100),
+    context_app: Optional[str] = Query(None, description="Current app name for context boost"),
+    context_url: Optional[str] = Query(None, description="Current URL for context boost"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Unified V2 search with:
+    - RRF fusion of FTS + semantic results
+    - Recency and frequency boosts
+    - Context-aware boosting
+    - Trigram fuzzy fallback
+    """
+    # Always run FTS
+    fts_results = await _fts_unified_results(q, project_id, current_user.id, limit * 2, db)
+
+    # Always try semantic (graceful fallback if no embedding API)
+    semantic_results = await _semantic_unified_results(q, project_id, current_user.id, limit * 2, db)
+
+    # RRF merge
+    if semantic_results:
+        merged = _rrf_merge(fts_results, semantic_results)
+    else:
+        # FTS only — assign synthetic RRF scores based on rank
+        merged = []
+        for rank, item in enumerate(fts_results, start=1):
+            item_copy = item.copy()
+            item_copy["rrf_score"] = round(1.0 / (RRF_K + rank), 6)
+            merged.append(item_copy)
+
+    # Phase 5: Trigram fallback if too few FTS results
+    if len(fts_results) < 3 and len(q.strip()) > 2:
+        trigram_results = await _trigram_fallback(q, project_id, current_user.id, limit, db)
+        # Merge trigram results into existing with low RRF contribution
+        existing_ids = {f"{r['type']}:{r['id']}" for r in merged}
+        for tri_item in trigram_results:
+            key = f"{tri_item['type']}:{tri_item['id']}"
+            if key not in existing_ids:
+                tri_item["rrf_score"] = round(tri_item.get("score", 0) * 0.01, 6)
+                merged.append(tri_item)
+
+    # Phase 3: Apply ranking boosts
+    for item in merged:
+        boost = 1.0
+        session_obj = item.pop("_session", None)
+
+        if item["type"] == "workflow" and session_obj:
+            boost *= _recency_boost(session_obj.updated_at)
+            boost *= _frequency_boost(getattr(session_obj, "view_count", None))
+
+        # Phase 4: Context-aware boost
+        if (context_app or context_url) and item["type"] == "workflow" and session_obj:
+            context_match = await _check_context_match(
+                session_obj.id, context_app, context_url, db
+            )
+            if context_match:
+                boost *= 1.5
+
+        item["score"] = round(item["rrf_score"] * boost, 6)
+
+    # Sort by boosted score
+    merged.sort(key=lambda r: r["score"], reverse=True)
+
+    # Clean up internal fields
+    for item in merged:
+        item.pop("rrf_score", None)
+        item.pop("_session", None)
+
+    return {
+        "query": q,
+        "results": merged[:limit],
+        "total_results": len(merged),
+        "search_type": "hybrid" if semantic_results else "keyword",
+    }
+
+
+async def _check_context_match(
+    session_id: str,
+    context_app: Optional[str],
+    context_url: Optional[str],
+    db: AsyncSession,
+) -> bool:
+    """Check if any steps in this workflow match the given context."""
+    if not context_app and not context_url:
+        return False
+
+    conditions = [ProcessRecordingStep.session_id == session_id]
+    match_parts = []
+
+    if context_app:
+        match_parts.append(
+            func.lower(ProcessRecordingStep.window_title).contains(context_app.lower())
+        )
+
+    if context_url:
+        match_parts.append(
+            or_(
+                func.lower(ProcessRecordingStep.content).contains(context_url.lower()),
+                func.lower(ProcessRecordingStep.window_title).contains(context_url.lower()),
+            )
+        )
+
+    if match_parts:
+        conditions.append(or_(*match_parts))
+
+    stmt = select(func.count()).select_from(ProcessRecordingStep).where(and_(*conditions))
+    result = await db.execute(stmt)
+    count = result.scalar()
+    return (count or 0) > 0
+
+
+# ---------------------------------------------------------------------------
+# View count endpoint (Phase 3)
+# ---------------------------------------------------------------------------
+
+@router.patch("/workflows/{session_id}/view")
+async def record_workflow_view(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Increment view_count and update last_viewed_at for a workflow."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Security check
+    if session.is_private and session.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    view_count = getattr(session, "view_count", None)
+    if view_count is not None:
+        session.view_count = (session.view_count or 0) + 1
+        session.last_viewed_at = datetime.utcnow()
+    else:
+        # Column doesn't exist yet (migration not run)
+        pass
+
+    return {"view_count": getattr(session, "view_count", 0)}

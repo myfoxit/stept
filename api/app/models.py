@@ -308,10 +308,14 @@ class ProcessRecordingSession(Base):
     processing_error = Column(String, nullable=True)
     
     search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
-    
+
+    # Ranking signals
+    view_count = Column(Integer, nullable=False, default=0, server_default="0")
+    last_viewed_at = Column(DateTime, nullable=True)
+
     # Soft delete
     deleted_at = Column(DateTime, nullable=True, index=True)
-    
+
     # Relationships
     user = relationship("User", back_populates="recording_sessions", foreign_keys=[user_id])
     files = relationship("ProcessRecordingFile", back_populates="session", cascade="all, delete-orphan")
@@ -382,9 +386,11 @@ class ProcessRecordingStep(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
+    search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
+
     # Relationships
     session = relationship("ProcessRecordingSession", back_populates="steps")
-    
+
     # Unique constraint: one step per (session, step_number)
     __table_args__ = (
         UniqueConstraint('session_id', 'step_number', name='_session_step_number_unique'),
