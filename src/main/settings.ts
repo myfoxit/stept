@@ -13,6 +13,8 @@ export interface Settings {
   autoAnnotateSteps: boolean;
   autoGenerateGuide: boolean;
   frontendUrl: string;
+  spotlightShortcut: string;
+  recordingShortcut: string;
 }
 
 export interface WindowState {
@@ -26,9 +28,7 @@ export interface WindowState {
 interface StoreSchema {
   settings: Settings;
   windowState: WindowState;
-  tokens: {
-    refreshToken?: string;
-  };
+  tokens: { refreshToken?: string };
 }
 
 const defaultSettings: Settings = {
@@ -42,13 +42,11 @@ const defaultSettings: Settings = {
   autoAnnotateSteps: true,
   autoGenerateGuide: false,
   frontendUrl: 'http://localhost:5173',
+  spotlightShortcut: 'Ctrl+Shift+Space',
+  recordingShortcut: 'Ctrl+Shift+R',
 };
 
-const defaultWindowState: WindowState = {
-  width: 1200,
-  height: 800,
-  isMaximized: false,
-};
+const defaultWindowState: WindowState = { width: 1200, height: 800, isMaximized: false };
 
 export class SettingsManager {
   private store: any;
@@ -57,149 +55,43 @@ export class SettingsManager {
     this.store = new Store<StoreSchema>({
       name: 'settings',
       cwd: path.join(app.getPath('userData'), 'Ondoki'),
-      defaults: {
-        settings: defaultSettings,
-        windowState: defaultWindowState,
-        tokens: {},
-      },
-      // Encrypt sensitive data
+      defaults: { settings: defaultSettings, windowState: defaultWindowState, tokens: {} },
       encryptionKey: 'ondoki-desktop-encryption-key',
-      // Use same format as C# app for compatibility
       fileExtension: 'json',
     });
   }
 
-  public getSettings(): Settings {
-    return this.store.get('settings', defaultSettings);
-  }
+  public getSettings(): Settings { return this.store.get('settings', defaultSettings); }
 
   public async saveSettings(settings: Partial<Settings>): Promise<void> {
-    const currentSettings = this.getSettings();
-    const newSettings = { ...currentSettings, ...settings };
-    this.store.set('settings', newSettings);
+    const current = this.getSettings();
+    this.store.set('settings', { ...current, ...settings });
   }
 
-  public async resetSettings(): Promise<void> {
-    this.store.set('settings', defaultSettings);
-  }
+  public async resetSettings(): Promise<void> { this.store.set('settings', defaultSettings); }
 
   public isLlmConfigured(): boolean {
-    const settings = this.getSettings();
-    return !!(settings.llmProvider && settings.llmModel);
+    const s = this.getSettings();
+    return !!(s.llmProvider && s.llmModel);
   }
 
-  public getWindowState(): WindowState {
-    return this.store.get('windowState', defaultWindowState);
-  }
+  public getWindowState(): WindowState { return this.store.get('windowState', defaultWindowState); }
+  public setWindowState(state: WindowState): void { this.store.set('windowState', state); }
 
-  public setWindowState(state: WindowState): void {
-    this.store.set('windowState', state);
-  }
+  public getRefreshToken(): string | undefined { return this.store.get('tokens.refreshToken'); }
+  public setRefreshToken(token: string): void { this.store.set('tokens.refreshToken', token); }
+  public clearRefreshToken(): void { this.store.delete('tokens.refreshToken'); }
 
-  // Token management (encrypted)
-  public getRefreshToken(): string | undefined {
-    return this.store.get('tokens.refreshToken');
-  }
-
-  public setRefreshToken(token: string): void {
-    this.store.set('tokens.refreshToken', token);
-  }
-
-  public clearRefreshToken(): void {
-    this.store.delete('tokens.refreshToken');
-  }
-
-  // Utility methods for specific settings
   public getApiEndpoints() {
-    const settings = this.getSettings();
-    return {
-      cloud: settings.cloudEndpoint,
-      chat: settings.chatApiUrl,
-      api: settings.apiKey,
-    };
+    const s = this.getSettings();
+    return { cloud: s.cloudEndpoint, chat: s.chatApiUrl, api: s.apiKey };
   }
 
   public getLlmConfig() {
-    const settings = this.getSettings();
-    return {
-      provider: settings.llmProvider,
-      apiKey: settings.llmApiKey,
-      model: settings.llmModel,
-      baseUrl: settings.llmBaseUrl,
-      isConfigured: this.isLlmConfigured(),
-    };
+    const s = this.getSettings();
+    return { provider: s.llmProvider, apiKey: s.llmApiKey, model: s.llmModel, baseUrl: s.llmBaseUrl, isConfigured: this.isLlmConfigured() };
   }
 
-  public getAutomationSettings() {
-    const settings = this.getSettings();
-    return {
-      autoAnnotateSteps: settings.autoAnnotateSteps,
-      autoGenerateGuide: settings.autoGenerateGuide,
-    };
-  }
-
-  // Migration from C# settings format (for compatibility)
-  public migrateFromLegacySettings(legacySettingsPath: string): boolean {
-    try {
-      const fs = require('fs');
-      if (fs.existsSync(legacySettingsPath)) {
-        const legacyData = JSON.parse(fs.readFileSync(legacySettingsPath, 'utf8'));
-        
-        // Map C# settings to Electron settings
-        const migratedSettings: Partial<Settings> = {
-          cloudEndpoint: legacyData.CloudEndpoint || defaultSettings.cloudEndpoint,
-          chatApiUrl: legacyData.ChatApiUrl || defaultSettings.chatApiUrl,
-          apiKey: legacyData.ApiKey || defaultSettings.apiKey,
-          llmProvider: legacyData.LlmProvider || defaultSettings.llmProvider,
-          llmApiKey: legacyData.LlmApiKey || defaultSettings.llmApiKey,
-          llmModel: legacyData.LlmModel || defaultSettings.llmModel,
-          llmBaseUrl: legacyData.LlmBaseUrl || defaultSettings.llmBaseUrl,
-          autoAnnotateSteps: legacyData.AutoAnnotateSteps ?? defaultSettings.autoAnnotateSteps,
-          autoGenerateGuide: legacyData.AutoGenerateGuide ?? defaultSettings.autoGenerateGuide,
-          frontendUrl: legacyData.FrontendUrl || defaultSettings.frontendUrl,
-        };
-
-        this.saveSettings(migratedSettings);
-        console.log('Successfully migrated legacy settings');
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to migrate legacy settings:', error);
-    }
-    return false;
-  }
-
-  // Debug/development helpers
-  public exportSettings(): string {
-    return JSON.stringify({
-      settings: this.getSettings(),
-      windowState: this.getWindowState(),
-    }, null, 2);
-  }
-
-  public importSettings(settingsJson: string): boolean {
-    try {
-      const data = JSON.parse(settingsJson);
-      if (data.settings) {
-        this.saveSettings(data.settings);
-      }
-      if (data.windowState) {
-        this.setWindowState(data.windowState);
-      }
-      return true;
-    } catch (error) {
-      console.error('Failed to import settings:', error);
-      return false;
-    }
-  }
-
-  // Get store file path for backup purposes
-  public getStorePath(): string {
-    return this.store.path;
-  }
-
-  // Clear all data (for testing or reset)
-  public clearAll(): void {
-    this.store.clear();
-  }
+  public getStorePath(): string { return this.store.path; }
+  public clearAll(): void { this.store.clear(); }
 }

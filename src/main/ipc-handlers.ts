@@ -36,6 +36,13 @@ export function setupIpcHandlers(
       currentRecordingSteps = [];
       currentProjectId = projectId || '';
 
+      // Configure ignored shortcuts so they don't create steps
+      const settings = settingsManager.getSettings();
+      recordingService.setIgnoredShortcuts([
+        settings.spotlightShortcut || 'Ctrl+Shift+Space',
+        settings.recordingShortcut || 'Ctrl+Shift+R',
+      ]);
+
       // Get userId from auth
       try {
         const status = await authService.getStatus();
@@ -52,6 +59,7 @@ export function setupIpcHandlers(
       });
 
       await recordingService.startRecording(captureArea, projectId);
+      app.emit('recording-started');
       return { success: true };
     } catch (error) {
       throw new Error(`Failed to start recording: ${error instanceof Error ? error.message : String(error)}`);
@@ -61,6 +69,7 @@ export function setupIpcHandlers(
   ipcMain.handle('recording:stop', async (event) => {
     try {
       await recordingService.stopRecording();
+      app.emit('recording-stopped');
 
       // Auto-upload immediately
       if (currentRecordingSteps.length > 0 && currentProjectId) {
@@ -73,26 +82,28 @@ export function setupIpcHandlers(
           );
           event.sender.send('upload:complete', result);
 
-          // Native notification
+          // Open the workflow in browser (like Scribe does)
+          if (result?.url) {
+            shell.openExternal(result.url);
+          } else if (result?.recordingId) {
+            const settings = settingsManager.getSettings();
+            const frontendUrl = (settings.frontendUrl || 'http://localhost:5173').replace(/\/+$/, '');
+            shell.openExternal(`${frontendUrl}/workflow/${result.recordingId}`);
+          }
+
           if (Notification.isSupported()) {
-            const notif = new Notification({
+            new Notification({
               title: 'Recording uploaded',
               body: `${currentRecordingSteps.length} steps uploaded successfully`,
               silent: true,
-            });
-            notif.show();
+            }).show();
           }
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           event.sender.send('upload:error', errorMsg);
 
           if (Notification.isSupported()) {
-            const notif = new Notification({
-              title: 'Upload failed',
-              body: errorMsg,
-              silent: false,
-            });
-            notif.show();
+            new Notification({ title: 'Upload failed', body: errorMsg, silent: false }).show();
           }
         }
       }

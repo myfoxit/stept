@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, protocol, screen, shell, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell, Tray, Menu, nativeImage, Notification } from 'electron';
 import * as path from 'path';
 import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
@@ -10,11 +10,16 @@ const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
 class OndokiApp {
   private spotlightWindow: BrowserWindow | null = null;
+  private settingsWindow: BrowserWindow | null = null;
+  private countdownWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private authService: AuthService;
   private settingsManager: SettingsManager;
   private isQuitting = false;
   private lastProjectId: string = '';
+  private isRecording = false;
+  private normalTrayIcon: Electron.NativeImage | null = null;
+  private recordingTrayIcon: Electron.NativeImage | null = null;
 
   constructor() {
     this.settingsManager = new SettingsManager();
@@ -27,18 +32,19 @@ class OndokiApp {
     this.setupAppEventListeners();
     setupIpcHandlers(this.authService, this.settingsManager);
     this.setupSpotlightIpc();
+    this.setupSettingsIpc();
+    this.setupCountdownIpc();
+    this.setupRecordingStateTracking();
 
     await app.whenReady();
     Menu.setApplicationMenu(null);
 
-    // Tray-only app — no main window
     this.createTray();
     this.registerGlobalShortcuts();
 
-    // Try auto-login on startup
     this.authService.tryAutoLogin().catch(() => {});
 
-    // Show spotlight on launch so user can log in
+    // First launch: show spotlight open (not hidden)
     this.showSpotlightWindow();
 
     this.handleStartupProtocol();
@@ -46,33 +52,154 @@ class OndokiApp {
 
   // ─── Global Shortcuts ──────────────────────────────────────────────────────
 
+  private registeredShortcuts: string[] = [];
+
   private registerGlobalShortcuts(): void {
+    // Unregister old ones
+    for (const s of this.registeredShortcuts) {
+      try { globalShortcut.unregister(s); } catch {}
+    }
+    this.registeredShortcuts = [];
+
     const settings = this.settingsManager.getSettings();
-    const shortcut = (settings as any).spotlightShortcut || 'Ctrl+Shift+Space';
 
-    try {
-      globalShortcut.register(shortcut, () => this.toggleSpotlightWindow());
-    } catch (e) {
-      console.error(`[Spotlight] Failed to register shortcut "${shortcut}":`, e);
-    }
-
-    // Always register Ctrl+Shift+Space as fallback
-    if (shortcut !== 'Ctrl+Shift+Space') {
-      try { globalShortcut.register('Ctrl+Shift+Space', () => this.toggleSpotlightWindow()); } catch {}
-    }
-
-    // Mac: also Cmd+Shift+Space
+    // Spotlight shortcut
+    const spotlightShortcut = settings.spotlightShortcut || 'Ctrl+Shift+Space';
+    this.tryRegister(spotlightShortcut, () => this.toggleSpotlightWindow());
     if (process.platform === 'darwin') {
-      const macShortcut = shortcut.replace('Ctrl', 'Cmd');
-      if (macShortcut !== shortcut) {
-        try { globalShortcut.register(macShortcut, () => this.toggleSpotlightWindow()); } catch {}
-      }
-      if (macShortcut !== 'Cmd+Shift+Space' && shortcut !== 'Cmd+Shift+Space') {
-        try { globalShortcut.register('Cmd+Shift+Space', () => this.toggleSpotlightWindow()); } catch {}
-      }
+      this.tryRegister(spotlightShortcut.replace('Ctrl', 'Cmd'), () => this.toggleSpotlightWindow());
     }
 
-    console.log('[Spotlight] Global shortcuts registered');
+    // Recording shortcut
+    const recordingShortcut = settings.recordingShortcut || 'Ctrl+Shift+R';
+    this.tryRegister(recordingShortcut, () => {
+      if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
+        this.spotlightWindow.webContents.send('toggle-recording');
+      }
+    });
+    if (process.platform === 'darwin') {
+      this.tryRegister(recordingShortcut.replace('Ctrl', 'Cmd'), () => {
+        if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
+          this.spotlightWindow.webContents.send('toggle-recording');
+        }
+      });
+    }
+
+    console.log('[Spotlight] Shortcuts registered:', this.registeredShortcuts);
+  }
+
+  private tryRegister(shortcut: string, callback: () => void): void {
+    try {
+      if (!this.registeredShortcuts.includes(shortcut)) {
+        globalShortcut.register(shortcut, callback);
+        this.registeredShortcuts.push(shortcut);
+      }
+    } catch (e) {
+      console.warn(`Failed to register shortcut "${shortcut}":`, e);
+    }
+  }
+
+  // ─── Recording State Tracking ─────────────────────────────────────────────
+
+  private setupRecordingStateTracking(): void {
+    // Listen for recording state changes to update tray/dock
+    app.on('recording-started' as any, () => {
+      this.isRecording = true;
+      this.updateTrayForRecording(true);
+      if (process.platform === 'darwin') {
+        app.dock?.setBadge('⏺');
+      }
+    });
+
+    app.on('recording-stopped' as any, () => {
+      this.isRecording = false;
+      this.updateTrayForRecording(false);
+      if (process.platform === 'darwin') {
+        app.dock?.setBadge('');
+      }
+    });
+  }
+
+  private updateTrayForRecording(recording: boolean): void {
+    if (!this.tray) return;
+    if (recording) {
+      this.tray.setTitle(' ⏺ REC');
+      if (this.recordingTrayIcon) this.tray.setImage(this.recordingTrayIcon);
+    } else {
+      this.tray.setTitle('');
+      if (this.normalTrayIcon) this.tray.setImage(this.normalTrayIcon);
+    }
+    this.updateTrayMenu();
+  }
+
+  // ─── Countdown Overlay ────────────────────────────────────────────────────
+
+  private setupCountdownIpc(): void {
+    ipcMain.handle('countdown:show', async () => {
+      await this.showCountdownOverlay();
+      return { ok: true };
+    });
+  }
+
+  private async showCountdownOverlay(): Promise<void> {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+
+    this.countdownWindow = new BrowserWindow({
+      width, height,
+      x: 0, y: 0,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: false,
+      resizable: false,
+      fullscreen: true,
+      hasShadow: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    });
+
+    this.countdownWindow.setIgnoreMouseEvents(true);
+    this.countdownWindow.setVisibleOnAllWorkspaces(true);
+
+    const html = `<!DOCTYPE html><html><head><style>
+      * { margin: 0; padding: 0; }
+      body { background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+             width: 100vw; height: 100vh; font-family: 'Outfit', -apple-system, sans-serif; overflow: hidden; }
+      .count { font-size: 180px; font-weight: 800; color: white; text-shadow: 0 4px 40px rgba(0,0,0,0.5);
+               animation: pop 0.8s ease-out; opacity: 0; }
+      @keyframes pop { 0% { transform: scale(1.5); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+      .label { position: absolute; bottom: 60px; color: rgba(255,255,255,0.7); font-size: 18px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+    </style></head><body>
+      <div class="count" id="num">3</div>
+      <div class="label">Recording starts in...</div>
+      <script>
+        const el = document.getElementById('num');
+        let n = 3;
+        function tick() {
+          el.textContent = n;
+          el.style.animation = 'none';
+          void el.offsetHeight;
+          el.style.animation = 'pop 0.8s ease-out';
+          n--;
+          if (n > 0) setTimeout(tick, 1000);
+          else if (n === 0) { setTimeout(() => { el.textContent = '●'; el.style.color = '#FF5F57'; el.style.fontSize = '120px'; el.style.animation = 'none'; void el.offsetHeight; el.style.animation = 'pop 0.8s ease-out'; }, 1000); }
+        }
+        tick();
+        setTimeout(() => window.close(), 3800);
+      </script>
+    </body></html>`;
+
+    await this.countdownWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    this.countdownWindow.show();
+
+    // Auto-close after countdown
+    setTimeout(() => {
+      if (this.countdownWindow && !this.countdownWindow.isDestroyed()) {
+        this.countdownWindow.close();
+        this.countdownWindow = null;
+      }
+    }, 4000);
   }
 
   // ─── Spotlight Window ──────────────────────────────────────────────────────
@@ -100,7 +227,6 @@ class OndokiApp {
     this.spotlightWindow!.setBounds({ x, y, width: winWidth, height: winHeight });
     this.spotlightWindow!.show();
     this.spotlightWindow!.focus();
-
     this.spotlightWindow!.webContents.send('spotlight:show', this.lastProjectId);
   }
 
@@ -112,27 +238,18 @@ class OndokiApp {
 
   private createSpotlightWindow(): void {
     this.spotlightWindow = new BrowserWindow({
-      width: 620,
-      height: 560,
-      show: false,
-      frame: false,
-      transparent: true,
-      resizable: false,
-      movable: false,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      fullscreenable: false,
-      hasShadow: true,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        preload: PRELOAD_PATH,
-      },
+      width: 620, height: 560,
+      show: false, frame: false, transparent: true,
+      resizable: false, movable: false, alwaysOnTop: true,
+      skipTaskbar: true, fullscreenable: false, hasShadow: true,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
     });
 
     this.spotlightWindow.setVisibleOnAllWorkspaces(true);
 
     this.spotlightWindow.on('blur', () => {
+      // Don't hide if recording — user needs to see the mini status
+      if (this.isRecording) return;
       setTimeout(() => {
         if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
           this.hideSpotlightWindow();
@@ -140,9 +257,7 @@ class OndokiApp {
       }, 100);
     });
 
-    this.spotlightWindow.on('closed', () => {
-      this.spotlightWindow = null;
-    });
+    this.spotlightWindow.on('closed', () => { this.spotlightWindow = null; });
 
     this.spotlightWindow.loadFile(SPOTLIGHT_PATH).catch((err: Error) => {
       console.error('Failed to load spotlight:', err);
@@ -167,11 +282,175 @@ class OndokiApp {
     ipcMain.handle('spotlight:resize', (_event, height: number) => {
       if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
         const bounds = this.spotlightWindow.getBounds();
-        const clampedHeight = Math.max(200, Math.min(height, 700));
-        this.spotlightWindow.setBounds({ ...bounds, height: clampedHeight });
+        this.spotlightWindow.setBounds({ ...bounds, height: Math.max(200, Math.min(height, 700)) });
       }
       return { ok: true };
     });
+  }
+
+  // ─── Settings Window ──────────────────────────────────────────────────────
+
+  private setupSettingsIpc(): void {
+    ipcMain.handle('settings:open-window', () => {
+      this.openSettingsWindow();
+      return { ok: true };
+    });
+
+    // Re-register shortcuts when settings change
+    ipcMain.on('settings:shortcuts-changed', () => {
+      this.registerGlobalShortcuts();
+    });
+  }
+
+  private openSettingsWindow(): void {
+    if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
+      this.settingsWindow.focus();
+      return;
+    }
+
+    this.settingsWindow = new BrowserWindow({
+      width: 500, height: 580,
+      title: 'Ondoki Settings',
+      resizable: false, minimizable: false, maximizable: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
+    });
+
+    const settingsHtml = this.generateSettingsHtml();
+    this.settingsWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(settingsHtml)}`);
+
+    this.settingsWindow.on('closed', () => { this.settingsWindow = null; });
+  }
+
+  private generateSettingsHtml(): string {
+    return `<!DOCTYPE html><html><head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: #FAFAFC; color: #1A1A2E; padding: 24px; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 24px; letter-spacing: -0.03em; }
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 11px; font-weight: 600; color: #A0A0B2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #1A1A2E; }
+  input[type="text"], input[type="url"] { width: 100%; padding: 8px 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: #fff; margin-bottom: 12px; }
+  input:focus { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.1); }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .toggle { width: 36px; height: 20px; border-radius: 10px; background: #D1D5DB; cursor: pointer; position: relative; transition: background 0.2s; }
+  .toggle.on { background: #6C5CE7; }
+  .toggle-knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .toggle.on .toggle-knob { transform: translateX(16px); }
+  .shortcut-input { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: center; }
+  .btn { padding: 10px 24px; border-radius: 10px; border: none; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #6C5CE7; color: #fff; }
+  .btn-primary:hover { background: #5A4BD6; }
+  .btn-danger { background: transparent; color: #FF5F57; border: 1px solid #FF5F57; }
+  .btn-danger:hover { background: rgba(255,95,87,0.08); }
+  .footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.07); }
+  .hint { font-size: 11px; color: #A0A0B2; margin-top: -8px; margin-bottom: 12px; }
+</style>
+</head><body>
+<h1>⚙️ Settings</h1>
+
+<div class="section">
+  <div class="section-title">Ondoki Server</div>
+  <label>API URL</label>
+  <input type="url" id="chatApiUrl" placeholder="http://localhost:8000/api/v1">
+  <label>Frontend URL</label>
+  <input type="url" id="frontendUrl" placeholder="http://localhost:5173">
+</div>
+
+<div class="section">
+  <div class="section-title">AI Enhancement</div>
+  <div class="toggle-row">
+    <label style="margin:0">Auto-improve step titles with AI</label>
+    <div class="toggle" id="toggleAnnotate" onclick="toggleAnnotate()"><div class="toggle-knob"></div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Keyboard Shortcuts</div>
+  <label>Open Spotlight</label>
+  <input type="text" id="spotlightShortcut" class="shortcut-input" placeholder="Ctrl+Shift+Space" readonly>
+  <div class="hint">Click and press your desired shortcut</div>
+  <label>Start/Stop Recording</label>
+  <input type="text" id="recordingShortcut" class="shortcut-input" placeholder="Ctrl+Shift+R" readonly>
+  <div class="hint">Click and press your desired shortcut</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Account</div>
+  <div id="accountInfo" style="font-size:13px;color:#6E6E82;margin-bottom:10px;">Loading...</div>
+  <button class="btn btn-danger" onclick="logout()">Sign Out</button>
+</div>
+
+<div class="footer">
+  <button class="btn btn-primary" onclick="save()">Save</button>
+</div>
+
+<script>
+  const api = window.electronAPI;
+  let settings = {};
+  let autoAnnotate = true;
+
+  async function init() {
+    settings = await api.getSettings();
+    document.getElementById('chatApiUrl').value = settings.chatApiUrl || '';
+    document.getElementById('frontendUrl').value = settings.frontendUrl || '';
+    document.getElementById('spotlightShortcut').value = settings.spotlightShortcut || 'Ctrl+Shift+Space';
+    document.getElementById('recordingShortcut').value = settings.recordingShortcut || 'Ctrl+Shift+R';
+    autoAnnotate = settings.autoAnnotateSteps !== false;
+    updateToggle();
+
+    const status = await api.getAuthStatus();
+    document.getElementById('accountInfo').textContent = status.isAuthenticated
+      ? 'Signed in as ' + (status.user?.name || status.user?.email || 'User')
+      : 'Not signed in';
+  }
+
+  function updateToggle() {
+    const el = document.getElementById('toggleAnnotate');
+    el.className = autoAnnotate ? 'toggle on' : 'toggle';
+  }
+  function toggleAnnotate() { autoAnnotate = !autoAnnotate; updateToggle(); }
+
+  // Shortcut capture
+  ['spotlightShortcut', 'recordingShortcut'].forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener('keydown', (e) => {
+      e.preventDefault();
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.metaKey) parts.push('Cmd');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      const key = e.key;
+      if (!['Control','Meta','Alt','Shift'].includes(key)) {
+        parts.push(key === ' ' ? 'Space' : key.length === 1 ? key.toUpperCase() : key);
+        input.value = parts.join('+');
+      }
+    });
+  });
+
+  async function save() {
+    await api.saveSettings({
+      chatApiUrl: document.getElementById('chatApiUrl').value,
+      cloudEndpoint: document.getElementById('chatApiUrl').value.replace(/\\/api\\/v1$/, '/api/v1/process-recording'),
+      frontendUrl: document.getElementById('frontendUrl').value,
+      autoAnnotateSteps: autoAnnotate,
+      spotlightShortcut: document.getElementById('spotlightShortcut').value,
+      recordingShortcut: document.getElementById('recordingShortcut').value,
+    });
+    // Notify main process to re-register shortcuts
+    window.close();
+  }
+
+  async function logout() {
+    await api.logout();
+    document.getElementById('accountInfo').textContent = 'Signed out';
+  }
+
+  init();
+</script>
+</body></html>`;
   }
 
   // ─── Single Instance ───────────────────────────────────────────────────────
@@ -179,13 +458,11 @@ class OndokiApp {
   private handleSingleInstance(): boolean {
     const gotTheLock = app.requestSingleInstanceLock();
     if (!gotTheLock) { app.quit(); return false; }
-
     app.on('second-instance', (event, commandLine) => {
       this.showSpotlightWindow();
       const protocolUrl = commandLine.find(arg => arg.startsWith('ondoki://'));
       if (protocolUrl) this.handleProtocolUrl(protocolUrl);
     });
-
     return true;
   }
 
@@ -199,45 +476,23 @@ class OndokiApp {
     } else {
       app.setAsDefaultProtocolClient('ondoki');
     }
-
-    app.on('open-url', (event, url) => {
-      event.preventDefault();
-      this.handleProtocolUrl(url);
-    });
+    app.on('open-url', (event, url) => { event.preventDefault(); this.handleProtocolUrl(url); });
   }
 
   // ─── App Events ────────────────────────────────────────────────────────────
 
   private setupAppEventListeners(): void {
-    // Tray-only app: don't quit when windows close
-    app.on('window-all-closed', (e: Event) => {
-      // Do nothing — keep running in tray
-    });
-
-    app.on('activate', () => {
-      this.showSpotlightWindow();
-    });
-
-    app.on('before-quit', () => {
-      this.isQuitting = true;
-    });
-
-    app.on('will-quit', () => {
-      globalShortcut.unregisterAll();
-    });
+    app.on('window-all-closed', () => { /* tray-only: keep running */ });
+    app.on('activate', () => { this.showSpotlightWindow(); });
+    app.on('before-quit', () => { this.isQuitting = true; });
+    app.on('will-quit', () => { globalShortcut.unregisterAll(); });
 
     app.on('web-contents-created', (event, contents) => {
-      contents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
-        return { action: 'deny' };
-      });
+      contents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
     });
   }
 
   // ─── Tray ──────────────────────────────────────────────────────────────────
-
-  private normalTrayIcon: Electron.NativeImage | null = null;
-  private badgeTrayIcon: Electron.NativeImage | null = null;
 
   private createTray(): void {
     const iconPath = path.join(__dirname, '..', '..', 'assets');
@@ -247,47 +502,37 @@ class OndokiApp {
     trayIcon.setTemplateImage(true);
     this.normalTrayIcon = trayIcon;
 
-    const badgeBase = nativeImage.createFromPath(path.join(iconPath, 'icon.png'));
-    const badge = badgeBase.resize({ width: 16, height: 16 });
-    badge.setTemplateImage(false);
-    this.badgeTrayIcon = badge;
+    // Recording icon — same but we'll add title text
+    const recIcon = icon16.resize({ width: 16, height: 16 });
+    recIcon.setTemplateImage(false);
+    this.recordingTrayIcon = recIcon;
 
     this.tray = new Tray(trayIcon);
     this.tray.setToolTip('Ondoki');
-
-    // Click tray → show spotlight
-    this.tray.on('click', () => {
-      this.showSpotlightWindow();
-    });
-
+    this.tray.on('click', () => this.showSpotlightWindow());
     this.updateTrayMenu();
 
-    app.on('context-matches-updated' as any, (matches: any[], ctx: any) => {
-      if (this.badgeTrayIcon) this.tray?.setImage(this.badgeTrayIcon);
-      this.tray?.setTitle(` ${matches.length}`);
-      this.updateTrayMenu(undefined, matches);
+    app.on('context-matches-updated' as any, (matches: any[]) => {
+      this.updateTrayMenu(matches);
     });
-
-    app.on('context-no-matches' as any, () => {
-      if (this.normalTrayIcon) this.tray?.setImage(this.normalTrayIcon);
-      this.tray?.setTitle('');
-      this.updateTrayMenu();
-    });
+    app.on('context-no-matches' as any, () => { this.updateTrayMenu(); });
   }
 
-  private updateTrayMenu(contextInfo?: string, matches?: any[]): void {
+  private updateTrayMenu(matches?: any[]): void {
     if (!this.tray) return;
 
     const template: Electron.MenuItemConstructorOptions[] = [
       {
-        label: 'Open Spotlight',
+        label: 'Open Ondoki',
         accelerator: process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space',
         click: () => this.showSpotlightWindow(),
       },
       { type: 'separator' },
+      { label: 'Settings...', click: () => this.openSettingsWindow() },
     ];
 
     if (matches && matches.length > 0) {
+      template.push({ type: 'separator' });
       template.push({ label: `${matches.length} suggestion${matches.length > 1 ? 's' : ''}`, enabled: false });
       for (const m of matches.slice(0, 5)) {
         template.push({
@@ -295,14 +540,14 @@ class OndokiApp {
           click: () => {
             const settings = this.settingsManager.getSettings();
             const frontendUrl = settings.frontendUrl || 'http://localhost:5173';
-            const resourcePath = m.resource_type === 'workflow' ? `/workflow/${m.resource_id}` : `/editor/${m.resource_id}`;
-            shell.openExternal(`${frontendUrl}${resourcePath}`);
+            const p = m.resource_type === 'workflow' ? `/workflow/${m.resource_id}` : `/editor/${m.resource_id}`;
+            shell.openExternal(`${frontendUrl}${p}`);
           },
         });
       }
-      template.push({ type: 'separator' });
     }
 
+    template.push({ type: 'separator' });
     template.push({ label: 'Quit', click: () => { this.isQuitting = true; app.quit(); } });
     this.tray.setContextMenu(Menu.buildFromTemplate(template));
   }
@@ -311,14 +556,11 @@ class OndokiApp {
 
   private handleStartupProtocol(): void {
     const protocolUrl = process.argv.find(arg => arg.startsWith('ondoki://'));
-    if (protocolUrl) {
-      setTimeout(() => this.handleProtocolUrl(protocolUrl), 1000);
-    }
+    if (protocolUrl) setTimeout(() => this.handleProtocolUrl(protocolUrl), 1000);
   }
 
   private async handleProtocolUrl(url: string): Promise<void> {
     console.log('Handling protocol URL:', url);
-
     if (url.startsWith('ondoki://auth/callback')) {
       try {
         const success = await this.authService.handleCallback(url);
@@ -326,11 +568,8 @@ class OndokiApp {
           const status = await this.authService.getStatus();
           this.spotlightWindow.webContents.send('auth-status-changed', status);
         }
-      } catch (error) {
-        console.error('Auth callback error:', error);
-      }
+      } catch (error) { console.error('Auth callback error:', error); }
     }
-
     this.showSpotlightWindow();
   }
 }
@@ -338,10 +577,5 @@ class OndokiApp {
 const ondokiApp = new OndokiApp();
 ondokiApp.initialize().catch(console.error);
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+process.on('uncaughtException', (error) => { console.error('Uncaught Exception:', error); });
+process.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason); });

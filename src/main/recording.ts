@@ -197,6 +197,7 @@ export class RecordingService extends EventEmitter {
   private clickQueue: { event: NativeClickEvent; count: number; preCapture?: Buffer }[] = [];
   private lastClickTime = 0;
   private lastClickPos = { x: 0, y: 0 };
+  private ignoredShortcuts: Set<string> = new Set();
 
   // Native hooks process
   private hooksProcess: ChildProcess | null = null;
@@ -212,6 +213,17 @@ export class RecordingService extends EventEmitter {
   constructor() {
     super();
     this.screenshotService = new ScreenshotService();
+  }
+
+  /** Set shortcut combos that should NOT be recorded as steps (e.g. "Ctrl+Shift+Space") */
+  public setIgnoredShortcuts(shortcuts: string[]): void {
+    this.ignoredShortcuts.clear();
+    for (const s of shortcuts) {
+      // Normalize: sort modifiers, uppercase key
+      this.ignoredShortcuts.add(s.toUpperCase());
+      // Also add Cmd variant for macOS
+      this.ignoredShortcuts.add(s.replace(/Ctrl/i, 'Cmd').toUpperCase());
+    }
   }
 
   // ------------------------------------------------------------------
@@ -865,6 +877,12 @@ export class RecordingService extends EventEmitter {
       if (event.modifiers.includes('alt')) mods.push(isMac ? 'Option' : 'Alt');
       if (event.modifiers.includes('shift')) mods.push('Shift');
       const combo = [...mods, keyLabel].join('+');
+
+      // Skip ignored shortcuts (spotlight/recording hotkeys)
+      if (this.ignoredShortcuts.has(combo.toUpperCase())) {
+        console.log(`[DIAG] keyboard shortcut filtered: "${combo}" (configured shortcut)`);
+        return;
+      }
 
       const windowTitle = event.window?.title || 'Unknown Window';
 

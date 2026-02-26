@@ -96,6 +96,15 @@ export interface ElectronAPI {
   spotlightResize: (height: number) => Promise<any>;
   onSpotlightShow: (callback: (projectId: string) => void) => () => void;
 
+  // Settings window
+  openSettingsWindow: () => Promise<any>;
+
+  // Countdown
+  showCountdown: () => Promise<any>;
+
+  // Recording toggle (from global shortcut)
+  onToggleRecording: (callback: () => void) => () => void;
+
   // Utility
   openExternal: (url: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
@@ -193,6 +202,19 @@ const electronAPI: ElectronAPI = {
     const handler = (_e: IpcRendererEvent, projectId: string) => callback(projectId);
     ipcRenderer.on('spotlight:show', handler);
     return () => ipcRenderer.removeListener('spotlight:show', handler);
+  },
+
+  // Settings window
+  openSettingsWindow: () => ipcRenderer.invoke('settings:open-window'),
+
+  // Countdown
+  showCountdown: () => ipcRenderer.invoke('countdown:show'),
+
+  // Recording toggle (from global shortcut)
+  onToggleRecording: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('toggle-recording', handler);
+    return () => ipcRenderer.removeListener('toggle-recording', handler);
   },
 
   // Utility

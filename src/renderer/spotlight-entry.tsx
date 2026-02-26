@@ -99,7 +99,7 @@ const SpotlightApp: React.FC = () => {
   // Recording
   const [rec, setRec] = useState<RecState>({ isRecording: false, isPaused: false, stepCount: 0 });
   const [duration, setDuration] = useState(0);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  
 
   // Upload toast
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -112,8 +112,7 @@ const SpotlightApp: React.FC = () => {
   // Project
   const [selectedProjectId, setSelectedProjectId] = useState('');
 
-  // Settings panel
-  const [showSettings, setShowSettings] = useState(false);
+  
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -157,7 +156,6 @@ const SpotlightApp: React.FC = () => {
       setResults([]);
       setHighlightIndex(0);
       setChatMessages([]);
-      setShowSettings(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     });
 
@@ -204,9 +202,16 @@ const SpotlightApp: React.FC = () => {
       if (ctx) setContextInfo({ windowTitle: ctx.windowTitle, appName: ctx.appName, url: ctx.url });
     });
 
+    // Recording toggle from global shortcut
+    const unsubToggleRec = api.onToggleRecording?.(() => {
+      // Will be handled via ref since this is a closure
+      document.dispatchEvent(new CustomEvent('ondoki-toggle-recording'));
+    });
+
     return () => {
       unsubAuth?.(); unsubShow?.(); unsubCtx?.(); unsubNoCtx?.();
       unsubStep?.(); unsubState?.(); unsubUpStart?.(); unsubUpDone?.(); unsubUpErr?.();
+      unsubToggleRec?.();
     };
   }, []);
 
@@ -280,17 +285,13 @@ const SpotlightApp: React.FC = () => {
     try { await window.electronAPI?.initiateLogin(); } catch (e) { console.error('Login failed:', e); }
   }, []);
 
-  const handleLogout = useCallback(async () => {
-    try {
-      await window.electronAPI?.logout();
-      setAuth({ isAuthenticated: false, user: null, projects: [] });
-    } catch (e) { console.error('Logout failed:', e); }
-  }, []);
-
   const handleStartRecording = useCallback(async () => {
     if (!selectedProjectId) return;
-    // Use all-displays as default capture area
     try {
+      // Show countdown overlay
+      await window.electronAPI?.showCountdown?.();
+      // Wait for countdown to finish (3 seconds + buffer)
+      await new Promise(resolve => setTimeout(resolve, 3200));
       await window.electronAPI?.startRecording({ type: 'all-displays' }, selectedProjectId);
       setRec({ isRecording: true, isPaused: false, stepCount: 0 });
       setDuration(0);
@@ -303,6 +304,16 @@ const SpotlightApp: React.FC = () => {
       setRec(prev => ({ ...prev, isRecording: false, isPaused: false }));
     } catch (e) { console.error('Failed to stop recording:', e); }
   }, []);
+
+  // Handle recording toggle from global shortcut
+  useEffect(() => {
+    const handler = () => {
+      if (rec.isRecording) handleStopRecording();
+      else handleStartRecording();
+    };
+    document.addEventListener('ondoki-toggle-recording', handler);
+    return () => document.removeEventListener('ondoki-toggle-recording', handler);
+  }, [rec.isRecording, handleStartRecording, handleStopRecording]);
 
   const handleTogglePause = useCallback(async () => {
     try {
@@ -456,39 +467,17 @@ const SpotlightApp: React.FC = () => {
                 </div>
 
                 {/* Settings gear */}
-                <button onClick={() => setShowSettings(!showSettings)} style={{
+                <button onClick={() => window.electronAPI?.openSettingsWindow?.()} style={{
                   width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)',
-                  background: showSettings ? 'rgba(108,92,231,0.1)' : '#FAFAFC',
+                  background: '#FAFAFC',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s',
                 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={showSettings ? '#6C5CE7' : '#6E6E82'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E6E82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                   </svg>
                 </button>
               </div>
-
-              {/* Settings panel (inline) */}
-              {showSettings && (
-                <div style={{
-                  padding: '10px 12px', marginBottom: 10, borderRadius: 10,
-                  background: '#FAFAFC', border: '1px solid rgba(0,0,0,0.07)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#6E6E82' }}>
-                      {auth.user?.name || auth.user?.email || 'User'}
-                    </span>
-                    <button onClick={handleLogout} style={{
-                      padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.1)',
-                      background: '#fff', fontSize: 11, fontWeight: 500, color: '#FF5F57',
-                      cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-                    }}>Sign Out</button>
-                  </div>
-                  <div style={{ fontSize: 10, color: '#A0A0B2' }}>
-                    Shortcut: Ctrl+Shift+Space
-                  </div>
-                </div>
-              )}
 
               {/* Recording controls */}
               {!rec.isRecording ? (
@@ -508,29 +497,7 @@ const SpotlightApp: React.FC = () => {
                     </svg>
                     Start Recording
                   </button>
-                  {/* Voice toggle */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px',
-                    borderRadius: 10, border: '1px solid rgba(0,0,0,0.08)', background: '#FAFAFC',
-                    cursor: 'pointer', userSelect: 'none',
-                  }} onClick={() => setVoiceEnabled(!voiceEnabled)}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                      stroke={voiceEnabled ? '#6C5CE7' : '#A0A0B2'} strokeWidth="2" strokeLinecap="round">
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    </svg>
-                    <span style={{ fontSize: 11, fontWeight: 500, color: voiceEnabled ? '#6C5CE7' : '#A0A0B2' }}>Voice</span>
-                    <div style={{
-                      width: 28, height: 16, borderRadius: 8, padding: 2,
-                      background: voiceEnabled ? '#6C5CE7' : '#D1D5DB', transition: 'background 0.2s',
-                    }}>
-                      <div style={{
-                        width: 12, height: 12, borderRadius: '50%', background: '#fff',
-                        transform: voiceEnabled ? 'translateX(12px)' : 'translateX(0)',
-                        transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                      }}/>
-                    </div>
-                  </div>
+                  
                 </div>
               ) : (
                 /* Recording in progress */
@@ -578,17 +545,7 @@ const SpotlightApp: React.FC = () => {
                       ⏹ Stop
                     </button>
                   </div>
-                  {/* Action chips */}
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    {['📝 Add note', '📷 Screenshot', '🎤 Voice note'].map(label => (
-                      <button key={label} style={{
-                        flex: 1, padding: '5px 8px', borderRadius: 8,
-                        border: '1px dashed rgba(0,0,0,0.1)', background: '#fff',
-                        fontSize: 10, cursor: 'pointer', color: '#6E6E82',
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}>{label}</button>
-                    ))}
-                  </div>
+                  
                 </div>
               )}
             </div>
