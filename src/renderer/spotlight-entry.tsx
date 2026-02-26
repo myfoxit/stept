@@ -419,8 +419,10 @@ const SpotlightApp: React.FC = () => {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
-          width: 580, background: '#fff', borderRadius: 20,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.07)',
+          width: 580, background: 'rgba(255, 255, 255, 0.82)', borderRadius: 20,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.5)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
           padding: '40px 0', textAlign: 'center', color: '#A0A0B2', fontSize: 13,
           fontFamily: "'DM Sans', sans-serif",
         }}>Loading...</div>
@@ -433,8 +435,10 @@ const SpotlightApp: React.FC = () => {
       onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
 
       <div style={{
-        width: 580, maxWidth: '94vw', background: '#fff', borderRadius: 20,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.07)',
+        width: 580, maxWidth: '94vw', background: 'rgba(255, 255, 255, 0.82)', borderRadius: 20,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+        border: '1px solid rgba(255, 255, 255, 0.5)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
         overflow: 'hidden', fontFamily: "'DM Sans', sans-serif",
         animation: 'spotlightIn 0.15s ease-out',
       }}>
@@ -917,7 +921,7 @@ styleEl.textContent = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { margin: 0; background: transparent; overflow: hidden; -webkit-app-region: no-drag; }
+  html, body { margin: 0; background: transparent; overflow: hidden; -webkit-app-region: no-drag; }
 
   @keyframes spotlightIn {
     from { opacity: 0; transform: translateY(-8px) scale(0.98); }

@@ -1033,6 +1033,7 @@ export class RecordingService extends EventEmitter {
       });
 
       this.overlayWindow.setIgnoreMouseEvents(true);
+      this.overlayWindow.setContentProtection(true);
       this.overlayWindow.setVisibleOnAllWorkspaces(true);
 
       // On macOS, use screen-saver level so the overlay floats above everything

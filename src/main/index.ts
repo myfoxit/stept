@@ -276,8 +276,9 @@ class OndokiApp {
     this.spotlightWindow = new BrowserWindow({
       width: 620, height: 560,
       show: false, frame: false, transparent: true,
+      backgroundColor: '#00000000',
       resizable: false, movable: false, alwaysOnTop: true,
-      skipTaskbar: true, fullscreenable: false, hasShadow: true,
+      skipTaskbar: true, fullscreenable: false, hasShadow: false,
       webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
     });
 
@@ -319,8 +320,13 @@ class OndokiApp {
       return { action: 'deny' };
     });
 
+    // Dev tools available via Cmd+Shift+I — not opened automatically
     if (isDev) {
-      this.spotlightWindow.webContents.openDevTools({ mode: 'detach' });
+      this.spotlightWindow.webContents.on('before-input-event', (_event, input) => {
+        if (input.type === 'keyDown' && input.shift && input.meta && input.key === 'I') {
+          this.spotlightWindow?.webContents.toggleDevTools();
+        }
+      });
     }
   }
 
