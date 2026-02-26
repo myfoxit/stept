@@ -1,6 +1,6 @@
 // Native Windows window info + input hooks helper
 // Compile: dotnet publish -c Release -r win-x64 --self-contained
-// Usage: window-info.exe mouse|windows|point <x> <y>|serve|hooks
+// Usage: window-info.exe mouse|windows|point <x> <y>|serve|hooks|watch
 // Output: JSON to stdout
 
 using System;
@@ -111,6 +111,11 @@ namespace Ondoki.Native
         [DllImport("user32.dll")] public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr GetModuleHandle(string lpModuleName);
 
+        // WinEvent hooks
+        public delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+        [DllImport("user32.dll")] public static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+        [DllImport("user32.dll")] public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
         // Message pump
         [DllImport("user32.dll")] public static extern int GetMessage(out MSG msg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
         [DllImport("user32.dll")] public static extern bool TranslateMessage(ref MSG msg);
@@ -156,6 +161,11 @@ namespace Ondoki.Native
         public const int VK_MENU = 0x12; // Alt
         public const int VK_LWIN = 0x5B;
         public const int VK_RWIN = 0x5C;
+
+        // WinEvent constants
+        public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+        public const uint EVENT_OBJECT_NAMECHANGE = 0x800C;
+        public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
     }
 
     [ComImport, Guid("618736e0-3c3d-11cf-810c-00aa00389b71"), InterfaceType(ComInterfaceType.InterfaceIsIDispatch)]
@@ -812,6 +822,103 @@ namespace Ondoki.Native
             Win32.UnhookWindowsHookEx(keyboardHook);
         }
 
+        // ---- Watch mode ----
+
+        // Must hold reference to prevent GC
+        static Win32.WinEventDelegate _watchEventProc;
+
+        static string _lastWatchApp = "";
+        static string _lastWatchTitle = "";
+        static int _selfPid = Process.GetCurrentProcess().Id;
+
+        static string GetProcessDescription(int pid)
+        {
+            try
+            {
+                var proc = Process.GetProcessById(pid);
+                try
+                {
+                    var desc = proc.MainModule.FileVersionInfo.FileDescription;
+                    if (!string.IsNullOrWhiteSpace(desc)) return desc;
+                }
+                catch { }
+                return proc.ProcessName;
+            }
+            catch { return ""; }
+        }
+
+        static void WatchEventCallback(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+        {
+            try
+            {
+                var fgHwnd = Win32.GetForegroundWindow();
+                if (fgHwnd == IntPtr.Zero) return;
+
+                string title = GetWindowTitle(fgHwnd);
+                var (pid, processName) = GetProcessInfo(fgHwnd);
+
+                // Skip self
+                if ((int)pid == _selfPid) return;
+
+                // For name-change events, only care about the foreground window
+                if (eventType == Win32.EVENT_OBJECT_NAMECHANGE && hwnd != fgHwnd) return;
+
+                string app = GetProcessDescription((int)pid);
+                if (string.IsNullOrEmpty(app)) app = processName;
+                if (string.IsNullOrEmpty(app)) return;
+
+                // Dedup
+                if (app == _lastWatchApp && title == _lastWatchTitle) return;
+                _lastWatchApp = app;
+                _lastWatchTitle = title;
+
+                WriteEvent(Json.Obj(
+                    ("type", Json.Str("change")),
+                    ("app", Json.Str(app)),
+                    ("title", Json.Str(title)),
+                    ("pid", Json.Num((int)pid))
+                ));
+            }
+            catch { }
+        }
+
+        static void HandleWatch()
+        {
+            _watchEventProc = WatchEventCallback;
+
+            // Hook foreground window changes
+            var fgHook = Win32.SetWinEventHook(
+                Win32.EVENT_SYSTEM_FOREGROUND, Win32.EVENT_SYSTEM_FOREGROUND,
+                IntPtr.Zero, _watchEventProc, 0, 0, Win32.WINEVENT_OUTOFCONTEXT);
+
+            // Hook title/name changes (e.g. browser tab navigation)
+            var nameHook = Win32.SetWinEventHook(
+                Win32.EVENT_OBJECT_NAMECHANGE, Win32.EVENT_OBJECT_NAMECHANGE,
+                IntPtr.Zero, _watchEventProc, 0, 0, Win32.WINEVENT_OUTOFCONTEXT);
+
+            if (fgHook == IntPtr.Zero || nameHook == IntPtr.Zero)
+            {
+                Console.Error.WriteLine("Failed to install WinEvent hooks");
+                Environment.Exit(1);
+            }
+
+            // Ready
+            WriteEvent(Json.Obj(("type", Json.Str("ready"))));
+
+            // Emit initial state
+            _watchEventProc(IntPtr.Zero, Win32.EVENT_SYSTEM_FOREGROUND, Win32.GetForegroundWindow(), 0, 0, 0, 0);
+
+            // Message pump
+            while (Win32.GetMessage(out MSG msg, IntPtr.Zero, 0, 0) > 0)
+            {
+                Win32.TranslateMessage(ref msg);
+                Win32.DispatchMessage(ref msg);
+            }
+
+            Win32.UnhookWinEvent(fgHook);
+            Win32.UnhookWinEvent(nameHook);
+        }
+
         // ---- Utilities ----
 
         static int ExtractInt(string json, string key)
@@ -858,7 +965,7 @@ namespace Ondoki.Native
 
             if (args.Length < 1)
             {
-                Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>|serve|hooks");
+                Console.Error.WriteLine("Usage: window-info mouse|windows|point <x> <y>|serve|hooks|watch");
                 return 1;
             }
 
@@ -870,6 +977,7 @@ namespace Ondoki.Native
                     case "windows": HandleWindows(); break;
                     case "serve": HandleServe(); break;
                     case "hooks": HandleHooks(); break;
+                    case "watch": HandleWatch(); break;
                     case "point":
                         if (args.Length < 3 || !double.TryParse(args[1], out double px) || !double.TryParse(args[2], out double py))
                         {

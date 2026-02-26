@@ -5,6 +5,7 @@
 //        window-info point <x> <y>  → returns window/element at point
 //        window-info serve          → persistent JSON-RPC mode via stdin/stdout
 //        window-info hooks          → stream input events (click/key/scroll) as JSON lines
+//        window-info watch          → stream window-change events as JSON lines
 // Output: JSON to stdout
 
 import AppKit
@@ -518,6 +519,78 @@ func handleHooks() {
     CFRunLoopRun()
 }
 
+// MARK: - Watch mode (stream window-change events)
+
+struct WatchChangeEvent: Codable {
+    let type = "change"
+    let app: String
+    let title: String
+    let pid: Int
+}
+
+struct WatchReadyEvent: Codable {
+    let type = "ready"
+}
+
+func handleWatch() {
+    setbuf(stdout, nil)
+
+    let selfPID = ProcessInfo.processInfo.processIdentifier
+
+    var lastApp = ""
+    var lastTitle = ""
+
+    func emitCurrentApp(_ app: NSRunningApplication) {
+        let name = app.localizedName ?? ""
+        let pid = Int(app.processIdentifier)
+
+        // Skip self and empty app names
+        if name.isEmpty || app.processIdentifier == selfPID { return }
+
+        // Get window title via accessibility API
+        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        var titleValue: AnyObject?
+        var windowTitle = ""
+        var focusedWindow: AXUIElement?
+        AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &titleValue)
+        if let win = titleValue {
+            focusedWindow = (win as! AXUIElement)
+            var winTitle: AnyObject?
+            AXUIElementCopyAttributeValue(focusedWindow!, kAXTitleAttribute as CFString, &winTitle)
+            windowTitle = (winTitle as? String) ?? ""
+        }
+
+        // Dedup: only emit when app or title changes
+        if name == lastApp && windowTitle == lastTitle { return }
+        lastApp = name
+        lastTitle = windowTitle
+
+        writeJSON(WatchChangeEvent(app: name, title: windowTitle, pid: pid))
+    }
+
+    // Emit ready
+    writeJSON(WatchReadyEvent())
+
+    // Emit initial state
+    if let frontApp = NSWorkspace.shared.frontmostApplication {
+        emitCurrentApp(frontApp)
+    }
+
+    // Observe app activation
+    NSWorkspace.shared.notificationCenter.addObserver(
+        forName: NSWorkspace.didActivateApplicationNotification,
+        object: nil,
+        queue: nil
+    ) { notification in
+        if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+            emitCurrentApp(app)
+        }
+    }
+
+    // Run forever
+    RunLoop.current.run()
+}
+
 // MARK: - CLI Commands
 
 func handleMouse() {
@@ -555,7 +628,7 @@ func handlePointQuery(x: Double, y: Double) {
 let args = CommandLine.arguments
 
 if args.count < 2 {
-    fputs("Usage: window-info mouse|windows|point <x> <y>|serve|hooks\n", stderr)
+    fputs("Usage: window-info mouse|windows|point <x> <y>|serve|hooks|watch\n", stderr)
     exit(1)
 }
 
@@ -575,6 +648,8 @@ case "serve":
     handleServe()
 case "hooks":
     handleHooks()
+case "watch":
+    handleWatch()
 default:
     fputs("Unknown command: \(args[1])\n", stderr)
     exit(1)
