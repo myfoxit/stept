@@ -7,6 +7,9 @@ import {
   IconDeviceDesktop,
   IconChevronDown,
   IconSearch,
+  IconRegex,
+  IconWindowMaximize,
+  IconApps,
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,15 +44,23 @@ interface ContextLinkPanelProps {
 const MATCH_ICONS: Record<string, typeof IconWorld> = {
   url_pattern: IconWorld,
   url_exact: IconWorld,
-  app_name: IconDeviceDesktop,
-  window_title: IconDeviceDesktop,
+  url_regex: IconRegex,
+  app_name: IconApps,
+  app_exact: IconDeviceDesktop,
+  app_regex: IconRegex,
+  window_title: IconWindowMaximize,
+  window_regex: IconRegex,
 };
 
 const PLACEHOLDERS: Record<string, string> = {
   url_pattern: '*.salesforce.com/*',
   url_exact: 'https://app.example.com/dashboard',
-  app_name: 'Microsoft Excel',
+  url_regex: 'https://.*\\.example\\.com/.*',
+  app_name: 'Excel',
+  app_exact: 'Microsoft Excel',
+  app_regex: '(Code|IntelliJ)',
   window_title: 'Customer Portal',
+  window_regex: 'PR #\\d+',
 };
 
 interface SearchResult {
@@ -273,8 +284,12 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
                 <SelectContent>
                   <SelectItem value="url_pattern">URL Pattern</SelectItem>
                   <SelectItem value="url_exact">Exact URL</SelectItem>
+                  <SelectItem value="url_regex">URL Regex</SelectItem>
                   <SelectItem value="app_name">App Name</SelectItem>
+                  <SelectItem value="app_exact">App (Exact)</SelectItem>
+                  <SelectItem value="app_regex">App Regex</SelectItem>
                   <SelectItem value="window_title">Window Title</SelectItem>
+                  <SelectItem value="window_regex">Window Regex</SelectItem>
                 </SelectContent>
               </Select>
               <Input

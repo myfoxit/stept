@@ -565,8 +565,11 @@ class ContextLink(Base):
     created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # What to match
-    match_type = Column(String(20), nullable=False)  # 'url_pattern', 'url_exact', 'app_name', 'window_title'
+    match_type = Column(String(20), nullable=False)  # 'url_pattern', 'url_exact', 'url_regex', 'app_name', 'app_exact', 'app_regex', 'window_title', 'window_regex'
     match_value = Column(String(500), nullable=False)
+
+    # AND grouping — links sharing a group_id must ALL match
+    group_id = Column(String(16), nullable=True, index=True)
 
     # What to surface
     resource_type = Column(String(20), nullable=False)  # 'workflow', 'document'
