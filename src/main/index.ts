@@ -1,4 +1,16 @@
-import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, screen, shell, Tray, Menu, nativeImage, Notification } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  globalShortcut,
+  ipcMain,
+  screen,
+  shell,
+  Tray,
+  Menu,
+  nativeImage,
+  Notification,
+} from 'electron';
 import * as path from 'path';
 import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
@@ -73,7 +85,9 @@ class OndokiApp {
   private registerGlobalShortcuts(): void {
     // Unregister old ones
     for (const s of this.registeredShortcuts) {
-      try { globalShortcut.unregister(s); } catch {}
+      try {
+        globalShortcut.unregister(s);
+      } catch {}
     }
     this.registeredShortcuts = [];
 
@@ -83,7 +97,9 @@ class OndokiApp {
     const spotlightShortcut = settings.spotlightShortcut || 'Ctrl+Shift+Space';
     this.tryRegister(spotlightShortcut, () => this.toggleSpotlightWindow());
     if (process.platform === 'darwin') {
-      this.tryRegister(spotlightShortcut.replace('Ctrl', 'Cmd'), () => this.toggleSpotlightWindow());
+      this.tryRegister(spotlightShortcut.replace('Ctrl', 'Cmd'), () =>
+        this.toggleSpotlightWindow(),
+      );
     }
 
     // Recording shortcut
@@ -174,8 +190,10 @@ class OndokiApp {
     const y = workArea.y + 32; // near top of the active display
 
     this.countdownWindow = new BrowserWindow({
-      width: pillW, height: pillH,
-      x, y,
+      width: pillW,
+      height: pillH,
+      x,
+      y,
       frame: false,
       transparent: true,
       alwaysOnTop: true,
@@ -198,7 +216,7 @@ class OndokiApp {
               background: rgba(0,0,0,0.75); backdrop-filter: blur(12px);
               -webkit-backdrop-filter: blur(12px);
               box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-      .dot { width: 8px; height: 8px; border-radius: 50%; background: #FF5F57;
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: #E14D2A;
              animation: blink 1s step-end infinite; }
       @keyframes blink { 50% { opacity: 0.3; } }
       .text { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9);
@@ -225,7 +243,9 @@ class OndokiApp {
       </script>
     </body></html>`;
 
-    await this.countdownWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await this.countdownWindow.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+    );
     this.countdownWindow.show();
 
     // Auto-close after countdown
@@ -240,7 +260,11 @@ class OndokiApp {
   // ─── Spotlight Window ──────────────────────────────────────────────────────
 
   private toggleSpotlightWindow(): void {
-    if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
+    if (
+      this.spotlightWindow &&
+      !this.spotlightWindow.isDestroyed() &&
+      this.spotlightWindow.isVisible()
+    ) {
       this.hideSpotlightWindow();
     } else {
       this.showSpotlightWindow();
@@ -259,11 +283,19 @@ class OndokiApp {
     const x = workArea.x + Math.round((workArea.width - winWidth) / 2);
     const y = workArea.y + Math.round(workArea.height * 0.16);
 
-    this.spotlightWindow!.setBounds({ x, y, width: winWidth, height: winHeight });
+    this.spotlightWindow!.setBounds({
+      x,
+      y,
+      width: winWidth,
+      height: winHeight,
+    });
     this.lastSpotlightShowTime = Date.now();
     this.spotlightWindow!.show();
     this.spotlightWindow!.focus();
-    this.spotlightWindow!.webContents.send('spotlight:show', this.lastProjectId);
+    this.spotlightWindow!.webContents.send(
+      'spotlight:show',
+      this.lastProjectId,
+    );
   }
 
   private hideSpotlightWindow(): void {
@@ -274,12 +306,23 @@ class OndokiApp {
 
   private createSpotlightWindow(): void {
     this.spotlightWindow = new BrowserWindow({
-      width: 620, height: 560,
-      show: false, frame: false, transparent: true,
+      width: 620,
+      height: 560,
+      show: false,
+      frame: false,
+      transparent: true,
       backgroundColor: '#00000000',
-      resizable: false, movable: false, alwaysOnTop: true,
-      skipTaskbar: true, fullscreenable: false, hasShadow: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
+      resizable: false,
+      movable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      fullscreenable: false,
+      hasShadow: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: PRELOAD_PATH,
+      },
     });
 
     this.spotlightWindow.setVisibleOnAllWorkspaces(true);
@@ -298,13 +341,19 @@ class OndokiApp {
       // Debounce: ignore blur within 2s of showing (macOS focus/load quirk)
       if (Date.now() - this.lastSpotlightShowTime < 2000) return;
       setTimeout(() => {
-        if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
+        if (
+          this.spotlightWindow &&
+          !this.spotlightWindow.isDestroyed() &&
+          this.spotlightWindow.isVisible()
+        ) {
           this.hideSpotlightWindow();
         }
       }, 100);
     });
 
-    this.spotlightWindow.on('closed', () => { this.spotlightWindow = null; });
+    this.spotlightWindow.on('closed', () => {
+      this.spotlightWindow = null;
+    });
 
     // Reset blur debounce when page finishes loading (prevents premature hide on startup)
     this.spotlightWindow.webContents.on('did-finish-load', () => {
@@ -322,11 +371,19 @@ class OndokiApp {
 
     // Dev tools available via Cmd+Shift+I — not opened automatically
     if (isDev) {
-      this.spotlightWindow.webContents.on('before-input-event', (_event, input) => {
-        if (input.type === 'keyDown' && input.shift && input.meta && input.key === 'I') {
-          this.spotlightWindow?.webContents.toggleDevTools();
-        }
-      });
+      this.spotlightWindow.webContents.on(
+        'before-input-event',
+        (_event, input) => {
+          if (
+            input.type === 'keyDown' &&
+            input.shift &&
+            input.meta &&
+            input.key === 'I'
+          ) {
+            this.spotlightWindow?.webContents.toggleDevTools();
+          }
+        },
+      );
     }
   }
 
@@ -339,7 +396,10 @@ class OndokiApp {
     ipcMain.handle('spotlight:resize', (_event, height: number) => {
       if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
         const bounds = this.spotlightWindow.getBounds();
-        this.spotlightWindow.setBounds({ ...bounds, height: Math.max(200, Math.min(height, 700)) });
+        this.spotlightWindow.setBounds({
+          ...bounds,
+          height: Math.max(200, Math.min(height, 700)),
+        });
       }
       return { ok: true };
     });
@@ -366,16 +426,27 @@ class OndokiApp {
     }
 
     this.settingsWindow = new BrowserWindow({
-      width: 500, height: 580,
+      width: 500,
+      height: 580,
       title: 'Ondoki Settings',
-      resizable: false, minimizable: false, maximizable: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: PRELOAD_PATH,
+      },
     });
 
     const settingsHtml = this.generateSettingsHtml();
-    this.settingsWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(settingsHtml)}`);
+    this.settingsWindow.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(settingsHtml)}`,
+    );
 
-    this.settingsWindow.on('closed', () => { this.settingsWindow = null; });
+    this.settingsWindow.on('closed', () => {
+      this.settingsWindow = null;
+    });
   }
 
   private generateSettingsHtml(): string {
@@ -383,23 +454,23 @@ class OndokiApp {
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'DM Sans', sans-serif; background: #FAFAFC; color: #1A1A2E; padding: 24px; }
+  body { font-family: 'DM Sans', sans-serif; background: #F5F5F5; color: #1A1A2E; padding: 24px; }
   h1 { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 24px; letter-spacing: -0.03em; }
   .section { margin-bottom: 20px; }
   .section-title { font-size: 11px; font-weight: 600; color: #A0A0B2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
   label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #1A1A2E; }
   input[type="text"], input[type="url"] { width: 100%; padding: 8px 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: #fff; margin-bottom: 12px; }
-  input:focus { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.1); }
+  input:focus { border-color: #1A1A1A; box-shadow: 0 0 0 3px rgba(26,26,26,0.1); }
   .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
   .toggle { width: 36px; height: 20px; border-radius: 10px; background: #D1D5DB; cursor: pointer; position: relative; transition: background 0.2s; }
-  .toggle.on { background: #6C5CE7; }
+  .toggle.on { background: #1A1A1A; }
   .toggle-knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
   .toggle.on .toggle-knob { transform: translateX(16px); }
   .shortcut-input { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: center; }
   .btn { padding: 10px 24px; border-radius: 10px; border: none; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .btn-primary { background: #6C5CE7; color: #fff; }
-  .btn-primary:hover { background: #5A4BD6; }
-  .btn-danger { background: transparent; color: #FF5F57; border: 1px solid #FF5F57; }
+  .btn-primary { background: #1A1A1A; color: #fff; }
+  .btn-primary:hover { background: #333333; }
+  .btn-danger { background: transparent; color: #E14D2A; border: 1px solid #E14D2A; }
   .btn-danger:hover { background: rgba(255,95,87,0.08); }
   .footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.07); }
   .hint { font-size: 11px; color: #A0A0B2; margin-top: -8px; margin-bottom: 12px; }
@@ -541,25 +612,31 @@ class OndokiApp {
 
         const displays = screen.getAllDisplays();
 
-        const screenSources = sources.filter(s => s.id.startsWith('screen:')).map(s => {
-          const display = displays.find(d => String(d.id) === s.display_id);
-          return {
-            id: s.id,
-            name: s.name || `Display ${s.display_id}`,
-            displayId: s.display_id,
-            thumbnail: s.thumbnail.toDataURL(),
-            bounds: display?.bounds || null,
-            isPrimary: display ? display.bounds.x === 0 && display.bounds.y === 0 : false,
-          };
-        });
+        const screenSources = sources
+          .filter((s) => s.id.startsWith('screen:'))
+          .map((s) => {
+            const display = displays.find((d) => String(d.id) === s.display_id);
+            return {
+              id: s.id,
+              name: s.name || `Display ${s.display_id}`,
+              displayId: s.display_id,
+              thumbnail: s.thumbnail.toDataURL(),
+              bounds: display?.bounds || null,
+              isPrimary: display
+                ? display.bounds.x === 0 && display.bounds.y === 0
+                : false,
+            };
+          });
 
-        const windowSources = sources.filter(s => s.id.startsWith('window:') && s.name).map(s => ({
-          id: s.id,
-          name: s.name,
-          handle: parseInt(s.id.split(':')[1], 10),
-          thumbnail: s.thumbnail.toDataURL(),
-          appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
-        }));
+        const windowSources = sources
+          .filter((s) => s.id.startsWith('window:') && s.name)
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            handle: parseInt(s.id.split(':')[1], 10),
+            thumbnail: s.thumbnail.toDataURL(),
+            appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
+          }));
 
         this.openPickerWindow(screenSources, windowSources);
 
@@ -597,20 +674,30 @@ class OndokiApp {
           fetchWindowIcons: true,
         });
         const displays = screen.getAllDisplays();
-        const screenSources = sources.filter(s => s.id.startsWith('screen:')).map(s => {
-          const display = displays.find(d => String(d.id) === s.display_id);
-          return {
-            id: s.id, name: s.name || `Display ${s.display_id}`,
-            displayId: s.display_id, thumbnail: s.thumbnail.toDataURL(),
-            bounds: display?.bounds || null,
-            isPrimary: display ? display.bounds.x === 0 && display.bounds.y === 0 : false,
-          };
-        });
-        const windowSources = sources.filter(s => s.id.startsWith('window:') && s.name).map(s => ({
-          id: s.id, name: s.name, handle: parseInt(s.id.split(':')[1], 10),
-          thumbnail: s.thumbnail.toDataURL(),
-          appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
-        }));
+        const screenSources = sources
+          .filter((s) => s.id.startsWith('screen:'))
+          .map((s) => {
+            const display = displays.find((d) => String(d.id) === s.display_id);
+            return {
+              id: s.id,
+              name: s.name || `Display ${s.display_id}`,
+              displayId: s.display_id,
+              thumbnail: s.thumbnail.toDataURL(),
+              bounds: display?.bounds || null,
+              isPrimary: display
+                ? display.bounds.x === 0 && display.bounds.y === 0
+                : false,
+            };
+          });
+        const windowSources = sources
+          .filter((s) => s.id.startsWith('window:') && s.name)
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            handle: parseInt(s.id.split(':')[1], 10),
+            thumbnail: s.thumbnail.toDataURL(),
+            appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
+          }));
         return { screens: screenSources, windows: windowSources };
       } catch (error) {
         console.error('Failed to get sources:', error);
@@ -631,18 +718,29 @@ class OndokiApp {
     const winH = 520;
 
     // Hide spotlight while picker is open so it doesn't obscure the picker
-    if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
+    if (
+      this.spotlightWindow &&
+      !this.spotlightWindow.isDestroyed() &&
+      this.spotlightWindow.isVisible()
+    ) {
       this.spotlightWindow.hide();
     }
 
     this.pickerWindow = new BrowserWindow({
-      width: winW, height: winH,
+      width: winW,
+      height: winH,
       x: workArea.x + Math.round((workArea.width - winW) / 2),
       y: workArea.y + Math.round((workArea.height - winH) / 2),
       title: 'Choose Capture Source',
-      resizable: false, minimizable: false, maximizable: false,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
       alwaysOnTop: true,
-      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: PRELOAD_PATH,
+      },
     });
 
     this.pickerWindow.on('closed', () => {
@@ -656,10 +754,15 @@ class OndokiApp {
     });
 
     const pickerHtml = this.generatePickerHtml(screenSources, windowSources);
-    this.pickerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(pickerHtml)}`);
+    this.pickerWindow.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(pickerHtml)}`,
+    );
   }
 
-  private generatePickerHtml(screenSources: any[], windowSources: any[]): string {
+  private generatePickerHtml(
+    screenSources: any[],
+    windowSources: any[],
+  ): string {
     const screensJson = JSON.stringify(screenSources);
     const windowsJson = JSON.stringify(windowSources);
 
@@ -667,7 +770,7 @@ class OndokiApp {
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'DM Sans', sans-serif; background: #FAFAFC; color: #1A1A2E; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+  body { font-family: 'DM Sans', sans-serif; background: #F5F5F5; color: #1A1A2E; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
   h1 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.03em; }
   .header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 14px; border-bottom: 1px solid rgba(0,0,0,0.07); }
   .section-label { font-size: 11px; font-weight: 600; color: #A0A0B2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
@@ -678,9 +781,9 @@ class OndokiApp {
   .section { margin-bottom: 20px; }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .source-card { border: 2px solid rgba(0,0,0,0.07); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.15s; background: #fff; }
-  .source-card:hover { border-color: rgba(108,92,231,0.35); box-shadow: 0 4px 16px rgba(108,92,231,0.1); transform: translateY(-1px); }
+  .source-card:hover { border-color: rgba(26,26,26,0.35); box-shadow: 0 4px 16px rgba(26,26,26,0.1); transform: translateY(-1px); }
   @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .source-card.selected { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
+  .source-card.selected { border-color: #1A1A1A; box-shadow: 0 0 0 3px rgba(26,26,26,0.15); }
   .thumb { width: 100%; aspect-ratio: 16/9; background: #E8E8F0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .source-info { padding: 8px 10px; }
@@ -689,13 +792,13 @@ class OndokiApp {
   .footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; border-top: 1px solid rgba(0,0,0,0.07); background: #fff; }
   .btn-cancel { padding: 8px 20px; border-radius: 10px; border: 1.5px solid rgba(0,0,0,0.1); background: transparent; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: #6E6E82; cursor: pointer; transition: all 0.15s; }
   .btn-cancel:hover { border-color: #6E6E82; }
-  .btn-select { padding: 8px 24px; border-radius: 10px; border: none; background: #6C5CE7; color: #fff; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 8px rgba(108,92,231,0.2); }
-  .btn-select:hover { background: #5A4BD6; transform: translateY(-1px); }
+  .btn-select { padding: 8px 24px; border-radius: 10px; border: none; background: #1A1A1A; color: #fff; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 8px rgba(26,26,26,0.2); }
+  .btn-select:hover { background: #333333; transform: translateY(-1px); }
   .btn-select:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .all-screens-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 2px solid rgba(0,0,0,0.07); border-radius: 12px; cursor: pointer; transition: all 0.15s; background: #fff; margin-bottom: 12px; }
-  .all-screens-card:hover { border-color: rgba(108,92,231,0.35); }
-  .all-screens-card.selected { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
-  .all-icon { width: 48px; height: 32px; border-radius: 6px; background: linear-gradient(135deg, #6C5CE7, #00D2D3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .all-screens-card:hover { border-color: rgba(26,26,26,0.35); }
+  .all-screens-card.selected { border-color: #1A1A1A; box-shadow: 0 0 0 3px rgba(26,26,26,0.15); }
+  .all-icon { width: 48px; height: 32px; border-radius: 6px; background: linear-gradient(135deg, #1A1A1A, #333333); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 </style>
 </head><body>
 <div class="header">
@@ -824,10 +927,15 @@ class OndokiApp {
 
   private handleSingleInstance(): boolean {
     const gotTheLock = app.requestSingleInstanceLock();
-    if (!gotTheLock) { app.quit(); return false; }
+    if (!gotTheLock) {
+      app.quit();
+      return false;
+    }
     app.on('second-instance', (event, commandLine) => {
       this.showSpotlightWindow();
-      const protocolUrl = commandLine.find(arg => arg.startsWith('ondoki://'));
+      const protocolUrl = commandLine.find((arg) =>
+        arg.startsWith('ondoki://'),
+      );
       if (protocolUrl) this.handleProtocolUrl(protocolUrl);
     });
     return true;
@@ -838,24 +946,40 @@ class OndokiApp {
   private registerProtocol(): void {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
-        app.setAsDefaultProtocolClient('ondoki', process.execPath, [path.resolve(process.argv[1])]);
+        app.setAsDefaultProtocolClient('ondoki', process.execPath, [
+          path.resolve(process.argv[1]),
+        ]);
       }
     } else {
       app.setAsDefaultProtocolClient('ondoki');
     }
-    app.on('open-url', (event, url) => { event.preventDefault(); this.handleProtocolUrl(url); });
+    app.on('open-url', (event, url) => {
+      event.preventDefault();
+      this.handleProtocolUrl(url);
+    });
   }
 
   // ─── App Events ────────────────────────────────────────────────────────────
 
   private setupAppEventListeners(): void {
-    app.on('window-all-closed', () => { /* tray-only: keep running */ });
-    app.on('activate', () => { this.showSpotlightWindow(); });
-    app.on('before-quit', () => { this.isQuitting = true; });
-    app.on('will-quit', () => { globalShortcut.unregisterAll(); });
+    app.on('window-all-closed', () => {
+      /* tray-only: keep running */
+    });
+    app.on('activate', () => {
+      this.showSpotlightWindow();
+    });
+    app.on('before-quit', () => {
+      this.isQuitting = true;
+    });
+    app.on('will-quit', () => {
+      globalShortcut.unregisterAll();
+    });
 
     app.on('web-contents-created', (event, contents) => {
-      contents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+      contents.setWindowOpenHandler(({ url }) => {
+        shell.openExternal(url);
+        return { action: 'deny' };
+      });
     });
   }
 
@@ -882,7 +1006,9 @@ class OndokiApp {
     app.on('context-matches-updated' as any, (matches: any[]) => {
       this.updateTrayMenu(matches);
     });
-    app.on('context-no-matches' as any, () => { this.updateTrayMenu(); });
+    app.on('context-no-matches' as any, () => {
+      this.updateTrayMenu();
+    });
   }
 
   private updateTrayMenu(matches?: any[]): void {
@@ -891,7 +1017,10 @@ class OndokiApp {
     const template: Electron.MenuItemConstructorOptions[] = [
       {
         label: 'Open Ondoki',
-        accelerator: process.platform === 'darwin' ? 'Cmd+Shift+Space' : 'Ctrl+Shift+Space',
+        accelerator:
+          process.platform === 'darwin'
+            ? 'Cmd+Shift+Space'
+            : 'Ctrl+Shift+Space',
         click: () => this.showSpotlightWindow(),
       },
       { type: 'separator' },
@@ -900,14 +1029,20 @@ class OndokiApp {
 
     if (matches && matches.length > 0) {
       template.push({ type: 'separator' });
-      template.push({ label: `${matches.length} suggestion${matches.length > 1 ? 's' : ''}`, enabled: false });
+      template.push({
+        label: `${matches.length} suggestion${matches.length > 1 ? 's' : ''}`,
+        enabled: false,
+      });
       for (const m of matches.slice(0, 5)) {
         template.push({
           label: `${m.resource_type === 'workflow' ? '⚡' : '📄'} ${m.resource_name}`,
           click: () => {
             const settings = this.settingsManager.getSettings();
             const frontendUrl = settings.frontendUrl || 'http://localhost:5173';
-            const p = m.resource_type === 'workflow' ? `/workflow/${m.resource_id}` : `/editor/${m.resource_id}`;
+            const p =
+              m.resource_type === 'workflow'
+                ? `/workflow/${m.resource_id}`
+                : `/editor/${m.resource_id}`;
             shell.openExternal(`${frontendUrl}${p}`);
           },
         });
@@ -915,15 +1050,22 @@ class OndokiApp {
     }
 
     template.push({ type: 'separator' });
-    template.push({ label: 'Quit', click: () => { this.isQuitting = true; app.quit(); } });
+    template.push({
+      label: 'Quit',
+      click: () => {
+        this.isQuitting = true;
+        app.quit();
+      },
+    });
     this.tray.setContextMenu(Menu.buildFromTemplate(template));
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private handleStartupProtocol(): void {
-    const protocolUrl = process.argv.find(arg => arg.startsWith('ondoki://'));
-    if (protocolUrl) setTimeout(() => this.handleProtocolUrl(protocolUrl), 1000);
+    const protocolUrl = process.argv.find((arg) => arg.startsWith('ondoki://'));
+    if (protocolUrl)
+      setTimeout(() => this.handleProtocolUrl(protocolUrl), 1000);
   }
 
   private async handleProtocolUrl(url: string): Promise<void> {
@@ -931,11 +1073,17 @@ class OndokiApp {
     if (url.startsWith('ondoki://auth/callback')) {
       try {
         const success = await this.authService.handleCallback(url);
-        if (success && this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
+        if (
+          success &&
+          this.spotlightWindow &&
+          !this.spotlightWindow.isDestroyed()
+        ) {
           const status = await this.authService.getStatus();
           this.spotlightWindow.webContents.send('auth-status-changed', status);
         }
-      } catch (error) { console.error('Auth callback error:', error); }
+      } catch (error) {
+        console.error('Auth callback error:', error);
+      }
     }
     // Prevent blur-hide during macOS focus transition from the browser callback
     this.lastSpotlightShowTime = Date.now();
@@ -946,5 +1094,9 @@ class OndokiApp {
 const ondokiApp = new OndokiApp();
 ondokiApp.initialize().catch(console.error);
 
-process.on('uncaughtException', (error) => { console.error('Uncaught Exception:', error); });
-process.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason); });
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
