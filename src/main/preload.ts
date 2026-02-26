@@ -34,6 +34,7 @@ export interface Settings {
   cloudEndpoint: string; chatApiUrl: string; apiKey: string;
   llmProvider: string; llmApiKey: string; llmModel: string; llmBaseUrl: string;
   autoAnnotateSteps: boolean; autoGenerateGuide: boolean; frontendUrl: string;
+  minimizeOnRecord: boolean;
 }
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string; timestamp?: Date; }
@@ -101,6 +102,14 @@ export interface ElectronAPI {
 
   // Countdown
   showCountdown: () => Promise<any>;
+
+  // Picker
+  openPicker: () => Promise<CaptureArea | null>;
+  pickerSelect: (captureArea: CaptureArea) => Promise<any>;
+  pickerGetSources: () => Promise<{ screens: any[]; windows: any[] }>;
+
+  // Recording state
+  setRecordingStarting: (starting: boolean) => Promise<any>;
 
   // Recording toggle (from global shortcut)
   onToggleRecording: (callback: () => void) => () => void;
@@ -209,6 +218,14 @@ const electronAPI: ElectronAPI = {
 
   // Countdown
   showCountdown: () => ipcRenderer.invoke('countdown:show'),
+
+  // Picker
+  openPicker: () => ipcRenderer.invoke('picker:open'),
+  pickerSelect: (captureArea) => ipcRenderer.invoke('picker:select', captureArea),
+  pickerGetSources: () => ipcRenderer.invoke('picker:get-sources'),
+
+  // Recording state
+  setRecordingStarting: (starting) => ipcRenderer.invoke('recording:set-starting', starting),
 
   // Recording toggle (from global shortcut)
   onToggleRecording: (callback) => {

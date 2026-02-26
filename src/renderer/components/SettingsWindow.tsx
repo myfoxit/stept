@@ -20,6 +20,7 @@ const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChan
     autoAnnotateSteps: true,
     autoGenerateGuide: false,
     frontendUrl: 'http://localhost:5173',
+    minimizeOnRecord: true,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

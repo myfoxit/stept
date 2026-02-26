@@ -15,6 +15,7 @@ export interface Settings {
   frontendUrl: string;
   spotlightShortcut: string;
   recordingShortcut: string;
+  minimizeOnRecord: boolean;
 }
 
 export interface WindowState {
@@ -44,6 +45,7 @@ const defaultSettings: Settings = {
   frontendUrl: 'http://localhost:5173',
   spotlightShortcut: 'Ctrl+Shift+Space',
   recordingShortcut: 'Ctrl+Shift+R',
+  minimizeOnRecord: true,
 };
 
 const defaultWindowState: WindowState = { width: 1200, height: 800, isMaximized: false };

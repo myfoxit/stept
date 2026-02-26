@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen, shell, Tray, Menu, nativeImage, Notification } from 'electron';
+import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, screen, shell, Tray, Menu, nativeImage, Notification } from 'electron';
 import * as path from 'path';
 import { setupIpcHandlers } from './ipc-handlers';
 import { SettingsManager } from './settings';
@@ -12,12 +12,16 @@ class OndokiApp {
   private spotlightWindow: BrowserWindow | null = null;
   private settingsWindow: BrowserWindow | null = null;
   private countdownWindow: BrowserWindow | null = null;
+  private pickerWindow: BrowserWindow | null = null;
+  private pickerResolve: ((area: any) => void) | null = null;
   private tray: Tray | null = null;
   private authService: AuthService;
   private settingsManager: SettingsManager;
   private isQuitting = false;
   private lastProjectId: string = '';
   private isRecording = false;
+  private isAuthenticated = false;
+  private isStartingRecording = false;
   private lastSpotlightShowTime = 0;
   private normalTrayIcon: Electron.NativeImage | null = null;
   private recordingTrayIcon: Electron.NativeImage | null = null;
@@ -35,6 +39,7 @@ class OndokiApp {
     this.setupSpotlightIpc();
     this.setupSettingsIpc();
     this.setupCountdownIpc();
+    this.setupPickerIpc();
     this.setupRecordingStateTracking();
 
     await app.whenReady();
@@ -42,6 +47,16 @@ class OndokiApp {
 
     this.createTray();
     this.registerGlobalShortcuts();
+
+    // Track auth state to prevent blur hiding during login
+    this.authService.on('status-changed', (status: any) => {
+      const wasAuthenticated = this.isAuthenticated;
+      this.isAuthenticated = status.isAuthenticated;
+      if (status.isAuthenticated && !wasAuthenticated) {
+        // Just completed login — ensure spotlight is visible
+        this.showSpotlightWindow();
+      }
+    });
 
     this.authService.tryAutoLogin().catch(() => {});
 
@@ -262,12 +277,18 @@ class OndokiApp {
     this.spotlightWindow.setVisibleOnAllWorkspaces(true);
 
     this.spotlightWindow.on('blur', () => {
+      // Don't hide if not authenticated — user needs to see the login UI
+      if (!this.isAuthenticated) return;
       // Don't hide if recording — user needs to see the mini status
       if (this.isRecording) return;
+      // Don't hide during recording countdown
+      if (this.isStartingRecording) return;
       // Don't hide if settings window is open (focus just moved there)
       if (this.settingsWindow && !this.settingsWindow.isDestroyed()) return;
-      // Debounce: ignore blur within 500ms of showing (macOS focus quirk)
-      if (Date.now() - this.lastSpotlightShowTime < 500) return;
+      // Don't hide if picker window is open
+      if (this.pickerWindow && !this.pickerWindow.isDestroyed()) return;
+      // Debounce: ignore blur within 2s of showing (macOS focus/load quirk)
+      if (Date.now() - this.lastSpotlightShowTime < 2000) return;
       setTimeout(() => {
         if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
           this.hideSpotlightWindow();
@@ -276,6 +297,11 @@ class OndokiApp {
     });
 
     this.spotlightWindow.on('closed', () => { this.spotlightWindow = null; });
+
+    // Reset blur debounce when page finishes loading (prevents premature hide on startup)
+    this.spotlightWindow.webContents.on('did-finish-load', () => {
+      this.lastSpotlightShowTime = Date.now();
+    });
 
     this.spotlightWindow.loadFile(SPOTLIGHT_PATH).catch((err: Error) => {
       console.error('Failed to load spotlight:', err);
@@ -385,6 +411,14 @@ class OndokiApp {
 </div>
 
 <div class="section">
+  <div class="section-title">Recording</div>
+  <div class="toggle-row">
+    <label style="margin:0">Minimize when recording starts</label>
+    <div class="toggle" id="toggleMinimize" onclick="toggleMinimize()"><div class="toggle-knob"></div></div>
+  </div>
+</div>
+
+<div class="section">
   <div class="section-title">Keyboard Shortcuts</div>
   <label>Open Spotlight</label>
   <input type="text" id="spotlightShortcut" class="shortcut-input" placeholder="Ctrl+Shift+Space" readonly>
@@ -408,6 +442,7 @@ class OndokiApp {
   const api = window.electronAPI;
   let settings = {};
   let autoAnnotate = true;
+  let minimizeOnRecord = true;
 
   async function init() {
     settings = await api.getSettings();
@@ -416,7 +451,9 @@ class OndokiApp {
     document.getElementById('spotlightShortcut').value = settings.spotlightShortcut || 'Ctrl+Shift+Space';
     document.getElementById('recordingShortcut').value = settings.recordingShortcut || 'Ctrl+Shift+R';
     autoAnnotate = settings.autoAnnotateSteps !== false;
+    minimizeOnRecord = settings.minimizeOnRecord !== false;
     updateToggle();
+    updateMinimizeToggle();
 
     const status = await api.getAuthStatus();
     document.getElementById('accountInfo').textContent = status.isAuthenticated
@@ -429,6 +466,12 @@ class OndokiApp {
     el.className = autoAnnotate ? 'toggle on' : 'toggle';
   }
   function toggleAnnotate() { autoAnnotate = !autoAnnotate; updateToggle(); }
+
+  function updateMinimizeToggle() {
+    const el = document.getElementById('toggleMinimize');
+    el.className = minimizeOnRecord ? 'toggle on' : 'toggle';
+  }
+  function toggleMinimize() { minimizeOnRecord = !minimizeOnRecord; updateMinimizeToggle(); }
 
   // Shortcut capture
   ['spotlightShortcut', 'recordingShortcut'].forEach(id => {
@@ -454,6 +497,7 @@ class OndokiApp {
       cloudEndpoint: document.getElementById('chatApiUrl').value.replace(/\\/api\\/v1$/, '/api/v1/process-recording'),
       frontendUrl: document.getElementById('frontendUrl').value,
       autoAnnotateSteps: autoAnnotate,
+      minimizeOnRecord: minimizeOnRecord,
       spotlightShortcut: document.getElementById('spotlightShortcut').value,
       recordingShortcut: document.getElementById('recordingShortcut').value,
     });
@@ -467,6 +511,290 @@ class OndokiApp {
   }
 
   init();
+</script>
+</body></html>`;
+  }
+
+  // ─── Picker Window ──────────────────────────────────────────────────────────
+
+  private setupPickerIpc(): void {
+    ipcMain.handle('picker:open', async () => {
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen', 'window'],
+          thumbnailSize: { width: 320, height: 180 },
+          fetchWindowIcons: true,
+        });
+
+        const displays = screen.getAllDisplays();
+
+        const screenSources = sources.filter(s => s.id.startsWith('screen:')).map(s => {
+          const display = displays.find(d => String(d.id) === s.display_id);
+          return {
+            id: s.id,
+            name: s.name || `Display ${s.display_id}`,
+            displayId: s.display_id,
+            thumbnail: s.thumbnail.toDataURL(),
+            bounds: display?.bounds || null,
+            isPrimary: display ? display.bounds.x === 0 && display.bounds.y === 0 : false,
+          };
+        });
+
+        const windowSources = sources.filter(s => s.id.startsWith('window:') && s.name).map(s => ({
+          id: s.id,
+          name: s.name,
+          handle: parseInt(s.id.split(':')[1], 10),
+          thumbnail: s.thumbnail.toDataURL(),
+          appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
+        }));
+
+        this.openPickerWindow(screenSources, windowSources);
+
+        return new Promise<any>((resolve) => {
+          this.pickerResolve = resolve;
+        });
+      } catch (error) {
+        console.error('Failed to open picker:', error);
+        return null;
+      }
+    });
+
+    ipcMain.handle('picker:select', (_event, captureArea: any) => {
+      if (this.pickerResolve) {
+        this.pickerResolve(captureArea);
+        this.pickerResolve = null;
+      }
+      if (this.pickerWindow && !this.pickerWindow.isDestroyed()) {
+        this.pickerWindow.close();
+        this.pickerWindow = null;
+      }
+      return { ok: true };
+    });
+
+    ipcMain.handle('recording:set-starting', (_event, starting: boolean) => {
+      this.isStartingRecording = starting;
+      return { ok: true };
+    });
+
+    ipcMain.handle('picker:get-sources', async () => {
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen', 'window'],
+          thumbnailSize: { width: 320, height: 180 },
+          fetchWindowIcons: true,
+        });
+        const displays = screen.getAllDisplays();
+        const screenSources = sources.filter(s => s.id.startsWith('screen:')).map(s => {
+          const display = displays.find(d => String(d.id) === s.display_id);
+          return {
+            id: s.id, name: s.name || `Display ${s.display_id}`,
+            displayId: s.display_id, thumbnail: s.thumbnail.toDataURL(),
+            bounds: display?.bounds || null,
+            isPrimary: display ? display.bounds.x === 0 && display.bounds.y === 0 : false,
+          };
+        });
+        const windowSources = sources.filter(s => s.id.startsWith('window:') && s.name).map(s => ({
+          id: s.id, name: s.name, handle: parseInt(s.id.split(':')[1], 10),
+          thumbnail: s.thumbnail.toDataURL(),
+          appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
+        }));
+        return { screens: screenSources, windows: windowSources };
+      } catch (error) {
+        console.error('Failed to get sources:', error);
+        return { screens: [], windows: [] };
+      }
+    });
+  }
+
+  private openPickerWindow(screenSources: any[], windowSources: any[]): void {
+    if (this.pickerWindow && !this.pickerWindow.isDestroyed()) {
+      this.pickerWindow.focus();
+      return;
+    }
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+    const winW = 720;
+    const winH = 520;
+
+    this.pickerWindow = new BrowserWindow({
+      width: winW, height: winH,
+      x: Math.round((screenW - winW) / 2),
+      y: Math.round((screenH - winH) / 2),
+      title: 'Choose Capture Source',
+      resizable: false, minimizable: false, maximizable: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
+    });
+
+    this.pickerWindow.on('closed', () => {
+      if (this.pickerResolve) {
+        this.pickerResolve(null);
+        this.pickerResolve = null;
+      }
+      this.pickerWindow = null;
+    });
+
+    const pickerHtml = this.generatePickerHtml(screenSources, windowSources);
+    this.pickerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(pickerHtml)}`);
+  }
+
+  private generatePickerHtml(screenSources: any[], windowSources: any[]): string {
+    const screensJson = JSON.stringify(screenSources);
+    const windowsJson = JSON.stringify(windowSources);
+
+    return `<!DOCTYPE html><html><head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: #FAFAFC; color: #1A1A2E; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.03em; }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 14px; border-bottom: 1px solid rgba(0,0,0,0.07); }
+  .section-label { font-size: 11px; font-weight: 600; color: #A0A0B2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .body { flex: 1; overflow-y: auto; padding: 18px 24px; }
+  .body::-webkit-scrollbar { width: 5px; }
+  .body::-webkit-scrollbar-track { background: transparent; }
+  .body::-webkit-scrollbar-thumb { background: #D4D4DE; border-radius: 3px; }
+  .section { margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .source-card { border: 2px solid rgba(0,0,0,0.07); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.15s; background: #fff; }
+  .source-card:hover { border-color: rgba(108,92,231,0.35); box-shadow: 0 4px 16px rgba(108,92,231,0.1); transform: translateY(-1px); }
+  @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .source-card.selected { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
+  .thumb { width: 100%; aspect-ratio: 16/9; background: #E8E8F0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .source-info { padding: 8px 10px; }
+  .source-name { font-size: 12px; font-weight: 600; color: #1A1A2E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .source-meta { font-size: 10px; color: #A0A0B2; margin-top: 2px; }
+  .footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; border-top: 1px solid rgba(0,0,0,0.07); background: #fff; }
+  .btn-cancel { padding: 8px 20px; border-radius: 10px; border: 1.5px solid rgba(0,0,0,0.1); background: transparent; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: #6E6E82; cursor: pointer; transition: all 0.15s; }
+  .btn-cancel:hover { border-color: #6E6E82; }
+  .btn-select { padding: 8px 24px; border-radius: 10px; border: none; background: #6C5CE7; color: #fff; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 8px rgba(108,92,231,0.2); }
+  .btn-select:hover { background: #5A4BD6; transform: translateY(-1px); }
+  .btn-select:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .all-screens-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 2px solid rgba(0,0,0,0.07); border-radius: 12px; cursor: pointer; transition: all 0.15s; background: #fff; margin-bottom: 12px; }
+  .all-screens-card:hover { border-color: rgba(108,92,231,0.35); }
+  .all-screens-card.selected { border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
+  .all-icon { width: 48px; height: 32px; border-radius: 6px; background: linear-gradient(135deg, #6C5CE7, #00D2D3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+</style>
+</head><body>
+<div class="header">
+  <h1>Choose Capture Source</h1>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#28C840;font-weight:600;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#28C840;animation:livePulse 2s infinite;"></span>
+      Live
+    </span>
+    <span style="font-size:11px;color:#A0A0B2;">Click a source, then Start Capture</span>
+  </div>
+</div>
+<div class="body" id="body">
+  <div class="section">
+    <div class="section-label">Screens</div>
+    <div class="all-screens-card" id="all-screens" onclick="selectAll()">
+      <div class="all-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div>
+        <div class="source-name">Entire Screen</div>
+        <div class="source-meta">Capture all displays</div>
+      </div>
+    </div>
+    <div class="grid" id="screens-grid"></div>
+  </div>
+  <div class="section">
+    <div class="section-label">Application Windows</div>
+    <div class="grid" id="windows-grid"></div>
+  </div>
+</div>
+<div class="footer">
+  <button class="btn-cancel" onclick="cancel()">Cancel</button>
+  <button class="btn-select" id="selectBtn" onclick="confirmSelect()">Start Capture</button>
+</div>
+<script>
+  const api = window.electronAPI;
+  const screens = ${screensJson};
+  const wins = ${windowsJson};
+  let selected = { type: 'all-displays' };
+
+  function renderScreens() {
+    const grid = document.getElementById('screens-grid');
+    grid.innerHTML = screens.map((s, i) => \`
+      <div class="source-card" id="screen-\${i}" onclick="selectScreen(\${i})">
+        <div class="thumb"><img src="\${s.thumbnail}" alt="\${s.name}"/></div>
+        <div class="source-info">
+          <div class="source-name">\${s.name}</div>
+          <div class="source-meta">\${s.bounds ? s.bounds.width + ' × ' + s.bounds.height : ''}\${s.isPrimary ? ' (primary)' : ''}</div>
+        </div>
+      </div>
+    \`).join('');
+  }
+
+  function renderWindows() {
+    const grid = document.getElementById('windows-grid');
+    if (wins.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:12px;color:#A0A0B2;">No visible windows</div>';
+      return;
+    }
+    grid.innerHTML = wins.map((w, i) => \`
+      <div class="source-card" id="win-\${i}" onclick="selectWindow(\${i})">
+        <div class="thumb"><img src="\${w.thumbnail}" alt="\${w.name}"/></div>
+        <div class="source-info">
+          <div class="source-name">\${w.name}</div>
+        </div>
+      </div>
+    \`).join('');
+  }
+
+  function clearSelection() {
+    document.querySelectorAll('.source-card, .all-screens-card').forEach(el => el.classList.remove('selected'));
+  }
+
+  function selectAll() {
+    clearSelection();
+    document.getElementById('all-screens').classList.add('selected');
+    selected = { type: 'all-displays' };
+  }
+
+  function selectScreen(i) {
+    clearSelection();
+    document.getElementById('screen-' + i).classList.add('selected');
+    const s = screens[i];
+    selected = { type: 'single-display', displayId: s.displayId, displayName: s.name, bounds: s.bounds };
+  }
+
+  function selectWindow(i) {
+    clearSelection();
+    document.getElementById('win-' + i).classList.add('selected');
+    const w = wins[i];
+    selected = { type: 'window', windowHandle: w.handle, windowTitle: w.name };
+  }
+
+  function confirmSelect() {
+    api.pickerSelect(selected);
+  }
+
+  function cancel() {
+    window.close();
+  }
+
+  renderScreens();
+  renderWindows();
+  selectAll();
+
+  // Live preview: refresh thumbnails every 3 seconds
+  setInterval(async () => {
+    try {
+      const sources = await api.pickerGetSources();
+      sources.screens.forEach((s, i) => {
+        const card = document.getElementById('screen-' + i);
+        if (card) { const img = card.querySelector('img'); if (img) img.src = s.thumbnail; }
+      });
+      sources.windows.forEach((w, i) => {
+        const card = document.getElementById('win-' + i);
+        if (card) { const img = card.querySelector('img'); if (img) img.src = w.thumbnail; }
+      });
+    } catch (e) {}
+  }, 3000);
 </script>
 </body></html>`;
   }
@@ -588,7 +916,9 @@ class OndokiApp {
         }
       } catch (error) { console.error('Auth callback error:', error); }
     }
-    this.showSpotlightWindow();
+    // Prevent blur-hide during macOS focus transition from the browser callback
+    this.lastSpotlightShowTime = Date.now();
+    setTimeout(() => this.showSpotlightWindow(), 300);
   }
 }
 
