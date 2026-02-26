@@ -99,7 +99,10 @@ const SpotlightApp: React.FC = () => {
   // Recording
   const [rec, setRec] = useState<RecState>({ isRecording: false, isPaused: false, stepCount: 0 });
   const [duration, setDuration] = useState(0);
-  
+  const [showCaptureSelector, setShowCaptureSelector] = useState(false);
+  const [captureDisplays, setCaptureDisplays] = useState<{ id: string; name: string; bounds: any; isPrimary: boolean }[]>([]);
+  const [captureWindows, setCaptureWindows] = useState<{ handle: number; title: string; bounds: any; processId: number }[]>([]);
+  const [captureLoading, setCaptureLoading] = useState(false);
 
   // Upload toast
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -285,17 +288,33 @@ const SpotlightApp: React.FC = () => {
     try { await window.electronAPI?.initiateLogin(); } catch (e) { console.error('Login failed:', e); }
   }, []);
 
-  const handleStartRecording = useCallback(async () => {
+  const doStartRecording = useCallback(async (captureArea: { type: string; displayId?: string; displayName?: string; windowHandle?: number; windowTitle?: string; bounds?: any }) => {
     if (!selectedProjectId) return;
     try {
+      setShowCaptureSelector(false);
       // Show countdown overlay
       await window.electronAPI?.showCountdown?.();
       // Wait for countdown to finish (3 seconds + buffer)
       await new Promise(resolve => setTimeout(resolve, 3200));
-      await window.electronAPI?.startRecording({ type: 'all-displays' }, selectedProjectId);
+      await window.electronAPI?.startRecording(captureArea as any, selectedProjectId);
       setRec({ isRecording: true, isPaused: false, stepCount: 0 });
       setDuration(0);
     } catch (e) { console.error('Failed to start recording:', e); }
+  }, [selectedProjectId]);
+
+  const handleStartRecording = useCallback(async () => {
+    if (!selectedProjectId) return;
+    // Show capture selector
+    setShowCaptureSelector(true);
+    setCaptureLoading(true);
+    try {
+      const api = window.electronAPI;
+      if (!api) return;
+      const [d, w] = await Promise.all([api.getDisplays(), api.getWindows()]);
+      setCaptureDisplays(d || []);
+      setCaptureWindows((w || []).filter((win: any) => win.title && win.title.trim()));
+    } catch (e) { console.error('Failed to load capture options:', e); }
+    finally { setCaptureLoading(false); }
   }, [selectedProjectId]);
 
   const handleStopRecording = useCallback(async () => {
@@ -305,15 +324,15 @@ const SpotlightApp: React.FC = () => {
     } catch (e) { console.error('Failed to stop recording:', e); }
   }, []);
 
-  // Handle recording toggle from global shortcut
+  // Handle recording toggle from global shortcut (bypasses capture selector — records all)
   useEffect(() => {
     const handler = () => {
       if (rec.isRecording) handleStopRecording();
-      else handleStartRecording();
+      else doStartRecording({ type: 'all-displays' });
     };
     document.addEventListener('ondoki-toggle-recording', handler);
     return () => document.removeEventListener('ondoki-toggle-recording', handler);
-  }, [rec.isRecording, handleStartRecording, handleStopRecording]);
+  }, [rec.isRecording, doStartRecording, handleStopRecording]);
 
   const handleTogglePause = useCallback(async () => {
     try {
@@ -480,9 +499,9 @@ const SpotlightApp: React.FC = () => {
               </div>
 
               {/* Recording controls */}
-              {!rec.isRecording ? (
+              {!rec.isRecording && !showCaptureSelector ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button onClick={handleStartRecording} disabled={!selectedProjectId}
+                  <button onClick={() => doStartRecording({ type: 'all-displays' })} disabled={!selectedProjectId}
                     style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       padding: '9px 16px', borderRadius: 10, border: 'none',
@@ -495,9 +514,112 @@ const SpotlightApp: React.FC = () => {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/>
                     </svg>
-                    Start Recording
+                    Record All
                   </button>
-                  
+                  <button onClick={handleStartRecording} disabled={!selectedProjectId}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                      padding: '9px 14px', borderRadius: 10,
+                      border: '1.5px solid rgba(108,92,231,0.25)', background: 'rgba(108,92,231,0.06)',
+                      color: selectedProjectId ? '#6C5CE7' : '#ccc',
+                      fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif",
+                      cursor: selectedProjectId ? 'pointer' : 'not-allowed', transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => { if (selectedProjectId) { e.currentTarget.style.background = 'rgba(108,92,231,0.12)'; } }}
+                    onMouseLeave={e => { if (selectedProjectId) { e.currentTarget.style.background = 'rgba(108,92,231,0.06)'; } }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                    Choose...
+                  </button>
+                </div>
+              ) : showCaptureSelector && !rec.isRecording ? (
+                /* Capture selector inline */
+                <div style={{
+                  borderRadius: 10, border: '1.5px solid rgba(108,92,231,0.15)',
+                  background: '#FAFAFC', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)',
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#1A1A2E', fontFamily: "'Outfit', sans-serif" }}>
+                      Choose capture area
+                    </span>
+                    <button onClick={() => setShowCaptureSelector(false)} style={{
+                      border: 'none', background: 'none', cursor: 'pointer', padding: 2,
+                      color: '#A0A0B2', fontSize: 16, lineHeight: 1,
+                    }}>&times;</button>
+                  </div>
+                  {captureLoading ? (
+                    <div style={{ padding: '16px 0', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>Loading...</div>
+                  ) : (
+                    <div style={{ padding: 8, maxHeight: 180, overflowY: 'auto' }} className="scrollbar-thin">
+                      {/* All displays */}
+                      <div onClick={() => doStartRecording({ type: 'all-displays' })} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                        borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s',
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(108,92,231,0.08)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="1.5">
+                          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E' }}>Entire Screen</div>
+                          <div style={{ fontSize: 10, color: '#A0A0B2' }}>All displays</div>
+                        </div>
+                      </div>
+
+                      {/* Individual displays */}
+                      {captureDisplays.map(d => (
+                        <div key={d.id}
+                          onClick={() => doStartRecording({ type: 'single-display', displayId: d.id, displayName: d.name, bounds: d.bounds })}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                            borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(108,92,231,0.08)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E6E82" strokeWidth="1.5">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                          </svg>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E' }}>{d.name}</div>
+                            <div style={{ fontSize: 10, color: '#A0A0B2' }}>{d.bounds.width} x {d.bounds.height}{d.isPrimary ? ' (primary)' : ''}</div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Windows */}
+                      {captureWindows.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 9, fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 10px 4px' }}>
+                            Windows
+                          </div>
+                          {captureWindows.slice(0, 10).map(w => (
+                            <div key={w.handle}
+                              onClick={() => doStartRecording({ type: 'window', windowHandle: w.handle, windowTitle: w.title, bounds: w.bounds })}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
+                                borderRadius: 8, cursor: 'pointer', transition: 'background 0.1s',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(108,92,231,0.08)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0A0B2" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
+                              </svg>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#1A1A2E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {w.title}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Recording in progress */

@@ -18,6 +18,7 @@ class OndokiApp {
   private isQuitting = false;
   private lastProjectId: string = '';
   private isRecording = false;
+  private lastSpotlightShowTime = 0;
   private normalTrayIcon: Electron.NativeImage | null = null;
   private recordingTrayIcon: Electron.NativeImage | null = null;
 
@@ -143,18 +144,22 @@ class OndokiApp {
 
   private async showCountdownOverlay(): Promise<void> {
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.workAreaSize;
+    const { width: screenW } = primaryDisplay.workAreaSize;
+
+    const pillW = 220;
+    const pillH = 48;
+    const x = Math.round((screenW - pillW) / 2);
+    const y = 32; // near top of screen
 
     this.countdownWindow = new BrowserWindow({
-      width, height,
-      x: 0, y: 0,
+      width: pillW, height: pillH,
+      x, y,
       frame: false,
       transparent: true,
       alwaysOnTop: true,
       skipTaskbar: true,
       focusable: false,
       resizable: false,
-      fullscreen: true,
       hasShadow: false,
       webPreferences: { nodeIntegration: false, contextIsolation: true },
     });
@@ -164,29 +169,37 @@ class OndokiApp {
 
     const html = `<!DOCTYPE html><html><head><style>
       * { margin: 0; padding: 0; }
-      body { background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
-             width: 100vw; height: 100vh; font-family: 'Outfit', -apple-system, sans-serif; overflow: hidden; }
-      .count { font-size: 180px; font-weight: 800; color: white; text-shadow: 0 4px 40px rgba(0,0,0,0.5);
-               animation: pop 0.8s ease-out; opacity: 0; }
-      @keyframes pop { 0% { transform: scale(1.5); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
-      .label { position: absolute; bottom: 60px; color: rgba(255,255,255,0.7); font-size: 18px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+      body { background: transparent; display: flex; align-items: center; justify-content: center;
+             width: 100vw; height: 100vh; font-family: -apple-system, 'Segoe UI', sans-serif; overflow: hidden; }
+      .pill { display: flex; align-items: center; gap: 8px;
+              padding: 10px 20px; border-radius: 24px;
+              background: rgba(0,0,0,0.75); backdrop-filter: blur(12px);
+              -webkit-backdrop-filter: blur(12px);
+              box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: #FF5F57;
+             animation: blink 1s step-end infinite; }
+      @keyframes blink { 50% { opacity: 0.3; } }
+      .text { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9);
+              letter-spacing: 0.02em; white-space: nowrap; }
     </style></head><body>
-      <div class="count" id="num">3</div>
-      <div class="label">Recording starts in...</div>
+      <div class="pill">
+        <div class="dot"></div>
+        <div class="text" id="msg">Recording in 3\u2026</div>
+      </div>
       <script>
-        const el = document.getElementById('num');
+        const el = document.getElementById('msg');
         let n = 3;
         function tick() {
-          el.textContent = n;
-          el.style.animation = 'none';
-          void el.offsetHeight;
-          el.style.animation = 'pop 0.8s ease-out';
-          n--;
-          if (n > 0) setTimeout(tick, 1000);
-          else if (n === 0) { setTimeout(() => { el.textContent = '●'; el.style.color = '#FF5F57'; el.style.fontSize = '120px'; el.style.animation = 'none'; void el.offsetHeight; el.style.animation = 'pop 0.8s ease-out'; }, 1000); }
+          if (n > 0) {
+            el.textContent = 'Recording in ' + n + '\u2026';
+            n--;
+            setTimeout(tick, 1000);
+          } else {
+            el.textContent = 'Recording started';
+            setTimeout(() => window.close(), 600);
+          }
         }
         tick();
-        setTimeout(() => window.close(), 3800);
       </script>
     </body></html>`;
 
@@ -199,7 +212,7 @@ class OndokiApp {
         this.countdownWindow.close();
         this.countdownWindow = null;
       }
-    }, 4000);
+    }, 4200);
   }
 
   // ─── Spotlight Window ──────────────────────────────────────────────────────
@@ -225,6 +238,7 @@ class OndokiApp {
     const y = Math.round(screenH * 0.16);
 
     this.spotlightWindow!.setBounds({ x, y, width: winWidth, height: winHeight });
+    this.lastSpotlightShowTime = Date.now();
     this.spotlightWindow!.show();
     this.spotlightWindow!.focus();
     this.spotlightWindow!.webContents.send('spotlight:show', this.lastProjectId);
@@ -250,6 +264,10 @@ class OndokiApp {
     this.spotlightWindow.on('blur', () => {
       // Don't hide if recording — user needs to see the mini status
       if (this.isRecording) return;
+      // Don't hide if settings window is open (focus just moved there)
+      if (this.settingsWindow && !this.settingsWindow.isDestroyed()) return;
+      // Debounce: ignore blur within 500ms of showing (macOS focus quirk)
+      if (Date.now() - this.lastSpotlightShowTime < 500) return;
       setTimeout(() => {
         if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
           this.hideSpotlightWindow();

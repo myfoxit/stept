@@ -252,22 +252,6 @@ export class RecordingService extends EventEmitter {
         await this.showOverlay();
       }
 
-      // Minimize the Ondoki window and show countdown before recording starts
-      const { BrowserWindow } = require('electron');
-      const mainWindow = BrowserWindow.getAllWindows().find((w: any) => !w.isDestroyed());
-      if (mainWindow) {
-        mainWindow.minimize();
-      }
-
-      // 3-2-1 countdown — give user time to prepare
-      this.emit('countdown', 3);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      this.emit('countdown', 2);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      this.emit('countdown', 1);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      this.emit('countdown', 0);
-
       await this.startNativeHooks();
       this.emitStateChanged();
 
@@ -865,10 +849,10 @@ export class RecordingService extends EventEmitter {
 
     if (hasModifier) {
       // Keyboard shortcut
-      this.flushTypedText(event.window);
       const char = charMap[keycode];
       const named = namedMap[keycode];
-      const keyLabel = char ? char.toUpperCase() : named;
+      // Normalize: space char → "Space" to match shortcut naming convention
+      const keyLabel = char === ' ' ? 'Space' : char ? char.toUpperCase() : named;
       if (!keyLabel) return;
 
       const mods: string[] = [];
@@ -878,11 +862,13 @@ export class RecordingService extends EventEmitter {
       if (event.modifiers.includes('shift')) mods.push('Shift');
       const combo = [...mods, keyLabel].join('+');
 
-      // Skip ignored shortcuts (spotlight/recording hotkeys)
+      // Skip ignored shortcuts BEFORE flushing text (avoid spurious text steps)
       if (this.ignoredShortcuts.has(combo.toUpperCase())) {
         console.log(`[DIAG] keyboard shortcut filtered: "${combo}" (configured shortcut)`);
         return;
       }
+
+      this.flushTypedText(event.window);
 
       const windowTitle = event.window?.title || 'Unknown Window';
 
