@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
-import { execFile } from 'child_process';
+import { spawn, ChildProcess, execFile } from 'child_process';
 import { promisify } from 'util';
+import { createInterface, Interface } from 'readline';
+import { app } from 'electron';
 import * as path from 'path';
 
 const execFileAsync = promisify(execFile);
@@ -24,24 +26,41 @@ interface ContextMatch {
 }
 
 export class ContextWatcherService extends EventEmitter {
-  private interval: NodeJS.Timeout | null = null;
-  private lastContext: string = '';
-  private cache: Map<string, { matches: ContextMatch[]; time: number }> = new Map();
-  private readonly CACHE_TTL = 10 * 60 * 1000;
-  private readonly POLL_INTERVAL = 5000;
+  private watchProcess: ChildProcess | null = null;
+  private readline: Interface | null = null;
+  private lastActiveContext: ActiveContext | null = null;
+  private lastContextKey: string = '';
 
   private apiBaseUrl: string = '';
   private accessToken: string = '';
   private projectId: string = '';
-  private enabled: boolean = false;
 
   private nativeBinaryPath: string;
 
-  private readonly BROWSERS = ['Google Chrome', 'Safari', 'Firefox', 'Arc', 'Microsoft Edge', 'Brave Browser', 'Chromium', 'Opera'];
+  private readonly IGNORE_APPS = ['electron', 'ondoki desktop', 'ondoki-desktop'];
 
   constructor() {
     super();
-    this.nativeBinaryPath = path.join(__dirname, '..', '..', 'native', 'macos', 'window-info');
+    if (process.platform === 'darwin') {
+      this.nativeBinaryPath = app.isPackaged
+        ? path.join(path.dirname(app.getPath('exe')), '..', 'Resources', 'native', 'macos', 'window-info')
+        : path.join(__dirname, '..', '..', 'native', 'macos', 'window-info');
+    } else {
+      // Windows — try packaged path first, then dev paths
+      const candidates = [
+        path.join(path.dirname(app.getPath('exe')), '..', 'Resources', 'native', 'windows', 'window-info.exe'),
+        path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'window-info.exe'),
+        path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.exe'),
+      ];
+      this.nativeBinaryPath = candidates[0]; // Will be resolved on start
+      for (const c of candidates) {
+        try {
+          require('fs').accessSync(c);
+          this.nativeBinaryPath = c;
+          break;
+        } catch {}
+      }
+    }
   }
 
   configure(apiBaseUrl: string, accessToken: string, projectId: string) {
@@ -51,112 +70,137 @@ export class ContextWatcherService extends EventEmitter {
   }
 
   start() {
-    if (this.interval) return;
-    this.enabled = true;
-    this.interval = setInterval(() => this.check(), this.POLL_INTERVAL);
-    this.check();
+    if (this.watchProcess) return;
+    this.spawnWatcher();
   }
 
   stop() {
-    this.enabled = false;
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
+    if (this.watchProcess) {
+      this.watchProcess.kill();
+      this.watchProcess = null;
+    }
+    if (this.readline) {
+      this.readline.close();
+      this.readline = null;
     }
   }
 
-  private async check() {
-    if (!this.enabled || !this.apiBaseUrl || !this.accessToken) return;
+  public getLastActiveContext(): ActiveContext | null {
+    return this.lastActiveContext;
+  }
+
+  /**
+   * Force a fresh match query using the cached context.
+   * Call this when spotlight opens.
+   */
+  public async forceMatchCheck(): Promise<ContextMatch[]> {
+    const ctx = this.lastActiveContext;
+    if (!ctx || !this.apiBaseUrl || !this.accessToken) return [];
 
     try {
-      const ctx = await this.getActiveContext();
-      if (!ctx) return;
-
-      const ctxKey = JSON.stringify({ app: ctx.appName, host: ctx.url ? new URL(ctx.url).hostname : '', title: (ctx.windowTitle || '').slice(0, 120) });
-      if (ctxKey === this.lastContext) return;
-      this.lastContext = ctxKey;
-
-      const cached = this.cache.get(ctxKey);
-      if (cached && Date.now() - cached.time < this.CACHE_TTL) {
-        if (cached.matches.length > 0) {
-          this.emit('matches', cached.matches, ctx);
-        }
-        return;
-      }
-
       const matches = await this.queryMatches(ctx);
-      this.cache.set(ctxKey, { matches, time: Date.now() });
-
       if (matches.length > 0) {
         this.emit('matches', matches, ctx);
       } else {
         this.emit('no-matches', ctx);
       }
-    } catch (e) {
+      return matches;
+    } catch {
+      return [];
+    }
+  }
+
+  // ─── Native watcher process ─────────────────────────────────────────
+
+  private spawnWatcher() {
+    try {
+      this.watchProcess = spawn(this.nativeBinaryPath, ['watch'], {
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch (err) {
+      console.error('[context-watcher] Failed to spawn native watcher:', err);
+      return;
+    }
+
+    this.readline = createInterface({ input: this.watchProcess.stdout! });
+
+    this.readline.on('line', (line: string) => {
+      try {
+        const event = JSON.parse(line);
+        if (event.type === 'ready') {
+          console.log('[context-watcher] Native watcher ready');
+          return;
+        }
+        if (event.type === 'change') {
+          this.handleWindowChange(event.app, event.title);
+        }
+      } catch {
+        // Ignore malformed lines
+      }
+    });
+
+    this.watchProcess.on('exit', (code) => {
+      console.log(`[context-watcher] Native watcher exited (code ${code}), restarting in 3s...`);
+      this.watchProcess = null;
+      this.readline = null;
+      setTimeout(() => {
+        if (this.apiBaseUrl && this.accessToken) this.spawnWatcher();
+      }, 3000);
+    });
+  }
+
+  private async handleWindowChange(appName: string, windowTitle: string) {
+    // Skip our own app
+    if (!appName || this.IGNORE_APPS.includes(appName.toLowerCase())) return;
+
+    const ctx: ActiveContext = { appName, windowTitle };
+
+    // Always update the cached context
+    this.lastActiveContext = ctx;
+
+    // Dedup — don't re-query for same context
+    const ctxKey = `${appName}|${windowTitle}`;
+    if (ctxKey === this.lastContextKey) return;
+    this.lastContextKey = ctxKey;
+
+    // Query match API
+    if (!this.apiBaseUrl || !this.accessToken) return;
+
+    try {
+      const matches = await this.queryMatches(ctx);
+      if (matches.length > 0) {
+        this.emit('matches', matches, ctx);
+      } else {
+        this.emit('no-matches', ctx);
+      }
+    } catch {
       // Silent fail
     }
   }
 
+  // ─── Fallback: one-shot context detection (for getActiveContext IPC) ──
+
   public async getActiveContext(): Promise<ActiveContext | null> {
+    // Prefer cached context from watch mode
+    if (this.lastActiveContext) return this.lastActiveContext;
+
+    // Fallback: call native binary in mouse mode
     try {
       const { stdout } = await execFileAsync(this.nativeBinaryPath, ['mouse'], { timeout: 2000 });
       const info = JSON.parse(stdout);
-
       const windowTitle = info?.window?.title || '';
       const appName = info?.window?.ownerName || '';
-
-      if (!appName || appName === 'Electron' || appName === 'Ondoki Desktop') return null;
-
-      const ctx: ActiveContext = { windowTitle, appName };
-
-      if (this.BROWSERS.includes(appName)) {
-        const url = await this.getBrowserUrl(appName);
-        if (url) ctx.url = url;
-      }
-
-      return ctx;
+      if (!appName || this.IGNORE_APPS.includes(appName.toLowerCase())) return null;
+      return { windowTitle, appName };
     } catch {
       return null;
     }
   }
 
-  private async getBrowserUrl(appName: string): Promise<string | null> {
-    const scriptMap: Record<string, string> = {
-      'Google Chrome': 'tell application "Google Chrome" to get URL of active tab of first window',
-      'Safari': 'tell application "Safari" to get URL of current tab of first window',
-      'Arc': 'tell application "Arc" to get URL of active tab of first window',
-      'Microsoft Edge': 'tell application "Microsoft Edge" to get URL of active tab of first window',
-      'Brave Browser': 'tell application "Brave Browser" to get URL of active tab of first window',
-      'Chromium': 'tell application "Chromium" to get URL of active tab of first window',
-      'Opera': 'tell application "Opera" to get URL of active tab of first window',
-      'Firefox': 'tell application "System Events" to tell process "Firefox" to get value of attribute "AXTitle" of window 1',
-    };
-
-    const script = scriptMap[appName];
-    if (!script) return null;
-
-    try {
-      const { stdout } = await execFileAsync('/usr/bin/osascript', ['-e', script], { timeout: 1500 });
-      const result = stdout.trim();
-      if (appName === 'Firefox') return null;
-      if (result && result.startsWith('http')) return result;
-      return null;
-    } catch {
-      return null;
-    }
-  }
+  // ─── Match API ──────────────────────────────────────────────────────
 
   private async queryMatches(ctx: ActiveContext): Promise<ContextMatch[]> {
     const params = new URLSearchParams();
-    if (ctx.url) {
-      params.set('url', ctx.url);
-      try {
-        const host = new URL(ctx.url).hostname;
-        params.set('hostname', host);
-        const hostNoWww = host.replace(/^www\./, '');
-        if (hostNoWww !== host) params.set('hostname_base', hostNoWww);
-      } catch {}
-    }
     if (ctx.appName) params.set('app_name', ctx.appName);
     if (ctx.windowTitle) params.set('window_title', ctx.windowTitle);
     if (this.projectId) params.set('project_id', this.projectId);

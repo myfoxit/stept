@@ -272,7 +272,12 @@ export function setupIpcHandlers(
   });
 
   ipcMain.handle('context:get-active', async () => {
-    return await contextWatcher.getActiveContext();
+    // Prefer cached context from watch mode (always has the last real window before spotlight)
+    return contextWatcher.getLastActiveContext() || await contextWatcher.getActiveContext();
+  });
+
+  ipcMain.handle('context:force-match', async () => {
+    return await contextWatcher.forceMatchCheck();
   });
 
   ipcMain.handle('context:add-link', async (event, data: {

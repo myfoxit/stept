@@ -160,6 +160,10 @@ const SpotlightApp: React.FC = () => {
       setHighlightIndex(0);
       setChatMessages([]);
       setTimeout(() => inputRef.current?.focus(), 50);
+
+      // Force a fresh context match check — the watcher has the cached context
+      // from before spotlight stole focus
+      api.contextForceMatch?.();
     });
 
     // Context matches
