@@ -1047,6 +1047,71 @@ def _rrf_merge(
     return merged
 
 
+async def _ilike_unified_results(
+    query: str, project_id: str, user_id: str, limit: int, db: AsyncSession
+) -> list[dict]:
+    """ILIKE-based search for very short queries (1-2 chars) in unified-v2."""
+    results: list[dict] = []
+    pattern = f"%{query}%"
+
+    # Workflows by name/title
+    stmt = select(ProcessRecordingSession).where(
+        and_(
+            ProcessRecordingSession.project_id == project_id,
+            or_(
+                ProcessRecordingSession.is_private == False,
+                ProcessRecordingSession.owner_id == user_id,
+            ),
+            or_(
+                ProcessRecordingSession.name.ilike(pattern),
+                ProcessRecordingSession.generated_title.ilike(pattern),
+                ProcessRecordingSession.summary.ilike(pattern),
+            ),
+        )
+    ).limit(limit)
+    rows = await db.execute(stmt)
+    for rec in rows.scalars().all():
+        snippet = _extract_snippet(rec, [], query)
+        results.append({
+            "type": "workflow",
+            "id": rec.id,
+            "name": rec.name or rec.generated_title or "Untitled Workflow",
+            "summary": rec.summary,
+            "snippet": snippet,
+            "score": 0.5,
+            "_session": rec,
+        })
+
+    # Documents by name/content
+    doc_stmt = select(Document).where(
+        and_(
+            Document.project_id == project_id,
+            or_(
+                Document.is_private == False,
+                Document.owner_id == user_id,
+            ),
+            or_(
+                Document.name.ilike(pattern),
+                Document.search_text.ilike(pattern),
+            ),
+        )
+    ).limit(limit)
+    doc_rows = await db.execute(doc_stmt)
+    for doc in doc_rows.scalars().all():
+        text_content = doc.search_text or ""
+        snippet = _extract_text_snippet(text_content, query) if text_content else ""
+        results.append({
+            "type": "document",
+            "id": doc.id,
+            "name": doc.name or "Untitled",
+            "preview": snippet,
+            "snippet": snippet,
+            "score": 0.4,
+        })
+
+    return results[:limit]
+
+
 async def _fts_unified_results(
     query: str, project_id: str, user_id: str, limit: int, db: AsyncSession
 ) -> list[dict]:
@@ -1287,8 +1352,11 @@ async def unified_v2_search(
     - Context-aware boosting
     - Trigram fuzzy fallback
     """
-    # Always run FTS
-    fts_results = await _fts_unified_results(q, project_id, current_user.id, limit * 2, db)
+    # For very short queries (1-2 chars), use ILIKE which handles single chars better
+    if len(q.strip()) <= 2:
+        fts_results = await _ilike_unified_results(q, project_id, current_user.id, limit, db)
+    else:
+        fts_results = await _fts_unified_results(q, project_id, current_user.id, limit * 2, db)
 
     # Always try semantic (graceful fallback if no embedding API)
     semantic_results = await _semantic_unified_results(q, project_id, current_user.id, limit * 2, db)
