@@ -279,7 +279,6 @@ export function setupIpcHandlers(
 
   ipcMain.handle('context:pause', () => { contextWatcher.pause(); });
   ipcMain.handle('context:resume', () => { contextWatcher.resume(); });
-  ipcMain.handle('context:force-match', async () => { return await contextWatcher.forceMatchCheck(); });
 
   // App-level events for spotlight show/hide
   app.on('context-pause' as any, () => { contextWatcher.pause(); });

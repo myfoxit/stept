@@ -84,11 +84,8 @@ export class ContextWatcherService extends EventEmitter {
   /** Pause polling — keeps cached context frozen (use when spotlight is visible) */
   pause() { this.paused = true; }
 
-  /** Resume polling and clear dedup so new links get picked up */
-  resume() {
-    this.paused = false;
-    this.lastContext = '';  // Force re-check on next poll
-  }
+  /** Resume polling */
+  resume() { this.paused = false; }
 
   private async check() {
     if (!this.enabled || this.paused || !this.apiBaseUrl || !this.accessToken) return;
@@ -132,28 +129,6 @@ export class ContextWatcherService extends EventEmitter {
    */
   public getLastActiveContext(): ActiveContext | null {
     return this.lastActiveContext;
-  }
-
-  /**
-   * Force a fresh match query using the cached context.
-   * Skips the dedup cache — always hits the API.
-   * Returns matches and emits events.
-   */
-  public async forceMatchCheck(): Promise<ContextMatch[]> {
-    const ctx = this.lastActiveContext;
-    if (!ctx || !this.apiBaseUrl || !this.accessToken) return [];
-
-    try {
-      const matches = await this.queryMatches(ctx);
-      if (matches.length > 0) {
-        this.emit('matches', matches, ctx);
-      } else {
-        this.emit('no-matches', ctx);
-      }
-      return matches;
-    } catch {
-      return [];
-    }
   }
 
   public async getActiveContext(): Promise<ActiveContext | null> {

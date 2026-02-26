@@ -173,14 +173,12 @@ const SpotlightApp: React.FC = () => {
       setChatMessages([]);
       setTimeout(() => inputRef.current?.focus(), 50);
 
-      // Fetch cached context and force a fresh match query
+      // Immediately fetch context suggestions on show
       api.contextGetActive?.().then((ctx) => {
         if (ctx) {
           setContextInfo({ windowTitle: ctx.windowTitle, appName: ctx.appName, url: ctx.url, appBundleId: ctx.appBundleId });
         }
       });
-      // Force fresh match query — this always hits the API, bypassing dedup cache
-      api.contextForceMatch?.();
     });
 
     // Context matches
