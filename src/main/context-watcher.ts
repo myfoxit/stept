@@ -113,43 +113,11 @@ export class ContextWatcherService extends EventEmitter {
 
   public async getActiveContext(): Promise<ActiveContext | null> {
     try {
-      let windowTitle = '';
-      let appName = '';
+      const { stdout } = await execFileAsync(this.nativeBinaryPath, ['mouse'], { timeout: 2000 });
+      const info = JSON.parse(stdout);
 
-      if (process.platform === 'darwin') {
-        const { stdout } = await execFileAsync(this.nativeBinaryPath, ['mouse'], { timeout: 2000 });
-        const info = JSON.parse(stdout);
-        windowTitle = info?.window?.title || '';
-        appName = info?.window?.ownerName || '';
-      } else if (process.platform === 'win32') {
-        // Use PowerShell to get foreground window info
-        const script = `
-          Add-Type @"
-            using System;
-            using System.Runtime.InteropServices;
-            using System.Text;
-            public class Win32 {
-              [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-              [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
-              [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-            }
-"@
-          $hwnd = [Win32]::GetForegroundWindow()
-          $sb = New-Object System.Text.StringBuilder 256
-          [Win32]::GetWindowText($hwnd, $sb, 256) | Out-Null
-          $pid = 0
-          [Win32]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
-          $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
-          @{ title = $sb.ToString(); app = $proc.ProcessName; description = $proc.Description } | ConvertTo-Json
-        `;
-        const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], { timeout: 3000 });
-        const info = JSON.parse(stdout.trim());
-        windowTitle = info?.title || '';
-        // Use description (friendly name) if available, otherwise process name
-        appName = info?.description || info?.app || '';
-      } else {
-        return null;
-      }
+      const windowTitle = info?.window?.title || '';
+      const appName = info?.window?.ownerName || '';
 
       if (!appName || appName === 'Electron' || appName === 'Ondoki Desktop') return null;
 
@@ -158,17 +126,6 @@ export class ContextWatcherService extends EventEmitter {
       if (this.BROWSERS.includes(appName)) {
         const url = await this.getBrowserUrl(appName);
         if (url) ctx.url = url;
-      }
-
-      // Also try to extract URL from window title for browsers on Windows
-      if (process.platform === 'win32' && !ctx.url) {
-        // Many browsers show URL or domain in title. Also try reading URL via UI Automation
-        const browserProcesses = ['chrome', 'msedge', 'firefox', 'brave', 'opera', 'vivaldi', 'arc'];
-        const appLower = appName.toLowerCase();
-        if (browserProcesses.some(b => appLower.includes(b)) || this.BROWSERS.some(b => appLower.includes(b.toLowerCase()))) {
-          const url = await this.getWindowsBrowserUrl(appName);
-          if (url) ctx.url = url;
-        }
       }
 
       // Get bundle identifier (macOS)
@@ -203,45 +160,6 @@ export class ContextWatcherService extends EventEmitter {
       const result = stdout.trim();
       if (appName === 'Firefox') return null;
       if (result && result.startsWith('http')) return result;
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  private async getWindowsBrowserUrl(appName: string): Promise<string | null> {
-    // Use UI Automation to read the address bar from Chromium-based browsers
-    try {
-      const script = `
-        Add-Type -AssemblyName UIAutomationClient
-        Add-Type -AssemblyName UIAutomationTypes
-        $root = [System.Windows.Automation.AutomationElement]::RootElement
-        $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
-        $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
-        
-        # Find the foreground window
-        Add-Type @"
-          using System;
-          using System.Runtime.InteropServices;
-          public class FG { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }
-"@
-        $hwnd = [FG]::GetForegroundWindow()
-        $el = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
-        
-        # Search for edit controls (address bar)
-        $edits = $el.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
-        foreach ($edit in $edits) {
-          try {
-            $pattern = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-            $val = $pattern.Current.Value
-            if ($val -match "^https?://") { Write-Output $val; break }
-            if ($val -match "^[a-zA-Z0-9].*\\.[a-zA-Z]{2,}") { Write-Output "https://$val"; break }
-          } catch {}
-        }
-      `;
-      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], { timeout: 3000 });
-      const url = stdout.trim();
-      if (url && (url.startsWith('http://') || url.startsWith('https://'))) return url;
       return null;
     } catch {
       return null;
