@@ -83,6 +83,7 @@ export interface ElectronAPI {
   contextStart: (projectId: string) => Promise<any>;
   contextStop: () => Promise<any>;
   contextGetActive: () => Promise<{ windowTitle: string; appName: string; url?: string; appBundleId?: string } | null>;
+  contextForceMatch: () => Promise<any[]>;
   contextAddLink: (data: any) => Promise<any>;
   contextListLinks: (projectId?: string) => Promise<any[]>;
   contextDeleteLink: (linkId: string) => Promise<any>;
@@ -188,6 +189,7 @@ const electronAPI: ElectronAPI = {
   contextStart: (projectId) => ipcRenderer.invoke('context:start', projectId),
   contextStop: () => ipcRenderer.invoke('context:stop'),
   contextGetActive: () => ipcRenderer.invoke('context:get-active'),
+  contextForceMatch: () => ipcRenderer.invoke('context:force-match'),
   contextAddLink: (data) => ipcRenderer.invoke('context:add-link', data),
   contextListLinks: (projectId?) => ipcRenderer.invoke('context:list-links', projectId),
   contextDeleteLink: (linkId) => ipcRenderer.invoke('context:delete-link', linkId),
