@@ -296,29 +296,14 @@ const SpotlightApp: React.FC = () => {
       try {
         const api = window.electronAPI;
         if (!api) return;
-        const kwResult = await api.spotlightSearch(text, selectedProjectId);
-        let list: SpotlightResult[] = (kwResult?.results || []).map(
+        // unified-v2 handles keyword + semantic fusion via RRF — single call
+        const result = await api.spotlightSearch(text, selectedProjectId);
+        const list: SpotlightResult[] = (result?.results || []).map(
           (r: any) => ({
             ...r,
             name: r.name || r.resource_name || 'Untitled',
           }),
         );
-        if (text.length > 20 || QUESTION_PATTERN.test(text)) {
-          try {
-            const semResult = await api.spotlightSemanticSearch(
-              text,
-              selectedProjectId,
-            );
-            const semResults = (semResult?.results || []).map((r: any) => ({
-              ...r,
-              name: r.name || r.resource_name || 'Untitled',
-            }));
-            if (semResults.length > 0) {
-              const ids = new Set(semResults.map((s: SpotlightResult) => s.id));
-              list = [...semResults, ...list.filter((r) => !ids.has(r.id))];
-            }
-          } catch {}
-        }
         setResults(list);
         setHighlightIndex(0);
       } catch {

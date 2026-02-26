@@ -368,7 +368,8 @@ export function setupIpcHandlers(
     const token = authService.getAccessToken();
     if (!token) return { results: [] };
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
-    const u = new URL(`${apiBase}/search/unified`);
+    // Use unified-v2 (RRF fusion of keyword + semantic)
+    const u = new URL(`${apiBase}/search/unified-v2`);
     u.searchParams.set('q', query);
     u.searchParams.set('project_id', projectId);
     u.searchParams.set('limit', '20');
@@ -377,12 +378,13 @@ export function setupIpcHandlers(
     return await res.json();
   });
 
+  // Keep for backward compat but also route to unified-v2
   ipcMain.handle('spotlight:semantic-search', async (event, query: string, projectId: string) => {
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { results: [] };
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
-    const u = new URL(`${apiBase}/search/unified-semantic`);
+    const u = new URL(`${apiBase}/search/unified-v2`);
     u.searchParams.set('q', query);
     u.searchParams.set('project_id', projectId);
     u.searchParams.set('limit', '20');
