@@ -29,6 +29,57 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _extract_snippet(
+    session: ProcessRecordingSession,
+    matching_steps: list[dict],
+    query: str,
+    max_len: int = 160,
+) -> str:
+    """Extract a short text snippet showing where the query matches, with <mark> highlight."""
+    import re
+    q_lower = query.lower()
+    words = re.findall(r'\w+', query.strip())
+    pattern = re.compile('|'.join(re.escape(w) for w in words), re.IGNORECASE) if words else None
+
+    # Check fields in priority order: name, generated_title, summary, guide_markdown
+    candidates = [
+        session.name,
+        session.generated_title,
+        session.summary,
+        (session.guide_markdown or "")[:2000],
+    ]
+
+    for text in candidates:
+        if not text:
+            continue
+        # Find the position of the match
+        match = pattern.search(text) if pattern else None
+        if match:
+            start = max(0, match.start() - 40)
+            end = min(len(text), match.start() + max_len - 40)
+            snippet = text[start:end].strip()
+            if start > 0:
+                snippet = "…" + snippet
+            if end < len(text):
+                snippet = snippet + "…"
+            # Highlight all matches
+            if pattern:
+                snippet = pattern.sub(lambda m: f"<mark>{m.group()}</mark>", snippet)
+            return snippet
+
+    # Fallback: summary or first part of guide
+    fallback = session.summary or (session.guide_markdown or "")[:max_len]
+    if fallback:
+        snippet = fallback[:max_len]
+        if len(fallback) > max_len:
+            snippet += "…"
+        if pattern:
+            snippet = pattern.sub(lambda m: f"<mark>{m.group()}</mark>", snippet)
+        return snippet
+
+    return ""
+
+
 def _highlight(text: str, query: str) -> str:
     """Simple case-insensitive highlight using <mark> tags."""
     if not text or not query:
@@ -999,11 +1050,13 @@ async def _fts_unified_results(
         if not rec:
             continue
         session_objects[session_id] = rec
+        snippet = _extract_snippet(rec, step_by_session.get(session_id, []), query)
         results.append({
             "type": "workflow",
             "id": rec.id,
             "name": rec.name or rec.generated_title or "Untitled Workflow",
             "summary": rec.summary,
+            "snippet": snippet,
             "score": round(session_scores[session_id], 4),
             "matching_steps": sorted(
                 step_by_session.get(session_id, []),

@@ -194,29 +194,21 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
         {/* Workflows */}
         {workflows.length > 0 && (
           <CommandGroup heading={`Workflows (${workflows.length})`}>
-            {workflows.map((wf) => (
-              <div key={wf.id}>
-                <CommandItem onSelect={() => handleSelect(wf)}>
-                  <IconListDetails className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="flex-1 truncate">{wf.name}</span>
-                  {wf.score > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {Math.round(wf.score * 100)}%
-                    </span>
+            {workflows.map((wf: any) => (
+              <CommandItem key={wf.id} onSelect={() => handleSelect(wf)}>
+                <IconListDetails className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div className="flex flex-1 flex-col min-w-0">
+                  <span className="truncate">{wf.name}</span>
+                  {(wf.snippet || wf.summary) && (
+                    <span
+                      className="truncate text-xs text-muted-foreground"
+                      dangerouslySetInnerHTML={{
+                        __html: wf.snippet || wf.summary || '',
+                      }}
+                    />
                   )}
-                </CommandItem>
-                {wf.matching_steps?.slice(0, 2).map((step) => (
-                  <CommandItem
-                    key={step.step_id}
-                    className="pl-8 text-xs text-muted-foreground"
-                    onSelect={() => handleStepSelect(wf.id, step.step_number)}
-                  >
-                    <IconArrowRight className="mr-1 h-3 w-3" />
-                    Step {step.step_number}
-                    {step.generated_title ? `: ${step.generated_title}` : ''}
-                  </CommandItem>
-                ))}
-              </div>
+                </div>
+              </CommandItem>
             ))}
           </CommandGroup>
         )}
@@ -226,20 +218,18 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
           <CommandGroup heading={`Pages (${documents.length})`}>
             {documents.map((doc) => (
               <CommandItem key={doc.id} onSelect={() => handleSelect(doc)}>
-                <IconFileText className="mr-2 h-4 w-4 shrink-0" />
-                <div className="flex flex-1 flex-col">
+                <IconFileText className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div className="flex flex-1 flex-col min-w-0">
                   <span className="truncate">{doc.name || 'Untitled'}</span>
-                  {doc.preview && (
-                    <span className="truncate text-xs text-muted-foreground">
-                      {doc.preview}
-                    </span>
+                  {(doc.preview || (doc as any).snippet) && (
+                    <span
+                      className="truncate text-xs text-muted-foreground"
+                      dangerouslySetInnerHTML={{
+                        __html: (doc as any).snippet || doc.preview || '',
+                      }}
+                    />
                   )}
                 </div>
-                {doc.score > 0 && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {Math.round(doc.score * 100)}%
-                  </span>
-                )}
               </CommandItem>
             ))}
           </CommandGroup>

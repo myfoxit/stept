@@ -199,3 +199,11 @@
 .react-draggable-dragging {
   user-select: none;
 }
+
+/* Search snippet highlight */
+mark {
+  background-color: rgba(225, 77, 42, 0.15);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
