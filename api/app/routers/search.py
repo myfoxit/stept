@@ -42,6 +42,19 @@ def _highlight(text: str, query: str) -> str:
 # FTS helpers
 # ---------------------------------------------------------------------------
 
+def _build_prefix_tsquery(query: str) -> str:
+    """Build a prefix-aware tsquery string for as-you-type search.
+    Appends :* to the last word for prefix matching.
+    'backlo' -> 'backlo:*', 'click save' -> 'click & save:*'
+    """
+    import re as _re
+    words = _re.findall(r'\w+', query.strip())
+    if not words:
+        return query
+    parts = [f"'{w}'" for w in words[:-1]]
+    parts.append(f"'{words[-1]}':*")
+    return " & ".join(parts)
+
 async def _fts_search_sessions(
     query: str,
     project_id: str,
@@ -50,16 +63,17 @@ async def _fts_search_sessions(
     db: AsyncSession,
 ) -> list[tuple]:
     """Full-text search on process_recording_sessions. Returns list of (session, rank)."""
+    tsq = _build_prefix_tsquery(query)
     sql = sa_text("""
-        SELECT id, ts_rank_cd(search_tsv, plainto_tsquery('english', :q)) AS rank
+        SELECT id, ts_rank_cd(search_tsv, to_tsquery('english', :tsq)) AS rank
         FROM process_recording_sessions
         WHERE project_id = :project_id
-          AND search_tsv @@ plainto_tsquery('english', :q)
+          AND search_tsv @@ to_tsquery('english', :tsq)
           AND (is_private = false OR owner_id = :user_id)
         ORDER BY rank DESC
         LIMIT :limit
     """)
-    result = await db.execute(sql, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})
+    result = await db.execute(sql, {"tsq": tsq, "project_id": project_id, "user_id": user_id, "limit": limit})
     return result.fetchall()
 
 
@@ -71,18 +85,19 @@ async def _fts_search_steps(
     db: AsyncSession,
 ) -> list[tuple]:
     """Full-text search on process_recording_steps. Returns list of (step_id, session_id, step_number, generated_title, description, window_title, rank)."""
+    tsq = _build_prefix_tsquery(query)
     sql = sa_text("""
         SELECT s.id, s.session_id, s.step_number, s.generated_title, s.description, s.window_title,
-               ts_rank_cd(s.search_tsv, plainto_tsquery('english', :q)) AS rank
+               ts_rank_cd(s.search_tsv, to_tsquery('english', :tsq)) AS rank
         FROM process_recording_steps s
         JOIN process_recording_sessions sess ON s.session_id = sess.id
         WHERE sess.project_id = :project_id
-          AND s.search_tsv @@ plainto_tsquery('english', :q)
+          AND s.search_tsv @@ to_tsquery('english', :tsq)
           AND (sess.is_private = false OR sess.owner_id = :user_id)
         ORDER BY rank DESC
         LIMIT :limit
     """)
-    result = await db.execute(sql, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})
+    result = await db.execute(sql, {"tsq": tsq, "project_id": project_id, "user_id": user_id, "limit": limit})
     return result.fetchall()
 
 
@@ -588,16 +603,17 @@ async def _search_documents_keyword(
 
     # Try tsvector search first (faster, better ranking)
     try:
+        tsq = _build_prefix_tsquery(query)
         ts_stmt = sa_text("""
-            SELECT id, name, search_text, ts_rank(search_tsv, plainto_tsquery('english', :q)) as rank
+            SELECT id, name, search_text, ts_rank(search_tsv, to_tsquery('english', :tsq)) as rank
             FROM documents
             WHERE project_id = :project_id
-              AND search_tsv @@ plainto_tsquery('english', :q)
+              AND search_tsv @@ to_tsquery('english', :tsq)
               AND (is_private = false OR owner_id = :user_id)
             ORDER BY rank DESC
             LIMIT :limit
         """)
-        ts_result = await db.execute(ts_stmt, {"q": query, "project_id": project_id, "user_id": user_id, "limit": limit})
+        ts_result = await db.execute(ts_stmt, {"tsq": tsq, "project_id": project_id, "user_id": user_id, "limit": limit})
         ts_rows = ts_result.fetchall()
         if ts_rows:
             return [
