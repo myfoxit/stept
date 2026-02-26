@@ -82,11 +82,10 @@ export interface ElectronAPI {
   // Context watcher
   contextStart: (projectId: string) => Promise<any>;
   contextStop: () => Promise<any>;
-  contextGetActive: () => Promise<{ windowTitle: string; appName: string; url?: string; appBundleId?: string } | null>;
+  contextGetActive: () => Promise<{ windowTitle: string; appName: string; url?: string } | null>;
   contextAddLink: (data: any) => Promise<any>;
   contextListLinks: (projectId?: string) => Promise<any[]>;
   contextDeleteLink: (linkId: string) => Promise<any>;
-  getRunningApps: () => Promise<{ name: string; bundleId?: string }[]>;
   onContextMatches: (callback: (matches: any[], ctx: any) => void) => () => void;
   onContextNoMatches: (callback: (ctx: any) => void) => () => void;
 
@@ -191,7 +190,6 @@ const electronAPI: ElectronAPI = {
   contextAddLink: (data) => ipcRenderer.invoke('context:add-link', data),
   contextListLinks: (projectId?) => ipcRenderer.invoke('context:list-links', projectId),
   contextDeleteLink: (linkId) => ipcRenderer.invoke('context:delete-link', linkId),
-  getRunningApps: () => ipcRenderer.invoke('context:get-running-apps'),
   onContextMatches: (callback) => {
     const handler = (_e: IpcRendererEvent, matches: any[], ctx: any) => callback(matches, ctx);
     ipcRenderer.on('context:matches', handler);
