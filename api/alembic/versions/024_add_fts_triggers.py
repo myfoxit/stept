@@ -42,11 +42,11 @@ def upgrade():
         $$ LANGUAGE plpgsql;
     """)
 
+    op.execute("DROP TRIGGER IF EXISTS trg_sessions_search_tsv ON process_recording_sessions")
     op.execute("""
-        DROP TRIGGER IF EXISTS trg_sessions_search_tsv ON process_recording_sessions;
         CREATE TRIGGER trg_sessions_search_tsv
         BEFORE INSERT OR UPDATE ON process_recording_sessions
-        FOR EACH ROW EXECUTE FUNCTION sessions_search_tsv_trigger();
+        FOR EACH ROW EXECUTE FUNCTION sessions_search_tsv_trigger()
     """)
 
     # 3. Create trigger function for process_recording_steps
@@ -64,11 +64,11 @@ def upgrade():
         $$ LANGUAGE plpgsql;
     """)
 
+    op.execute("DROP TRIGGER IF EXISTS trg_steps_search_tsv ON process_recording_steps")
     op.execute("""
-        DROP TRIGGER IF EXISTS trg_steps_search_tsv ON process_recording_steps;
         CREATE TRIGGER trg_steps_search_tsv
         BEFORE INSERT OR UPDATE ON process_recording_steps
-        FOR EACH ROW EXECUTE FUNCTION steps_search_tsv_trigger();
+        FOR EACH ROW EXECUTE FUNCTION steps_search_tsv_trigger()
     """)
 
     # 4. Backfill existing rows by touching each row (trigger will fire)

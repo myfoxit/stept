@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ondoki CMP — Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #ffffff;
+    --sidebar-bg: #fafafa;
+    --border: #ebebeb;
+    --text-primary: #111111;
+    --text-secondary: #555555;
+    --text-muted: #999999;
+    --text-faint: #cccccc;
+    --brand-purple: #e14d2a;
+    --brand-purple-light: #ede9ff;
+    --brand-teal: #00D2D3;
+    --accent: #e14d2a;
+    --font-serif: 'Newsreader', Georgia, serif;
+    --font-sans: 'Instrument Sans', -apple-system, sans-serif;
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d8d8d8; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ─── PAGE SYSTEM ─── */
+  .page { display: none; }
+  .page.active { display: flex; }
+
+  /* ─── NAV TABS ─── */
+  .page-tabs {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+  }
+  .page-tab {
+    padding: 6px 18px; border-radius: 20px; border: none;
+    font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+    color: var(--text-muted); background: transparent;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .page-tab:hover { color: var(--text-secondary); background: #f5f5f5; }
+  .page-tab.active {
+    color: #fff; background: var(--text-primary);
+  }
+
+  /* ─── APP PAGE ─── */
+  .app-layout {
+    width: 100vw; height: 100vh; padding-top: 44px;
+    display: flex; overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 252px; min-width: 252px; height: 100%;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-logo {
+    padding: 20px 18px; display: flex; align-items: center; gap: 10;
+  }
+  .sidebar-logo-text { font-size: 15px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; }
+  .sidebar-badge {
+    margin-left: auto; font-size: 10px; font-weight: 700;
+    color: #fff; background: var(--brand-purple);
+    border-radius: 4px; padding: 2px 7px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
+  .sidebar-search {
+    margin: 0 14px 20px; padding: 8px 12px;
+    background: #fff; border: 1px solid #e5e5e5;
+    border-radius: var(--radius); display: flex; align-items: center; gap: 8;
+    transition: border-color 0.15s; cursor: text;
+  }
+  .sidebar-search:hover { border-color: #ccc; }
+  .sidebar-search span { font-size: 13px; color: #aaa; }
+  .sidebar-search .kbd {
+    margin-left: auto; font-size: 11px; color: #bbb; font-family: monospace;
+  }
+
+  .sidebar-nav { padding: 0 8px; margin-bottom: 6px; }
+  .nav-item {
+    padding: 7px 12px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    color: #666; cursor: pointer; display: flex; align-items: center; gap: 9;
+    transition: all 0.15s; text-decoration: none;
+  }
+  .nav-item:hover { background: #f0f0f0; color: var(--text-primary); }
+  .nav-item svg { flex-shrink: 0; }
+
+  .sidebar-divider { height: 1px; background: var(--border); margin: 10px 18px 16px; }
+
+  .sidebar-section-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #aaa; padding: 0 12px 10px;
+  }
+
+  .folder-header {
+    padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; gap: 7; transition: all 0.15s;
+  }
+  .folder-header:hover { background: #f0f0f0; }
+  .folder-header .count { margin-left: auto; font-size: 11px; color: #bbb; font-weight: 400; }
+  .folder-header .chevron { transition: transform 0.15s; }
+  .folder-header.open .chevron { transform: rotate(90deg); }
+
+  .folder-items { overflow: hidden; padding: 2px 0 4px; }
+  .doc-item {
+    padding: 5px 12px 5px 40px; border-radius: 7px; font-size: 13px;
+    color: #888; cursor: pointer; transition: all 0.15s; position: relative;
+    animation: slideIn 0.2s ease both;
+  }
+  .doc-item:hover { color: #444; }
+  .doc-item.active {
+    color: var(--text-primary); font-weight: 600;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .doc-item.active::before {
+    content: ''; position: absolute; left: 28px; top: 50%; transform: translateY(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+  }
+
+  .sidebar-user {
+    padding: 14px 18px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10; margin-top: auto;
+  }
+  .user-avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--text-primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .user-name { font-size: 13px; font-weight: 500; color: #222; }
+
+  /* Main content */
+  .main { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; }
+
+  .topbar {
+    padding: 10px 28px; display: flex; align-items: center;
+    justify-content: space-between; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; background: #fff;
+  }
+  .breadcrumb { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 6; }
+  .breadcrumb strong { color: #333; font-weight: 600; }
+  .topbar-actions { display: flex; align-items: center; gap: 6; }
+  .topbar-saved { font-size: 12px; color: #bbb; margin-right: 8; }
+
+  .btn {
+    padding: 6px 14px; border-radius: 7px; font-family: var(--font-sans);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5; transition: all 0.15s;
+    text-decoration: none;
+  }
+  .btn-outline {
+    border: 1px solid #e0e0e0; background: #fff; color: var(--text-secondary);
+  }
+  .btn-outline:hover { border-color: #ccc; background: #fafafa; }
+  .btn-primary {
+    border: none; background: var(--text-primary); color: #fff; font-weight: 600;
+  }
+  .btn-primary:hover { background: #333; }
+  .btn-accent {
+    border: none; background: var(--brand-purple); color: #fff; font-weight: 600;
+  }
+  .btn-accent:hover { background: #5a4bd6; }
+
+  .canvas { flex: 1; overflow: auto; background: #fff; display: flex; justify-content: center; }
+  .document { max-width: 680px; width: 100%; padding: 56px 32px 140px; }
+
+  .tags { display: flex; gap: 6; margin-bottom: 36; flex-wrap: wrap; align-items: center; animation: fadeUp 0.5s ease 0.1s both; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 5;
+    padding: 4px 10px; border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .tag-teams { background: #eef0ff; color: #4145a0; }
+  .tag-claude { background: #fff0e8; color: #b55d24; }
+  .tag-test { background: #edf7ed; color: #357435; }
+  .tag-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .tag-add {
+    width: 24px; height: 24px; border-radius: var(--radius-sm);
+    border: 1px dashed #ddd; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 14px; color: #ccc;
+    cursor: pointer; transition: all 0.15s; background: none;
+  }
+  .tag-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  .doc-title {
+    font-family: var(--font-serif); font-size: 56px; font-weight: 400;
+    color: var(--text-primary); line-height: 1.05; letter-spacing: -0.03em;
+    margin-bottom: 20px; animation: fadeUp 0.5s ease 0.15s both;
+  }
+
+  .doc-meta {
+    display: flex; align-items: center; gap: 12;
+    padding-bottom: 28px; margin-bottom: 36;
+    border-bottom: 1px solid #f0f0f0;
+    animation: fadeUp 0.5s ease 0.2s both;
+  }
+  .doc-meta .user-avatar { width: 28px; height: 28px; }
+  .doc-meta-name { font-size: 13px; font-weight: 500; color: #333; }
+  .doc-meta-info { font-size: 12px; color: #aaa; margin-top: 1px; }
+
+  .doc-body {
+    font-family: var(--font-serif); font-size: 18px; line-height: 1.75;
+    color: #2a2a2a; font-weight: 300;
+  }
+  .doc-body p { margin-bottom: 28px; }
+  .doc-body p:nth-child(1) { animation: fadeUp 0.5s ease 0.25s both; }
+  .doc-body p:nth-child(2) { animation: fadeUp 0.5s ease 0.32s both; }
+  .doc-body p:nth-child(3) { animation: fadeUp 0.5s ease 0.39s both; }
+  .doc-body p:nth-child(4) { animation: fadeUp 0.5s ease 0.46s both; }
+
+  .drop-cap {
+    float: left; font-family: var(--font-serif); font-size: 64px;
+    font-weight: 500; line-height: 0.8; margin-right: 8px;
+    margin-top: 6px; color: var(--accent);
+  }
+
+  .status-bar {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text-primary); color: #fff;
+    padding: 7px 18px; border-radius: 24px;
+    font-size: 12px; font-weight: 500;
+    display: flex; align-items: center; gap: 14;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    animation: fadeUp 0.5s ease 0.5s both;
+  }
+  .status-bar .sep { width: 1px; height: 12px; background: rgba(255,255,255,0.15); }
+  .status-bar .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-teal); }
+  .status-bar .muted { color: var(--text-muted); }
+
+  /* ─── BRAND GUIDELINES PAGE ─── */
+  .brand-page {
+    width: 100%; min-height: 100vh; padding: 80px 60px 100px;
+    max-width: 1000px; margin: 0 auto;
+    animation: fadeUp 0.5s ease both;
+  }
+  .brand-page h1 {
+    font-family: var(--font-serif); font-size: 48px; font-weight: 400;
+    letter-spacing: -0.03em; color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .brand-page .subtitle {
+    font-size: 16px; color: var(--text-muted); margin-bottom: 60px;
+    font-family: var(--font-sans);
+  }
+  .brand-section {
+    margin-bottom: 56px;
+  }
+  .brand-section h2 {
+    font-family: var(--font-sans); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted);
+    margin-bottom: 22px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Logo variants */
+  .logo-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  }
+  .logo-card {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 40px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16;
+    transition: all 0.2s;
+  }
+  .logo-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+  .logo-card.dark { background: var(--text-primary); border-color: transparent; }
+  .logo-card.purple { background: var(--accent-purple); border-color: transparent; }
+  .logo-card-label {
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .logo-card.dark .logo-card-label,
+  .logo-card.purple .logo-card-label { color: rgba(255,255,255,0.5); }
+
+  .logo-lockup { display: flex; align-items: center; gap: 12; }
+  .logo-lockup-text {
+    font-family: var(--font-sans); font-size: 18px; font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Colors */
+  .color-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px;
+  }
+  .color-card {
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .color-swatch { height: 80px; }
+  .color-info { padding: 12px 14px; }
+  .color-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+  .color-hex { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+  .color-use { font-size: 11px; color: #bbb; margin-top: 4px; }
+
+  /* Typography */
+  .type-specimen {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 32px; margin-bottom: 16px;
+  }
+  .type-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+  .type-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .type-meta { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+  .type-sample-large {
+    font-size: 42px; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+  .type-sample-body { font-size: 18px; line-height: 1.7; color: #444; }
+  .type-weights { display: flex; gap: 24px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+  .type-weight { font-size: 14px; color: var(--text-secondary); }
+  .type-weight span { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; font-family: var(--font-sans); }
+
+  /* Icon grid */
+  .icon-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px;
+  }
+  .icon-card {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px 16px; display: flex; flex-direction: column;
+    align-items: center; gap: 10; transition: all 0.2s;
+  }
+  .icon-card:hover { background: #fafafa; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+  .icon-card svg { color: var(--text-secondary); }
+  .icon-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+  /* Spacing */
+  .spacing-grid { display: flex; gap: 20px; flex-wrap: wrap; }
+  .spacing-item {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; width: 120px; display: flex;
+    flex-direction: column; align-items: center; gap: 8;
+  }
+  .spacing-visual {
+    background: var(--brand-purple-light); border-radius: 4px;
+  }
+  .spacing-label { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .spacing-value { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+
+  /* Components */
+  .component-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 20px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── PAGE TABS ─── -->
+<nav class="page-tabs">
+  <button class="page-tab active" onclick="showPage('app')">App Preview</button>
+  <button class="page-tab" onclick="showPage('brand')">Brand Guidelines</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE 1: APP PREVIEW                             -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-app" class="page active">
+  <div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <svg width="30" height="28" viewBox="0 0 38 36">
+          <rect x="0" y="4" width="32" height="32" rx="9" fill="#e14d2a"/>
+          <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+          <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+          <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+          <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#e14d2a"/>
+        </svg>
+        <span class="sidebar-logo-text">Ondoki</span>
+        <span class="sidebar-badge">CMP</span>
+      </div>
+
+      <div class="sidebar-search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Search...</span>
+        <span class="kbd">⌘K</span>
+      </div>
+
+      <div class="sidebar-nav">
+        <a class="nav-item" href="#">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          All Documents
+        </a>
+        <a class="nav-item" href="#">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Shared with me
+        </a>
+        <a class="nav-item" href="#">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Trash
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div style="padding: 0 8px; flex: 1; overflow-y: auto;">
+        <div class="sidebar-section-title">Collections</div>
+
+        <div class="folder-header open" onclick="this.classList.toggle('open'); this.nextElementSibling.style.display = this.classList.contains('open') ? 'block' : 'none';">
+          <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          Test
+          <span class="count">2</span>
+        </div>
+        <div class="folder-items">
+          <div class="doc-item active" style="animation-delay: 0s">Meeting</div>
+          <div class="doc-item" style="animation-delay: 0.04s">Brand Guidelines</div>
+        </div>
+
+        <div class="folder-header open" onclick="this.classList.toggle('open'); this.nextElementSibling.style.display = this.classList.contains('open') ? 'block' : 'none';">
+          <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          Unsorted
+          <span class="count">3</span>
+        </div>
+        <div class="folder-items">
+          <div class="doc-item" style="animation-delay: 0s">Untitled</div>
+          <div class="doc-item" style="animation-delay: 0.04s">Workflow: 2025-07-01</div>
+          <div class="doc-item" style="animation-delay: 0.08s">Workflow: Ondoki</div>
+        </div>
+      </div>
+
+      <div class="sidebar-user">
+        <div class="user-avatar">AH</div>
+        <span class="user-name">Alexander Höhne</span>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="topbar">
+        <div class="breadcrumb">
+          Test &nbsp;/&nbsp; <strong>Meeting</strong>
+        </div>
+        <div class="topbar-actions">
+          <span class="topbar-saved">Saved just now</span>
+          <button class="btn btn-outline">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share
+          </button>
+          <button class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <div class="canvas">
+        <div class="document">
+          <div class="tags">
+            <span class="tag tag-teams"><span class="tag-dot" style="background:#5b5fc7"></span> Microsoft Teams</span>
+            <span class="tag tag-claude"><span class="tag-dot" style="background:#e67e3c"></span> claude</span>
+            <span class="tag tag-test"><span class="tag-dot" style="background:#4a9a4a"></span> Test</span>
+            <button class="tag-add">+</button>
+          </div>
+
+          <h1 class="doc-title">Meeting</h1>
+
+          <div class="doc-meta">
+            <div class="user-avatar" style="width:28px;height:28px;font-size:10px">AH</div>
+            <div>
+              <div class="doc-meta-name">Alexander Höhne</div>
+              <div class="doc-meta-info">2 hours ago · 3 min read</div>
+            </div>
+          </div>
+
+          <div class="doc-body">
+            <p><span class="drop-cap">F</span>ar far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean. A small river named Duden flows by their place and supplies it with the necessary regelialia.</p>
+            <p>It is a paradisematic country, in which roasted parts of sentences fly into your mouth. Even the all-powerful Pointing has no control about the blind texts it is an almost unorthographic life. One day however a small line of blind text by the name of Lorem Ipsum decided to leave for the far World of Grammar.</p>
+            <p>The Big Oxmox advised her not to do so, because there were thousands of bad Commas, wild Question Marks and devious Semikoli, but the Little Blind Text didn't listen. She packed her seven versalia, put her initial into the belt and made herself on the way.</p>
+            <p>When she reached the first hills of the Italic Mountains, she had a last view back on the skyline of her hometown Bookmarksgrove, the headline of Alphabet Village and the subline of her own road, the Line Lane.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <span class="muted">284 words</span>
+        <span class="sep"></span>
+        <span>Document</span>
+        <span class="sep"></span>
+        <span class="sync-dot"></span>
+        <span class="muted" style="font-size:11px">Synced</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PAGE 2: BRAND GUIDELINES                        -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="page-brand" class="page" style="padding-top:44px;">
+  <div class="brand-page">
+
+    <h1>Brand Guidelines</h1>
+    <p class="subtitle">Ondoki CMP — Visual Identity System</p>
+
+    <!-- Logo -->
+    <div class="brand-section">
+      <h2>Logo</h2>
+      <div class="logo-grid">
+        <div class="logo-card">
+          <div class="logo-lockup">
+            <svg width="38" height="36" viewBox="0 0 38 36">
+              <rect x="0" y="4" width="32" height="32" rx="9" fill="#6C5CE7"/>
+              <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+              <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+              <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+              <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#00D2D3"/>
+            </svg>
+            <span class="logo-lockup-text" style="color:#111">Ondoki</span>
+          </div>
+          <span class="logo-card-label">Light Background</span>
+        </div>
+        <div class="logo-card dark">
+          <div class="logo-lockup">
+            <svg width="38" height="36" viewBox="0 0 38 36">
+              <rect x="0" y="4" width="32" height="32" rx="9" fill="#6C5CE7"/>
+              <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+              <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+              <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+              <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#00D2D3"/>
+            </svg>
+            <span class="logo-lockup-text" style="color:#fff">Ondoki</span>
+          </div>
+          <span class="logo-card-label">Dark Background</span>
+        </div>
+        <div class="logo-card purple">
+          <div class="logo-lockup">
+            <svg width="38" height="36" viewBox="0 0 38 36">
+              <rect x="0" y="4" width="32" height="32" rx="9" fill="rgba(255,255,255,0.2)"/>
+              <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+              <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+              <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+              <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#00D2D3"/>
+            </svg>
+            <span class="logo-lockup-text" style="color:#fff">Ondoki</span>
+          </div>
+          <span class="logo-card-label">Brand Background</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+        <!-- Icon only variants -->
+        <div class="logo-card" style="padding:30px">
+          <svg width="48" height="46" viewBox="0 0 38 36">
+            <rect x="0" y="4" width="32" height="32" rx="9" fill="#6C5CE7"/>
+            <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+            <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#00D2D3"/>
+          </svg>
+          <span class="logo-card-label">Icon — Full</span>
+        </div>
+        <div class="logo-card" style="padding:30px">
+          <svg width="40" height="40" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="9" fill="#6C5CE7"/>
+            <rect x="7" y="7" width="10" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="13.5" width="18" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="20" width="14" height="3.5" rx="1.75" fill="white"/>
+          </svg>
+          <span class="logo-card-label">Icon — Compact</span>
+        </div>
+        <div class="logo-card" style="padding:30px">
+          <svg width="24" height="24" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="9" fill="#6C5CE7"/>
+            <rect x="7" y="7" width="10" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="13.5" width="18" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="20" width="14" height="3.5" rx="1.75" fill="white"/>
+          </svg>
+          <span class="logo-card-label">Favicon — 24px</span>
+        </div>
+        <div class="logo-card" style="padding:30px">
+          <svg width="16" height="16" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="9" fill="#6C5CE7"/>
+            <rect x="7" y="7" width="10" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="13.5" width="18" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="20" width="14" height="3.5" rx="1.75" fill="white"/>
+          </svg>
+          <span class="logo-card-label">Favicon — 16px</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colors -->
+    <div class="brand-section">
+      <h2>Color Palette</h2>
+      <div class="color-grid">
+        <div class="color-card">
+          <div class="color-swatch" style="background:#6C5CE7"></div>
+          <div class="color-info">
+            <div class="color-name">Indigo</div>
+            <div class="color-hex">#6C5CE7</div>
+            <div class="color-use">Brand logo, badges, brand accent</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#00D2D3"></div>
+          <div class="color-info">
+            <div class="color-name">Cyan Spark</div>
+            <div class="color-hex">#00D2D3</div>
+            <div class="color-use">Sparkle accent, sync indicator</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#e14d2a"></div>
+          <div class="color-info">
+            <div class="color-name">Vermillion</div>
+            <div class="color-hex">#E14D2A</div>
+            <div class="color-use">UI accent, drop cap, active states</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#111111"></div>
+          <div class="color-info">
+            <div class="color-name">Ink</div>
+            <div class="color-hex">#111111</div>
+            <div class="color-use">Primary text, buttons, dark UI</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#555555"></div>
+          <div class="color-info">
+            <div class="color-name">Graphite</div>
+            <div class="color-hex">#555555</div>
+            <div class="color-use">Secondary text</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#999999"></div>
+          <div class="color-info">
+            <div class="color-name">Silver</div>
+            <div class="color-hex">#999999</div>
+            <div class="color-use">Muted text, timestamps</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#ebebeb"></div>
+          <div class="color-info">
+            <div class="color-name">Mist</div>
+            <div class="color-hex">#ebebeb</div>
+            <div class="color-use">Borders, dividers</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#fafafa"></div>
+          <div class="color-info">
+            <div class="color-name">Snow</div>
+            <div class="color-hex">#fafafa</div>
+            <div class="color-use">Sidebar, secondary surfaces</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-swatch" style="background:#ffffff; border-bottom: 1px solid #eee;"></div>
+          <div class="color-info">
+            <div class="color-name">White</div>
+            <div class="color-hex">#FFFFFF</div>
+            <div class="color-use">Canvas, primary surface</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <div style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px;">Semantic Tag Colors</div>
+        <div class="color-grid">
+          <div class="color-card">
+            <div class="color-swatch" style="background:#eef0ff; display:flex; align-items:center; justify-content:center;">
+              <span style="font-size:12px;font-weight:500;color:#4145a0">● Microsoft Teams</span>
+            </div>
+            <div class="color-info">
+              <div class="color-name">Teams Tag</div>
+              <div class="color-hex">bg: #eef0ff · text: #4145a0</div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div class="color-swatch" style="background:#fff0e8; display:flex; align-items:center; justify-content:center;">
+              <span style="font-size:12px;font-weight:500;color:#b55d24">● claude</span>
+            </div>
+            <div class="color-info">
+              <div class="color-name">Claude Tag</div>
+              <div class="color-hex">bg: #fff0e8 · text: #b55d24</div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div class="color-swatch" style="background:#edf7ed; display:flex; align-items:center; justify-content:center;">
+              <span style="font-size:12px;font-weight:500;color:#357435">● Test</span>
+            </div>
+            <div class="color-info">
+              <div class="color-name">Test Tag</div>
+              <div class="color-hex">bg: #edf7ed · text: #357435</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typography -->
+    <div class="brand-section">
+      <h2>Typography</h2>
+
+      <div class="type-specimen">
+        <div class="type-header">
+          <span class="type-name">Newsreader — Display & Body Serif</span>
+          <span class="type-meta">Google Fonts · Variable</span>
+        </div>
+        <div class="type-sample-large" style="font-family:'Newsreader',Georgia,serif;">
+          The quick brown fox jumps over the lazy dog
+        </div>
+        <div class="type-sample-body" style="font-family:'Newsreader',Georgia,serif; font-weight:300;">
+          Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts.
+        </div>
+        <div class="type-weights">
+          <span class="type-weight" style="font-family:'Newsreader',serif; font-weight:300;">Light Aa <span>300</span></span>
+          <span class="type-weight" style="font-family:'Newsreader',serif; font-weight:400;">Regular Aa <span>400</span></span>
+          <span class="type-weight" style="font-family:'Newsreader',serif; font-weight:500;">Medium Aa <span>500</span></span>
+          <span class="type-weight" style="font-family:'Newsreader',serif; font-weight:600;">SemiBold Aa <span>600</span></span>
+          <span class="type-weight" style="font-family:'Newsreader',serif; font-weight:400; font-style:italic;">Italic Aa <span>400i</span></span>
+        </div>
+      </div>
+
+      <div class="type-specimen">
+        <div class="type-header">
+          <span class="type-name">Instrument Sans — UI & Interface</span>
+          <span class="type-meta">Google Fonts · Variable</span>
+        </div>
+        <div class="type-sample-large" style="font-family:'Instrument Sans',sans-serif; font-size:36px;">
+          The quick brown fox jumps over the lazy dog
+        </div>
+        <div class="type-sample-body" style="font-family:'Instrument Sans',sans-serif; font-size:14px; line-height:1.6;">
+          Used for navigation, buttons, labels, metadata, and all interface elements. Clean and readable at small sizes.
+        </div>
+        <div class="type-weights">
+          <span class="type-weight" style="font-family:'Instrument Sans',sans-serif; font-weight:400;">Regular Aa <span>400</span></span>
+          <span class="type-weight" style="font-family:'Instrument Sans',sans-serif; font-weight:500;">Medium Aa <span>500</span></span>
+          <span class="type-weight" style="font-family:'Instrument Sans',sans-serif; font-weight:600;">SemiBold Aa <span>600</span></span>
+          <span class="type-weight" style="font-family:'Instrument Sans',sans-serif; font-weight:700;">Bold Aa <span>700</span></span>
+        </div>
+      </div>
+
+      <div class="type-specimen" style="background:#fafafa; border-color:#f0f0f0;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:16px; text-transform:uppercase; letter-spacing:0.08em;">Type Scale</div>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; align-items:baseline; gap:20px;">
+            <span style="font-family:monospace; font-size:11px; color:#aaa; width:80px;">56px / 1.05</span>
+            <span style="font-family:'Newsreader',serif; font-size:56px; line-height:1.05; letter-spacing:-0.03em; color:#111;">Document Title</span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:20px;">
+            <span style="font-family:monospace; font-size:11px; color:#aaa; width:80px;">18px / 1.75</span>
+            <span style="font-family:'Newsreader',serif; font-size:18px; line-height:1.75; font-weight:300; color:#2a2a2a;">Body text — the heart of every document</span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:20px;">
+            <span style="font-family:monospace; font-size:11px; color:#aaa; width:80px;">15px / 1.4</span>
+            <span style="font-family:'Instrument Sans',sans-serif; font-size:15px; font-weight:600; color:#111;">Sidebar Logo</span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:20px;">
+            <span style="font-family:monospace; font-size:11px; color:#aaa; width:80px;">13px / 1.4</span>
+            <span style="font-family:'Instrument Sans',sans-serif; font-size:13px; font-weight:500; color:#666;">Navigation Item</span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:20px;">
+            <span style="font-family:monospace; font-size:11px; color:#aaa; width:80px;">12px / 1.4</span>
+            <span style="font-family:'Instrument Sans',sans-serif; font-size:12px; font-weight:500; color:#555;">Button Label</span>
+          </div>
+          <div style="display:flex; align-items:baseline; gap:20px;">
+            <span style="font-family:monospace; font-size:11px; color:#aaa; width:80px;">10px / 1.2</span>
+            <span style="font-family:'Instrument Sans',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#aaa;">SECTION LABEL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Icons -->
+    <div class="brand-section">
+      <h2>UI Icons</h2>
+      <div class="icon-grid">
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <span class="icon-label">Document</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <span class="icon-label">Shared</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          <span class="icon-label">Trash</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span class="icon-label">Search</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <span class="icon-label">Share</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="icon-label">Export</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+          <span class="icon-label">Chevron</span>
+        </div>
+        <div class="icon-card">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+          <span class="icon-label">Folder</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Components -->
+    <div class="brand-section">
+      <h2>Components</h2>
+
+      <div style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:12px;">Buttons</div>
+      <div class="component-row">
+        <button class="btn btn-primary" style="padding:8px 20px;">Primary</button>
+        <button class="btn btn-accent" style="padding:8px 20px;">Brand</button>
+        <button class="btn btn-outline" style="padding:8px 20px; background:var(--accent); color:#fff; border-color:var(--accent);">Accent</button>
+        <button class="btn btn-outline" style="padding:8px 20px;">Outline</button>
+      </div>
+
+      <div style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:12px; margin-top:24px;">Tags</div>
+      <div class="component-row">
+        <span class="tag tag-teams"><span class="tag-dot" style="background:#5b5fc7"></span> Microsoft Teams</span>
+        <span class="tag tag-claude"><span class="tag-dot" style="background:#e67e3c"></span> claude</span>
+        <span class="tag tag-test"><span class="tag-dot" style="background:#4a9a4a"></span> Test</span>
+        <button class="tag-add">+</button>
+      </div>
+
+      <div style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:12px; margin-top:24px;">Status Bar</div>
+      <div class="component-row">
+        <div style="background:#111;color:#fff;padding:7px 18px;border-radius:24px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:14px;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+          <span style="color:#999">284 words</span>
+          <span style="width:1px;height:12px;background:rgba(255,255,255,0.15)"></span>
+          <span>Document</span>
+          <span style="width:1px;height:12px;background:rgba(255,255,255,0.15)"></span>
+          <span style="width:7px;height:7px;border-radius:50%;background:#00D2D3"></span>
+          <span style="font-size:11px;color:#999">Synced</span>
+        </div>
+      </div>
+
+      <div style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:12px; margin-top:24px;">Badge</div>
+      <div class="component-row">
+        <span style="font-size:10px;font-weight:700;color:#fff;background:#6C5CE7;border-radius:4px;padding:3px 8px;letter-spacing:0.04em;text-transform:uppercase;">CMP</span>
+        <span style="font-size:10px;font-weight:700;color:#fff;background:#111;border-radius:4px;padding:3px 8px;letter-spacing:0.04em;text-transform:uppercase;">PRO</span>
+        <span style="font-size:10px;font-weight:700;color:#357435;background:#edf7ed;border-radius:4px;padding:3px 8px;letter-spacing:0.04em;text-transform:uppercase;">ACTIVE</span>
+      </div>
+
+      <div style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:12px; margin-top:24px;">Radius & Spacing</div>
+      <div class="spacing-grid">
+        <div class="spacing-item">
+          <div class="spacing-visual" style="width:60px;height:40px;border-radius:5px;"></div>
+          <span class="spacing-label">Small</span>
+          <span class="spacing-value">5px</span>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-visual" style="width:60px;height:40px;border-radius:7px;"></div>
+          <span class="spacing-label">Default</span>
+          <span class="spacing-value">7px</span>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-visual" style="width:60px;height:40px;border-radius:8px;"></div>
+          <span class="spacing-label">Medium</span>
+          <span class="spacing-value">8px</span>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-visual" style="width:60px;height:40px;border-radius:12px;"></div>
+          <span class="spacing-label">Large</span>
+          <span class="spacing-value">12px</span>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-visual" style="width:40px;height:40px;border-radius:50%;"></div>
+          <span class="spacing-label">Circle</span>
+          <span class="spacing-value">50%</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>

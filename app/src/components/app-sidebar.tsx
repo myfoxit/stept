@@ -156,7 +156,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     width="32"
                     height="32"
                     rx="9"
-                    fill="#6C5CE7"
+                    fill="#E14D2A"
                   />
                   <rect
                     x="7"
@@ -184,7 +184,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                   <path
                     d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#00D2D3"
+                    fill="#E14D2A"
                   />
                 </svg>
                 <span
@@ -364,7 +364,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <div className="px-3 pb-2">
         <button
           onClick={openSpotlight}
-          className="flex w-full items-center gap-2 rounded-lg bg-[#f1effe] px-3 py-2 text-left transition-colors hover:border-[#ddd7f8] border border-transparent"
+          className="flex w-full items-center gap-2 rounded-lg bg-[#ffffff] px-3 py-2 text-left transition-colors border-[#ebebeb] border"
         >
           <Search className="h-3.5 w-3.5 text-[#a5a2b4] flex-shrink-0" />
           <span className="text-[0.78rem] font-medium text-[#a5a2b4]">
