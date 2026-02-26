@@ -419,10 +419,9 @@ const SpotlightApp: React.FC = () => {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
-          width: 580, background: 'rgba(255, 255, 255, 0.82)', borderRadius: 20,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          width: 580, background: '#ffffff', borderRadius: 20,
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+          border: '1px solid #e4e1ed',
           padding: '40px 0', textAlign: 'center', color: '#A0A0B2', fontSize: 13,
           fontFamily: "'DM Sans', sans-serif",
         }}>Loading...</div>
@@ -435,10 +434,9 @@ const SpotlightApp: React.FC = () => {
       onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
 
       <div style={{
-        width: 580, maxWidth: '94vw', background: 'rgba(255, 255, 255, 0.82)', borderRadius: 20,
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-        border: '1px solid rgba(255, 255, 255, 0.5)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        width: 580, maxWidth: '94vw', background: '#ffffff', borderRadius: 20,
+        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+        border: '1px solid #e4e1ed',
         overflow: 'hidden', fontFamily: "'DM Sans', sans-serif",
         animation: 'spotlightIn 0.15s ease-out',
       }}>
