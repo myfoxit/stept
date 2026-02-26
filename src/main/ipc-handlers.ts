@@ -277,13 +277,6 @@ export function setupIpcHandlers(
     return contextWatcher.getLastActiveContext() || await contextWatcher.getActiveContext();
   });
 
-  ipcMain.handle('context:pause', () => { contextWatcher.pause(); });
-  ipcMain.handle('context:resume', () => { contextWatcher.resume(); });
-
-  // App-level events for spotlight show/hide
-  app.on('context-pause' as any, () => { contextWatcher.pause(); });
-  app.on('context-resume' as any, () => { contextWatcher.resume(); });
-
   ipcMain.handle('context:add-link', async (event, data: {
     project_id: string; match_type: string; match_value: string;
     resource_type: string; resource_id: string; note?: string;

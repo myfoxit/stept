@@ -42,7 +42,6 @@ export class ContextWatcherService extends EventEmitter {
   private accessToken: string = '';
   private projectId: string = '';
   private enabled: boolean = false;
-  private paused: boolean = false;
 
   private nativeBinaryPath: string;
 
@@ -81,14 +80,8 @@ export class ContextWatcherService extends EventEmitter {
     }
   }
 
-  /** Pause polling — keeps cached context frozen (use when spotlight is visible) */
-  pause() { this.paused = true; }
-
-  /** Resume polling */
-  resume() { this.paused = false; }
-
   private async check() {
-    if (!this.enabled || this.paused || !this.apiBaseUrl || !this.accessToken) return;
+    if (!this.enabled || !this.apiBaseUrl || !this.accessToken) return;
 
     try {
       const ctx = await this.getActiveContext();
@@ -171,8 +164,9 @@ export class ContextWatcherService extends EventEmitter {
         return null;
       }
 
-      // Only ignore our own app
-      if (!appName || appName === 'Electron' || appName.toLowerCase() === 'ondoki desktop' || appName.toLowerCase() === 'ondoki-desktop') return null;
+      // Ignore our own app and common shell/terminal hosts
+      const IGNORE_APPS = ['Electron', 'Ondoki Desktop', 'ondoki-desktop', 'powershell', 'WindowsTerminal', 'cmd', 'conhost', 'Windows PowerShell', 'Command Prompt'];
+      if (!appName || IGNORE_APPS.some(i => appName.toLowerCase() === i.toLowerCase())) return null;
 
       const ctx: ActiveContext = { windowTitle, appName };
 

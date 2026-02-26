@@ -261,8 +261,6 @@ class OndokiApp {
 
     this.spotlightWindow!.setBounds({ x, y, width: winWidth, height: winHeight });
     this.lastSpotlightShowTime = Date.now();
-    // Pause context polling so cached context stays frozen while spotlight is open
-    app.emit('context-pause');
     this.spotlightWindow!.show();
     this.spotlightWindow!.focus();
     this.spotlightWindow!.webContents.send('spotlight:show', this.lastProjectId);
@@ -272,8 +270,6 @@ class OndokiApp {
     if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
       this.spotlightWindow.hide();
     }
-    // Resume context polling
-    app.emit('context-resume');
   }
 
   private createSpotlightWindow(): void {
