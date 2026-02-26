@@ -57,6 +57,12 @@ class OndokiApp {
     await app.whenReady();
     Menu.setApplicationMenu(null);
 
+    // Set dock icon on macOS
+    if (process.platform === 'darwin') {
+      const dockIcon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'icon512.png'));
+      if (!dockIcon.isEmpty()) app.dock?.setIcon(dockIcon);
+    }
+
     this.createTray();
     this.registerGlobalShortcuts();
 
@@ -425,10 +431,13 @@ class OndokiApp {
       return;
     }
 
+    const windowIcon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'icon256.png'));
     this.settingsWindow = new BrowserWindow({
-      width: 500,
-      height: 580,
+      width: 480,
+      height: 560,
       title: 'Ondoki Settings',
+      icon: windowIcon,
+      alwaysOnTop: true,
       resizable: false,
       minimizable: false,
       maximizable: false,
@@ -454,7 +463,7 @@ class OndokiApp {
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'DM Sans', sans-serif; background: #F5F5F5; color: #1A1A2E; padding: 24px; }
+  body { font-family: 'DM Sans', sans-serif; background: #FFFFFF; color: #111111; padding: 24px; }
   h1 { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 24px; letter-spacing: -0.03em; }
   .section { margin-bottom: 20px; }
   .section-title { font-size: 11px; font-weight: 600; color: #A0A0B2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }

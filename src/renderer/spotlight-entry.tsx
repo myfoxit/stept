@@ -363,6 +363,15 @@ const SpotlightApp: React.FC = () => {
     window.electronAPI?.spotlightDismiss?.();
   }, []);
 
+  // Global ESC handler — works even when input isn't focused
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismiss();
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, [dismiss]);
+
   const handleLogin = useCallback(async () => {
     try {
       await window.electronAPI?.initiateLogin();
