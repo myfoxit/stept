@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   IconLink,
   IconPlus,
   IconX,
   IconWorld,
   IconDeviceDesktop,
-  IconChevronDown,
   IconSearch,
   IconRegex,
   IconWindowMaximize,
@@ -30,10 +29,11 @@ import {
   listContextLinks,
   createContextLink,
   deleteContextLink,
+  listKnownApps,
   type ContextLink,
+  type KnownApp,
 } from '@/api/context-links';
-import { useProject } from '@/providers/project-provider';
-import { apiClient } from '@/lib/apiClient';
+import { cn } from '@/lib/utils';
 
 interface ContextLinkPanelProps {
   projectId: string;
@@ -52,36 +52,59 @@ const MATCH_ICONS: Record<string, typeof IconWorld> = {
   window_regex: IconRegex,
 };
 
-const PLACEHOLDERS: Record<string, string> = {
-  url_pattern: '*.salesforce.com/*',
-  url_exact: 'https://app.example.com/dashboard',
-  url_regex: 'https://.*\\.example\\.com/.*',
-  app_name: 'Excel',
-  app_exact: 'Microsoft Excel',
-  app_regex: '(Code|IntelliJ)',
-  window_title: 'Customer Portal',
-  window_regex: 'PR #\\d+',
+type MatchCategory = 'url' | 'app' | 'window';
+type MatchHow = 'contains' | 'exact' | 'regex';
+
+const MATCH_TYPE_MAP: Record<MatchCategory, Record<MatchHow, string>> = {
+  url: { contains: 'url_pattern', exact: 'url_exact', regex: 'url_regex' },
+  app: { contains: 'app_name', exact: 'app_exact', regex: 'app_regex' },
+  window: { contains: 'window_title', exact: 'window_title', regex: 'window_regex' },
 };
 
-interface SearchResult {
-  type: string;
-  id: string;
-  name: string;
-}
+const VALUE_PLACEHOLDERS: Record<MatchCategory, Record<MatchHow, string>> = {
+  url: {
+    contains: 'e.g. salesforce.com',
+    exact: 'e.g. https://app.example.com/dashboard',
+    regex: 'e.g. https://.*\\.example\\.com/.*',
+  },
+  app: {
+    contains: 'e.g. Excel',
+    exact: 'e.g. Microsoft Excel',
+    regex: 'e.g. (Code|IntelliJ)',
+  },
+  window: {
+    contains: 'e.g. Customer Portal',
+    exact: 'e.g. Customer Portal - Dashboard',
+    regex: 'e.g. PR #\\d+',
+  },
+};
+
+const POPULAR_APP_NAMES = [
+  'VS Code', 'Chrome', 'Figma', 'Slack', 'Excel', 'Word',
+  'Notion', 'Terminal', 'Safari', 'Firefox', 'Xcode', 'IntelliJ',
+  'Postman', 'Photoshop', 'Teams', 'Zoom',
+];
 
 export function ContextLinkPanel({ projectId, resourceType, resourceId }: ContextLinkPanelProps) {
   const [links, setLinks] = useState<ContextLink[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [matchType, setMatchType] = useState('url_pattern');
+
+  // Two-step form state
+  const [matchCategory, setMatchCategory] = useState<MatchCategory>('url');
+  const [matchHow, setMatchHow] = useState<MatchHow>('contains');
   const [matchValue, setMatchValue] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Search existing contexts to add
+  // Search existing contexts
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [allLinks, setAllLinks] = useState<ContextLink[]>([]);
   const [searchResults, setSearchResults] = useState<ContextLink[]>([]);
+
+  // App picker state
+  const [knownApps, setKnownApps] = useState<KnownApp[]>([]);
+  const [appSearchQuery, setAppSearchQuery] = useState('');
 
   useEffect(() => {
     loadLinks();
@@ -99,7 +122,6 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
   const loadAllLinks = async () => {
     try {
       const data = await listContextLinks(projectId);
-      // Filter out links already on this resource
       const existing = new Set(links.map(l => l.id));
       setAllLinks(data.filter(l => !existing.has(l.id)));
       setSearchResults(data.filter(l => !existing.has(l.id)));
@@ -124,13 +146,42 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
     }
   }, [searchQuery, allLinks]);
 
+  // Load known apps when app category is selected
+  useEffect(() => {
+    if (matchCategory === 'app' && knownApps.length === 0) {
+      listKnownApps().then(setKnownApps).catch(() => {});
+    }
+  }, [matchCategory]);
+
+  // Reset value when category changes
+  useEffect(() => {
+    setMatchValue('');
+    setAppSearchQuery('');
+  }, [matchCategory]);
+
+  const getMatchType = (): string => MATCH_TYPE_MAP[matchCategory][matchHow];
+
+  // Find aliases for selected app
+  const selectedAppInfo = knownApps.find(
+    a => a.name.toLowerCase() === matchValue.toLowerCase()
+  );
+
+  // Filtered apps for autocomplete
+  const filteredApps = appSearchQuery.trim()
+    ? knownApps.filter(app => {
+        const q = appSearchQuery.toLowerCase();
+        return app.name.toLowerCase().includes(q) ||
+               app.aliases.some(a => a.toLowerCase().includes(q));
+      })
+    : [];
+
   const handleCreate = async () => {
     if (!matchValue.trim()) return;
     setSaving(true);
     try {
       await createContextLink({
         project_id: projectId,
-        match_type: matchType,
+        match_type: getMatchType(),
         match_value: matchValue,
         resource_type: resourceType,
         resource_id: resourceId,
@@ -175,6 +226,17 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
     }
   };
 
+  const handleAppChipClick = (appName: string) => {
+    setMatchValue(appName);
+    setAppSearchQuery('');
+  };
+
+  // Map popular app names to known app data (fall back to stub)
+  const popularApps = POPULAR_APP_NAMES.map(name => {
+    const known = knownApps.find(a => a.name === name);
+    return known || { name, aliases: [] as string[], bundle_id: '' };
+  });
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {/* Existing context links as tags */}
@@ -216,8 +278,8 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
             {links.length === 0 ? 'Add context' : <IconPlus className="h-3 w-3" />}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 p-3" align="start">
-          {/* Toggle between new and search existing */}
+        <PopoverContent className="w-80 p-3" align="start">
+          {/* Toggle between New and Search Existing */}
           <div className="mb-3 flex gap-1">
             <Button
               variant={!searchMode ? 'default' : 'outline'}
@@ -239,6 +301,7 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
           </div>
 
           {searchMode ? (
+            /* === SEARCH EXISTING MODE (unchanged) === */
             <div className="space-y-2">
               <Input
                 placeholder="Search existing context links..."
@@ -276,35 +339,137 @@ export function ContextLinkPanel({ projectId, resourceType, resourceId }: Contex
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <Select value={matchType} onValueChange={setMatchType}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="url_pattern">URL Pattern</SelectItem>
-                  <SelectItem value="url_exact">Exact URL</SelectItem>
-                  <SelectItem value="url_regex">URL Regex</SelectItem>
-                  <SelectItem value="app_name">App Name</SelectItem>
-                  <SelectItem value="app_exact">App (Exact)</SelectItem>
-                  <SelectItem value="app_regex">App Regex</SelectItem>
-                  <SelectItem value="window_title">Window Title</SelectItem>
-                  <SelectItem value="window_regex">Window Regex</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder={PLACEHOLDERS[matchType]}
-                value={matchValue}
-                onChange={e => setMatchValue(e.target.value)}
-                className="h-7 text-xs"
-                autoFocus
-              />
+            /* === NEW LINK CREATION (redesigned two-step) === */
+            <div className="space-y-3">
+              {/* Step 1: WHAT to match */}
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">Match</div>
+                <div className="flex gap-1">
+                  {([
+                    { key: 'url' as MatchCategory, label: 'URL', icon: '🌐' },
+                    { key: 'app' as MatchCategory, label: 'App', icon: '💻' },
+                    { key: 'window' as MatchCategory, label: 'Title', icon: '📝' },
+                  ]).map(({ key, label, icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setMatchCategory(key)}
+                      className={cn(
+                        'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                        matchCategory === key
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <span className="text-sm leading-none">{icon}</span>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 2: HOW to match */}
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">How</div>
+                <Select value={matchHow} onValueChange={v => setMatchHow(v as MatchHow)}>
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contains">contains</SelectItem>
+                    <SelectItem value="exact">is exactly</SelectItem>
+                    <SelectItem value="regex">matches regex</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Step 3: VALUE input */}
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">Value</div>
+
+                {matchCategory === 'app' && matchHow !== 'regex' ? (
+                  /* App picker: chips + search */
+                  <div className="space-y-2">
+                    {/* Popular app chips */}
+                    <div className="flex flex-wrap gap-1">
+                      {popularApps.map(app => (
+                        <button
+                          key={app.name}
+                          onClick={() => handleAppChipClick(app.name)}
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
+                            matchValue === app.name
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                          )}
+                        >
+                          {app.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Search / type custom app name */}
+                    <div className="relative">
+                      <Input
+                        placeholder="Or type app name..."
+                        value={matchValue}
+                        onChange={e => {
+                          setMatchValue(e.target.value);
+                          setAppSearchQuery(e.target.value);
+                        }}
+                        className="h-7 text-xs"
+                      />
+                      {/* Autocomplete dropdown */}
+                      {appSearchQuery.trim() && filteredApps.length > 0 && (
+                        <div className="absolute left-0 top-full z-10 mt-1 max-h-32 w-full overflow-y-auto rounded-md border bg-popover p-1 shadow-md">
+                          {filteredApps.slice(0, 8).map(app => (
+                            <button
+                              key={app.name}
+                              onClick={() => {
+                                setMatchValue(app.name);
+                                setAppSearchQuery('');
+                              }}
+                              className="flex w-full items-center justify-between rounded-sm px-2 py-1 text-left text-xs hover:bg-accent"
+                            >
+                              <span className="font-medium">{app.name}</span>
+                              {app.aliases.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {app.aliases.slice(0, 2).join(', ')}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Show aliases for selected app */}
+                    {selectedAppInfo && selectedAppInfo.aliases.length > 0 && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Also matches: {selectedAppInfo.aliases.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  /* Standard text input for URL, Window Title, or App regex */
+                  <Input
+                    placeholder={VALUE_PLACEHOLDERS[matchCategory][matchHow]}
+                    value={matchValue}
+                    onChange={e => setMatchValue(e.target.value)}
+                    className="h-7 text-xs"
+                    autoFocus
+                  />
+                )}
+              </div>
+
+              {/* Note */}
               <Input
                 placeholder="Note (optional)"
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 className="h-7 text-xs"
               />
+
+              {/* Actions */}
               <div className="flex justify-end gap-1">
                 <Button
                   size="sm"
