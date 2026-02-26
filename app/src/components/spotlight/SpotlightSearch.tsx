@@ -82,7 +82,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, selectedProjectId, isQuestionLike]);
+  }, [query, selectedProjectId]);
 
   const handleSelect = (result: UnifiedSearchResult) => {
     onOpenChange(false);
