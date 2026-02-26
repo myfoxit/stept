@@ -157,14 +157,21 @@ class OndokiApp {
     });
   }
 
+  /** Get the display where the mouse cursor currently is. */
+  private getMouseDisplay(): Electron.Display {
+    const cursorPoint = screen.getCursorScreenPoint();
+    return screen.getDisplayNearestPoint(cursorPoint);
+  }
+
   private async showCountdownOverlay(): Promise<void> {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenW } = primaryDisplay.workAreaSize;
+    const mouseDisplay = this.getMouseDisplay();
+    const { width: screenW } = mouseDisplay.workAreaSize;
+    const workArea = mouseDisplay.workArea;
 
     const pillW = 220;
     const pillH = 48;
-    const x = Math.round((screenW - pillW) / 2);
-    const y = 32; // near top of screen
+    const x = workArea.x + Math.round((screenW - pillW) / 2);
+    const y = workArea.y + 32; // near top of the active display
 
     this.countdownWindow = new BrowserWindow({
       width: pillW, height: pillH,
@@ -245,12 +252,12 @@ class OndokiApp {
       this.createSpotlightWindow();
     }
 
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+    const mouseDisplay = this.getMouseDisplay();
+    const workArea = mouseDisplay.workArea;
     const winWidth = 620;
     const winHeight = 560;
-    const x = Math.round((screenW - winWidth) / 2);
-    const y = Math.round(screenH * 0.16);
+    const x = workArea.x + Math.round((workArea.width - winWidth) / 2);
+    const y = workArea.y + Math.round(workArea.height * 0.16);
 
     this.spotlightWindow!.setBounds({ x, y, width: winWidth, height: winHeight });
     this.lastSpotlightShowTime = Date.now();
@@ -612,17 +619,23 @@ class OndokiApp {
       return;
     }
 
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+    const mouseDisplay = this.getMouseDisplay();
+    const workArea = mouseDisplay.workArea;
     const winW = 720;
     const winH = 520;
 
+    // Hide spotlight while picker is open so it doesn't obscure the picker
+    if (this.spotlightWindow && !this.spotlightWindow.isDestroyed() && this.spotlightWindow.isVisible()) {
+      this.spotlightWindow.hide();
+    }
+
     this.pickerWindow = new BrowserWindow({
       width: winW, height: winH,
-      x: Math.round((screenW - winW) / 2),
-      y: Math.round((screenH - winH) / 2),
+      x: workArea.x + Math.round((workArea.width - winW) / 2),
+      y: workArea.y + Math.round((workArea.height - winH) / 2),
       title: 'Choose Capture Source',
       resizable: false, minimizable: false, maximizable: false,
+      alwaysOnTop: true,
       webPreferences: { nodeIntegration: false, contextIsolation: true, preload: PRELOAD_PATH },
     });
 
@@ -632,6 +645,8 @@ class OndokiApp {
         this.pickerResolve = null;
       }
       this.pickerWindow = null;
+      // Restore spotlight after picker closes
+      this.showSpotlightWindow();
     });
 
     const pickerHtml = this.generatePickerHtml(screenSources, windowSources);

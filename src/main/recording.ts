@@ -1033,20 +1033,80 @@ export class RecordingService extends EventEmitter {
       });
 
       this.overlayWindow.setIgnoreMouseEvents(true);
+      this.overlayWindow.setVisibleOnAllWorkspaces(true);
 
-      await this.overlayWindow.loadURL(`data:text/html,${encodeURIComponent(`
-        <!DOCTYPE html><html><head><style>
-          body { margin:0; width:100vw; height:100vh;
-                 border:2px solid #ef4444; box-sizing:border-box;
-                 background:transparent; pointer-events:none;
-                 animation:pulse 2s ease-in-out infinite; }
-          @keyframes pulse {
-            0%,100% { border-color:#ef4444; }
-            50% { border-color:#dc2626; box-shadow:inset 0 0 12px rgba(239,68,68,0.15); }
-          }
-        </style></head><body></body></html>
-      `)}`);
+      // On macOS, use screen-saver level so the overlay floats above everything
+      // without intercepting input or appearing in screen captures
+      if (process.platform === 'darwin') {
+        this.overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+      }
 
+      const overlayHtml = `<!DOCTYPE html><html><head><style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+        .border-overlay {
+          position: absolute;
+          inset: 0;
+          border: 2.5px dashed rgba(139, 92, 246, 0.85);
+          border-radius: 4px;
+          pointer-events: none;
+          animation: march 1s linear infinite, glow 2s ease-in-out infinite;
+        }
+        @keyframes march {
+          to { border-dash-offset: 20px; }
+        }
+        /* Marching ants via rotating background on a pseudo-element */
+        .border-overlay::before {
+          content: '';
+          position: absolute;
+          inset: -3px;
+          border: 2.5px solid transparent;
+          border-radius: 4px;
+          background: repeating-linear-gradient(
+            90deg,
+            rgba(139, 92, 246, 0.9) 0px,
+            rgba(139, 92, 246, 0.9) 6px,
+            transparent 6px,
+            transparent 12px
+          ) border-box;
+          -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: dash-march 0.4s linear infinite;
+        }
+        @keyframes dash-march {
+          to { background-position: 12px 0; }
+        }
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 6px rgba(139, 92, 246, 0.25); }
+          50% { box-shadow: 0 0 12px rgba(139, 92, 246, 0.45); }
+        }
+        .corner { position: absolute; width: 12px; height: 12px; }
+        .corner::before, .corner::after {
+          content: ''; position: absolute; background: rgba(139, 92, 246, 0.9); border-radius: 1px;
+        }
+        .corner-tl { top: -1px; left: -1px; }
+        .corner-tl::before { width: 12px; height: 2.5px; top: 0; left: 0; }
+        .corner-tl::after { width: 2.5px; height: 12px; top: 0; left: 0; }
+        .corner-tr { top: -1px; right: -1px; }
+        .corner-tr::before { width: 12px; height: 2.5px; top: 0; right: 0; }
+        .corner-tr::after { width: 2.5px; height: 12px; top: 0; right: 0; }
+        .corner-bl { bottom: -1px; left: -1px; }
+        .corner-bl::before { width: 12px; height: 2.5px; bottom: 0; left: 0; }
+        .corner-bl::after { width: 2.5px; height: 12px; bottom: 0; left: 0; }
+        .corner-br { bottom: -1px; right: -1px; }
+        .corner-br::before { width: 12px; height: 2.5px; bottom: 0; right: 0; }
+        .corner-br::after { width: 2.5px; height: 12px; bottom: 0; right: 0; }
+      </style></head><body>
+        <div class="border-overlay">
+          <div class="corner corner-tl"></div>
+          <div class="corner corner-tr"></div>
+          <div class="corner corner-bl"></div>
+          <div class="corner corner-br"></div>
+        </div>
+      </body></html>`;
+
+      await this.overlayWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(overlayHtml)}`);
       this.overlayWindow.show();
 
       if (this.captureArea.type === 'window' && this.captureArea.windowHandle) {
