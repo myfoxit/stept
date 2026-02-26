@@ -80,6 +80,32 @@ def _extract_snippet(
     return ""
 
 
+def _extract_text_snippet(text: str, query: str, max_len: int = 160) -> str:
+    """Extract a snippet from raw text around the first match, with <mark> highlights."""
+    import re
+    if not text or not query:
+        return (text or "")[:max_len]
+    words = re.findall(r'\w+', query.strip())
+    if not words:
+        return text[:max_len]
+    pattern = re.compile('|'.join(re.escape(w) for w in words), re.IGNORECASE)
+    match = pattern.search(text)
+    if match:
+        start = max(0, match.start() - 40)
+        end = min(len(text), match.start() + max_len - 40)
+        snippet = text[start:end].strip()
+        if start > 0:
+            snippet = "…" + snippet
+        if end < len(text):
+            snippet = snippet + "…"
+    else:
+        snippet = text[:max_len]
+        if len(text) > max_len:
+            snippet += "…"
+    snippet = pattern.sub(lambda m: f"<mark>{m.group()}</mark>", snippet)
+    return snippet
+
+
 def _highlight(text: str, query: str) -> str:
     """Simple case-insensitive highlight using <mark> tags."""
     if not text or not query:
@@ -667,10 +693,15 @@ async def _search_documents_keyword(
         ts_result = await db.execute(ts_stmt, {"tsq": tsq, "project_id": project_id, "user_id": user_id, "limit": limit})
         ts_rows = ts_result.fetchall()
         if ts_rows:
-            return [
-                {"type": "document", "id": row.id, "name": row.name, "preview": (row.search_text or "")[:200], "score": round(float(row.rank), 4)}
-                for row in ts_rows
-            ]
+            results = []
+            for row in ts_rows:
+                snippet = _extract_text_snippet(row.search_text or "", query)
+                results.append({
+                    "type": "document", "id": row.id, "name": row.name,
+                    "preview": snippet, "snippet": snippet,
+                    "score": round(float(row.rank), 4),
+                })
+            return results
     except Exception:
         pass
 
@@ -709,12 +740,13 @@ async def _search_documents_keyword(
             if name_match:
                 score = max(score, 0.5)
 
-        preview = text_content[:200] if text_content else ""
+        snippet = _extract_text_snippet(text_content, query) if text_content else ""
         scored.append({
             "type": "document",
             "id": doc.id,
             "name": name,
-            "preview": preview,
+            "preview": snippet,
+            "snippet": snippet,
             "score": round(score, 4),
         })
 
