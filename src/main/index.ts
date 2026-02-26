@@ -987,14 +987,14 @@ class OndokiApp {
 
   private createTray(): void {
     const iconPath = path.join(__dirname, '..', '..', 'assets');
-    const icon16 = nativeImage.createFromPath(path.join(iconPath, 'icon.png'));
 
-    const trayIcon = icon16.resize({ width: 16, height: 16 });
-    trayIcon.setTemplateImage(true);
+    // Use pre-generated sized icons
+    const trayIcon = nativeImage.createFromPath(path.join(iconPath, 'trayIcon.png'));
+    trayIcon.setTemplateImage(false); // Color icon, not template
     this.normalTrayIcon = trayIcon;
 
-    // Recording icon — same but we'll add title text
-    const recIcon = icon16.resize({ width: 16, height: 16 });
+    // Recording icon — same icon, title changes
+    const recIcon = nativeImage.createFromPath(path.join(iconPath, 'trayIcon.png'));
     recIcon.setTemplateImage(false);
     this.recordingTrayIcon = recIcon;
 

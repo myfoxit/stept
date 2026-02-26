@@ -89,10 +89,13 @@
     },
     "files": [
       "lib/",
+      "assets/",
       "node_modules/",
       "package.json"
     ],
+    "icon": "assets/icon.png",
     "mac": {
+      "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
       "target": [
         {
@@ -105,6 +108,7 @@
       ]
     },
     "win": {
+      "icon": "assets/icon.ico",
       "target": "nsis"
     },
     "linux": {

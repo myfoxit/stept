@@ -620,35 +620,12 @@ const SpotlightApp: React.FC = () => {
         {!auth.isAuthenticated ? (
           <div style={{ padding: '40px 32px', textAlign: 'center' }}>
             <div style={{ marginBottom: 16 }}>
-              <svg width="36" height="32" viewBox="0 0 72 64" fill="none">
-                <rect
-                  x="6"
-                  y="8"
-                  width="26"
-                  height="10"
-                  rx="5"
-                  fill="#1A1A1A"
-                />
-                <rect
-                  x="6"
-                  y="26"
-                  width="46"
-                  height="10"
-                  rx="5"
-                  fill="#1A1A1A"
-                />
-                <rect
-                  x="6"
-                  y="44"
-                  width="36"
-                  height="10"
-                  rx="5"
-                  fill="#1A1A1A"
-                />
-                <path
-                  d="M58 6 L60.5 14 L68 16.5 L60.5 19 L58 27 L55.5 19 L48 16.5 L55.5 14 Z"
-                  fill="#E14D2A"
-                />
+              <svg width="38" height="36" viewBox="0 0 38 36" fill="none">
+                <rect x="0" y="4" width="32" height="32" rx="9" fill="#E14D2A" />
+                <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white" />
+                <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white" />
+                <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white" />
+                <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#E14D2A" />
               </svg>
             </div>
             <div
@@ -724,35 +701,12 @@ const SpotlightApp: React.FC = () => {
                     flexShrink: 0,
                   }}
                 >
-                  <svg width="20" height="18" viewBox="0 0 72 64" fill="none">
-                    <rect
-                      x="6"
-                      y="8"
-                      width="26"
-                      height="10"
-                      rx="5"
-                      fill="#1A1A1A"
-                    />
-                    <rect
-                      x="6"
-                      y="26"
-                      width="46"
-                      height="10"
-                      rx="5"
-                      fill="#1A1A1A"
-                    />
-                    <rect
-                      x="6"
-                      y="44"
-                      width="36"
-                      height="10"
-                      rx="5"
-                      fill="#1A1A1A"
-                    />
-                    <path
-                      d="M58 6 L60.5 14 L68 16.5 L60.5 19 L58 27 L55.5 19 L48 16.5 L55.5 14 Z"
-                      fill="#E14D2A"
-                    />
+                  <svg width="20" height="19" viewBox="0 0 38 36" fill="none">
+                    <rect x="0" y="4" width="32" height="32" rx="9" fill="#E14D2A" />
+                    <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white" />
+                    <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white" />
+                    <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white" />
+                    <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#E14D2A" />
                   </svg>
                 </div>
 
@@ -1607,35 +1561,12 @@ const SpotlightApp: React.FC = () => {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <svg width="12" height="10" viewBox="0 0 72 64" fill="none">
-                  <rect
-                    x="6"
-                    y="8"
-                    width="26"
-                    height="10"
-                    rx="5"
-                    fill="#1A1A1A"
-                  />
-                  <rect
-                    x="6"
-                    y="26"
-                    width="46"
-                    height="10"
-                    rx="5"
-                    fill="#1A1A1A"
-                  />
-                  <rect
-                    x="6"
-                    y="44"
-                    width="36"
-                    height="10"
-                    rx="5"
-                    fill="#1A1A1A"
-                  />
-                  <path
-                    d="M58 6 L60.5 14 L68 16.5 L60.5 19 L58 27 L55.5 19 L48 16.5 L55.5 14 Z"
-                    fill="#E14D2A"
-                  />
+                <svg width="12" height="11" viewBox="0 0 38 36" fill="none">
+                  <rect x="0" y="4" width="32" height="32" rx="9" fill="#E14D2A" />
+                  <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white" />
+                  <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white" />
+                  <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white" />
+                  <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#E14D2A" />
                 </svg>
                 <span
                   style={{ fontSize: 10, color: '#A0A0B2', fontWeight: 500 }}
