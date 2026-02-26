@@ -272,9 +272,7 @@ export function setupIpcHandlers(
   });
 
   ipcMain.handle('context:get-active', async () => {
-    // Return cached context from last poll — calling getActiveContext() here
-    // would detect the Electron/spotlight window itself since it's now focused
-    return contextWatcher.getLastActiveContext() || await contextWatcher.getActiveContext();
+    return await contextWatcher.getActiveContext();
   });
 
   ipcMain.handle('context:add-link', async (event, data: {

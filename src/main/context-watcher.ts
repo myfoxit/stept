@@ -33,7 +33,6 @@ export interface RunningApp {
 export class ContextWatcherService extends EventEmitter {
   private interval: NodeJS.Timeout | null = null;
   private lastContext: string = '';
-  private lastActiveContext: ActiveContext | null = null;
   private cache: Map<string, { matches: ContextMatch[]; time: number }> = new Map();
   private readonly CACHE_TTL = 10 * 60 * 1000;
   private readonly POLL_INTERVAL = 5000;
@@ -87,9 +86,6 @@ export class ContextWatcherService extends EventEmitter {
       const ctx = await this.getActiveContext();
       if (!ctx) return;
 
-      // Cache the last active context so spotlight can read it (before focus changes)
-      this.lastActiveContext = ctx;
-
       const ctxKey = JSON.stringify({ app: ctx.appName, host: ctx.url ? new URL(ctx.url).hostname : '', title: (ctx.windowTitle || '').slice(0, 120) });
       if (ctxKey === this.lastContext) return;
       this.lastContext = ctxKey;
@@ -113,15 +109,6 @@ export class ContextWatcherService extends EventEmitter {
     } catch (e) {
       // Silent fail
     }
-  }
-
-  /**
-   * Returns the last context captured by the background poller.
-   * Use this instead of getActiveContext() when spotlight is open,
-   * because getActiveContext() would detect the Electron window itself.
-   */
-  public getLastActiveContext(): ActiveContext | null {
-    return this.lastActiveContext;
   }
 
   public async getActiveContext(): Promise<ActiveContext | null> {
@@ -164,9 +151,7 @@ export class ContextWatcherService extends EventEmitter {
         return null;
       }
 
-      // Ignore our own app and common shell/terminal hosts
-      const IGNORE_APPS = ['Electron', 'Ondoki Desktop', 'ondoki-desktop', 'powershell', 'WindowsTerminal', 'cmd', 'conhost', 'Windows PowerShell', 'Command Prompt'];
-      if (!appName || IGNORE_APPS.some(i => appName.toLowerCase() === i.toLowerCase())) return null;
+      if (!appName || appName === 'Electron' || appName === 'Ondoki Desktop') return null;
 
       const ctx: ActiveContext = { windowTitle, appName };
 
