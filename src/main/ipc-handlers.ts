@@ -318,6 +318,10 @@ export function setupIpcHandlers(
     return { ok: true };
   });
 
+  ipcMain.handle('context:get-running-apps', async () => {
+    return await contextWatcher.getRunningApps();
+  });
+
   ipcMain.handle('context:stop', async () => {
     contextWatcher.stop();
     return { success: true };

@@ -27,6 +27,17 @@ interface ContextInfo {
   windowTitle?: string;
   appName?: string;
   url?: string;
+  appBundleId?: string;
+}
+
+interface ContextSuggestion {
+  id: string;
+  type: string;
+  name: string;
+  match_reason?: string;
+  resource_type?: string;
+  step_count?: number;
+  updated_at?: string;
 }
 
 interface AuthState {
@@ -111,6 +122,7 @@ const SpotlightApp: React.FC = () => {
   // Context
   const [contextInfo, setContextInfo] = useState<ContextInfo | null>(null);
   const [contextMatchCount, setContextMatchCount] = useState(0);
+  const [contextSuggestions, setContextSuggestions] = useState<ContextSuggestion[]>([]);
 
   // Project
   const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -160,11 +172,18 @@ const SpotlightApp: React.FC = () => {
       setHighlightIndex(0);
       setChatMessages([]);
       setTimeout(() => inputRef.current?.focus(), 50);
+
+      // Immediately fetch context suggestions on show
+      api.contextGetActive?.().then((ctx) => {
+        if (ctx) {
+          setContextInfo({ windowTitle: ctx.windowTitle, appName: ctx.appName, url: ctx.url, appBundleId: ctx.appBundleId });
+        }
+      });
     });
 
     // Context matches
     const unsubCtx = api.onContextMatches?.((matches, ctx) => {
-      setContextInfo({ windowTitle: ctx?.windowTitle, appName: ctx?.appName, url: ctx?.url });
+      setContextInfo({ windowTitle: ctx?.windowTitle, appName: ctx?.appName, url: ctx?.url, appBundleId: ctx?.appBundleId });
       setContextMatchCount(matches?.length || 0);
       setContextResults(matches?.map((m: any) => ({
         id: m.resource_id || m.id,
@@ -173,11 +192,21 @@ const SpotlightApp: React.FC = () => {
         step_count: m.step_count,
         updated_at: m.updated_at,
       })) || []);
+      setContextSuggestions(matches?.map((m: any) => ({
+        id: m.resource_id || m.id,
+        type: m.resource_type || 'workflow',
+        name: m.resource_name || m.name || 'Untitled',
+        match_reason: m.match_reason || ctx?.appName || '',
+        resource_type: m.resource_type,
+        step_count: m.step_count,
+        updated_at: m.updated_at,
+      })) || []);
     });
     const unsubNoCtx = api.onContextNoMatches?.(() => {
       setContextInfo(null);
       setContextMatchCount(0);
       setContextResults([]);
+      setContextSuggestions([]);
     });
 
     // Recording events
@@ -382,7 +411,7 @@ const SpotlightApp: React.FC = () => {
 
   // ─── Keyboard ───────────────────────────────────────────────────────────
 
-  const allResults = [...(query.trim() ? [] : contextResults), ...results];
+  const allResults = [...contextSuggestions.map(s => ({ id: s.id, type: s.type, name: s.name, resource_type: s.resource_type } as SpotlightResult)), ...results];
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { dismiss(); return; }
@@ -410,7 +439,7 @@ const SpotlightApp: React.FC = () => {
     color: '#6C5CE7', lineHeight: '16px',
   };
 
-  const grouped = groupResults(query.trim() ? results : []);
+  const grouped = groupResults(results);
   const hasResults = allResults.length > 0;
 
   // ─── RENDER ─────────────────────────────────────────────────────────────
@@ -690,53 +719,68 @@ const SpotlightApp: React.FC = () => {
 
             {/* ═══ CONTENT AREA ═══ */}
             {mode === 'search' ? (
-              <div ref={resultsRef} style={{ maxHeight: 280, overflowY: 'auto', padding: '6px 10px' }} className="scrollbar-thin">
-                {/* Context results (always shown when no query) */}
-                {!query.trim() && contextResults.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px' }}>Suggested</div>
-                    {contextResults.map((result, idx) => (
-                      <ResultItem key={result.id} result={result} index={idx}
+              <div ref={resultsRef} style={{ maxHeight: 280, overflowY: 'auto' }} className="scrollbar-thin">
+                {/* Suggested for you — always visible when there are context matches */}
+                {contextSuggestions.length > 0 && (
+                  <div style={{
+                    background: 'rgba(108, 92, 231, 0.04)',
+                    borderBottom: '1px solid rgba(108, 92, 231, 0.08)',
+                    padding: '6px 10px',
+                  }}>
+                    <div style={{
+                      fontSize: 10, fontWeight: 600, color: '#6C5CE7', textTransform: 'uppercase',
+                      letterSpacing: '0.08em', padding: '4px 6px 4px',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2.5">
+                        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
+                      </svg>
+                      Suggested for you
+                    </div>
+                    {contextSuggestions.map((suggestion, idx) => (
+                      <SuggestionItem key={suggestion.id} suggestion={suggestion} index={idx}
                         isHighlighted={idx === highlightIndex}
                         onHover={() => setHighlightIndex(idx)}
-                        onClick={() => openResult(result)} />
+                        onClick={() => openResult({ id: suggestion.id, type: suggestion.type, name: suggestion.name, resource_type: suggestion.resource_type })} />
                     ))}
                   </div>
                 )}
 
                 {/* Search results */}
-                {isSearching && results.length === 0 && (
-                  <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>Searching...</div>
-                )}
-                {!isSearching && query.trim() && results.length === 0 && (
-                  <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
-                    No results for "{query}"
-                  </div>
-                )}
-                {!query.trim() && contextResults.length === 0 && (
-                  <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
-                    Start typing to search workflows and pages...
-                  </div>
-                )}
-
-                {(() => {
-                  const offset = !query.trim() ? contextResults.length : 0;
-                  let globalIndex = offset;
-                  return Object.entries(grouped).map(([label, items]) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px' }}>{label}</div>
-                      {items.map((result) => {
-                        const idx = globalIndex++;
-                        return (
-                          <ResultItem key={result.id} result={result} index={idx}
-                            isHighlighted={idx === highlightIndex}
-                            onHover={() => setHighlightIndex(idx)}
-                            onClick={() => openResult(result)} />
-                        );
-                      })}
+                <div style={{ padding: '6px 10px' }}>
+                  {isSearching && results.length === 0 && (
+                    <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>Searching...</div>
+                  )}
+                  {!isSearching && query.trim() && results.length === 0 && (
+                    <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
+                      No results for "{query}"
                     </div>
-                  ));
-                })()}
+                  )}
+                  {!query.trim() && contextSuggestions.length === 0 && (
+                    <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
+                      Start typing to search workflows and pages...
+                    </div>
+                  )}
+
+                  {(() => {
+                    const offset = contextSuggestions.length;
+                    let globalIndex = offset;
+                    return Object.entries(grouped).map(([label, items]) => (
+                      <div key={label}>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px' }}>{label}</div>
+                        {items.map((result) => {
+                          const idx = globalIndex++;
+                          return (
+                            <ResultItem key={result.id} result={result} index={idx}
+                              isHighlighted={idx === highlightIndex}
+                              onHover={() => setHighlightIndex(idx)}
+                              onClick={() => openResult(result)} />
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
             ) : (
               /* AI Chat */
@@ -905,6 +949,61 @@ const ResultItem: React.FC<{
       </div>
       {isHighlighted && (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A0A0B2" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      )}
+    </div>
+  );
+};
+
+// ─── Suggestion Item Component ───────────────────────────────────────────────
+
+const SuggestionItem: React.FC<{
+  suggestion: ContextSuggestion;
+  index: number;
+  isHighlighted: boolean;
+  onHover: () => void;
+  onClick: () => void;
+}> = ({ suggestion, isHighlighted, onHover, onClick }) => {
+  const isWorkflow = (suggestion.type || suggestion.resource_type) === 'workflow';
+
+  return (
+    <div data-result-item onClick={onClick} onMouseEnter={onHover} style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+      borderRadius: 8, cursor: 'pointer', transition: 'all 0.1s',
+      background: isHighlighted ? 'rgba(108,92,231,0.1)' : 'transparent',
+      boxShadow: isHighlighted ? 'inset 0 0 0 1.5px rgba(108,92,231,0.18)' : 'none',
+    }}>
+      <div style={{
+        width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        background: isWorkflow ? 'rgba(108,92,231,0.1)' : 'rgba(0,210,211,0.1)',
+      }}>
+        {isWorkflow ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00D2D3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+          </svg>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {suggestion.name}
+        </div>
+      </div>
+      {suggestion.match_reason && (
+        <span style={{
+          padding: '2px 7px', borderRadius: 6, fontSize: 9, fontWeight: 600,
+          background: 'rgba(108, 92, 231, 0.1)', color: '#6C5CE7',
+          whiteSpace: 'nowrap', flexShrink: 0, letterSpacing: '0.02em',
+        }}>
+          {suggestion.match_reason}
+        </span>
+      )}
+      {isHighlighted && (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A0A0B2" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
         </svg>
       )}
