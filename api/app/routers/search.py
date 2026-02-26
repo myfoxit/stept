@@ -101,7 +101,11 @@ async def smart_search(
     use_fts = len(q.strip()) > 2
 
     if use_fts:
-        return await _smart_search_fts(q, project_id, current_user, limit, db)
+        result = await _smart_search_fts(q, project_id, current_user, limit, db)
+        # Fallback to ILIKE if FTS returned nothing (e.g. search_tsv not populated)
+        if result.get("total_results", 0) == 0:
+            return await _smart_search_ilike(q, project_id, current_user, limit, db)
+        return result
     else:
         return await _smart_search_ilike(q, project_id, current_user, limit, db)
 
@@ -669,6 +673,9 @@ async def unified_search(
     if use_fts:
         # FTS path for workflows
         all_results.extend(await _fts_workflow_results(q, project_id, current_user.id, limit, db))
+        # Fallback to ILIKE if FTS returned nothing (e.g. search_tsv not yet populated)
+        if not all_results:
+            all_results.extend(await _keyword_workflow_results(q, project_id, current_user, limit, db))
     else:
         # Short query fallback
         all_results.extend(await _keyword_workflow_results(q, project_id, current_user, limit, db))
