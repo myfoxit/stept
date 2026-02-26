@@ -7,7 +7,6 @@ module.exports = (env, argv) => {
   return {
     target: 'electron-renderer',
     entry: {
-      bundle: './src/renderer/index.tsx',
       spotlight: './src/renderer/spotlight-entry.tsx',
     },
     module: {
@@ -55,11 +54,6 @@ module.exports = (env, argv) => {
       clean: true,
     },
     plugins: [
-      new HtmlWebpackPlugin({
-        template: './src/renderer/index.html',
-        filename: 'index.html',
-        chunks: ['bundle'],
-      }),
       new HtmlWebpackPlugin({
         template: './src/renderer/spotlight.html',
         filename: 'spotlight.html',

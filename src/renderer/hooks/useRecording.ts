@@ -34,22 +34,12 @@ export const useRecording = () => {
       setRecordingState(prev => ({ ...prev, stepCount: prev.stepCount + 1 }));
     });
 
-    // Listen for AI annotations — update the matching step with generated title/description
-    const unsubAnnotated = window.electronAPI.onStepAnnotated?.((annotatedStep: any) => {
-      setSteps(prev => prev.map(s =>
-        s.stepNumber === annotatedStep.stepNumber
-          ? { ...s, ...annotatedStep }
-          : s
-      ));
-    });
-
     const unsubState = window.electronAPI.onRecordingStateChanged((state: RecordingState) => {
       setRecordingState(state);
     });
 
     return () => {
       unsubStep?.();
-      unsubAnnotated?.();
       unsubState?.();
     };
   }, []);

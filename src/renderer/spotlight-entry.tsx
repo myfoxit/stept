@@ -18,17 +18,6 @@ interface SpotlightResult {
   step_count?: number;
 }
 
-interface PreviewData {
-  title?: string;
-  name?: string;
-  summary?: string;
-  content?: string;
-  steps?: { stepNumber: number; description: string; generatedTitle?: string }[];
-  word_count?: number;
-  step_count?: number;
-  updated_at?: string;
-}
-
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -38,8 +27,18 @@ interface ContextInfo {
   windowTitle?: string;
   appName?: string;
   url?: string;
-  manualItems?: { type: string; content: string }[];
-  clipboardText?: string;
+}
+
+interface AuthState {
+  isAuthenticated: boolean;
+  user?: { id: string; email: string; name: string } | null;
+  projects: { id: string; name: string; userId: string; role: string }[];
+}
+
+interface RecState {
+  isRecording: boolean;
+  isPaused: boolean;
+  stepCount: number;
 }
 
 type SpotMode = 'search' | 'ai';
@@ -69,160 +68,186 @@ function formatRelativeTime(dateStr?: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  return `${weeks}w ago`;
+  return `${Math.floor(days / 7)}w ago`;
 }
 
-// ─── CSS variables (inline since this is a standalone window) ───────────────
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
-const CSS_VARS: Record<string, string> = {
-  '--purple': '#6C5CE7',
-  '--purple-hover': '#5A4BD6',
-  '--purple-light': 'rgba(108, 92, 231, 0.08)',
-  '--teal': '#00D2D3',
-  '--teal-light': 'rgba(0, 210, 211, 0.08)',
-  '--dark': '#1A1A2E',
-  '--bg': '#FAFAFC',
-  '--card': '#FFFFFF',
-  '--border': 'rgba(0, 0, 0, 0.07)',
-  '--text-primary': '#1A1A2E',
-  '--text-secondary': '#6E6E82',
-  '--text-muted': '#A0A0B2',
-  '--green': '#28C840',
-  '--green-light': 'rgba(40, 200, 64, 0.08)',
-};
-
-// ─── Spotlight Component ────────────────────────────────────────────────────
+// ─── Spotlight App ──────────────────────────────────────────────────────────
 
 const SpotlightApp: React.FC = () => {
+  // Auth
+  const [auth, setAuth] = useState<AuthState>({ isAuthenticated: false, user: null, projects: [] });
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Spotlight state
   const [mode, setMode] = useState<SpotMode>('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SpotlightResult[]>([]);
+  const [contextResults, setContextResults] = useState<SpotlightResult[]>([]);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
+
+  // AI chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [projectId, setProjectId] = useState('');
+
+  // Recording
+  const [rec, setRec] = useState<RecState>({ isRecording: false, isPaused: false, stepCount: 0 });
+  const [duration, setDuration] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+
+  // Upload toast
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadError, setUploadError] = useState('');
+
+  // Context
   const [contextInfo, setContextInfo] = useState<ContextInfo | null>(null);
+  const [contextMatchCount, setContextMatchCount] = useState(0);
+
+  // Project
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+
+  // Settings panel
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Refs
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Apply CSS vars
-  useEffect(() => {
-    for (const [key, value] of Object.entries(CSS_VARS)) {
-      document.documentElement.style.setProperty(key, value);
-    }
-  }, []);
+  // ─── Init ───────────────────────────────────────────────────────────────
 
-  // Initialize - get project ID from main process
   useEffect(() => {
     const api = window.electronAPI;
-    if (!api) return;
+    if (!api) { setAuthLoading(false); return; }
 
-    // Listen for spotlight data from main process
-    const unsub = api.onSpotlightOpenOverlay?.((pid: string) => {
-      if (pid) setProjectId(pid);
+    // Get auth status
+    api.getAuthStatus().then((status: any) => {
+      if (status?.isAuthenticated) {
+        setAuth({ isAuthenticated: true, user: status.user, projects: status.projects || [] });
+        const pid = status.projects?.[0]?.id || '';
+        setSelectedProjectId(pid);
+        if (pid) api.contextStart?.(pid);
+      }
+      setAuthLoading(false);
+    }).catch(() => setAuthLoading(false));
+
+    // Auth changes
+    const unsubAuth = api.onAuthStatusChanged?.((status: any) => {
+      setAuth({
+        isAuthenticated: status.isAuthenticated,
+        user: status.user ?? null,
+        projects: status.projects ?? [],
+      });
+      if (status.isAuthenticated && status.projects?.[0]?.id) {
+        setSelectedProjectId(prev => prev || status.projects[0].id);
+        api.contextStart?.(status.projects[0].id);
+      }
+    });
+
+    // Spotlight show
+    const unsubShow = api.onSpotlightShow?.((pid: string) => {
+      if (pid) setSelectedProjectId(pid);
       setQuery('');
       setResults([]);
       setHighlightIndex(0);
-      setPreviewData(null);
       setChatMessages([]);
+      setShowSettings(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     });
 
-    // Listen for context updates
+    // Context matches
     const unsubCtx = api.onContextMatches?.((matches, ctx) => {
-      setContextInfo({
-        windowTitle: ctx?.windowTitle,
-        appName: ctx?.appName,
-        url: ctx?.url,
-      });
+      setContextInfo({ windowTitle: ctx?.windowTitle, appName: ctx?.appName, url: ctx?.url });
+      setContextMatchCount(matches?.length || 0);
+      setContextResults(matches?.map((m: any) => ({
+        id: m.resource_id || m.id,
+        type: m.resource_type || 'workflow',
+        name: m.resource_name || m.name || 'Untitled',
+        step_count: m.step_count,
+        updated_at: m.updated_at,
+      })) || []);
+    });
+    const unsubNoCtx = api.onContextNoMatches?.(() => {
+      setContextInfo(null);
+      setContextMatchCount(0);
+      setContextResults([]);
+    });
+
+    // Recording events
+    const unsubStep = api.onStepRecorded?.((step: any) => {
+      setRec(prev => ({ ...prev, stepCount: prev.stepCount + 1 }));
+    });
+    const unsubState = api.onRecordingStateChanged?.((state: any) => {
+      setRec(state);
+    });
+
+    // Upload events
+    const unsubUpStart = api.onUploadStarted?.(() => setUploadStatus('uploading'));
+    const unsubUpDone = api.onUploadComplete?.((result: any) => {
+      setUploadStatus('success');
+      setTimeout(() => setUploadStatus('idle'), 3000);
+    });
+    const unsubUpErr = api.onUploadError?.((err: string) => {
+      setUploadStatus('error');
+      setUploadError(err);
+      setTimeout(() => setUploadStatus('idle'), 5000);
     });
 
     // Get initial context
     api.contextGetActive?.().then((ctx) => {
-      if (ctx) {
-        setContextInfo({
-          windowTitle: ctx.windowTitle,
-          appName: ctx.appName,
-          url: ctx.url,
-        });
-      }
+      if (ctx) setContextInfo({ windowTitle: ctx.windowTitle, appName: ctx.appName, url: ctx.url });
     });
 
-    return () => { unsub?.(); unsubCtx?.(); };
-  }, []);
-
-  // Focus input on mount
-  useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, []);
-
-  // Fetch preview when highlighted result changes
-  useEffect(() => {
-    if (mode !== 'search' || results.length === 0) {
-      setPreviewData(null);
-      return;
-    }
-    const highlighted = results[highlightIndex];
-    if (!highlighted) { setPreviewData(null); return; }
-
-    const inlinePreview: PreviewData = {
-      title: highlighted.name || highlighted.resource_name,
-      summary: highlighted.preview || highlighted.summary || highlighted.resource_summary || highlighted.note || '',
-      step_count: highlighted.step_count,
-      word_count: highlighted.word_count,
-      updated_at: highlighted.updated_at,
+    return () => {
+      unsubAuth?.(); unsubShow?.(); unsubCtx?.(); unsubNoCtx?.();
+      unsubStep?.(); unsubState?.(); unsubUpStart?.(); unsubUpDone?.(); unsubUpErr?.();
     };
-    setPreviewData(inlinePreview);
+  }, []);
 
-    if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
-    previewTimeoutRef.current = setTimeout(async () => {
-      const api = window.electronAPI;
-      if (!api?.spotlightPreview) return;
-      const id = highlighted.id || (highlighted as any).resource_id;
-      const type = highlighted.type || highlighted.resource_type || 'document';
-      if (!id) return;
-      setIsLoadingPreview(true);
-      try {
-        const result = await api.spotlightPreview(id, type);
-        if (result?.preview) setPreviewData(prev => ({ ...prev, ...result.preview }));
-      } catch {} finally { setIsLoadingPreview(false); }
-    }, 300);
+  // Focus on mount
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
-    return () => { if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current); };
-  }, [highlightIndex, results, mode]);
+  // Recording timer
+  useEffect(() => {
+    if (!rec.isRecording || rec.isPaused) return;
+    const interval = setInterval(() => setDuration(prev => prev + 1), 1000);
+    return () => clearInterval(interval);
+  }, [rec.isRecording, rec.isPaused]);
 
-  // Search
+  // ─── Search ─────────────────────────────────────────────────────────────
+
   const performSearch = useCallback(async (text: string) => {
-    if (!text.trim() || !projectId) { setResults([]); return; }
+    if (!text.trim() || !selectedProjectId) { setResults([]); return; }
     setIsSearching(true);
     try {
       const api = window.electronAPI;
       if (!api) return;
-      const kwResult = await api.spotlightSearch(text, projectId);
+      const kwResult = await api.spotlightSearch(text, selectedProjectId);
       let list: SpotlightResult[] = (kwResult?.results || []).map((r: any) => ({
         ...r, name: r.name || r.resource_name || 'Untitled',
       }));
       if (text.length > 20 || QUESTION_PATTERN.test(text)) {
         try {
-          const semResult = await api.spotlightSemanticSearch(text, projectId);
+          const semResult = await api.spotlightSemanticSearch(text, selectedProjectId);
           const semResults = (semResult?.results || []).map((r: any) => ({
             ...r, name: r.name || r.resource_name || 'Untitled',
           }));
           if (semResults.length > 0) {
-            list = [...semResults, ...list.filter((r) => !new Set(semResults.map((s: SpotlightResult) => s.id)).has(r.id))];
+            const ids = new Set(semResults.map((s: SpotlightResult) => s.id));
+            list = [...semResults, ...list.filter(r => !ids.has(r.id))];
           }
         } catch {}
       }
       setResults(list);
       setHighlightIndex(0);
     } catch { setResults([]); } finally { setIsSearching(false); }
-  }, [projectId]);
+  }, [selectedProjectId]);
 
   useEffect(() => {
     if (mode !== 'search') return;
@@ -231,7 +256,8 @@ const SpotlightApp: React.FC = () => {
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, [query, mode, performSearch]);
 
-  // Open result
+  // ─── Actions ────────────────────────────────────────────────────────────
+
   const openResult = useCallback(async (result: SpotlightResult) => {
     const api = window.electronAPI;
     if (!api) return;
@@ -240,59 +266,85 @@ const SpotlightApp: React.FC = () => {
       const frontendUrl = (settings.frontendUrl || 'http://localhost:5173').replace(/\/+$/, '');
       const id = result.id || (result as any).resource_id;
       const type = result.type || result.resource_type;
-      const path = type === 'workflow' ? `/workflow/${id}` : `/editor/${id}`;
-      await api.openExternal(`${frontendUrl}${path}`);
-      dismissSpotlight();
+      const p = type === 'workflow' ? `/workflow/${id}` : `/editor/${id}`;
+      await api.openExternal(`${frontendUrl}${p}`);
+      api.spotlightDismiss?.();
     } catch (err) { console.error('Failed to open result:', err); }
   }, []);
 
-  // Dismiss
-  const dismissSpotlight = useCallback(() => {
-    const api = window.electronAPI;
-    (api as any)?.spotlightDismiss?.();
+  const dismiss = useCallback(() => {
+    window.electronAPI?.spotlightDismiss?.();
   }, []);
 
-  // Send AI message — include context automatically
+  const handleLogin = useCallback(async () => {
+    try { await window.electronAPI?.initiateLogin(); } catch (e) { console.error('Login failed:', e); }
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await window.electronAPI?.logout();
+      setAuth({ isAuthenticated: false, user: null, projects: [] });
+    } catch (e) { console.error('Logout failed:', e); }
+  }, []);
+
+  const handleStartRecording = useCallback(async () => {
+    if (!selectedProjectId) return;
+    // Use all-displays as default capture area
+    try {
+      await window.electronAPI?.startRecording({ type: 'all-displays' }, selectedProjectId);
+      setRec({ isRecording: true, isPaused: false, stepCount: 0 });
+      setDuration(0);
+    } catch (e) { console.error('Failed to start recording:', e); }
+  }, [selectedProjectId]);
+
+  const handleStopRecording = useCallback(async () => {
+    try {
+      await window.electronAPI?.stopRecording();
+      setRec(prev => ({ ...prev, isRecording: false, isPaused: false }));
+    } catch (e) { console.error('Failed to stop recording:', e); }
+  }, []);
+
+  const handleTogglePause = useCallback(async () => {
+    try {
+      if (rec.isPaused) await window.electronAPI?.resumeRecording();
+      else await window.electronAPI?.pauseRecording();
+      setRec(prev => ({ ...prev, isPaused: !prev.isPaused }));
+    } catch (e) { console.error('Failed to toggle pause:', e); }
+  }, [rec.isPaused]);
+
   const sendAiMessage = useCallback(async () => {
     const text = query.trim();
     if (!text || isChatLoading) return;
-    const userMsg: ChatMessage = { role: 'user', content: text };
-    setChatMessages(prev => [...prev, userMsg]);
+    setChatMessages(prev => [...prev, { role: 'user', content: text }]);
     setQuery('');
     setIsChatLoading(true);
     try {
       const api = window.electronAPI;
       if (!api) throw new Error('API not available');
-
-      // Build context string from active context
-      let contextStr = JSON.stringify({ project_id: projectId });
-      if (contextInfo) {
-        contextStr = JSON.stringify({
-          project_id: projectId,
-          active_context: contextInfo,
-        });
-      }
-
-      const response = await api.sendChatMessage(
-        [{ role: 'user', content: text }],
-        contextStr
-      );
+      const contextStr = JSON.stringify({
+        project_id: selectedProjectId,
+        ...(contextInfo ? { active_context: contextInfo } : {}),
+      });
+      const response = await api.sendChatMessage([{ role: 'user', content: text }], contextStr);
       setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
     } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I couldn\'t process that request. Please try again.' }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally { setIsChatLoading(false); }
-  }, [query, projectId, isChatLoading, contextInfo]);
+  }, [query, selectedProjectId, isChatLoading, contextInfo]);
 
-  // Keyboard
+  // ─── Keyboard ───────────────────────────────────────────────────────────
+
+  const allResults = [...(query.trim() ? [] : contextResults), ...results];
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { dismissSpotlight(); return; }
+    if (e.key === 'Escape') { dismiss(); return; }
     if (e.key === 'Tab') { e.preventDefault(); setMode(prev => prev === 'search' ? 'ai' : 'search'); return; }
     if (mode === 'search') {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIndex(prev => Math.min(prev + 1, results.length - 1)); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIndex(prev => Math.min(prev + 1, allResults.length - 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIndex(prev => Math.max(prev - 1, 0)); }
-      else if (e.key === 'Enter' && results[highlightIndex]) { e.preventDefault(); openResult(results[highlightIndex]); }
+      else if (e.key === 'Enter' && allResults[highlightIndex]) { e.preventDefault(); openResult(allResults[highlightIndex]); }
     } else if (mode === 'ai' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage(); }
-  }, [mode, results, highlightIndex, dismissSpotlight, openResult, sendAiMessage]);
+  }, [mode, allResults, highlightIndex, dismiss, openResult, sendAiMessage]);
 
   // Scroll into view
   useEffect(() => {
@@ -301,322 +353,586 @@ const SpotlightApp: React.FC = () => {
     items[highlightIndex]?.scrollIntoView({ block: 'nearest' });
   }, [highlightIndex]);
 
-  const grouped = groupResults(results);
-  const hasResults = results.length > 0;
-  const highlightedResult = results[highlightIndex];
+  // ─── Styles ─────────────────────────────────────────────────────────────
 
   const kbdStyle: React.CSSProperties = {
-    display: 'inline-flex', padding: '1px 4px', borderRadius: 4,
-    background: 'rgba(108,92,231,0.1)', border: '1px solid rgba(108,92,231,0.18)',
-    fontFamily: "'JetBrains Mono', monospace", fontSize: '0.52rem', fontWeight: 500,
-    color: '#6C5CE7', lineHeight: 1.3,
+    display: 'inline-flex', padding: '1px 5px', borderRadius: 4,
+    background: 'rgba(108,92,231,0.1)', border: '1px solid rgba(108,92,231,0.15)',
+    fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 500,
+    color: '#6C5CE7', lineHeight: '16px',
   };
 
+  const grouped = groupResults(query.trim() ? results : []);
+  const hasResults = allResults.length > 0;
+
+  // ─── RENDER ─────────────────────────────────────────────────────────────
+
+  if (authLoading) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{
+          width: 580, background: '#fff', borderRadius: 20,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.07)',
+          padding: '40px 0', textAlign: 'center', color: '#A0A0B2', fontSize: 13,
+          fontFamily: "'DM Sans', sans-serif",
+        }}>Loading...</div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      style={{
-        width: '100%', height: '100%',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        paddingTop: 0,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) dismissSpotlight(); }}
-    >
-      {/* Spotlight Card */}
+    <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', paddingTop: 0 }}
+      onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
+
       <div style={{
-        width: hasResults && mode === 'search' ? 780 : 580,
-        maxWidth: '92vw',
-        background: '#FFFFFF',
-        borderRadius: 20,
+        width: 580, maxWidth: '94vw', background: '#fff', borderRadius: 20,
         boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.07)',
-        overflow: 'hidden',
+        overflow: 'hidden', fontFamily: "'DM Sans', sans-serif",
         animation: 'spotlightIn 0.15s ease-out',
-        transition: 'width 0.2s ease',
       }}>
-        {/* Context Badge */}
-        {contextInfo && contextInfo.appName && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 18px',
-            background: 'rgba(40, 200, 64, 0.06)',
-            borderBottom: '1px solid rgba(40, 200, 64, 0.12)',
-            fontSize: '0.6rem', color: '#6E6E82',
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', background: '#28C840', flexShrink: 0,
-            }} />
-            <span style={{ fontWeight: 600 }}>Context:</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {contextInfo.appName}{contextInfo.windowTitle ? ` — ${contextInfo.windowTitle}` : ''}
-            </span>
-          </div>
-        )}
 
-        {/* Search Input */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '14px 18px', borderBottom: '1px solid rgba(0,0,0,0.07)',
-        }}>
-          {mode === 'search' ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-            </svg>
-          ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
-            </svg>
-          )}
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={mode === 'search' ? 'Search workflows, pages, guides...' : 'Ask anything about your knowledge base...'}
-            style={{
-              flex: 1, border: 'none', background: 'none',
-              fontFamily: "'DM Sans', sans-serif", fontSize: '0.92rem',
-              color: '#1A1A2E', outline: 'none',
-            }}
-          />
-          <span style={kbdStyle}>ESC</span>
-        </div>
-
-        {/* Mode Switch */}
-        <div style={{
-          display: 'flex', padding: '8px 18px', gap: 0,
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
-        }}>
-          {(['search', 'ai'] as SpotMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              style={{
-                flex: 1, padding: 7, border: 'none',
-                fontFamily: "'Outfit', sans-serif", fontSize: '0.72rem', fontWeight: 600,
-                cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', borderRadius: 8,
-                color: mode === m ? '#6C5CE7' : '#A0A0B2',
-                background: mode === m ? 'rgba(108,92,231,0.08)' : 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              }}
-            >
-              {m === 'search' ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
-                </svg>
-              )}
-              {m === 'search' ? 'Search' : 'Ask AI'}
-            </button>
-          ))}
-        </div>
-
-        {/* Content Area */}
-        {mode === 'search' ? (
-          <div style={{ display: 'flex', maxHeight: 340 }}>
-            {/* Results List */}
-            <div ref={resultsRef} style={{
-              flex: hasResults ? '0 0 55%' : '1 1 100%', padding: '8px 12px', overflowY: 'auto',
-              borderRight: hasResults ? '1px solid rgba(0,0,0,0.07)' : 'none',
-            }} className="scrollbar-thin">
-              {isSearching && results.length === 0 && (
-                <div style={{ padding: '20px 8px', textAlign: 'center' }}>
-                  <div style={{ width: 16, height: 16, border: '2px solid rgba(108,92,231,0.15)', borderTop: '2px solid #6C5CE7', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
-                  <span style={{ fontSize: '0.72rem', color: '#A0A0B2' }}>Searching...</span>
-                </div>
-              )}
-              {!isSearching && query.trim() && results.length === 0 && (
-                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: '0.72rem', color: '#A0A0B2' }}>
-                  No results found for &ldquo;{query}&rdquo;
-                </div>
-              )}
-              {!query.trim() && !isSearching && (
-                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: '0.72rem', color: '#A0A0B2' }}>
-                  Start typing to search your workflows and pages...
-                </div>
-              )}
-              {(() => {
-                let globalIndex = 0;
-                return Object.entries(grouped).map(([label, items]) => (
-                  <div key={label}>
-                    <div style={{ fontSize: '0.56rem', fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px' }}>{label}</div>
-                    {items.map((result) => {
-                      const idx = globalIndex++;
-                      const isHighlighted = idx === highlightIndex;
-                      const rType = result.type || result.resource_type;
-                      const isWorkflow = rType === 'workflow';
-                      const meta: string[] = [];
-                      if (result.step_count) meta.push(`${result.step_count} steps`);
-                      if (result.word_count) meta.push(`${result.word_count} words`);
-                      if (result.updated_at) meta.push(formatRelativeTime(result.updated_at));
-                      return (
-                        <div key={result.id} data-result-item onClick={() => openResult(result)} style={{
-                          display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8,
-                          cursor: 'pointer', transition: 'all 0.12s',
-                          background: isHighlighted ? 'rgba(108,92,231,0.08)' : 'transparent',
-                          boxShadow: isHighlighted ? 'inset 0 0 0 1.5px rgba(108,92,231,0.18)' : 'none',
-                        }} onMouseEnter={() => setHighlightIndex(idx)}>
-                          <div style={{
-                            width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                            background: isWorkflow ? 'rgba(108,92,231,0.08)' : 'rgba(0,210,211,0.08)',
-                          }}>
-                            {isWorkflow ? (
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3"/></svg>
-                            ) : (
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00D2D3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/></svg>
-                            )}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{result.name || result.resource_name || 'Untitled'}</div>
-                            <div style={{ fontSize: '0.6rem', color: '#A0A0B2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.join(' · ')}</div>
-                          </div>
-                          {isHighlighted && <span style={{ fontSize: '0.56rem', color: '#A0A0B2', flexShrink: 0 }}>↵</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ));
-              })()}
+        {/* ═══ AUTH GATE ═══ */}
+        {!auth.isAuthenticated ? (
+          <div style={{ padding: '40px 32px', textAlign: 'center' }}>
+            <div style={{ marginBottom: 16 }}>
+              <svg width="36" height="32" viewBox="0 0 72 64" fill="none">
+                <rect x="6" y="8" width="26" height="10" rx="5" fill="#6C5CE7" />
+                <rect x="6" y="26" width="46" height="10" rx="5" fill="#6C5CE7" />
+                <rect x="6" y="44" width="36" height="10" rx="5" fill="#6C5CE7" />
+                <path d="M58 6 L60.5 14 L68 16.5 L60.5 19 L58 27 L55.5 19 L48 16.5 L55.5 14 Z" fill="#00D2D3" />
+              </svg>
             </div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 800, fontSize: 20, color: '#1A1A2E', letterSpacing: '-0.03em', marginBottom: 8 }}>ondoki</div>
+            <p style={{ fontSize: 13, color: '#6E6E82', lineHeight: 1.5, marginBottom: 24 }}>
+              Sign in to start recording and searching your workflows.
+            </p>
+            <button onClick={handleLogin} style={{
+              padding: '10px 32px', borderRadius: 10, border: 'none',
+              background: '#6C5CE7', color: '#fff', fontSize: 14, fontWeight: 600,
+              fontFamily: "'Outfit', sans-serif", cursor: 'pointer',
+              transition: 'background 0.15s',
+            }} onMouseEnter={e => e.currentTarget.style.background = '#5A4BD6'}
+               onMouseLeave={e => e.currentTarget.style.background = '#6C5CE7'}>
+              Sign In
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* ═══ CONTROL DECK ═══ */}
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
 
-            {/* Preview Panel */}
-            {hasResults && (
-              <div style={{ flex: '0 0 45%', padding: '14px 16px', overflowY: 'auto', background: '#FAFAFC' }} className="scrollbar-thin">
-                {previewData ? (
-                  <div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                        {(() => {
-                          const rType = highlightedResult?.type || highlightedResult?.resource_type;
-                          const isWorkflow = rType === 'workflow';
-                          return <span style={{ display: 'inline-flex', padding: '2px 7px', borderRadius: 4, fontSize: '0.52rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', background: isWorkflow ? 'rgba(108,92,231,0.08)' : 'rgba(0,210,211,0.08)', color: isWorkflow ? '#6C5CE7' : '#00D2D3' }}>{isWorkflow ? 'Workflow' : 'Page'}</span>;
-                        })()}
-                        {isLoadingPreview && <div style={{ width: 10, height: 10, border: '1.5px solid rgba(108,92,231,0.15)', borderTop: '1.5px solid #6C5CE7', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
-                      </div>
-                      <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.88rem', fontWeight: 700, color: '#1A1A2E', lineHeight: 1.3 }}>
-                        {previewData.title || previewData.name || highlightedResult?.name || 'Untitled'}
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                        {previewData.step_count && <span style={{ fontSize: '0.58rem', color: '#A0A0B2' }}>{previewData.step_count} steps</span>}
-                        {previewData.word_count && <span style={{ fontSize: '0.58rem', color: '#A0A0B2' }}>{previewData.word_count} words</span>}
-                        {previewData.updated_at && <span style={{ fontSize: '0.58rem', color: '#A0A0B2' }}>{formatRelativeTime(previewData.updated_at)}</span>}
-                      </div>
+              {/* Top row: logo + project + settings */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                {/* Logo */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <svg width="20" height="18" viewBox="0 0 72 64" fill="none">
+                    <rect x="6" y="8" width="26" height="10" rx="5" fill="#6C5CE7" />
+                    <rect x="6" y="26" width="46" height="10" rx="5" fill="#6C5CE7" />
+                    <rect x="6" y="44" width="36" height="10" rx="5" fill="#6C5CE7" />
+                    <path d="M58 6 L60.5 14 L68 16.5 L60.5 19 L58 27 L55.5 19 L48 16.5 L55.5 14 Z" fill="#00D2D3" />
+                  </svg>
+                </div>
+
+                {/* Project selector */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <select value={selectedProjectId}
+                    onChange={e => {
+                      setSelectedProjectId(e.target.value);
+                      window.electronAPI?.contextStart?.(e.target.value);
+                    }}
+                    style={{
+                      width: '100%', padding: '6px 28px 6px 10px', borderRadius: 8,
+                      border: '1px solid rgba(0,0,0,0.1)', background: '#FAFAFC',
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 500,
+                      color: '#1A1A2E', appearance: 'none', cursor: 'pointer', outline: 'none',
+                    }}>
+                    {auth.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {auth.projects.length === 0 && <option value="">No projects</option>}
+                  </select>
+                  <svg style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A0A0B2" strokeWidth="2.5">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+
+                {/* Settings gear */}
+                <button onClick={() => setShowSettings(!showSettings)} style={{
+                  width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)',
+                  background: showSettings ? 'rgba(108,92,231,0.1)' : '#FAFAFC',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={showSettings ? '#6C5CE7' : '#6E6E82'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Settings panel (inline) */}
+              {showSettings && (
+                <div style={{
+                  padding: '10px 12px', marginBottom: 10, borderRadius: 10,
+                  background: '#FAFAFC', border: '1px solid rgba(0,0,0,0.07)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#6E6E82' }}>
+                      {auth.user?.name || auth.user?.email || 'User'}
+                    </span>
+                    <button onClick={handleLogout} style={{
+                      padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.1)',
+                      background: '#fff', fontSize: 11, fontWeight: 500, color: '#FF5F57',
+                      cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+                    }}>Sign Out</button>
+                  </div>
+                  <div style={{ fontSize: 10, color: '#A0A0B2' }}>
+                    Shortcut: Ctrl+Shift+Space
+                  </div>
+                </div>
+              )}
+
+              {/* Recording controls */}
+              {!rec.isRecording ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button onClick={handleStartRecording} disabled={!selectedProjectId}
+                    style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      padding: '9px 16px', borderRadius: 10, border: 'none',
+                      background: selectedProjectId ? '#6C5CE7' : '#ccc', color: '#fff',
+                      fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif",
+                      cursor: selectedProjectId ? 'pointer' : 'not-allowed', transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { if (selectedProjectId) e.currentTarget.style.background = '#5A4BD6'; }}
+                    onMouseLeave={e => { if (selectedProjectId) e.currentTarget.style.background = '#6C5CE7'; }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/>
+                    </svg>
+                    Start Recording
+                  </button>
+                  {/* Voice toggle */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px',
+                    borderRadius: 10, border: '1px solid rgba(0,0,0,0.08)', background: '#FAFAFC',
+                    cursor: 'pointer', userSelect: 'none',
+                  }} onClick={() => setVoiceEnabled(!voiceEnabled)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                      stroke={voiceEnabled ? '#6C5CE7' : '#A0A0B2'} strokeWidth="2" strokeLinecap="round">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    </svg>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: voiceEnabled ? '#6C5CE7' : '#A0A0B2' }}>Voice</span>
+                    <div style={{
+                      width: 28, height: 16, borderRadius: 8, padding: 2,
+                      background: voiceEnabled ? '#6C5CE7' : '#D1D5DB', transition: 'background 0.2s',
+                    }}>
+                      <div style={{
+                        width: 12, height: 12, borderRadius: '50%', background: '#fff',
+                        transform: voiceEnabled ? 'translateX(12px)' : 'translateX(0)',
+                        transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }}/>
                     </div>
-                    {previewData.summary && (
-                      <div style={{ fontSize: '0.72rem', lineHeight: 1.6, color: '#6E6E82', marginBottom: 12, padding: '10px 12px', background: '#FFFFFF', borderRadius: 8, border: '1px solid rgba(0,0,0,0.07)' }}>
-                        {previewData.summary.length > 300 ? previewData.summary.slice(0, 300) + '...' : previewData.summary}
-                      </div>
-                    )}
-                    {previewData.steps && previewData.steps.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: '0.56rem', fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Steps</div>
-                        {previewData.steps.slice(0, 5).map((step, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: i < Math.min(previewData.steps!.length, 5) - 1 ? '1px solid rgba(0,0,0,0.07)' : 'none' }}>
-                            <span style={{ width: 18, height: 18, borderRadius: 5, background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.07)', fontSize: '0.56rem', fontWeight: 600, color: '#A0A0B2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{step.stepNumber || i + 1}</span>
-                            <span style={{ fontSize: '0.68rem', color: '#1A1A2E', lineHeight: 1.4 }}>{step.generatedTitle || step.description || `Step ${step.stepNumber || i + 1}`}</span>
-                          </div>
-                        ))}
-                        {previewData.steps.length > 5 && <div style={{ fontSize: '0.6rem', color: '#A0A0B2', padding: '6px 0' }}>+{previewData.steps.length - 5} more steps</div>}
-                      </div>
-                    )}
-                    {previewData.content && !previewData.steps && (
-                      <div style={{ fontSize: '0.68rem', lineHeight: 1.6, color: '#6E6E82', whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'hidden', maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)' }}>
-                        {previewData.content.slice(0, 500)}
-                      </div>
-                    )}
-                    <button onClick={() => highlightedResult && openResult(highlightedResult)} style={{
-                      marginTop: 14, width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #6C5CE7', background: 'rgba(108,92,231,0.08)', fontFamily: "'Outfit', sans-serif", fontSize: '0.7rem', fontWeight: 600, color: '#6C5CE7', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                    }} onMouseEnter={(e) => { e.currentTarget.style.background = '#6C5CE7'; e.currentTarget.style.color = 'white'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(108,92,231,0.08)'; e.currentTarget.style.color = '#6C5CE7'; }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                      Open in Browser
+                  </div>
+                </div>
+              ) : (
+                /* Recording in progress */
+                <div style={{
+                  padding: '10px 12px', borderRadius: 12,
+                  border: rec.isPaused ? '1.5px solid rgba(0,0,0,0.1)' : '1.5px solid #FF5F57',
+                  background: rec.isPaused ? '#FAFAFC' : 'rgba(255,95,87,0.04)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {!rec.isPaused && <div style={{
+                        width: 8, height: 8, borderRadius: '50%', background: '#FF5F57',
+                        animation: 'pulse 2s infinite',
+                      }}/>}
+                      <span style={{
+                        fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 700,
+                        color: rec.isPaused ? '#6E6E82' : '#FF5F57',
+                      }}>
+                        {rec.isPaused ? 'Paused' : 'Recording workflow'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#FF5F57', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {formatDuration(duration)}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#6C5CE7', fontWeight: 600 }}>
+                        {rec.stepCount} step{rec.stepCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={handleTogglePause} style={{
+                      flex: 1, padding: '6px 12px', borderRadius: 8,
+                      border: '1px solid rgba(0,0,0,0.1)', background: '#fff',
+                      fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      fontFamily: "'DM Sans', sans-serif", color: '#1A1A2E',
+                    }}>
+                      {rec.isPaused ? '▶ Resume' : '⏸ Pause'}
+                    </button>
+                    <button onClick={handleStopRecording} style={{
+                      padding: '6px 16px', borderRadius: 8, border: 'none',
+                      background: '#FF5F57', color: '#fff', fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+                    }}>
+                      ⏹ Stop
                     </button>
                   </div>
+                  {/* Action chips */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    {['📝 Add note', '📷 Screenshot', '🎤 Voice note'].map(label => (
+                      <button key={label} style={{
+                        flex: 1, padding: '5px 8px', borderRadius: 8,
+                        border: '1px dashed rgba(0,0,0,0.1)', background: '#fff',
+                        fontSize: 10, cursor: 'pointer', color: '#6E6E82',
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ═══ UPLOAD TOAST ═══ */}
+            {uploadStatus !== 'idle' && (
+              <div style={{
+                padding: '6px 16px', fontSize: 11, fontWeight: 500, textAlign: 'center',
+                background: uploadStatus === 'uploading' ? '#EEF2FF' : uploadStatus === 'success' ? '#ECFDF5' : '#FEF2F2',
+                color: uploadStatus === 'uploading' ? '#6C5CE7' : uploadStatus === 'success' ? '#059669' : '#DC2626',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+              }}>
+                {uploadStatus === 'uploading' && '⬆️ Uploading recording...'}
+                {uploadStatus === 'success' && '✅ Recording uploaded successfully'}
+                {uploadStatus === 'error' && `❌ Upload failed: ${uploadError}`}
+              </div>
+            )}
+
+            {/* ═══ SEARCH BAR ═══ */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)',
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke={mode === 'search' ? '#6C5CE7' : '#6C5CE7'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {mode === 'search' ? (
+                  <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>
                 ) : (
-                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A0A0B2', fontSize: '0.72rem' }}>Select a result to preview</div>
+                  <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
+                )}
+              </svg>
+              <input ref={inputRef} type="text" value={query}
+                onChange={e => setQuery(e.target.value)} onKeyDown={handleKeyDown}
+                placeholder={mode === 'search' ? 'Search workflows, pages...' : 'Ask anything about your knowledge base...'}
+                style={{
+                  flex: 1, border: 'none', background: 'none', fontSize: 14,
+                  fontFamily: "'DM Sans', sans-serif", color: '#1A1A2E', outline: 'none',
+                }}/>
+              {/* Search / AI toggle */}
+              <div style={{ display: 'flex', gap: 0, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                <button onClick={() => setMode('search')} style={{
+                  padding: '4px 10px', border: 'none', fontSize: 11, fontWeight: 600,
+                  fontFamily: "'Outfit', sans-serif", cursor: 'pointer',
+                  background: mode === 'search' ? 'rgba(108,92,231,0.1)' : '#fff',
+                  color: mode === 'search' ? '#6C5CE7' : '#A0A0B2',
+                }}>Search</button>
+                <button onClick={() => setMode('ai')} style={{
+                  padding: '4px 10px', border: 'none', borderLeft: '1px solid rgba(0,0,0,0.08)',
+                  fontSize: 11, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: 'pointer',
+                  background: mode === 'ai' ? 'rgba(108,92,231,0.1)' : '#fff',
+                  color: mode === 'ai' ? '#6C5CE7' : '#A0A0B2',
+                  display: 'flex', alignItems: 'center', gap: 3,
+                }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
+                  </svg>
+                  AI
+                </button>
+              </div>
+              <span style={kbdStyle}>ESC</span>
+            </div>
+
+            {/* ═══ CONTEXT BAR ═══ */}
+            {contextInfo && contextInfo.appName && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 16px', background: 'rgba(108,92,231,0.04)',
+                borderBottom: '1px solid rgba(108,92,231,0.08)', fontSize: 11,
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#28C840', flexShrink: 0 }}/>
+                <span style={{ color: '#1A1A2E', fontWeight: 600 }}>{contextInfo.appName}</span>
+                {contextInfo.url && (
+                  <span style={{ color: '#A0A0B2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    · {(() => { try { return new URL(contextInfo.url).hostname; } catch { return contextInfo.url; } })()}
+                  </span>
+                )}
+                {contextMatchCount > 0 && (
+                  <span style={{
+                    marginLeft: 'auto', padding: '1px 8px', borderRadius: 10,
+                    background: 'rgba(108,92,231,0.1)', color: '#6C5CE7',
+                    fontWeight: 600, fontSize: 10,
+                  }}>
+                    {contextMatchCount} linked
+                  </span>
                 )}
               </div>
             )}
-          </div>
-        ) : (
-          /* AI Chat */
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '14px 18px', maxHeight: 280, overflowY: 'auto', borderBottom: chatMessages.length > 0 || isChatLoading ? '1px solid rgba(0,0,0,0.07)' : 'none' }} className="scrollbar-thin">
-              {chatMessages.length === 0 && !isChatLoading && (
-                <div style={{ padding: '16px 0', textAlign: 'center', fontSize: '0.72rem', color: '#A0A0B2' }}>
-                  Ask a question about your workflows, guides, or documents...
-                </div>
-              )}
-              {chatMessages.map((msg, i) => (
-                <div key={i} style={{ display: 'flex', marginBottom: 8, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: msg.role === 'assistant' ? 8 : 0 }}>
-                  {msg.role === 'assistant' && (
-                    <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, background: 'rgba(108,92,231,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2.5"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/></svg>
+
+            {/* ═══ CONTENT AREA ═══ */}
+            {mode === 'search' ? (
+              <div ref={resultsRef} style={{ maxHeight: 280, overflowY: 'auto', padding: '6px 10px' }} className="scrollbar-thin">
+                {/* Context results (always shown when no query) */}
+                {!query.trim() && contextResults.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px' }}>Suggested</div>
+                    {contextResults.map((result, idx) => (
+                      <ResultItem key={result.id} result={result} index={idx}
+                        isHighlighted={idx === highlightIndex}
+                        onHover={() => setHighlightIndex(idx)}
+                        onClick={() => openResult(result)} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Search results */}
+                {isSearching && results.length === 0 && (
+                  <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>Searching...</div>
+                )}
+                {!isSearching && query.trim() && results.length === 0 && (
+                  <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
+                    No results for "{query}"
+                  </div>
+                )}
+                {!query.trim() && contextResults.length === 0 && (
+                  <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
+                    Start typing to search workflows and pages...
+                  </div>
+                )}
+
+                {(() => {
+                  const offset = !query.trim() ? contextResults.length : 0;
+                  let globalIndex = offset;
+                  return Object.entries(grouped).map(([label, items]) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#A0A0B2', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 6px 4px' }}>{label}</div>
+                      {items.map((result) => {
+                        const idx = globalIndex++;
+                        return (
+                          <ResultItem key={result.id} result={result} index={idx}
+                            isHighlighted={idx === highlightIndex}
+                            onHover={() => setHighlightIndex(idx)}
+                            onClick={() => openResult(result)} />
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
+              </div>
+            ) : (
+              /* AI Chat */
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '10px 16px', maxHeight: 240, overflowY: 'auto' }} className="scrollbar-thin">
+                  {chatMessages.length === 0 && !isChatLoading && (
+                    <div style={{ padding: '16px 0', textAlign: 'center', fontSize: 12, color: '#A0A0B2' }}>
+                      Ask about your workflows, guides, or documents...
                     </div>
                   )}
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} style={{
+                      display: 'flex', marginBottom: 8,
+                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      gap: msg.role === 'assistant' ? 8 : 0,
+                    }}>
+                      {msg.role === 'assistant' && (
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          background: 'rgba(108,92,231,0.08)', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center', marginTop: 2,
+                        }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2.5">
+                            <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
+                          </svg>
+                        </div>
+                      )}
+                      <div style={{
+                        padding: '8px 12px', fontSize: 13, lineHeight: 1.5, maxWidth: '85%',
+                        borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
+                        background: msg.role === 'user' ? '#6C5CE7' : '#FAFAFC',
+                        color: msg.role === 'user' ? '#fff' : '#1A1A2E',
+                        border: msg.role === 'assistant' ? '1px solid rgba(0,0,0,0.07)' : 'none',
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      }}>{msg.content}</div>
+                    </div>
+                  ))}
+                  {isChatLoading && (
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                        background: 'rgba(108,92,231,0.08)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', marginTop: 2,
+                      }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2.5">
+                          <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/>
+                        </svg>
+                      </div>
+                      <div style={{
+                        padding: '8px 12px', fontSize: 13, borderRadius: '4px 14px 14px 14px',
+                        background: '#FAFAFC', border: '1px solid rgba(0,0,0,0.07)', color: '#A0A0B2',
+                      }}>Thinking...</div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: '8px 16px' }}>
                   <div style={{
-                    padding: '9px 13px', fontSize: '0.76rem', lineHeight: 1.5, maxWidth: '88%',
-                    borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
-                    background: msg.role === 'user' ? '#6C5CE7' : '#FAFAFC',
-                    color: msg.role === 'user' ? 'white' : '#1A1A2E',
-                    border: msg.role === 'assistant' ? '1px solid rgba(0,0,0,0.07)' : 'none',
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                  }}>{msg.content}</div>
-                </div>
-              ))}
-              {isChatLoading && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, background: 'rgba(108,92,231,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2.5"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/></svg>
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                    border: '1.5px solid rgba(0,0,0,0.07)', borderRadius: 10, background: '#FAFAFC',
+                  }}>
+                    <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={handleKeyDown}
+                      placeholder="Follow up..." style={{
+                        flex: 1, border: 'none', background: 'none', fontSize: 13,
+                        fontFamily: "'DM Sans', sans-serif", color: '#1A1A2E', outline: 'none',
+                      }}/>
+                    <button onClick={sendAiMessage} disabled={!query.trim() || isChatLoading}
+                      style={{
+                        width: 24, height: 24, borderRadius: 7, background: '#6C5CE7',
+                        border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', opacity: !query.trim() || isChatLoading ? 0.5 : 1,
+                      }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                      </svg>
+                    </button>
                   </div>
-                  <div style={{ padding: '9px 13px', fontSize: '0.76rem', borderRadius: '4px 14px 14px 14px', background: '#FAFAFC', border: '1px solid rgba(0,0,0,0.07)', color: '#A0A0B2' }}>Thinking...</div>
                 </div>
-              )}
-            </div>
-            <div style={{ padding: '10px 18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: '1.5px solid rgba(0,0,0,0.07)', borderRadius: 10, background: '#FAFAFC' }}>
-                <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={handleKeyDown} placeholder="Follow up..." style={{ flex: 1, border: 'none', background: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem', color: '#1A1A2E', outline: 'none' }} />
-                <button onClick={sendAiMessage} disabled={!query.trim() || isChatLoading} style={{ width: 26, height: 26, borderRadius: 7, background: '#6C5CE7', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, opacity: !query.trim() || isChatLoading ? 0.5 : 1 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </button>
+              </div>
+            )}
+
+            {/* ═══ FOOTER ═══ */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '6px 16px', background: '#FAFAFC', borderTop: '1px solid rgba(0,0,0,0.07)',
+            }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {mode === 'search' ? (
+                  <>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#A0A0B2' }}>
+                      <span style={kbdStyle}>↑↓</span> Nav
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#A0A0B2' }}>
+                      <span style={kbdStyle}>↵</span> Open
+                    </span>
+                  </>
+                ) : (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#A0A0B2' }}>
+                    <span style={kbdStyle}>↵</span> Send
+                  </span>
+                )}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#A0A0B2' }}>
+                  <span style={kbdStyle}>Tab</span> {mode === 'search' ? 'AI' : 'Search'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <svg width="12" height="10" viewBox="0 0 72 64" fill="none">
+                  <rect x="6" y="8" width="26" height="10" rx="5" fill="#6C5CE7" />
+                  <rect x="6" y="26" width="46" height="10" rx="5" fill="#6C5CE7" />
+                  <rect x="6" y="44" width="36" height="10" rx="5" fill="#6C5CE7" />
+                  <path d="M58 6 L60.5 14 L68 16.5 L60.5 19 L58 27 L55.5 19 L48 16.5 L55.5 14 Z" fill="#00D2D3" />
+                </svg>
+                <span style={{ fontSize: 10, color: '#A0A0B2', fontWeight: 500 }}>ondoki</span>
               </div>
             </div>
-          </div>
+          </>
         )}
-
-        {/* Footer */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 18px', background: '#FAFAFC', borderTop: '1px solid rgba(0,0,0,0.07)',
-        }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {mode === 'search' ? (
-              <>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.56rem', color: '#A0A0B2' }}>
-                  <span style={kbdStyle}>↑↓</span> Navigate
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.56rem', color: '#A0A0B2' }}>
-                  <span style={kbdStyle}>↵</span> Open
-                </span>
-              </>
-            ) : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.56rem', color: '#A0A0B2' }}>
-                <span style={kbdStyle}>↵</span> Send
-              </span>
-            )}
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.56rem', color: '#A0A0B2' }}>
-              <span style={kbdStyle}>Tab</span> Switch
-            </span>
-          </div>
-          <span style={{ fontSize: '0.58rem', color: '#A0A0B2' }}>
-            {mode === 'search' ? `${results.length} result${results.length !== 1 ? 's' : ''}` : 'AI Chat'}
-          </span>
-        </div>
       </div>
     </div>
   );
 };
+
+// ─── Result Item Component ──────────────────────────────────────────────────
+
+const ResultItem: React.FC<{
+  result: SpotlightResult;
+  index: number;
+  isHighlighted: boolean;
+  onHover: () => void;
+  onClick: () => void;
+}> = ({ result, isHighlighted, onHover, onClick }) => {
+  const rType = result.type || result.resource_type;
+  const isWorkflow = rType === 'workflow';
+  const meta: string[] = [];
+  if (result.step_count) meta.push(`${result.step_count} steps`);
+  if (result.word_count) meta.push(`${result.word_count} words`);
+  if (result.updated_at) meta.push(formatRelativeTime(result.updated_at));
+
+  return (
+    <div data-result-item onClick={onClick} onMouseEnter={onHover} style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+      borderRadius: 8, cursor: 'pointer', transition: 'all 0.1s',
+      background: isHighlighted ? 'rgba(108,92,231,0.08)' : 'transparent',
+      boxShadow: isHighlighted ? 'inset 0 0 0 1.5px rgba(108,92,231,0.15)' : 'none',
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        background: isWorkflow ? 'rgba(108,92,231,0.08)' : 'rgba(0,210,211,0.08)',
+      }}>
+        {isWorkflow ? (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6C5CE7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00D2D3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+          </svg>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {result.name || result.resource_name || 'Untitled'}
+        </div>
+        <div style={{ fontSize: 10, color: '#A0A0B2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {meta.join(' · ')}
+        </div>
+      </div>
+      {isHighlighted && (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A0A0B2" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      )}
+    </div>
+  );
+};
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { margin: 0; background: transparent; overflow: hidden; -webkit-app-region: no-drag; }
+
+  @keyframes spotlightIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .scrollbar-thin::-webkit-scrollbar { width: 5px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+  ::selection { background: rgba(108,92,231,0.2); }
+  input::placeholder { color: #A0A0B2; }
+`;
+document.head.appendChild(styleEl);
 
 // ─── Mount ──────────────────────────────────────────────────────────────────
 
