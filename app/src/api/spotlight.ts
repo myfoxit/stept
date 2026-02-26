@@ -38,8 +38,26 @@ export interface ConfirmActionResponse {
 
 // ── API Functions ────────────────────────────────────────────────────────────
 
-/** Unified keyword search across workflows + documents */
+/** Unified hybrid search (RRF fusion of keyword + semantic) across workflows + documents */
 export async function unifiedSearch(
+  query: string,
+  projectId: string,
+  limit = 20,
+  contextApp?: string,
+  contextUrl?: string,
+): Promise<UnifiedSearchResponse> {
+  const params: Record<string, unknown> = { q: query, project_id: projectId, limit };
+  if (contextApp) params.context_app = contextApp;
+  if (contextUrl) params.context_url = contextUrl;
+  return request<UnifiedSearchResponse>({
+    method: 'GET',
+    url: '/search/unified-v2',
+    params,
+  });
+}
+
+/** Legacy unified keyword search (fallback) */
+export async function unifiedKeywordSearch(
   query: string,
   projectId: string,
   limit = 20,
@@ -51,7 +69,7 @@ export async function unifiedSearch(
   });
 }
 
-/** Unified semantic search across workflows + documents */
+/** Legacy unified semantic search */
 export async function unifiedSemanticSearch(
   query: string,
   projectId: string,

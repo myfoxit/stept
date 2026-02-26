@@ -27,12 +27,8 @@ import { useChat } from '@/components/Chat/ChatContext';
 import { useCreateDocument } from '@/hooks/api/documents';
 import {
   unifiedSearch,
-  unifiedSemanticSearch,
   type UnifiedSearchResult,
 } from '@/api/spotlight';
-
-// Question-like patterns that trigger parallel semantic search
-const QUESTION_WORDS = /^(how|what|why|when|where|who|which|can|does|is|are|do|should|could|would)\b/i;
 
 interface SpotlightSearchProps {
   open: boolean;
@@ -60,11 +56,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
     }
   }, [open]);
 
-  const isQuestionLike = useCallback((q: string) => {
-    return q.length > 20 || QUESTION_WORDS.test(q.trim());
-  }, []);
-
-  // Debounced search
+  // Debounced search — unified-v2 handles keyword + semantic fusion via RRF
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -77,26 +69,9 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       setIsSearching(true);
 
       try {
-        // Always do keyword search
-        const kwResults = await unifiedSearch(query, selectedProjectId);
-        setResults(kwResults.results);
-        setSearchType('keyword');
-
-        // Also fire semantic search in parallel for question-like queries
-        if (isQuestionLike(query)) {
-          try {
-            const semResults = await unifiedSemanticSearch(query, selectedProjectId);
-            if (semResults.results.length > 0) {
-              // Merge: prefer semantic, keep unique keyword results
-              const semIds = new Set(semResults.results.map((r) => r.id));
-              const uniqueKw = kwResults.results.filter((r) => !semIds.has(r.id));
-              setResults([...semResults.results, ...uniqueKw]);
-              setSearchType('semantic');
-            }
-          } catch {
-            // Semantic failed — keyword results still shown
-          }
-        }
+        const response = await unifiedSearch(query, selectedProjectId);
+        setResults(response.results);
+        setSearchType(response.search_type || 'keyword');
       } catch (err) {
         console.error('Search failed:', err);
       } finally {
