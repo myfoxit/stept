@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { desktopCapturer } from 'electron';
 import * as path from 'path';
 
 const execFileAsync = promisify(execFile);
@@ -46,9 +45,13 @@ export class ContextWatcherService extends EventEmitter {
   private paused: boolean = false;
 
   private nativeBinaryPath: string;
-  private bundleIdCache: Map<string, string | null> = new Map();
+
+  // Running apps cache (10s TTL)
   private runningAppsCache: { apps: RunningApp[]; time: number } | null = null;
   private readonly RUNNING_APPS_CACHE_TTL = 10 * 1000;
+
+  // Bundle ID cache (persists for session)
+  private bundleIdCache: Map<string, string | null> = new Map();
 
   private readonly BROWSERS = ['Google Chrome', 'Safari', 'Firefox', 'Arc', 'Microsoft Edge', 'Brave Browser', 'Chromium', 'Opera'];
 
@@ -78,11 +81,13 @@ export class ContextWatcherService extends EventEmitter {
     }
   }
 
+  /** Pause polling — keeps cached context frozen (use when spotlight is visible) */
   pause() { this.paused = true; }
 
+  /** Resume polling and clear dedup so new links get picked up */
   resume() {
     this.paused = false;
-    this.lastContext = '';
+    this.lastContext = '';  // Force re-check on next poll
   }
 
   private async check() {
@@ -92,13 +97,10 @@ export class ContextWatcherService extends EventEmitter {
       const ctx = await this.getActiveContext();
       if (!ctx) return;
 
+      // Cache the last active context so spotlight can read it (before focus changes)
       this.lastActiveContext = ctx;
 
-      const ctxKey = JSON.stringify({
-        app: ctx.appName,
-        title: (ctx.windowTitle || '').slice(0, 120),
-        url: ctx.url || '',
-      });
+      const ctxKey = JSON.stringify({ app: ctx.appName, host: ctx.url ? new URL(ctx.url).hostname : '', title: (ctx.windowTitle || '').slice(0, 120) });
       if (ctxKey === this.lastContext) return;
       this.lastContext = ctxKey;
 
@@ -118,15 +120,25 @@ export class ContextWatcherService extends EventEmitter {
       } else {
         this.emit('no-matches', ctx);
       }
-    } catch {
+    } catch (e) {
       // Silent fail
     }
   }
 
+  /**
+   * Returns the last context captured by the background poller.
+   * Use this instead of getActiveContext() when spotlight is open,
+   * because getActiveContext() would detect the Electron window itself.
+   */
   public getLastActiveContext(): ActiveContext | null {
     return this.lastActiveContext;
   }
 
+  /**
+   * Force a fresh match query using the cached context.
+   * Skips the dedup cache — always hits the API.
+   * Returns matches and emits events.
+   */
   public async forceMatchCheck(): Promise<ContextMatch[]> {
     const ctx = this.lastActiveContext;
     if (!ctx || !this.apiBaseUrl || !this.accessToken) return [];
@@ -144,137 +156,78 @@ export class ContextWatcherService extends EventEmitter {
     }
   }
 
-  // ─── Context Detection ──────────────────────────────────────────────
-
   public async getActiveContext(): Promise<ActiveContext | null> {
     try {
-      // macOS: use native binary (fast, gives app name + window title)
+      let windowTitle = '';
+      let appName = '';
+
       if (process.platform === 'darwin') {
-        return await this.getActiveContextMacOS();
+        const { stdout } = await execFileAsync(this.nativeBinaryPath, ['mouse'], { timeout: 2000 });
+        const info = JSON.parse(stdout);
+        windowTitle = info?.window?.title || '';
+        appName = info?.window?.ownerName || '';
+      } else if (process.platform === 'win32') {
+        // Use PowerShell to get foreground window info
+        const script = `
+          Add-Type @"
+            using System;
+            using System.Runtime.InteropServices;
+            using System.Text;
+            public class Win32 {
+              [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+              [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+              [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+            }
+"@
+          $hwnd = [Win32]::GetForegroundWindow()
+          $sb = New-Object System.Text.StringBuilder 256
+          [Win32]::GetWindowText($hwnd, $sb, 256) | Out-Null
+          $pid = 0
+          [Win32]::GetWindowThreadProcessId($hwnd, [ref]$pid) | Out-Null
+          $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+          @{ title = $sb.ToString(); app = $proc.ProcessName; description = $proc.Description } | ConvertTo-Json
+        `;
+        const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], { timeout: 3000 });
+        const info = JSON.parse(stdout.trim());
+        windowTitle = info?.title || '';
+        // Use description (friendly name) if available, otherwise process name
+        appName = info?.description || info?.app || '';
+      } else {
+        return null;
       }
 
-      // All platforms: use desktopCapturer (built into Electron, reliable)
-      return await this.getActiveContextDesktopCapturer();
+      // Only ignore our own app
+      if (!appName || appName === 'Electron' || appName.toLowerCase() === 'ondoki desktop' || appName.toLowerCase() === 'ondoki-desktop') return null;
+
+      const ctx: ActiveContext = { windowTitle, appName };
+
+      if (this.BROWSERS.includes(appName)) {
+        const url = await this.getBrowserUrl(appName);
+        if (url) ctx.url = url;
+      }
+
+      // Also try to extract URL from window title for browsers on Windows
+      if (process.platform === 'win32' && !ctx.url) {
+        // Many browsers show URL or domain in title. Also try reading URL via UI Automation
+        const browserProcesses = ['chrome', 'msedge', 'firefox', 'brave', 'opera', 'vivaldi', 'arc'];
+        const appLower = appName.toLowerCase();
+        if (browserProcesses.some(b => appLower.includes(b)) || this.BROWSERS.some(b => appLower.includes(b.toLowerCase()))) {
+          const url = await this.getWindowsBrowserUrl(appName);
+          if (url) ctx.url = url;
+        }
+      }
+
+      // Get bundle identifier (macOS)
+      if (process.platform === 'darwin') {
+        const bundleId = await this.getAppBundleId(appName);
+        if (bundleId) ctx.appBundleId = bundleId;
+      }
+
+      return ctx;
     } catch {
       return null;
     }
   }
-
-  private async getActiveContextMacOS(): Promise<ActiveContext | null> {
-    const { stdout } = await execFileAsync(this.nativeBinaryPath, ['mouse'], { timeout: 2000 });
-    const info = JSON.parse(stdout);
-
-    const windowTitle = info?.window?.title || '';
-    const appName = info?.window?.ownerName || '';
-
-    if (!appName || this.isOwnApp(appName)) return null;
-
-    const ctx: ActiveContext = { windowTitle, appName };
-
-    if (this.BROWSERS.includes(appName)) {
-      const url = await this.getBrowserUrl(appName);
-      if (url) ctx.url = url;
-    }
-
-    const bundleId = await this.getAppBundleId(appName);
-    if (bundleId) ctx.appBundleId = bundleId;
-
-    return ctx;
-  }
-
-  private async getActiveContextDesktopCapturer(): Promise<ActiveContext | null> {
-    // desktopCapturer.getSources returns all visible windows with their titles
-    // Window titles from browsers include the page: "Google - Google Chrome"
-    // This works on Windows, macOS, and Linux with zero external deps
-    const sources = await desktopCapturer.getSources({
-      types: ['window'],
-      fetchWindowIcons: false,
-      thumbnailSize: { width: 1, height: 1 }, // minimal — we only need titles
-    });
-
-    // Filter out our own windows
-    const external = sources.filter(s => {
-      const title = s.name || '';
-      return title.trim() !== '' && !this.isOwnApp(title);
-    });
-
-    if (external.length === 0) return null;
-
-    // First source is typically the topmost/most-recently-focused window
-    const top = external[0];
-    const windowTitle = top.name || '';
-
-    // Parse browser window titles: "Page Title - Browser Name"
-    // Chrome: "Google - Google Chrome"
-    // Edge: "Google - Microsoft Edge"
-    // Firefox: "Google — Mozilla Firefox"
-    const parsed = this.parseBrowserWindowTitle(windowTitle);
-
-    const ctx: ActiveContext = {
-      windowTitle,
-      appName: parsed.appName || windowTitle,
-    };
-
-    // Try to extract URL from title for known browsers
-    // Browser titles often show "domain.com" or "Page Title" — useful for matching
-    if (parsed.isBrowser && parsed.pageTitle) {
-      // We don't get the exact URL, but we can send the page title
-      // and window_title matching will pick it up
-      // Also set a synthetic hostname if the page title looks like a domain
-      const domainMatch = parsed.pageTitle.match(/^([\w-]+\.[\w.-]+)/);
-      if (domainMatch) {
-        ctx.url = `https://${domainMatch[1]}`;
-      }
-    }
-
-    return ctx;
-  }
-
-  private parseBrowserWindowTitle(title: string): { appName: string; pageTitle: string; isBrowser: boolean } {
-    // Common browser title patterns:
-    // "Page Title - Google Chrome"
-    // "Page Title - Microsoft Edge"  
-    // "Page Title — Mozilla Firefox"
-    // "Page Title - Brave"
-    // "Page Title - Opera"
-    const browserSuffixes = [
-      'Google Chrome', 'Microsoft Edge', 'Mozilla Firefox', 'Brave',
-      'Opera', 'Safari', 'Arc', 'Chromium', 'Vivaldi', 'Brave Browser',
-    ];
-
-    for (const browser of browserSuffixes) {
-      // Try both " - " and " — " separators
-      for (const sep of [' - ', ' — ', ' – ']) {
-        if (title.endsWith(`${sep}${browser}`)) {
-          return {
-            appName: browser,
-            pageTitle: title.slice(0, -(sep.length + browser.length)),
-            isBrowser: true,
-          };
-        }
-      }
-    }
-
-    // Not a browser, or unknown format
-    // Try generic " - AppName" pattern (many apps use this)
-    const lastDash = title.lastIndexOf(' - ');
-    if (lastDash > 0) {
-      return {
-        appName: title.slice(lastDash + 3).trim(),
-        pageTitle: title.slice(0, lastDash).trim(),
-        isBrowser: false,
-      };
-    }
-
-    return { appName: title, pageTitle: '', isBrowser: false };
-  }
-
-  private isOwnApp(name: string): boolean {
-    const lower = name.toLowerCase();
-    return lower === 'electron' || lower.includes('ondoki desktop') || lower.includes('ondoki-desktop');
-  }
-
-  // ─── macOS Browser URL via AppleScript ──────────────────────────────
 
   private async getBrowserUrl(appName: string): Promise<string | null> {
     const scriptMap: Record<string, string> = {
@@ -285,6 +238,7 @@ export class ContextWatcherService extends EventEmitter {
       'Brave Browser': 'tell application "Brave Browser" to get URL of active tab of first window',
       'Chromium': 'tell application "Chromium" to get URL of active tab of first window',
       'Opera': 'tell application "Opera" to get URL of active tab of first window',
+      'Firefox': 'tell application "System Events" to tell process "Firefox" to get value of attribute "AXTitle" of window 1',
     };
 
     const script = scriptMap[appName];
@@ -293,6 +247,7 @@ export class ContextWatcherService extends EventEmitter {
     try {
       const { stdout } = await execFileAsync('/usr/bin/osascript', ['-e', script], { timeout: 1500 });
       const result = stdout.trim();
+      if (appName === 'Firefox') return null;
       if (result && result.startsWith('http')) return result;
       return null;
     } catch {
@@ -300,7 +255,44 @@ export class ContextWatcherService extends EventEmitter {
     }
   }
 
-  // ─── Match API ──────────────────────────────────────────────────────
+  private async getWindowsBrowserUrl(appName: string): Promise<string | null> {
+    // Use UI Automation to read the address bar from Chromium-based browsers
+    try {
+      const script = `
+        Add-Type -AssemblyName UIAutomationClient
+        Add-Type -AssemblyName UIAutomationTypes
+        $root = [System.Windows.Automation.AutomationElement]::RootElement
+        $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
+        $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+        
+        # Find the foreground window
+        Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class FG { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }
+"@
+        $hwnd = [FG]::GetForegroundWindow()
+        $el = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+        
+        # Search for edit controls (address bar)
+        $edits = $el.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+        foreach ($edit in $edits) {
+          try {
+            $pattern = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+            $val = $pattern.Current.Value
+            if ($val -match "^https?://") { Write-Output $val; break }
+            if ($val -match "^[a-zA-Z0-9].*\\.[a-zA-Z]{2,}") { Write-Output "https://$val"; break }
+          } catch {}
+        }
+      `;
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], { timeout: 3000 });
+      const url = stdout.trim();
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) return url;
+      return null;
+    } catch {
+      return null;
+    }
+  }
 
   private async queryMatches(ctx: ActiveContext): Promise<ContextMatch[]> {
     const params = new URLSearchParams();
@@ -327,10 +319,39 @@ export class ContextWatcherService extends EventEmitter {
 
     if (!res.ok) return [];
     const data = await res.json();
-    return data.matches || [];
+    const matches: ContextMatch[] = data.matches || [];
+
+    // Derive match_reason for UI display
+    for (const m of matches) {
+      if (!m.match_reason) {
+        m.match_reason = this.deriveMatchReason(m, ctx);
+      }
+    }
+
+    return matches;
   }
 
-  // ─── macOS Bundle ID ───────────────────────────────────────────────
+  private deriveMatchReason(match: ContextMatch, ctx: ActiveContext): string {
+    const type = match.match_type;
+    if (type === 'app_exact' || type === 'app_regex') {
+      return ctx.appName || match.match_value;
+    }
+    if (type === 'url_regex' || type === 'url_exact') {
+      try {
+        return new URL(ctx.url || match.match_value).hostname;
+      } catch {
+        return match.match_value;
+      }
+    }
+    if (type === 'window_regex' || type === 'window_exact') {
+      return ctx.windowTitle?.slice(0, 40) || match.match_value;
+    }
+    if (type === 'hostname' || type === 'hostname_base') {
+      return match.match_value;
+    }
+    // Fallback: show app name or match value
+    return ctx.appName || match.match_value;
+  }
 
   private async getAppBundleId(appName: string): Promise<string | null> {
     if (this.bundleIdCache.has(appName)) {
@@ -350,47 +371,60 @@ export class ContextWatcherService extends EventEmitter {
     }
   }
 
-  // ─── Running Apps ──────────────────────────────────────────────────
-
   public async getRunningApps(): Promise<RunningApp[]> {
+    // Return cached if fresh
     if (this.runningAppsCache && Date.now() - this.runningAppsCache.time < this.RUNNING_APPS_CACHE_TTL) {
       return this.runningAppsCache.apps;
     }
 
     const apps: RunningApp[] = [];
 
-    // Use desktopCapturer — works everywhere
-    try {
-      const sources = await desktopCapturer.getSources({
-        types: ['window'],
-        fetchWindowIcons: false,
-        thumbnailSize: { width: 1, height: 1 },
-      });
-
-      const seen = new Set<string>();
-      for (const source of sources) {
-        const parsed = this.parseBrowserWindowTitle(source.name);
-        const name = parsed.appName || source.name;
-        if (name && !this.isOwnApp(name) && !seen.has(name)) {
-          seen.add(name);
-          apps.push({ name });
-        }
-      }
-    } catch {}
-
-    // macOS: also get bundle IDs
     if (process.platform === 'darwin') {
       try {
         const { stdout } = await execFileAsync('/usr/bin/osascript', [
-          '-e', 'tell application "System Events" to get name of every application process whose background only is false',
+          '-e', 'tell application "System Events" to get {name, bundle identifier} of every application process whose background only is false',
         ], { timeout: 3000 });
-        const names = stdout.trim().split(',').map(s => s.trim());
-        const seen = new Set(apps.map(a => a.name));
-        for (const name of names) {
-          if (name && !this.isOwnApp(name) && !seen.has(name)) {
-            seen.add(name);
-            apps.push({ name });
+
+        // AppleScript returns: {name1, name2, ...}, {id1, id2, ...}
+        const lines = stdout.trim();
+        // Parse the two lists
+        const match = lines.match(/^\{(.*)\},\s*\{(.*)\}$/s);
+        if (match) {
+          const names = match[1].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+          const ids = match[2].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+          for (let i = 0; i < names.length; i++) {
+            const name = names[i];
+            if (name && name !== 'Electron' && name !== 'Ondoki Desktop') {
+              apps.push({
+                name,
+                bundleId: ids[i] && ids[i] !== 'missing value' ? ids[i] : undefined,
+              });
+            }
           }
+        }
+      } catch {
+        // Fallback: simpler approach
+        try {
+          const { stdout } = await execFileAsync('/usr/bin/osascript', [
+            '-e', 'tell application "System Events" to get name of every application process whose background only is false',
+          ], { timeout: 3000 });
+          const names = stdout.trim().split(',').map(s => s.trim());
+          for (const name of names) {
+            if (name && name !== 'Electron' && name !== 'Ondoki Desktop') {
+              apps.push({ name });
+            }
+          }
+        } catch {}
+      }
+    } else if (process.platform === 'win32') {
+      try {
+        const { stdout } = await execFileAsync('powershell.exe', [
+          '-NoProfile', '-Command',
+          'Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -Property ProcessName -Unique | ForEach-Object { $_.ProcessName }',
+        ], { timeout: 5000 });
+        const names = stdout.trim().split('\n').map(s => s.trim()).filter(Boolean);
+        for (const name of names) {
+          apps.push({ name });
         }
       } catch {}
     }
