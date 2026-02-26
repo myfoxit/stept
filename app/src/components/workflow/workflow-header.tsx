@@ -45,7 +45,7 @@ export function WorkflowHeader({
   const iconValue =
     iconOverride?.value || (workflow as any).icon_value || "IconPencil";
   const iconColor =
-    iconOverride?.color || (workflow as any).icon_color || "#3a7a52";
+    iconOverride?.color || (workflow as any).icon_color || "#6C5CE7";
 
   const renderIcon = () => {
     if (iconType === "favicon" && iconValue) {

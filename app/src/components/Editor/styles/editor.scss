@@ -73,8 +73,8 @@ body,
 }
 
 .tiptap.ProseMirror {
-  font-family: "Arial", Georgia, serif;
-  color: #57534e;
+  font-family: "DM Sans", "Outfit", sans-serif;
+  color: #3d3a50;
   font-size: 1.08rem;
   line-height: 1.9;
 }
@@ -85,8 +85,8 @@ body,
 .tiptap.ProseMirror h4,
 .tiptap.ProseMirror h5,
 .tiptap.ProseMirror h6 {
-  font-family: "Arial", sans-serif;
-  color: #1c1917;
+  font-family: "Newsreader", Georgia, serif;
+  color: #1a1a2e;
 }
 
 .tiptap.ProseMirror h2 {
@@ -103,35 +103,35 @@ body,
 }
 
 .tiptap.ProseMirror strong {
-  color: #1c1917;
+  color: #1a1a2e;
   font-weight: 600;
 }
 
 .tiptap.ProseMirror a {
-  color: #3a7a52;
+  color: #6C5CE7;
   text-decoration: underline;
-  text-decoration-color: #3a7a5212;
+  text-decoration-color: rgba(108, 92, 231, 0.12);
   text-underline-offset: 3px;
 }
 
 .tiptap.ProseMirror a:hover {
-  text-decoration-color: #3a7a52;
+  text-decoration-color: #6C5CE7;
 }
 
 .tiptap.ProseMirror code {
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: "DM Mono", monospace;
   font-size: 0.86em;
-  background: #f5f3ff;
-  border: 1px solid #e8e5fe;
+  background: #f1effe;
+  border: 1px solid #ddd7f8;
   padding: 2px 7px;
   border-radius: 5px;
-  color: #3a7a52;
+  color: #5647c7;
 }
 
 .tiptap.ProseMirror blockquote {
-  border-left: 3px solid #3a7a52;
+  border-left: 3px solid #6C5CE7;
   padding-left: 18px;
-  color: #a8a29e;
+  color: #a5a2b4;
   font-style: italic;
 }
 
@@ -178,12 +178,12 @@ body,
 
   .ondoki-page-title {
     /* visual */
-    font-family: "Arial", sans-serif;
+    font-family: "Newsreader", Georgia, serif;
     font-size: 2.75rem;
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: -0.03em;
-    color: #1c1917;
+    color: #1a1a2e;
     background: transparent;
     border: none;
 

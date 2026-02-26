@@ -46,8 +46,8 @@ export function SiteHeader({
                 <span
                   className={
                     i === breadcrumbs.length - 1
-                      ? "font-semibold text-[#1C1917] "
-                      : "font-medium text-[#A8A29E] hover:text-[#D94F3D] cursor-pointer transition-colors"
+                      ? "font-semibold text-[#1a1a2e] "
+                      : "font-medium text-[#a5a2b4] hover:text-[#6C5CE7] cursor-pointer transition-colors"
                   }
                 >
                   {crumb.label}

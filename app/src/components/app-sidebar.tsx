@@ -156,7 +156,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     width="32"
                     height="32"
                     rx="9"
-                    fill="#3a7a52"
+                    fill="#6C5CE7"
                   />
                   <rect
                     x="7"
@@ -184,7 +184,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                   <path
                     d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#3a7a52"
+                    fill="#00D2D3"
                   />
                 </svg>
                 <span
@@ -246,7 +246,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="h-8 w-full justify-between px-2 font-medium text-[0.82rem] text-[#57534E] hover:bg-[#F5F4F2]"
+                      className="h-8 w-full justify-between px-2 font-medium text-[0.82rem] text-[#3d3a50] hover:bg-[#f1effe]"
                       data-testid="project-selector-trigger"
                     >
                       <span className="truncate">
@@ -364,13 +364,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <div className="px-3 pb-2">
         <button
           onClick={openSpotlight}
-          className="flex w-full items-center gap-2 rounded-lg bg-[#F5F4F2] px-3 py-2 text-left transition-colors hover:border-[#E0DEDC] border border-transparent"
+          className="flex w-full items-center gap-2 rounded-lg bg-[#f1effe] px-3 py-2 text-left transition-colors hover:border-[#ddd7f8] border border-transparent"
         >
-          <Search className="h-3.5 w-3.5 text-[#A8A29E] flex-shrink-0" />
-          <span className="text-[0.78rem] font-medium text-[#A8A29E]">
+          <Search className="h-3.5 w-3.5 text-[#a5a2b4] flex-shrink-0" />
+          <span className="text-[0.78rem] font-medium text-[#a5a2b4]">
             Search...
           </span>
-          <kbd className="ml-auto text-[0.6rem] font-semibold bg-white border border-[#EEECEB] px-1.5 py-px rounded text-[#D6D3D1]">
+          <kbd className="ml-auto text-[0.6rem] font-semibold bg-white border border-[#e4e1ed] px-1.5 py-px rounded text-[#a5a2b4]">
             ⌘K
           </kbd>
         </button>

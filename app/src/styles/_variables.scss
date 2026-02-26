@@ -176,15 +176,15 @@
   **************************************************/
 
   /* Global colors - Light mode */
-  --tt-bg-color: var(--white);
-  --tt-border-color: var(--tt-gray-light-a-200);
-  --tt-border-color-tint: var(--tt-gray-light-a-100);
-  --tt-sidebar-bg-color: var(--white);
-  --tt-scrollbar-color: var(--tt-gray-light-a-200);
+  --tt-bg-color: #f4f3f8;
+  --tt-border-color: #e4e1ed;
+  --tt-border-color-tint: #eeecf5;
+  --tt-sidebar-bg-color: #faf9fc;
+  --tt-scrollbar-color: #e4e1ed;
   --tt-cursor-color: var(--tt-brand-color-500);
   --tt-selection-color: rgba(108, 92, 231, 0.15);
   --tt-card-bg-color: var(--white);
-  --tt-card-border-color: var(--tt-gray-light-a-100);
+  --tt-card-border-color: #eeecf5;
 }
 
 /* Global colors - Dark mode */
