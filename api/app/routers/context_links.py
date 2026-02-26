@@ -134,7 +134,11 @@ def _link_matches(link: ContextLink, url: str | None, app_name: str | None,
         return bool(url and url == mv)
 
     if mt == "url_pattern":
-        return bool(url and fnmatch.fnmatch(url, mv))
+        if not url:
+            return False
+        # Auto-wrap with wildcards if no glob chars present (enables "contains" behavior)
+        pattern = mv if any(c in mv for c in '*?[') else f"*{mv}*"
+        return fnmatch.fnmatch(url.lower(), pattern.lower())
 
     if mt == "url_regex":
         if not url:
