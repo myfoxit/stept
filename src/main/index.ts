@@ -997,13 +997,14 @@ class OndokiApp {
   private createTray(): void {
     const iconPath = path.join(__dirname, '..', '..', 'assets');
 
-    // Use pre-generated sized icons
-    const trayIcon = nativeImage.createFromPath(path.join(iconPath, 'trayIcon.png'));
+    // Windows needs .ico for tray; macOS uses .png
+    const trayFile = process.platform === 'win32' ? 'icon.ico' : 'trayIcon.png';
+    const trayIcon = nativeImage.createFromPath(path.join(iconPath, trayFile));
     trayIcon.setTemplateImage(false); // Color icon, not template
     this.normalTrayIcon = trayIcon;
 
     // Recording icon — same icon, title changes
-    const recIcon = nativeImage.createFromPath(path.join(iconPath, 'trayIcon.png'));
+    const recIcon = nativeImage.createFromPath(path.join(iconPath, trayFile));
     recIcon.setTemplateImage(false);
     this.recordingTrayIcon = recIcon;
 

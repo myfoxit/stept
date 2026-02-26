@@ -606,6 +606,7 @@ const SpotlightApp: React.FC = () => {
         display: 'flex',
         justifyContent: 'center',
         paddingTop: 0,
+        background: 'rgba(0,0,0,0.01)', // near-invisible but prevents click-through on transparent areas
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) dismiss();
