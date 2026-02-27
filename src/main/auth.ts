@@ -79,7 +79,7 @@ export class AuthService extends EventEmitter {
     }
 
     try {
-      console.log('Attempting auto-login with refresh token...');
+      console.log('Attempting auto-login with stored refresh token');
       
       const response = await fetch(`${this.getApiBaseUrl()}/auth/token`, {
         method: 'POST',
@@ -138,7 +138,7 @@ export class AuthService extends EventEmitter {
       authUrl.searchParams.set('redirect_uri', AuthService.REDIRECT_URI);
       authUrl.searchParams.set('state', this.state);
 
-      console.log('Opening authorization URL:', authUrl.toString());
+      console.log('Opening authorization URL:', authUrl.origin + authUrl.pathname);
 
       // Open in default browser
       await shell.openExternal(authUrl.toString());
@@ -149,7 +149,7 @@ export class AuthService extends EventEmitter {
 
   public async handleCallback(callbackUrl: string): Promise<boolean> {
     try {
-      console.log('Handling auth callback:', callbackUrl);
+      console.log('Handling auth callback');
       
       const parsedUrl = new URL(callbackUrl);
       const code = parsedUrl.searchParams.get('code');
@@ -241,7 +241,7 @@ export class AuthService extends EventEmitter {
               refresh_token: this.refreshToken,
             }),
           });
-          console.log('Refresh token revoked on server');
+          console.log('Token revoked on server');
         } catch (error) {
           console.error('Failed to revoke token on server:', error);
         }
@@ -282,7 +282,7 @@ export class AuthService extends EventEmitter {
 
       if (response.ok) {
         this.currentUser = await response.json();
-        console.log('Fetched user info:', this.currentUser?.name, this.currentUser?.email);
+        console.log('Fetched user info:', this.currentUser?.email);
       } else {
         console.error('Failed to fetch user info:', response.status);
       }
@@ -325,7 +325,7 @@ export class AuthService extends EventEmitter {
       await this.disconnectWebSocket();
 
       const wsUrl = `${this.getWsBaseUrl()}/auth/ws/notifications?token=${encodeURIComponent(this.accessToken)}`;
-      console.log('Connecting to WebSocket:', wsUrl);
+      console.log('Connecting to WebSocket:', this.getWsBaseUrl() + '/auth/ws/notifications');
 
       this.webSocket = new WebSocket(wsUrl);
 
@@ -345,13 +345,10 @@ export class AuthService extends EventEmitter {
 
       this.webSocket.on('message', (data) => {
         const message = data.toString();
-        console.log('WebSocket message:', message);
 
         if (message === 'FORCE_LOGOUT') {
           console.log('Received force logout notification');
           this.handleForceLogout();
-        } else if (message === 'pong') {
-          console.log('Received pong');
         }
       });
 
