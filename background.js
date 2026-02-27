@@ -40,7 +40,7 @@ authReadyPromise = new Promise(resolve => { authReadyResolve = resolve; });
 
 // Initialize state from storage — restore ALL auth state
 chrome.storage.local.get(
-  ['accessToken', 'refreshToken', 'currentUser', 'userProjects', 'selectedProjectId', 'isRecording', 'recordingStartTime', 'stepCounter'],
+  ['accessToken', 'refreshToken', 'currentUser', 'userProjects', 'selectedProjectId', 'isRecording', 'recordingStartTime', 'stepCounter', 'persistedSteps'],
   async (result) => {
     if (result.selectedProjectId) {
       state.selectedProjectId = result.selectedProjectId;
@@ -51,6 +51,12 @@ chrome.storage.local.get(
       state.stepCounter = result.stepCounter || 0;
       chrome.action.setBadgeText({ text: 'REC' });
       chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
+    }
+
+    // Restore persisted steps (survives SW restarts)
+    if (result.persistedSteps && Array.isArray(result.persistedSteps)) {
+      state.steps = result.persistedSteps;
+      state.stepCounter = Math.max(state.stepCounter, state.steps.length);
     }
 
     if (result.refreshToken) {
@@ -100,6 +106,23 @@ async function persistRecordingState() {
     stepCounter: state.stepCounter,
     selectedProjectId: state.selectedProjectId,
   });
+}
+
+// Helper to persist steps to storage (survives SW termination)
+async function persistSteps() {
+  try {
+    await chrome.storage.local.set({ persistedSteps: state.steps });
+  } catch (e) {
+    // Quota exceeded — persist steps without screenshots as fallback
+    debugLog('Steps persistence failed, retrying without screenshots:', e);
+    const lightweight = state.steps.map(s => ({ ...s, screenshotDataUrl: null }));
+    await chrome.storage.local.set({ persistedSteps: lightweight }).catch(() => {});
+  }
+}
+
+// Helper to clear persisted steps from storage
+async function clearPersistedSteps() {
+  await chrome.storage.local.remove('persistedSteps');
 }
 
 // PKCE helpers
@@ -392,6 +415,7 @@ function startRecording(projectId) {
 
   chrome.storage.local.set({ selectedProjectId: projectId });
   persistRecordingState();
+  clearPersistedSteps();
 
   // Inject content script into ALL open http/https tabs
   chrome.tabs.query({}, async (tabs) => {
@@ -574,6 +598,8 @@ async function addStep(stepData) {
   state.steps.push(step);
   debugLog('Step added:', step.stepNumber, step.actionType);
 
+  persistSteps();
+
   chrome.runtime
     .sendMessage({ type: 'STEP_ADDED', step: step })
     .catch(() => {});
@@ -585,6 +611,7 @@ function deleteStep(stepNumber) {
     step.stepNumber = index + 1;
   });
   state.stepCounter = state.steps.length;
+  persistSteps();
 }
 
 // Cloud upload
@@ -763,6 +790,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'CLEAR_STEPS':
         state.steps = [];
         state.stepCounter = 0;
+        clearPersistedSteps();
         sendResponse({ success: true });
         break;
 
