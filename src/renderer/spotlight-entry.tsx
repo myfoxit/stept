@@ -1,7 +1,7 @@
+import './styles/globals.css';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { theme } from './components/spotlight/theme';
 import { OndokiLogo } from './components/spotlight/OndokiLogo';
 import { SpotlightHeader } from './components/spotlight/SpotlightHeader';
 import { SearchBar } from './components/spotlight/SearchBar';
@@ -19,7 +19,7 @@ import type {
   SpotMode,
 } from './components/spotlight/types';
 
-// ─── Spotlight App ──────────────────────────────────────────────────────────
+// --- Spotlight App ------------------------------------------------------------
 
 const SpotlightApp: React.FC = () => {
   // Auth
@@ -76,7 +76,7 @@ const SpotlightApp: React.FC = () => {
   const resultsRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─── Init ───────────────────────────────────────────────────────────────
+  // --- Init ------------------------------------------------------------------
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -214,7 +214,7 @@ const SpotlightApp: React.FC = () => {
     return () => clearInterval(interval);
   }, [rec.isRecording, rec.isPaused]);
 
-  // ─── Search ─────────────────────────────────────────────────────────────
+  // --- Search ----------------------------------------------------------------
 
   const performSearch = useCallback(
     async (text: string) => {
@@ -253,7 +253,7 @@ const SpotlightApp: React.FC = () => {
     };
   }, [query, mode, performSearch]);
 
-  // ─── Actions ────────────────────────────────────────────────────────────
+  // --- Actions ---------------------------------------------------------------
 
   const openResult = useCallback(async (result: SpotlightResult) => {
     const api = window.electronAPI;
@@ -411,7 +411,7 @@ const SpotlightApp: React.FC = () => {
     }
   }, [query, selectedProjectId, isChatLoading, contextInfo]);
 
-  // ─── Keyboard ───────────────────────────────────────────────────────────
+  // --- Keyboard --------------------------------------------------------------
 
   const allResults = [...(query.trim() ? [] : contextResults), ...results];
 
@@ -454,44 +454,19 @@ const SpotlightApp: React.FC = () => {
     items[highlightIndex]?.scrollIntoView({ block: 'nearest' });
   }, [highlightIndex]);
 
-  // ─── RENDER ─────────────────────────────────────────────────────────────
+  // --- RENDER ----------------------------------------------------------------
 
   if (authLoading) {
     return (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div
-          className="spotlight-card"
-          style={{
-            padding: '40px 0',
-            textAlign: 'center',
-            color: theme.textMuted,
-            fontSize: 13,
-          }}
-        >
-          Loading...
-        </div>
+      <div className="spotlight-backdrop spotlight-backdrop--centered">
+        <div className="spotlight-card spotlight-loading">Loading...</div>
       </div>
     );
   }
 
   return (
     <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        paddingTop: 0,
-        background: 'rgba(0,0,0,0.01)',
-      }}
+      className="spotlight-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) dismiss();
       }}
@@ -499,44 +474,17 @@ const SpotlightApp: React.FC = () => {
       <div className="spotlight-card">
         {/* Auth gate */}
         {!auth.isAuthenticated ? (
-          <div style={{ padding: '40px 32px', textAlign: 'center' }}>
-            <div style={{ marginBottom: 16 }}>
+          <div className="auth-gate">
+            <div className="auth-gate-logo">
               <OndokiLogo width={38} height={36} />
             </div>
-            <div
-              style={{
-                fontFamily: theme.font.display,
-                fontWeight: 800,
-                fontSize: 20,
-                color: theme.dark,
-                letterSpacing: '-0.03em',
-                marginBottom: 8,
-              }}
-            >
-              ondoki
-            </div>
-            <p
-              style={{
-                fontSize: 13,
-                color: theme.textSecondary,
-                lineHeight: 1.5,
-                marginBottom: 24,
-              }}
-            >
+            <div className="auth-gate-title">ondoki</div>
+            <p className="auth-gate-desc">
               Sign in to start recording and searching your workflows.
             </p>
             <button
               onClick={handleLogin}
-              className="btn-dark"
-              style={{
-                padding: '10px 32px',
-                borderRadius: theme.radius.md,
-                border: 'none',
-                fontSize: 14,
-                fontWeight: 600,
-                fontFamily: theme.font.display,
-                cursor: 'pointer',
-              }}
+              className="btn-dark auth-gate-btn"
             >
               Sign In
             </button>
@@ -607,154 +555,7 @@ const SpotlightApp: React.FC = () => {
   );
 };
 
-// ─── Styles ─────────────────────────────────────────────────────────────────
-
-const styleEl = document.createElement('style');
-styleEl.textContent = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { margin: 0; background: transparent; overflow: hidden; -webkit-app-region: no-drag; }
-
-  @keyframes spotlightIn {
-    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  .scrollbar-thin::-webkit-scrollbar { width: 5px; }
-  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
-
-  ::selection { background: rgba(58,176,138,0.2); }
-  input::placeholder { color: #999999; }
-
-  .spotlight-card {
-    width: 530px;
-    max-width: 94vw;
-    background: #ffffff;
-    border-radius: 20px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
-    border: 1px solid #E0E0E0;
-    overflow: hidden;
-    font-family: 'DM Sans', sans-serif;
-    animation: spotlightIn 0.15s ease-out;
-  }
-
-  .spotlight-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
-  }
-
-  .search-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
-  }
-
-  .recording-controls {
-    padding: 10px 16px;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
-  }
-
-  .context-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 16px;
-    background: rgba(26,26,26,0.03);
-    border-bottom: 1px solid rgba(26,26,26,0.06);
-    font-size: 11px;
-  }
-
-  .content-area {
-    max-height: 280px;
-    overflow-y: auto;
-    padding: 6px 10px;
-  }
-
-  .footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 16px;
-    background: #F5F5F5;
-    border-top: 1px solid rgba(0,0,0,0.07);
-  }
-
-  .result-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.1s;
-  }
-  .result-item:hover {
-    background: rgba(26,26,26,0.06);
-  }
-
-  .pill-toggle {
-    display: flex;
-    gap: 0;
-    border-radius: 8px;
-    border: 1px solid rgba(0,0,0,0.08);
-    overflow: hidden;
-  }
-
-  .btn-dark {
-    background: #1A1A1A;
-    color: #fff;
-    transition: background 0.15s;
-  }
-  .btn-dark:hover { background: #333333; }
-  .btn-dark:disabled { background: #ccc; cursor: not-allowed; }
-
-  .btn-outline {
-    background: rgba(26,26,26,0.04);
-    border: 1.5px solid rgba(26,26,26,0.15);
-    transition: background 0.15s;
-  }
-  .btn-outline:hover { background: rgba(26,26,26,0.08); }
-
-  .kbd {
-    display: inline-flex;
-    padding: 1px 5px;
-    border-radius: 4px;
-    background: rgba(26,26,26,0.08);
-    border: 1px solid rgba(26,26,26,0.12);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 500;
-    color: #666666;
-    line-height: 16px;
-  }
-
-  .empty-state {
-    padding: 20px 8px;
-    text-align: center;
-    font-size: 12px;
-    color: #999999;
-  }
-`;
-document.head.appendChild(styleEl);
-
-// ─── Mount ──────────────────────────────────────────────────────────────────
+// --- Mount -------------------------------------------------------------------
 
 const container = document.getElementById('spotlight-root');
 if (container) {

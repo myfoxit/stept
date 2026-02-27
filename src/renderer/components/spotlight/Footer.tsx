@@ -1,5 +1,4 @@
 import React from 'react';
-import { theme } from './theme';
 import { OndokiLogo } from './OndokiLogo';
 import type { SpotMode } from './types';
 
@@ -9,62 +8,28 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ mode }) => (
   <div className="footer">
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div className="footer-hints">
       {mode === 'search' ? (
         <>
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              fontSize: 10,
-              color: theme.textMuted,
-            }}
-          >
-            <span className="kbd">↑↓</span> Nav
+          <span className="footer-hint">
+            <span className="kbd">&uarr;&darr;</span> Nav
           </span>
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              fontSize: 10,
-              color: theme.textMuted,
-            }}
-          >
-            <span className="kbd">↵</span> Open
+          <span className="footer-hint">
+            <span className="kbd">&crarr;</span> Open
           </span>
         </>
       ) : (
-        <span
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            fontSize: 10,
-            color: theme.textMuted,
-          }}
-        >
-          <span className="kbd">↵</span> Send
+        <span className="footer-hint">
+          <span className="kbd">&crarr;</span> Send
         </span>
       )}
-      <span
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 3,
-          fontSize: 10,
-          color: theme.textMuted,
-        }}
-      >
+      <span className="footer-hint">
         <span className="kbd">Tab</span> {mode === 'search' ? 'AI' : 'Search'}
       </span>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+    <div className="footer-brand">
       <OndokiLogo width={12} height={11} />
-      <span style={{ fontSize: 10, color: theme.textMuted, fontWeight: 500 }}>
-        ondoki
-      </span>
+      <span className="footer-brand-text">ondoki</span>
     </div>
   </div>
 );

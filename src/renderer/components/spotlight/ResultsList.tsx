@@ -1,17 +1,15 @@
 import React from 'react';
 import { Search, FileText, ListChecks, ExternalLink } from 'lucide-react';
-import { theme } from './theme';
 import { formatRelativeTime, groupResults } from './helpers';
 import type { SpotlightResult } from './types';
 
-// ─── ResultItem ──────────────────────────────────────────────────────────────
+// --- ResultItem ---------------------------------------------------------------
 
 const ResultItem: React.FC<{
   result: SpotlightResult;
   isHighlighted: boolean;
-  onHover: () => void;
   onClick: () => void;
-}> = ({ result, isHighlighted, onHover, onClick }) => {
+}> = ({ result, isHighlighted, onClick }) => {
   const rType = result.type || result.resource_type;
   const isWorkflow = rType === 'workflow';
   const meta: string[] = [];
@@ -23,90 +21,37 @@ const ResultItem: React.FC<{
     <div
       data-result-item
       onClick={onClick}
-      onMouseEnter={onHover}
-      className="result-item"
-      style={{
-        background: isHighlighted ? 'rgba(26,26,26,0.06)' : 'transparent',
-        boxShadow: isHighlighted
-          ? 'inset 0 0 0 1.5px rgba(26,26,26,0.12)'
-          : 'none',
-      }}
+      className={`result-item${isHighlighted ? ' result-item--active' : ''}`}
     >
       <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 7,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          background: isWorkflow
-            ? 'rgba(26,26,26,0.06)'
-            : 'rgba(136,136,136,0.08)',
-        }}
+        className={`result-icon ${isWorkflow ? 'result-icon--workflow' : 'result-icon--page'}`}
       >
         {isWorkflow ? (
-          <ListChecks size={14} color={theme.dark} strokeWidth={2} />
+          <ListChecks size={14} strokeWidth={2} />
         ) : (
-          <FileText size={14} color="#888888" strokeWidth={2} />
+          <FileText size={14} strokeWidth={2} />
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: theme.dark,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
+      <div className="result-info">
+        <div className="result-name">
           {result.name || result.resource_name || 'Untitled'}
         </div>
-        <div
-          style={{
-            fontSize: 10,
-            color: theme.textMuted,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {meta.join(' · ')}
-        </div>
+        <div className="result-meta">{meta.join(' \u00b7 ')}</div>
       </div>
       {isHighlighted && (
-        <ExternalLink
-          size={14}
-          color={theme.textMuted}
-          strokeWidth={2}
-          style={{ flexShrink: 0 }}
-        />
+        <ExternalLink size={14} strokeWidth={2} className="result-ext-icon" />
       )}
     </div>
   );
 };
 
-// ─── SectionLabel ────────────────────────────────────────────────────────────
+// --- SectionLabel -------------------------------------------------------------
 
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div
-    style={{
-      fontSize: 10,
-      fontWeight: 600,
-      color: theme.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      padding: '6px 6px 4px',
-    }}
-  >
-    {children}
-  </div>
+  <div className="section-label">{children}</div>
 );
 
-// ─── ResultsList ─────────────────────────────────────────────────────────────
+// --- ResultsList --------------------------------------------------------------
 
 interface ResultsListProps {
   query: string;
@@ -132,11 +77,7 @@ export const ResultsList: React.FC<ResultsListProps> = ({
   const grouped = groupResults(query.trim() ? results : []);
 
   return (
-    <div
-      ref={resultsRef}
-      className="content-area scrollbar-thin"
-      style={{ maxHeight: 280, overflowY: 'auto', padding: '6px 10px' }}
-    >
+    <div ref={resultsRef} className="content-area scrollbar-thin">
       {/* Context results (when no query) */}
       {!query.trim() && contextResults.length > 0 && (
         <div>
@@ -146,7 +87,6 @@ export const ResultsList: React.FC<ResultsListProps> = ({
               key={result.id}
               result={result}
               isHighlighted={idx === highlightIndex}
-              onHover={() => onHighlight(idx)}
               onClick={() => onOpen(result)}
             />
           ))}
@@ -165,31 +105,11 @@ export const ResultsList: React.FC<ResultsListProps> = ({
 
       {/* Empty state — no query, no context */}
       {!query.trim() && contextResults.length === 0 && (
-        <div
-          style={{
-            padding: '48px 8px 32px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 14,
-              background: 'rgba(58,176,138,0.08)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Search size={24} color={theme.accent} strokeWidth={2} />
+        <div className="empty-hero">
+          <div className="empty-hero-icon">
+            <Search size={24} strokeWidth={2} />
           </div>
-          <span style={{ fontSize: 13, color: theme.textMuted, fontWeight: 500 }}>
-            Start typing to search
-          </span>
+          <span className="empty-hero-text">Start typing to search</span>
         </div>
       )}
 
@@ -207,7 +127,6 @@ export const ResultsList: React.FC<ResultsListProps> = ({
                   key={result.id}
                   result={result}
                   isHighlighted={idx === highlightIndex}
-                  onHover={() => onHighlight(idx)}
                   onClick={() => onOpen(result)}
                 />
               );
