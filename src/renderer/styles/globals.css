@@ -66,7 +66,7 @@
   }
   body {
     font-family: var(--font-sans);
-    background: var(--bg);
+    background: transparent;
     color: var(--text-primary);
     font-size: 14px;
     line-height: 1.5;
@@ -863,11 +863,11 @@
     transition: all 0.15s;
   }
   .settings-btn--primary {
-    background: var(--dark);
+    background: var(--accent);
     color: #fff;
   }
   .settings-btn--primary:hover {
-    background: var(--dark-hover);
+    background: var(--accent-hover);
   }
   .settings-btn--danger {
     background: transparent;

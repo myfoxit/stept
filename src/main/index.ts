@@ -640,7 +640,7 @@ class OndokiApp {
   .source-card { border: 2px solid rgba(0,0,0,0.07); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.15s; background: #fff; }
   .source-card:hover { border-color: rgba(26,26,26,0.35); box-shadow: 0 4px 16px rgba(26,26,26,0.1); transform: translateY(-1px); }
   @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .source-card.selected { border-color: #1A1A1A; box-shadow: 0 0 0 3px rgba(26,26,26,0.15); }
+  .source-card.selected { border-color: #3ab08a; box-shadow: 0 0 0 3px rgba(58,176,138,0.15); }
   .thumb { width: 100%; aspect-ratio: 16/9; background: #E8E8F0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .source-info { padding: 8px 10px; }
@@ -649,13 +649,13 @@ class OndokiApp {
   .footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; border-top: 1px solid rgba(0,0,0,0.07); background: #fff; }
   .btn-cancel { padding: 8px 20px; border-radius: 10px; border: 1.5px solid rgba(0,0,0,0.1); background: transparent; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: #6E6E82; cursor: pointer; transition: all 0.15s; }
   .btn-cancel:hover { border-color: #6E6E82; }
-  .btn-select { padding: 8px 24px; border-radius: 10px; border: none; background: #1A1A1A; color: #fff; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 8px rgba(26,26,26,0.2); }
-  .btn-select:hover { background: #333333; transform: translateY(-1px); }
+  .btn-select { padding: 8px 24px; border-radius: 10px; border: none; background: #3ab08a; color: #fff; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; box-shadow: 0 2px 8px rgba(58,176,138,0.2); }
+  .btn-select:hover { background: #2f9a78; transform: translateY(-1px); }
   .btn-select:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .all-screens-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 2px solid rgba(0,0,0,0.07); border-radius: 12px; cursor: pointer; transition: all 0.15s; background: #fff; margin-bottom: 12px; }
   .all-screens-card:hover { border-color: rgba(26,26,26,0.35); }
-  .all-screens-card.selected { border-color: #1A1A1A; box-shadow: 0 0 0 3px rgba(26,26,26,0.15); }
-  .all-icon { width: 48px; height: 32px; border-radius: 6px; background: linear-gradient(135deg, #1A1A1A, #333333); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .all-screens-card.selected { border-color: #3ab08a; box-shadow: 0 0 0 3px rgba(58,176,138,0.15); }
+  .all-icon { width: 48px; height: 32px; border-radius: 6px; background: linear-gradient(135deg, #3ab08a, #2f9a78); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 </style>
 </head><body>
 <div class="header">
