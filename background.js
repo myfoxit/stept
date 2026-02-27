@@ -695,7 +695,7 @@ async function uploadCapture() {
       if (step.screenshotDataUrl) {
         const blob = await dataUrlToBlob(step.screenshotDataUrl);
         const formData = new FormData();
-        formData.append('file', blob, `step_${step.stepNumber}.png`);
+        formData.append('file', blob, `step_${step.stepNumber}.jpg`);
         formData.append('stepNumber', step.stepNumber.toString());
 
         const imageResponse = await authedFetch(
