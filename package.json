@@ -22,7 +22,7 @@
     "dev:renderer": "webpack serve --mode development",
     "start": "npm run build && electron . --no-sandbox",
     "dev:electron": "npm run build && electron . --development --no-sandbox",
-    "make": "electron-forge make",
+    "make": "npm run build && electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
