@@ -1,5 +1,6 @@
 import Store from 'electron-store';
-import { app } from 'electron';
+import { app, safeStorage } from 'electron';
+import * as crypto from 'crypto';
 import * as path from 'path';
 
 export interface Settings {
@@ -58,9 +59,20 @@ export class SettingsManager {
       name: 'settings',
       cwd: path.join(app.getPath('userData'), 'Ondoki'),
       defaults: { settings: defaultSettings, windowState: defaultWindowState, tokens: {} },
-      encryptionKey: 'ondoki-desktop-encryption-key',
+      encryptionKey: SettingsManager.deriveEncryptionKey(),
       fileExtension: 'json',
     });
+  }
+
+  private static deriveEncryptionKey(): string {
+    // Use safeStorage to derive a machine-specific key when available
+    // (macOS Keychain, Windows DPAPI, Linux keyring)
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString('ondoki-desktop-key-seed');
+      return crypto.createHash('sha256').update(encrypted).digest('hex');
+    }
+    // Fallback: derive from userData path (machine-specific but not secret)
+    return crypto.createHash('sha256').update(`ondoki-${app.getPath('userData')}`).digest('hex');
   }
 
   public getSettings(): Settings { return this.store.get('settings', defaultSettings); }
