@@ -37,6 +37,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { useProject } from '@/providers/project-provider';
 import { apiClient } from '@/lib/apiClient';
@@ -61,7 +72,7 @@ const roleLabels: Record<string, string> = {
 export function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { selectedProject } = useProject();
+  const { selectedProject, deleteProject } = useProject();
   const { data: currentUser } = useMe();
   const { data: members, isLoading } = useProjectMembers(projectId || '');
   const removeMember = useRemoveProjectMember();
@@ -226,6 +237,57 @@ export function ProjectSettingsPage() {
         </CardContent>
       </Card>
       
+      {/* Danger Zone */}
+      {currentUserMember?.role === 'owner' && (
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Delete this project</p>
+              <p className="text-sm text-muted-foreground">
+                Once deleted, the project and all its data will be permanently removed.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <IconTrash className="mr-2 h-4 w-4" />
+                  Delete Project
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the project "{selectedProject?.name}" and all of its data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={async () => {
+                      if (!projectId) return;
+                      try {
+                        await deleteProject(projectId);
+                        toast.success('Project deleted');
+                        navigate('/');
+                      } catch (error) {
+                        toast.error('Failed to delete project');
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Invite Dialog */}
       <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
         setInviteDialogOpen(open);
