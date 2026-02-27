@@ -2,6 +2,7 @@ import Store from 'electron-store';
 import { app, safeStorage } from 'electron';
 import * as crypto from 'crypto';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export interface Settings {
   cloudEndpoint: string;
@@ -55,13 +56,23 @@ export class SettingsManager {
   private store: any;
 
   constructor() {
-    this.store = new Store<StoreSchema>({
+    const storeOpts = {
       name: 'settings',
       cwd: path.join(app.getPath('userData'), 'Ondoki'),
       defaults: { settings: defaultSettings, windowState: defaultWindowState, tokens: {} },
       encryptionKey: SettingsManager.deriveEncryptionKey(),
       fileExtension: 'json',
-    });
+    };
+    try {
+      this.store = new Store<StoreSchema>(storeOpts);
+      // Force a read to detect decryption errors early
+      this.store.get('settings');
+    } catch (err) {
+      console.warn('Settings file corrupted or encryption key changed — resetting to defaults:', (err as Error).message);
+      const settingsPath = path.join(storeOpts.cwd, `${storeOpts.name}.${storeOpts.fileExtension}`);
+      try { fs.unlinkSync(settingsPath); } catch {}
+      this.store = new Store<StoreSchema>(storeOpts);
+    }
   }
 
   private static deriveEncryptionKey(): string {
