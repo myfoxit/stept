@@ -524,6 +524,11 @@ async function addStep(stepData) {
 
   if (state.steps.length >= MAX_STEPS) {
     debugLog(`Max steps (${MAX_STEPS}) reached, ignoring new step`);
+    // MISS-C003: Notify popup/sidepanel that the step limit has been reached
+    chrome.runtime.sendMessage({
+      type: 'MAX_STEPS_REACHED',
+      limit: MAX_STEPS,
+    }).catch(() => {});
     return;
   }
 

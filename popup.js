@@ -293,6 +293,10 @@ saveSettingsBtn.addEventListener('click', async () => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'STEP_ADDED') {
     refreshState();
+  } else if (message.type === 'MAX_STEPS_REACHED') {
+    // MISS-C003: Show warning when step limit is reached
+    stepCount.textContent = `Maximum steps reached (${message.limit}). Stop recording to save.`;
+    stepCount.style.color = '#dc2626';
   }
 });
 

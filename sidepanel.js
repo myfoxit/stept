@@ -323,6 +323,9 @@ chrome.runtime.onMessage.addListener((message) => {
   } else if (message.type === 'SCREENSHOT_FAILED') {
     // MISS-C002: Show user-visible error when screenshot capture fails
     showToast('Screenshot failed \u2014 try again');
+  } else if (message.type === 'MAX_STEPS_REACHED') {
+    // MISS-C003: Show warning when step limit is reached
+    showToast(`Maximum steps reached (${message.limit}). Stop recording to save.`, 6000);
   } else if (message.type === 'RECORDING_STATE_CHANGED') {
     refreshState();
   }
