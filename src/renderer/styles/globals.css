@@ -147,6 +147,9 @@
     overflow: hidden;
     font-family: var(--font-sans);
     animation: spotlightIn 0.15s ease-out;
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
   }
 
   .spotlight-loading {
@@ -492,6 +495,7 @@
     max-height: 280px;
     overflow-y: auto;
     padding: 6px 10px;
+    flex: 1;
   }
 
   /* ===== RESULT ITEM ===== */
@@ -596,6 +600,7 @@
   .chat-panel {
     display: flex;
     flex-direction: column;
+    flex: 1;
   }
   .chat-messages {
     padding: 10px 16px;
@@ -705,6 +710,7 @@
     padding: 6px 16px;
     background: var(--bg);
     border-top: 1px solid var(--border);
+    margin-top: auto;
   }
   .footer-hints {
     display: flex;
