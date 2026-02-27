@@ -418,10 +418,6 @@ async def get_documents_for_user(
         .limit(limit)
     )
     result = await db.execute(stmt)
-    return result.scalars().all().limit(limit)
-    
-    result = await db.execute(stmt)
-    
     return result.scalars().all()
 
 
