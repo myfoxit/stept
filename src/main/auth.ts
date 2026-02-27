@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import { shell } from 'electron';
 import * as crypto from 'crypto';
-import * as url from 'url';
 import WebSocket from 'ws';
 import { SettingsManager } from './settings';
 
