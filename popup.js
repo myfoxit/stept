@@ -29,6 +29,12 @@ const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
 let recordingInterval = null;
 
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
@@ -149,11 +155,11 @@ function renderSteps(steps) {
     const stepEl = document.createElement('div');
     stepEl.className = 'step-item';
     stepEl.innerHTML = `
-      <img class="step-thumbnail" src="${step.screenshotDataUrl || ''}" alt="Step ${step.stepNumber}">
+      <img class="step-thumbnail" src="${escapeHtml(step.screenshotDataUrl || '')}" alt="Step ${step.stepNumber}">
       <div class="step-info">
         <div class="step-number">Step ${step.stepNumber}</div>
-        <div class="step-action">${step.actionType}</div>
-        <div class="step-desc">${step.description}</div>
+        <div class="step-action">${escapeHtml(step.actionType)}</div>
+        <div class="step-desc">${escapeHtml(step.description)}</div>
       </div>
     `;
     stepsContainer.appendChild(stepEl);
