@@ -8,9 +8,13 @@
   --accent-light: rgba(58, 176, 138, 0.08);
   --accent-glow: rgba(58, 176, 138, 0.15);
   --dark: #1A1A1A;
+  --dark-hover: #333333;
   --bg: #F5F5F5;
   --card: #ffffff;
   --border: rgba(0, 0, 0, 0.07);
+  --border-light: rgba(0, 0, 0, 0.04);
+  --border-medium: #E0E0E0;
+  --recording: #E14D2A;
   --text-primary: #1A1A1A;
   --text-secondary: #6E6E6E;
   --text-muted: #999999;
@@ -59,14 +63,14 @@
     background-color: rgba(0, 0, 0, 0.2);
   }
 
-  /* ===== HOVER UTILITIES ===== */
+  /* ===== BUTTONS ===== */
   .btn-dark {
-    background: #1A1A1A;
+    background: var(--dark);
     color: #fff;
     transition: background 0.15s;
   }
   .btn-dark:hover {
-    background: #333333;
+    background: var(--dark-hover);
   }
   .btn-dark:disabled {
     background: #ccc;
@@ -80,6 +84,122 @@
   }
   .btn-outline:hover {
     background: rgba(26, 26, 26, 0.08);
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .btn-accent:hover {
+    background: var(--accent-hover);
+  }
+
+  /* ===== SPOTLIGHT CARD ===== */
+  .spotlight-card {
+    width: 530px;
+    max-width: 94vw;
+    background: var(--card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-light);
+    border: 1px solid var(--border-medium);
+    overflow: hidden;
+    font-family: 'DM Sans', sans-serif;
+    animation: spotlightIn 0.15s ease-out;
+  }
+
+  .spotlight-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .recording-controls {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .context-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    background: rgba(26, 26, 26, 0.03);
+    border-bottom: 1px solid rgba(26, 26, 26, 0.06);
+    font-size: 11px;
+  }
+
+  .content-area {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 6px 10px;
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  /* ===== RESULT ITEM ===== */
+  .result-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .result-item:hover {
+    background: rgba(26, 26, 26, 0.06);
+  }
+
+  /* ===== PILL TOGGLE ===== */
+  .pill-toggle {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+  }
+  .pill-active {
+    background: rgba(26, 26, 26, 0.08);
+  }
+
+  /* ===== KBD (keyboard shortcut badge) ===== */
+  .kbd {
+    display: inline-flex;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(26, 26, 26, 0.08);
+    border: 1px solid rgba(26, 26, 26, 0.12);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: #666666;
+    line-height: 16px;
+  }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    padding: 20px 8px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
   }
 }
 
