@@ -81,9 +81,8 @@ async def get_current_user(
         )
 
     # Support comma-separated JWT secrets for rotation
-    jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
-    if not jwt_secrets:
-        jwt_secrets = [settings.JWT_SECRET]
+    from app.core.jwt import get_jwt_secrets
+    jwt_secrets = get_jwt_secrets()
 
     payload = None
     for secret in jwt_secrets:

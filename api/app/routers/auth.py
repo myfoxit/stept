@@ -425,9 +425,8 @@ def _create_access_token(user_id: str, expires_delta: dt.timedelta = dt.timedelt
         "exp": expire,
         "type": "access"
     }
-    jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
-    signing_secret = jwt_secrets[0] if jwt_secrets else settings.JWT_SECRET
-    return jwt.encode(payload, signing_secret, algorithm="HS256")
+    from app.core.jwt import get_signing_secret
+    return jwt.encode(payload, get_signing_secret(), algorithm="HS256")
 
 @router.get("/authorize")
 async def authorize(
@@ -639,9 +638,8 @@ async def websocket_notifications(
     try:
         # Validate the JWT access token
         try:
-            jwt_secrets = [s.strip() for s in os.environ.get("JWT_SECRET", settings.JWT_SECRET).split(",") if s.strip()]
-            if not jwt_secrets:
-                jwt_secrets = [settings.JWT_SECRET]
+            from app.core.jwt import get_jwt_secrets
+            jwt_secrets = get_jwt_secrets()
             payload = None
             for secret in jwt_secrets:
                 try:
