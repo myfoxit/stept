@@ -564,7 +564,7 @@ const SpotlightApp: React.FC = () => {
       >
         <div
           style={{
-            width: 580,
+            width: 530,
             background: '#ffffff',
             borderRadius: 20,
             boxShadow:
@@ -599,7 +599,7 @@ const SpotlightApp: React.FC = () => {
     >
       <div
         style={{
-          width: 580,
+          width: 530,
           maxWidth: '94vw',
           background: '#ffffff',
           borderRadius: 20,
@@ -788,7 +788,123 @@ const SpotlightApp: React.FC = () => {
                   </svg>
                 </button>
               </div>
+            </div>
 
+            {/* ═══ SEARCH BAR (moved up) ═══ */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 16px',
+                borderBottom: '1px solid rgba(0,0,0,0.07)',
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#1A1A1A"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {mode === 'search' ? (
+                  <>
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </>
+                ) : (
+                  <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
+                )}
+              </svg>
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  mode === 'search'
+                    ? 'Search workflows, pages...'
+                    : 'Ask anything about your knowledge base...'
+                }
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'none',
+                  fontSize: 14,
+                  fontFamily: "'DM Sans', sans-serif",
+                  color: '#1A1A1A',
+                  outline: 'none',
+                }}
+              />
+              {/* Search / AI toggle */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 0,
+                  borderRadius: 8,
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  onClick={() => setMode('search')}
+                  style={{
+                    padding: '4px 10px',
+                    border: 'none',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fontFamily: "'Outfit', sans-serif",
+                    cursor: 'pointer',
+                    background:
+                      mode === 'search' ? 'rgba(26,26,26,0.08)' : '#fff',
+                    color: mode === 'search' ? '#1A1A1A' : '#999999',
+                  }}
+                >
+                  Search
+                </button>
+                <button
+                  onClick={() => setMode('ai')}
+                  style={{
+                    padding: '4px 10px',
+                    border: 'none',
+                    borderLeft: '1px solid rgba(0,0,0,0.08)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fontFamily: "'Outfit', sans-serif",
+                    cursor: 'pointer',
+                    background: mode === 'ai' ? 'rgba(26,26,26,0.08)' : '#fff',
+                    color: mode === 'ai' ? '#1A1A1A' : '#999999',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
+                  </svg>
+                  AI
+                </button>
+              </div>
+            </div>
+
+            {/* ═══ RECORDING CONTROLS ═══ */}
+            <div
+              style={{
+                padding: '10px 16px',
+                borderBottom: '1px solid rgba(0,0,0,0.07)',
+              }}
+            >
               {/* Recording controls */}
               {!rec.isRecording ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1023,115 +1139,6 @@ const SpotlightApp: React.FC = () => {
               </div>
             )}
 
-            {/* ═══ SEARCH BAR ═══ */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 16px',
-                borderBottom: '1px solid rgba(0,0,0,0.07)',
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={mode === 'search' ? '#1A1A1A' : '#1A1A1A'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {mode === 'search' ? (
-                  <>
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </>
-                ) : (
-                  <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                )}
-              </svg>
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  mode === 'search'
-                    ? 'Search workflows, pages...'
-                    : 'Ask anything about your knowledge base...'
-                }
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: 'none',
-                  fontSize: 14,
-                  fontFamily: "'DM Sans', sans-serif",
-                  color: '#1A1A1A',
-                  outline: 'none',
-                }}
-              />
-              {/* Search / AI toggle */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 0,
-                  borderRadius: 8,
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  onClick={() => setMode('search')}
-                  style={{
-                    padding: '4px 10px',
-                    border: 'none',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    fontFamily: "'Outfit', sans-serif",
-                    cursor: 'pointer',
-                    background:
-                      mode === 'search' ? 'rgba(26,26,26,0.08)' : '#fff',
-                    color: mode === 'search' ? '#1A1A1A' : '#999999',
-                  }}
-                >
-                  Search
-                </button>
-                <button
-                  onClick={() => setMode('ai')}
-                  style={{
-                    padding: '4px 10px',
-                    border: 'none',
-                    borderLeft: '1px solid rgba(0,0,0,0.08)',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    fontFamily: "'Outfit', sans-serif",
-                    cursor: 'pointer',
-                    background: mode === 'ai' ? 'rgba(26,26,26,0.08)' : '#fff',
-                    color: mode === 'ai' ? '#1A1A1A' : '#999999',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                  }}
-                >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                  </svg>
-                  AI
-                </button>
-              </div>
-              <span style={kbdStyle}>ESC</span>
-            </div>
-
             {/* ═══ CONTEXT BAR ═══ */}
             {contextInfo && contextInfo.appName && (
               <div
@@ -1261,13 +1268,32 @@ const SpotlightApp: React.FC = () => {
                 {!query.trim() && contextResults.length === 0 && (
                   <div
                     style={{
-                      padding: '20px 8px',
-                      textAlign: 'center',
-                      fontSize: 12,
-                      color: '#999999',
+                      padding: '48px 8px 32px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 10,
                     }}
                   >
-                    Start typing to search workflows and pages...
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 14,
+                        background: 'rgba(225,77,42,0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E14D2A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                      </svg>
+                    </div>
+                    <span style={{ fontSize: 13, color: '#999999', fontWeight: 500 }}>
+                      Start typing to search
+                    </span>
                   </div>
                 )}
 

@@ -312,8 +312,8 @@ class OndokiApp {
 
   private createSpotlightWindow(): void {
     this.spotlightWindow = new BrowserWindow({
-      width: 620,
-      height: 560,
+      width: 560,
+      height: 520,
       show: false,
       frame: false,
       transparent: true,
@@ -434,7 +434,7 @@ class OndokiApp {
     const windowIcon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'icon256.png'));
     this.settingsWindow = new BrowserWindow({
       width: 480,
-      height: 560,
+      height: 520,
       title: 'Ondoki Settings',
       icon: windowIcon,
       alwaysOnTop: true,
