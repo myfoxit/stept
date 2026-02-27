@@ -1,0 +1,101 @@
+---
+title: "Recording Workflows"
+description: "Capture step-by-step workflows using the desktop app or Chrome extension."
+---
+
+## Overview
+
+Workflow recording is ondoki's core feature. It captures each user action — clicks, keystrokes, navigation — as an individual step with a screenshot, window title, and position data. After recording, AI auto-processes the workflow to generate titles, summaries, tags, and per-step descriptions.
+
+## Recording Methods
+
+<CardGroup cols={2}>
+  <Card title="Desktop App" icon="desktop" href="/integrations/desktop-app">
+    Windows app (.NET 9 / WPF) that captures any application. Records clicks, keystrokes, and window changes across the entire desktop.
+  </Card>
+  <Card title="Chrome Extension" icon="chrome" href="/integrations/chrome-extension">
+    Browser extension for capturing web-based workflows. Records in-browser actions with page context.
+  </Card>
+</CardGroup>
+
+Both methods upload recordings to ondoki via the process recording API.
+
+## How Recording Works
+
+<Steps>
+  <Step title="Start a Recording Session">
+    The desktop app or Chrome extension creates a new recording session via `POST /api/v1/process-recording/session/create`.
+  </Step>
+  <Step title="Capture Steps">
+    Each user action creates a step with:
+    - **Screenshot** of the current screen/window
+    - **Action type** (click, keystroke, scroll, navigation)
+    - **Click position** (global and relative coordinates)
+    - **Window title** and size
+    - **Timestamp**
+    - **Key pressed** or **text typed** (for keyboard actions)
+  </Step>
+  <Step title="Upload to ondoki">
+    Steps and screenshots are uploaded to the server. Metadata is sent as JSON, screenshots as image files.
+  </Step>
+  <Step title="Finalize the Workflow">
+    The client calls the finalize endpoint, which triggers AI auto-processing.
+  </Step>
+</Steps>
+
+## AI Auto-Processing
+
+When a workflow is finalized (and an LLM is configured), ondoki automatically generates:
+
+| Generated Field | Description |
+|-----------------|-------------|
+| **Title** | Descriptive title based on the recorded steps |
+| **Summary** | 50–150 word overview of the workflow |
+| **Tags** | Topic tags for categorization |
+| **Difficulty** | Easy, Medium, or Advanced rating |
+| **Time Estimate** | Estimated completion time |
+| **Step Annotations** | Per-step titles and descriptions explaining what happened |
+| **Guide Markdown** | Complete step-by-step guide in Markdown format |
+
+<Note>
+AI processing requires an LLM to be configured in **Project Settings → AI/LLM**. Without it, workflows are saved but not auto-annotated.
+</Note>
+
+## Workflow Editor
+
+After recording, you can edit any workflow in the browser:
+
+- **Reorder steps** — drag-and-drop or use the reorder API
+- **Edit step descriptions** — refine auto-generated annotations
+- **Delete steps** — remove unnecessary or duplicate steps
+- **Add steps manually** — insert additional steps with descriptions
+- **Re-annotate** — trigger AI annotation on individual steps via the annotate button
+- **Set metadata** — change title, assign to folder, set privacy, add icon
+
+## Organizing Workflows
+
+Workflows support the same organizational features as documents:
+
+- **Folders** — nested folder hierarchy with drag-and-drop
+- **Projects** — team-scoped containers
+- **Privacy** — mark workflows as private (owner-only) or shared
+- **Icons** — assign Tabler icons or favicons with custom colors
+
+## Exporting Workflows
+
+Workflows can be exported in multiple formats:
+
+| Format | How |
+|--------|-----|
+| **PDF** | `GET /api/v1/process-recording/{id}/export?format=pdf` — uses Gotenberg |
+| **Markdown** | `GET /api/v1/process-recording/{id}/export?format=markdown` |
+| **Public Link** | Generate a share token for read-only access without login |
+| **Git** | Export project workflows to a Git repository via [Git Sync](/integrations/git-sync) |
+
+## Soft Delete and Recovery
+
+Deleted workflows are soft-deleted (moved to trash) and can be restored:
+
+- **Trash view**: See all deleted workflows in a project
+- **Restore**: Recover a soft-deleted workflow
+- **Permanent delete**: Permanently remove a workflow and all its data

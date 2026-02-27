@@ -1,0 +1,100 @@
+---
+title: "Redis"
+description: "Redis configuration for caching, WebSocket pub/sub, and task queues."
+---
+
+## Overview
+
+ondoki uses **Redis 7** for three purposes:
+
+1. **Caching** — session data and temporary state (DB 0)
+2. **WebSocket pub/sub** — real-time notification delivery across multiple backend instances
+3. **Celery broker** — task queue for async media processing jobs (DB 1)
+
+## Docker Setup
+
+### Development
+
+```yaml
+redis:
+  image: redis:7-alpine
+  container_name: ondoki-redis
+  restart: unless-stopped
+```
+
+No password required in development.
+
+### Production
+
+```yaml
+redis:
+  image: redis:7-alpine
+  container_name: ondoki-redis
+  restart: unless-stopped
+  command: >
+    redis-server
+    --requirepass ${REDIS_PASSWORD:-}
+    --maxmemory 256mb
+    --maxmemory-policy allkeys-lru
+  healthcheck:
+    test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+```
+
+Production configuration:
+
+- **Password authentication** via `REDIS_PASSWORD`
+- **Memory limit** of 256 MB with LRU eviction
+- **Health checks** every 10 seconds
+
+## Connection Strings
+
+ondoki uses two Redis databases:
+
+| Purpose | DB | Variable | Default |
+|---------|-----|----------|---------|
+| Cache + pub/sub | 0 | `REDIS_URL` | `redis://redis:6379/0` |
+| Celery broker | 1 | `CELERY_BROKER_URL` | `redis://redis:6379/1` |
+| Celery results | 1 | `CELERY_RESULT_BACKEND` | `redis://redis:6379/1` |
+
+In production with a password:
+
+```
+REDIS_URL=redis://:yourpassword@redis:6379/0
+CELERY_BROKER_URL=redis://:yourpassword@redis:6379/1
+CELERY_RESULT_BACKEND=redis://:yourpassword@redis:6379/1
+```
+
+## WebSocket Notifications
+
+The backend uses Redis pub/sub for real-time notifications to connected clients (e.g., desktop apps). This enables multi-server support — notifications published by one backend instance are delivered to WebSocket clients connected to any instance.
+
+Channel: notifications are published per-user using the user ID as the channel key.
+
+## Celery Task Queue
+
+The Celery media worker processes async jobs:
+
+- Video import processing (frame extraction, transcription, guide generation)
+- Queues: `celery`, `media`
+- Concurrency: 1 worker (video processing is CPU/memory intensive)
+
+## External Redis
+
+To use an external Redis instance:
+
+1. Set `REDIS_URL`, `CELERY_BROKER_URL`, and `CELERY_RESULT_BACKEND` to your external Redis connection strings
+2. Remove the `redis` service from your Docker Compose file
+3. Ensure the external Redis supports pub/sub (required for WebSocket notifications)
+
+## Persistence
+
+The default configuration does not persist Redis data to disk. This is acceptable because:
+
+- Session data is also stored in PostgreSQL
+- Celery tasks are transient
+- WebSocket pub/sub is ephemeral
+
+If you need Redis persistence, add a volume and configure RDB/AOF in your Redis configuration.

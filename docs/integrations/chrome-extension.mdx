@@ -1,0 +1,47 @@
+---
+title: "Chrome Extension"
+description: "Capture web-based workflows with the ondoki Chrome extension."
+---
+
+## Overview
+
+The [ondoki Chrome Extension](https://github.com/myfoxit/ondoki-chrome-extension) captures web-based workflows directly in the browser. It records clicks, navigation, and page context as step-by-step guides.
+
+## Installation
+
+1. Download from [GitHub Releases](https://github.com/myfoxit/ondoki-chrome-extension/releases) or the Chrome Web Store
+2. Enable the extension in Chrome
+3. Connect to your ondoki server
+
+## Connecting to Your Server
+
+1. Click the ondoki extension icon in the Chrome toolbar
+2. Enter your ondoki server URL
+3. Log in with your credentials
+
+## Recording
+
+1. Click **Start Recording** in the extension popup
+2. Navigate and interact with web pages normally
+3. Each click and navigation is captured as a step with a screenshot
+4. Click **Stop Recording** when finished
+5. The recording is uploaded to your ondoki project
+
+## After Upload
+
+The captured workflow follows the same processing pipeline as desktop recordings:
+
+- AI auto-generates title, summary, tags, and step annotations (if LLM is configured)
+- The workflow appears in your project and is searchable
+- You can edit, share, and export the workflow from the web UI
+
+## Use Cases
+
+- Recording SaaS onboarding flows
+- Documenting web-based admin procedures
+- Capturing bug reproduction steps
+- Creating training materials for web applications
+
+## Repository
+
+Source code and releases: [github.com/myfoxit/ondoki-chrome-extension](https://github.com/myfoxit/ondoki-chrome-extension)

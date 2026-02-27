@@ -1,0 +1,194 @@
+---
+title: "Database"
+description: "PostgreSQL and pgvector setup, migrations, and maintenance."
+---
+
+## Overview
+
+ondoki uses **PostgreSQL 16** with the **pgvector** extension for vector similarity search. The database is managed via SQLAlchemy 2 (async) with Alembic for migrations.
+
+## Docker Setup
+
+The Docker Compose files use the `pgvector/pgvector:pg16` image, which includes PostgreSQL 16 with pgvector pre-installed.
+
+```yaml
+db:
+  image: pgvector/pgvector:pg16
+  environment:
+    POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    POSTGRES_DB: ${POSTGRES_DB:-ondoki}
+  volumes:
+    - db-data:/var/lib/postgresql/data
+```
+
+In production, the database port is **not** exposed to the host — only accessible within the Docker network.
+
+## Connection String
+
+The backend connects using an async connection string:
+
+```
+DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ondoki
+```
+
+The `asyncpg` driver provides high-performance async database access.
+
+## Migrations
+
+ondoki uses [Alembic](https://alembic.sqlalchemy.org/) for database schema migrations.
+
+### Running Migrations
+
+```bash
+# Via Docker (recommended)
+make migrate
+
+# Or directly
+docker compose exec backend alembic upgrade head
+
+# Manual (local development)
+cd api
+alembic upgrade head
+```
+
+### Creating a New Migration
+
+```bash
+cd api
+alembic revision --autogenerate -m "description of change"
+```
+
+Review the generated migration file in `api/alembic/versions/` before applying.
+
+### Migration History
+
+```bash
+cd api
+alembic history
+alembic current
+```
+
+## pgvector Extension
+
+pgvector enables vector similarity search for semantic search. It's automatically available with the `pgvector/pgvector:pg16` image.
+
+The extension is created in migrations:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### How It's Used
+
+The `embedding` table stores 1536-dimensional vectors:
+
+```sql
+CREATE TABLE embedding (
+    id VARCHAR PRIMARY KEY,
+    source_type VARCHAR,
+    source_id VARCHAR,
+    content_hash VARCHAR,
+    embedding VECTOR(1536),
+    metadata JSONB,
+    created_at TIMESTAMP
+);
+```
+
+Queries use cosine distance for similarity:
+
+```sql
+SELECT * FROM embedding
+ORDER BY embedding <=> $query_vector
+LIMIT 10;
+```
+
+<Note>
+If pgvector is not available, ondoki gracefully falls back to full-text search only. Semantic search will be disabled but all other features work normally.
+</Note>
+
+## Full-Text Search
+
+PostgreSQL's built-in full-text search is used via `tsvector` columns on:
+
+- `document.search_tsv`
+- `processrecordingsession.search_tsv`
+- `processrecordingstep.search_tsv`
+
+These columns are updated automatically when content changes.
+
+## Schema Overview
+
+ondoki has 24 tables. Key tables and their purposes:
+
+| Table | Records |
+|-------|---------|
+| `user` | User accounts |
+| `project` / `project_members` | Teams and roles |
+| `document` / `document_version` | Documents and version history |
+| `folder` | Folder hierarchy |
+| `processrecordingsession` | Workflow recordings |
+| `processrecordingstep` | Workflow steps |
+| `processrecordingfile` | Uploaded screenshots |
+| `embedding` | Vector embeddings |
+| `knowledgesource` | Knowledge base files |
+| `auditlog` | Action audit trail |
+| `session` / `refreshtoken` | Auth sessions |
+
+## Backups
+
+### Volume Backup
+
+```bash
+# Stop the database
+docker compose stop db
+
+# Backup the volume
+docker run --rm -v ondoki-web_db-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/db-backup-$(date +%Y%m%d).tar.gz -C /data .
+
+# Restart
+docker compose start db
+```
+
+### pg_dump
+
+```bash
+# From inside the container
+docker compose exec db pg_dump -U postgres ondoki > backup.sql
+
+# Compressed
+docker compose exec db pg_dump -U postgres -Fc ondoki > backup.dump
+```
+
+### Restore
+
+```bash
+# From SQL dump
+docker compose exec -i db psql -U postgres ondoki < backup.sql
+
+# From compressed dump
+docker compose exec -i db pg_restore -U postgres -d ondoki < backup.dump
+```
+
+## Performance
+
+ondoki creates indexes on:
+
+- All foreign key columns
+- `search_tsv` columns (GIN index for full-text search)
+- `embedding` column (for vector similarity)
+- `created_at` / `updated_at` timestamps on frequently queried tables
+- `share_token` columns (unique index)
+- `deleted_at` for soft delete queries
+
+## External PostgreSQL
+
+To use an external PostgreSQL instance instead of the Docker container:
+
+1. Ensure PostgreSQL 16+ is installed with pgvector
+2. Create the database: `CREATE DATABASE ondoki;`
+3. Enable pgvector: `CREATE EXTENSION vector;`
+4. Set `DATABASE_URL` to your external connection string
+5. Remove the `db` service from your Docker Compose file
+6. Run migrations: `alembic upgrade head`

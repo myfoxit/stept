@@ -1,0 +1,150 @@
+---
+title: "MCP Integration"
+description: "Expose your knowledge base to Claude, Cursor, Copilot, or any MCP-compatible AI agent."
+---
+
+## Overview
+
+ondoki includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets external AI agents search and read your documentation. Connect Claude Desktop, Cursor, GitHub Copilot, or any MCP-compatible tool to your ondoki knowledge base.
+
+## How It Works
+
+The MCP server is mounted at `/mcp` on your ondoki backend and uses stateless HTTP transport via [FastMCP](https://github.com/jlowin/fastmcp). AI agents authenticate with project-scoped API keys and can list, search, and read your content.
+
+## Available Tools
+
+The MCP server exposes these tools to connected AI agents:
+
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List accessible projects |
+| `search_pages` | Full-text + semantic search on documents |
+| `search_workflows` | Full-text search on workflows |
+| `list_workflows` | List workflows in a project |
+| `read_document` | Get full document content |
+| `read_workflow` | Get workflow details with all steps |
+| `read_folder` | List folder contents |
+| `create_context_link` | Create URL/app → resource associations |
+
+## Setup
+
+### 1. Generate an API Key
+
+In the ondoki UI, go to **Project Settings → Integrations** and create a new MCP API key:
+
+1. Click **Create API Key**
+2. Enter a name (e.g., "Claude Desktop")
+3. Copy the generated key (it's only shown once)
+
+The key is project-scoped — it only grants access to the project where it was created.
+
+**API:** `POST /api/v1/mcp/projects/{project_id}/mcp-keys`
+
+### 2. Configure Your AI Agent
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    Add to your Claude Desktop MCP config (`claude_desktop_config.json`):
+
+    ```json
+    {
+      "mcpServers": {
+        "ondoki": {
+          "url": "https://app.yourdomain.com/mcp",
+          "headers": {
+            "Authorization": "Bearer ondoki_your_api_key_here"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Claude Code">
+    Add to your project's `.mcp.json`:
+
+    ```json
+    {
+      "mcpServers": {
+        "ondoki": {
+          "type": "url",
+          "url": "https://app.yourdomain.com/mcp",
+          "headers": {
+            "Authorization": "Bearer ondoki_your_api_key_here"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Add to your Cursor MCP settings:
+
+    ```json
+    {
+      "mcpServers": {
+        "ondoki": {
+          "url": "https://app.yourdomain.com/mcp",
+          "headers": {
+            "Authorization": "Bearer ondoki_your_api_key_here"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    Alternatively, set the API key as an environment variable:
+
+    ```bash
+    export ONDOKI_API_KEY=ondoki_your_api_key_here
+    ```
+
+    The MCP server checks for this env var if no Authorization header is provided.
+  </Tab>
+</Tabs>
+
+### 3. Verify
+
+Ask your AI agent to search your ondoki knowledge base:
+
+> "Search ondoki for deployment workflows"
+
+The agent should use the `search_workflows` or `search_pages` tool to query your content.
+
+## Authentication
+
+MCP requests are authenticated via API key:
+
+- **Header:** `Authorization: Bearer ondoki_<key>`
+- **Environment:** `ONDOKI_API_KEY=ondoki_<key>`
+
+Keys are:
+- Project-scoped (only access content in the associated project)
+- Hashed with SHA-256 in the database
+- Trackable (last used timestamp)
+- Revocable (can be deactivated)
+
+## Managing API Keys
+
+| Action | API |
+|--------|-----|
+| List keys | `GET /api/v1/mcp/projects/{project_id}/mcp-keys` |
+| Create key | `POST /api/v1/mcp/projects/{project_id}/mcp-keys` |
+| Revoke key | `DELETE /api/v1/mcp/projects/{project_id}/mcp-keys/{key_id}` |
+
+Keys show a prefix (first 12 characters) for identification. The full key is only returned at creation time.
+
+## Audit Logging
+
+All MCP access is tracked in the [audit log](/guides/sharing-publishing) with action type `MCP_ACCESS`. This includes:
+
+- Which API key was used
+- What resources were accessed
+- Timestamps and IP addresses
+
+## Use Cases
+
+- **Claude Code** — let Claude search your internal process docs while coding
+- **Cursor** — surface relevant workflows when writing related code
+- **Custom agents** — build AI assistants that can reference your team's knowledge base
+- **RAG pipelines** — use ondoki as a retrieval source for custom AI applications

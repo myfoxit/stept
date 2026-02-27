@@ -1,0 +1,103 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "ondoki",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#3ab08a",
+    "light": "#4dd9a8",
+    "dark": "#2e8d6e",
+    "anchors": {
+      "from": "#3ab08a",
+      "to": "#2e8d6e"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/myfoxit/ondoki-web"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "https://github.com/myfoxit/ondoki-web#quick-start"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "integrations/api-overview"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/myfoxit/ondoki-web"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://github.com/myfoxit/ondoki-web/discussions"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "architecture"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/recording-workflows",
+        "guides/document-editor",
+        "guides/ai-features",
+        "guides/search",
+        "guides/knowledge-base",
+        "guides/context-links",
+        "guides/sharing-publishing",
+        "guides/video-import"
+      ]
+    },
+    {
+      "group": "Self-Hosting",
+      "pages": [
+        "self-hosting/docker-compose",
+        "self-hosting/environment-variables",
+        "self-hosting/reverse-proxy",
+        "self-hosting/database",
+        "self-hosting/redis",
+        "self-hosting/email",
+        "self-hosting/upgrades"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "integrations/desktop-app",
+        "integrations/chrome-extension",
+        "integrations/mcp",
+        "integrations/git-sync",
+        "integrations/api-overview"
+      ]
+    },
+    {
+      "group": "Development",
+      "pages": [
+        "development/local-setup",
+        "development/project-structure",
+        "development/contributing",
+        "development/testing"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/myfoxit/ondoki-web"
+  }
+}

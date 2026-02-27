@@ -1,0 +1,115 @@
+---
+title: "Git Sync"
+description: "Export documents to GitHub, GitLab, or Bitbucket as Markdown."
+---
+
+## Overview
+
+Git Sync exports your ondoki documents to a Git repository as Markdown files. It's a one-way sync — changes in ondoki are pushed to Git, but changes in Git are not pulled back.
+
+## Supported Providers
+
+| Provider | Supported |
+|----------|-----------|
+| **GitHub** | Yes |
+| **GitLab** | Yes |
+| **Bitbucket** | Yes |
+
+## Setup
+
+### 1. Create a Personal Access Token
+
+<Tabs>
+  <Tab title="GitHub">
+    1. Go to [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens)
+    2. Generate a new token with `repo` scope
+    3. Copy the token
+  </Tab>
+  <Tab title="GitLab">
+    1. Go to GitLab → User Settings → Access Tokens
+    2. Create a token with `write_repository` scope
+    3. Copy the token
+  </Tab>
+  <Tab title="Bitbucket">
+    1. Go to Bitbucket → Personal settings → App passwords
+    2. Create a password with repository write permissions
+    3. Copy the password
+  </Tab>
+</Tabs>
+
+### 2. Configure in ondoki
+
+Navigate to **Project Settings → Integrations** or use the API:
+
+**Endpoint:** `PUT /api/v1/git-sync/{project_id}`
+
+```json
+{
+  "provider": "github",
+  "repo_url": "https://github.com/yourorg/docs-repo.git",
+  "branch": "main",
+  "directory": "/",
+  "access_token": "ghp_your_token_here"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `provider` | `github`, `gitlab`, or `bitbucket` |
+| `repo_url` | Full repository URL |
+| `branch` | Target branch (default: `main`) |
+| `directory` | Target directory within the repo (default: `/`) |
+| `access_token` | Personal access token (encrypted at rest) |
+
+### 3. Export
+
+Trigger an export manually:
+
+**Endpoint:** `POST /api/v1/git-sync/{project_id}/export`
+
+This:
+
+1. Fetches all documents in the project, ordered by folder structure
+2. Converts TipTap JSON content to Markdown
+3. Creates the folder hierarchy in the target repo
+4. Commits one `.md` file per document with metadata
+5. Pushes to the configured branch
+
+## Export Format
+
+Each document is exported as a Markdown file:
+
+- **File name:** derived from the document name
+- **Content:** TipTap JSON converted to standard Markdown
+- **Location:** follows the folder hierarchy from ondoki
+
+## Configuration Management
+
+| Action | Endpoint |
+|--------|----------|
+| Get config | `GET /api/v1/git-sync/{project_id}` |
+| Set/update config | `PUT /api/v1/git-sync/{project_id}` |
+| Remove config | `DELETE /api/v1/git-sync/{project_id}` |
+| Trigger export | `POST /api/v1/git-sync/{project_id}/export` |
+
+## Security
+
+- Access tokens are **encrypted at rest** using the `ONDOKI_ENCRYPTION_KEY` Fernet key
+- Tokens are never returned in API responses after initial storage
+- The token is decrypted only when performing a Git operation
+
+## Sync Status
+
+The configuration tracks the last sync:
+
+| Field | Description |
+|-------|-------------|
+| `last_sync_at` | Timestamp of last export |
+| `last_sync_status` | `success`, `error`, or `in_progress` |
+| `last_sync_error` | Error message if the last sync failed |
+
+## Limitations
+
+- **One-way only** — ondoki → Git. Changes made directly in the Git repo are not synced back.
+- **Manual trigger** — exports must be triggered manually (no automatic sync on document save).
+- **Documents only** — workflows are not exported via Git Sync (use PDF/Markdown export instead).

@@ -1,0 +1,111 @@
+---
+title: "Contributing"
+description: "How to contribute to ondoki."
+---
+
+## Getting Started
+
+1. Fork the repository on GitHub
+2. Clone your fork locally
+3. Set up the [development environment](/development/local-setup)
+4. Create a feature branch
+
+```bash
+git clone https://github.com/your-username/ondoki-web.git
+cd ondoki-web
+cp .env.example .env
+make dev
+```
+
+## Development Workflow
+
+<Steps>
+  <Step title="Create a Branch">
+    Use conventional branch naming:
+
+    ```bash
+    git checkout -b feat/my-feature
+    git checkout -b fix/bug-description
+    git checkout -b docs/update-readme
+    ```
+  </Step>
+  <Step title="Make Changes">
+    Edit code, add tests, verify everything works.
+  </Step>
+  <Step title="Run Tests">
+    ```bash
+    make test           # All tests
+    make test-backend   # Backend only (pytest)
+    make test-frontend  # Frontend only (Jest)
+    ```
+  </Step>
+  <Step title="Lint">
+    ```bash
+    make lint           # Runs ruff (Python) + tsc (TypeScript)
+    ```
+  </Step>
+  <Step title="Commit">
+    Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+    ```bash
+    git commit -m "feat: add workflow export to PDF"
+    git commit -m "fix: resolve search ranking for empty queries"
+    git commit -m "docs: update API reference"
+    ```
+  </Step>
+  <Step title="Submit PR">
+    Push your branch and open a Pull Request with a clear description.
+  </Step>
+</Steps>
+
+## Code Style
+
+### Python (Backend)
+
+- **Linter:** [Ruff](https://docs.astral.sh/ruff/)
+- **Formatting:** Ruff formatter
+- **Type hints:** Encouraged on function signatures
+- **Async:** Use `async/await` for all database operations
+
+### TypeScript (Frontend)
+
+- **Formatting:** [Prettier](https://prettier.io/)
+- **Linting:** ESLint with TypeScript rules
+- **Types:** TypeScript strict mode
+
+## Commit Messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Prefix | Use For |
+|--------|---------|
+| `feat:` | New features |
+| `fix:` | Bug fixes |
+| `docs:` | Documentation changes |
+| `refactor:` | Code restructuring (no behavior change) |
+| `test:` | Adding or updating tests |
+| `chore:` | Build, CI, dependency updates |
+| `perf:` | Performance improvements |
+
+## Pull Request Guidelines
+
+- Keep PRs focused — one feature or fix per PR
+- Include a clear description of what changed and why
+- Add or update tests for your changes
+- Ensure all tests pass before submitting
+- Link related GitHub issues
+
+## Reporting Issues
+
+- Use [GitHub Issues](https://github.com/myfoxit/ondoki-web/issues)
+- Include steps to reproduce
+- Include environment details (OS, browser, Docker version)
+- Screenshots are helpful for UI issues
+
+## Architecture
+
+See [Project Structure](/development/project-structure) for codebase layout and [Architecture](/architecture) for system design.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the [MIT License](https://github.com/myfoxit/ondoki-web/blob/master/LICENSE).

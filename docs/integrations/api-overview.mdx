@@ -1,0 +1,199 @@
+---
+title: "API Overview"
+description: "REST API reference with key endpoints."
+---
+
+## Overview
+
+ondoki exposes a REST API at `/api/v1/` built with FastAPI. Interactive documentation is available when the server is running:
+
+- **Swagger UI:** `http://your-server:8000/docs`
+- **OpenAPI JSON:** `http://your-server:8000/openapi.json`
+
+## Authentication
+
+Most API endpoints require authentication. ondoki supports three auth methods:
+
+| Method | Use Case | Header |
+|--------|----------|--------|
+| **Session cookie** | Web browser (set via `/auth/login`) | Automatic (cookie) |
+| **Bearer token** | Desktop app, CLI | `Authorization: Bearer <access_token>` |
+| **API key** | MCP server, external integrations | `Authorization: Bearer ondoki_<key>` |
+
+### Login
+
+```bash
+curl -X POST https://your-server/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "your-password"}'
+```
+
+Returns user info and sets a session cookie.
+
+### OAuth 2.0 PKCE (Desktop)
+
+For desktop and CLI clients, use the PKCE flow:
+
+1. `GET /api/v1/auth/authorize?response_type=code&code_challenge=<challenge>&redirect_uri=<uri>`
+2. User authenticates in browser
+3. `POST /api/v1/auth/token` with authorization code and code verifier
+4. Returns `access_token` and `refresh_token`
+
+## Key Endpoint Groups
+
+### Documents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/documents/filtered` | List documents with filtering and sorting |
+| `POST` | `/documents/` | Create a new document |
+| `GET` | `/documents/{id}` | Get document details |
+| `PUT` | `/documents/{id}` | Update document content |
+| `DELETE` | `/documents/{id}` | Soft delete |
+| `POST` | `/documents/{id}/share` | Generate public share link |
+| `POST` | `/documents/{id}/duplicate` | Duplicate document |
+| `PUT` | `/documents/{id}/move` | Move to folder |
+
+### Workflows (Process Recording)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/process-recording/session/create` | Create upload session |
+| `POST` | `/process-recording/session/{id}/metadata` | Upload metadata |
+| `POST` | `/process-recording/session/{id}/image` | Upload step screenshot |
+| `POST` | `/process-recording/session/{id}/finalize` | Finalize workflow |
+| `GET` | `/process-recording/workflows/filtered` | List with filtering |
+| `GET` | `/process-recording/{id}/export` | Export as PDF/Markdown |
+| `POST` | `/process-recording/steps/{id}/annotate` | AI-annotate a step |
+
+### Search
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/search/unified-v2` | Hybrid search (FTS + semantic) |
+
+Query parameters: `q` (query), `project_id`, `limit`
+
+### AI / Chat
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/chat/chat/completions` | LLM chat (streaming via SSE) |
+| `POST` | `/chat/inline` | Inline AI editor commands |
+| `GET` | `/chat/models` | List available models |
+| `GET` | `/chat/config` | Current LLM configuration |
+
+### Projects
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/projects/` | Create project |
+| `GET` | `/projects/{user_id}` | List user's projects |
+| `PUT` | `/projects/{id}` | Update project |
+| `DELETE` | `/projects/{id}` | Delete project (owner only) |
+| `POST` | `/projects/{id}/members` | Add member |
+| `PUT` | `/projects/{id}/members/{user_id}` | Update role |
+| `DELETE` | `/projects/{id}/members/{user_id}` | Remove member |
+
+### Folders
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/folders/` | List folders |
+| `POST` | `/folders/` | Create folder |
+| `PUT` | `/folders/{id}` | Update folder |
+| `DELETE` | `/folders/{id}` | Delete folder |
+| `GET` | `/folders/{id}/tree` | Get folder tree |
+
+### Knowledge Base
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/knowledge/upload` | Upload knowledge file |
+| `GET` | `/knowledge/sources` | List knowledge sources |
+| `DELETE` | `/knowledge/sources/{id}` | Delete knowledge source |
+
+### Sharing
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/shared/share` | Share resource with user |
+| `GET` | `/shared/shares` | List received shares |
+| `DELETE` | `/shared/shares/{id}` | Revoke share |
+
+### Audit Log
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/audit/logs` | Query audit logs |
+| `GET` | `/audit/logs/export` | Export as CSV |
+
+### Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/analytics/top-accessed` | Most viewed resources |
+| `GET` | `/analytics/access-by-channel` | Usage by channel |
+| `GET` | `/analytics/stale` | Unused resources |
+| `GET` | `/analytics/queries` | Recent searches |
+| `GET` | `/analytics/gaps` | Knowledge gaps |
+
+### Video Import
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/video-import/upload` | Upload video file |
+| `GET` | `/video-import/status/{session_id}` | Processing status |
+| `GET` | `/video-import/jobs/{job_id}` | Job status |
+
+### Git Sync
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/git-sync/{project_id}` | Get config |
+| `PUT` | `/git-sync/{project_id}` | Set/update config |
+| `DELETE` | `/git-sync/{project_id}` | Remove config |
+| `POST` | `/git-sync/{project_id}/export` | Trigger export |
+
+### MCP Keys
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/mcp/projects/{id}/mcp-keys` | List API keys |
+| `POST` | `/mcp/projects/{id}/mcp-keys` | Create API key |
+| `DELETE` | `/mcp/projects/{id}/mcp-keys/{key_id}` | Revoke key |
+
+### Health
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/ready` | Readiness check (DB connectivity) |
+
+## Error Format
+
+API errors return JSON:
+
+```json
+{
+  "detail": "Error message describing what went wrong"
+}
+```
+
+HTTP status codes follow standard conventions:
+
+| Code | Meaning |
+|------|---------|
+| `200` | Success |
+| `201` | Created |
+| `400` | Bad request |
+| `401` | Unauthorized |
+| `403` | Forbidden |
+| `404` | Not found |
+| `422` | Validation error |
+| `429` | Rate limited |
+| `500` | Internal server error |
+
+## Rate Limiting
+
+The chat endpoint (`/chat/chat/completions`) is rate-limited to prevent abuse. Other endpoints are not rate-limited by default but can be limited at the reverse proxy level.

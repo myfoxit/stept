@@ -1,0 +1,128 @@
+---
+title: "Search"
+description: "Hybrid full-text and semantic search with reciprocal rank fusion."
+---
+
+## Overview
+
+ondoki uses a hybrid search system that combines PostgreSQL full-text search with pgvector semantic search. Results are merged using Reciprocal Rank Fusion (RRF) and boosted by popularity and recency signals. A trigram fallback handles typos.
+
+## How It Works
+
+```
+User Query
+    │
+    ├─── Full-Text Search (tsvector)
+    │       Keyword matching with prefix support
+    │
+    ├─── Semantic Search (pgvector)
+    │       Vector similarity using embeddings
+    │
+    ├─── Trigram Fallback
+    │       Fuzzy matching for typos
+    │
+    ▼
+RRF Fusion
+    │
+    ├─── Combine rankings from all sources
+    ├─── Apply boosts (views, recency, type)
+    │
+    ▼
+Ranked Results with Highlighted Snippets
+```
+
+## Full-Text Search
+
+Uses PostgreSQL's built-in full-text search capabilities:
+
+- **tsvector columns** on documents, workflows, and workflow steps
+- **plainto_tsquery** for query parsing
+- **Prefix matching** — the last word in the query is treated as a prefix, enabling as-you-type search (e.g., "deploy back" matches "deploy backend")
+- **Indexed fields**: document names, workflow names, summaries, step descriptions, tags, guide content
+
+## Semantic Search
+
+Uses pgvector for vector similarity search:
+
+- **1536-dimensional embeddings** (OpenAI-compatible)
+- **Cosine distance** for similarity measurement
+- **Indexed content types**: workflows (whole + per-step), documents, document chunks, knowledge sources
+- **Content hashing** (SHA-256) to skip re-embedding unchanged content
+
+<Note>
+Semantic search requires an embedding model to be available. Embeddings are generated automatically when content is created or updated. If pgvector is not available, ondoki gracefully falls back to full-text search only.
+</Note>
+
+## Reciprocal Rank Fusion (RRF)
+
+RRF combines rankings from multiple search sources without needing to normalize scores:
+
+```
+RRF_score = Σ (1 / (k + rank_i))
+```
+
+Where `k` is a constant (typically 60) and `rank_i` is the position in each ranked list. This ensures that items ranked highly by multiple sources get the highest combined scores.
+
+## Ranking Boosts
+
+After RRF fusion, additional boosts are applied:
+
+| Boost | Factor | Description |
+|-------|--------|-------------|
+| **View count** | Popularity | More-viewed resources rank higher |
+| **Recency** | Time decay | Recently updated content is preferred |
+| **Resource type** | Type weight | Workflows may be weighted over documents |
+| **Exact title match** | Title bonus | Exact title matches get a significant boost |
+
+## Trigram Fallback
+
+If full-text and semantic search return insufficient results, ondoki falls back to PostgreSQL trigram matching (`pg_trgm`). This handles:
+
+- Typos (e.g., "deploymnet" → "deployment")
+- Partial word matches
+- Character transpositions
+
+## Search API
+
+**Endpoint:** `GET /api/v1/search/unified-v2`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `q` | string | Search query |
+| `project_id` | string | Scope to a specific project |
+| `limit` | integer | Max results (default: 20) |
+
+**Response fields per result:**
+
+| Field | Description |
+|-------|-------------|
+| `type` | `workflow`, `document`, or `step` |
+| `id` | Resource ID |
+| `title` | Resource title |
+| `snippet` | Text excerpt with `<mark>` highlighted matches |
+| `score` | Combined relevance score |
+| `matched_fields` | Which fields matched (name, summary, etc.) |
+| `updated_at` | Last update timestamp |
+
+## What Gets Indexed
+
+| Resource | Indexed Fields |
+|----------|---------------|
+| **Documents** | Name, extracted plain text content |
+| **Workflows** | Name, summary, tags, guide markdown |
+| **Workflow Steps** | Description, generated title, generated description |
+| **Knowledge Sources** | Processed content from uploaded files |
+
+### Full-Text Index
+
+Plain text is extracted from TipTap JSON content and stored in `search_text`. A `search_tsv` tsvector column is maintained for fast queries.
+
+### Semantic Index
+
+Embeddings are generated for each resource and stored in the `embedding` table with:
+
+- `source_type` — what kind of resource
+- `source_id` — which specific resource
+- `content_hash` — SHA-256 of the content (to skip re-embedding)
+- `embedding` — 1536-dimensional vector
+- `metadata` — additional context (JSON)

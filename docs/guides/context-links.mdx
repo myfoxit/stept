@@ -1,0 +1,91 @@
+---
+title: "Context Links"
+description: "Map URL patterns, app names, and window titles to relevant documentation."
+---
+
+## Overview
+
+Context links let you associate URL patterns, application names, or window titles with specific workflows and documents. When a user is working in a particular app or on a particular URL, ondoki can surface the most relevant documentation automatically.
+
+## How It Works
+
+A context link defines a **match rule** and a **target resource**. When the match rule triggers (e.g., the user's current URL matches a pattern), ondoki returns the linked workflow or document.
+
+## Match Types
+
+| Match Type | Description | Example |
+|------------|-------------|---------|
+| `url_pattern` | URL contains this string | `github.com/pulls` |
+| `url_exact` | Exact URL match | `https://app.example.com/settings` |
+| `url_regex` | Regular expression on URL | `https://jira\.com/browse/PROJ-\d+` |
+| `app_name` | Application name contains string | `Visual Studio Code` |
+| `app_exact` | Exact application name | `Google Chrome` |
+| `app_regex` | Regex on application name | `(Code\|VS Code)` |
+| `window_title` | Window title contains string | `Pull Request` |
+| `window_regex` | Regex on window title | `.*- Jira$` |
+
+## Creating Context Links
+
+### From the UI
+
+Navigate to **Context Links** in the sidebar. Add a new link by specifying:
+
+1. **Match type** and **match value**
+2. **Target resource** (workflow or document)
+3. **Priority** (higher priority links are returned first)
+4. **Note** (optional description)
+
+### From the API
+
+**Endpoint:** `POST /api/v1/context-links/`
+
+```json
+{
+  "match_type": "url_pattern",
+  "match_value": "github.com/pulls",
+  "resource_type": "workflow",
+  "resource_id": "wf_abc123",
+  "priority": 10,
+  "note": "PR review process"
+}
+```
+
+### From AI Chat
+
+The AI chat can create context links using the `add_context_link` tool. Ask the AI to link a URL pattern to a workflow or document.
+
+## AND Grouping
+
+Multiple context links can be grouped using `group_id` to create AND conditions. All links in a group must match for the group to trigger.
+
+Example: Surface a workflow only when the user is in Chrome AND on a specific URL:
+
+```json
+[
+  {
+    "match_type": "app_name",
+    "match_value": "Google Chrome",
+    "group_id": "deploy-guide",
+    "resource_type": "workflow",
+    "resource_id": "wf_deploy"
+  },
+  {
+    "match_type": "url_pattern",
+    "match_value": "console.aws.amazon.com",
+    "group_id": "deploy-guide",
+    "resource_type": "workflow",
+    "resource_id": "wf_deploy"
+  }
+]
+```
+
+## Priority
+
+When multiple context links match, results are ordered by `priority` (higher values first). Use priority to ensure the most specific or important documentation surfaces first.
+
+## Use Cases
+
+- **Onboarding** — link specific tools and URLs to their onboarding workflows
+- **Dev workflows** — surface deployment guides when the user opens the CI/CD dashboard
+- **Support** — link customer-facing URLs to internal troubleshooting docs
+- **Desktop app** — the ondoki desktop app uses context links to show relevant workflows based on the user's active application

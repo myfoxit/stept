@@ -1,0 +1,79 @@
+---
+title: "Desktop App"
+description: "Record screen workflows with the ondoki desktop application."
+---
+
+## Overview
+
+The [ondoki Desktop](https://github.com/myfoxit/ondoki-desktop) app is a Windows application built with .NET 9 / WPF. It runs in the background and captures user actions — clicks, keystrokes, window switches — as individual steps with screenshots.
+
+## Installation
+
+1. Download the latest release from [GitHub Releases](https://github.com/myfoxit/ondoki-desktop/releases)
+2. Install the application
+3. Launch and connect to your ondoki server
+
+## Connecting to Your Server
+
+The desktop app authenticates using OAuth 2.0 PKCE:
+
+<Steps>
+  <Step title="Enter Server URL">
+    Open the desktop app and enter your ondoki server URL (e.g., `https://app.yourdomain.com`).
+  </Step>
+  <Step title="Authorize">
+    The app opens your browser to the ondoki login page. Log in with your credentials.
+  </Step>
+  <Step title="Grant Access">
+    After authentication, the browser redirects back to the desktop app with an authorization code.
+  </Step>
+  <Step title="Connected">
+    The app exchanges the code for access and refresh tokens. It's now connected and ready to record.
+  </Step>
+</Steps>
+
+The PKCE flow ensures the desktop app never sees your password. Tokens are stored locally and refreshed automatically.
+
+## Recording a Workflow
+
+1. **Start recording** — click the record button or use the keyboard shortcut
+2. **Perform your workflow** — the app captures each action as a step
+3. **Stop recording** — click stop or use the keyboard shortcut
+4. **Upload** — the recording is uploaded to your ondoki server
+
+Each step captures:
+
+- Screenshot of the active window/screen
+- Click position (global and relative coordinates)
+- Window title and size
+- Action type (click, keystroke, scroll)
+- Key pressed or text typed (for keyboard actions)
+- Timestamp
+
+## After Upload
+
+Once uploaded, the workflow appears in your ondoki project. If an LLM is configured, ondoki automatically:
+
+- Generates a descriptive title
+- Creates a summary
+- Suggests tags
+- Annotates each step with a title and description
+- Generates a complete guide in Markdown
+
+## Context Links
+
+The desktop app can use [context links](/guides/context-links) to surface relevant documentation based on the user's active application and window title. This enables contextual help — the right workflow appears at the right time.
+
+## Real-Time Notifications
+
+The desktop app connects via WebSocket to receive real-time notifications from the server (e.g., when processing completes, when new content is shared).
+
+## Requirements
+
+- Windows 10 or later
+- .NET 9 Runtime
+- Network access to your ondoki server
+
+## Repository
+
+Source code and releases: [github.com/myfoxit/ondoki-desktop](https://github.com/myfoxit/ondoki-desktop)

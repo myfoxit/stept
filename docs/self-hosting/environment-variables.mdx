@@ -1,0 +1,154 @@
+---
+title: "Environment Variables"
+description: "Complete reference for all ondoki configuration variables."
+---
+
+## Overview
+
+All ondoki configuration is done via environment variables. Copy `.env.example` to `.env` and customize for your deployment.
+
+## Core
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ENVIRONMENT` | — | `local` | Environment mode: `local`, `staging`, `production`, `test` |
+| `DOMAIN` | Production | `localhost` | Domain for Caddy HTTPS (e.g., `app.ondoki.com`) |
+
+## Database
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `POSTGRES_USER` | Yes | `postgres` | PostgreSQL username |
+| `POSTGRES_PASSWORD` | Yes | `postgres` | PostgreSQL password |
+| `POSTGRES_DB` | — | `ondoki` | Database name |
+| `DATABASE_URL` | — | *(auto-composed)* | Full async connection string. Format: `postgresql+asyncpg://user:pass@host:5432/db` |
+
+## Security
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `JWT_SECRET` | **Yes** | — | JWT signing key. Generate: `openssl rand -hex 32` |
+| `ONDOKI_ENCRYPTION_KEY` | **Yes** | — | Fernet key for encrypting API keys at rest. Generate: `make generate-key` |
+
+<Warning>
+Never reuse these keys across environments. If you lose the encryption key, MCP API keys stored in the database cannot be decrypted and must be regenerated.
+</Warning>
+
+## Redis
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `REDIS_URL` | — | `redis://redis:6379/0` | Redis connection string |
+| `REDIS_PASSWORD` | Production | — | Redis password (set in production) |
+
+## Celery (Media Worker)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CELERY_BROKER_URL` | — | `redis://redis:6379/1` | Celery broker connection (Redis DB 1) |
+| `CELERY_RESULT_BACKEND` | — | `redis://redis:6379/1` | Celery result backend |
+
+## CORS & Frontend
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `FRONTEND_URL` | Production | `http://localhost:5173` | Frontend URL for CORS, email links, OAuth callbacks |
+| `CORS_ORIGINS` | Production | `http://localhost:5173,ondoki://` | Comma-separated allowed origins |
+| `CORS_ORIGIN_REGEX` | — | — | Regex pattern for CORS origin matching (e.g., `^https://.*\.ondoki\.com$`) |
+| `ALLOWED_ORIGINS` | — | — | Additional allowed origins for CSRF checks (comma-separated) |
+
+## Services
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GOTENBERG_URL` | — | `http://gotenberg:3000` | Gotenberg PDF generation service URL |
+
+## SMTP (Email)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SR_SMTP_HOST` | — | *(empty)* | SMTP host. Leave empty to disable email |
+| `SR_SMTP_PORT` | — | `587` | SMTP port |
+| `SR_SMTP_USER` | — | — | SMTP username |
+| `SR_SMTP_PASS` | — | — | SMTP password |
+| `SR_FROM_EMAIL` | — | `noreply@ondoki.com` | Sender email address |
+
+<Note>
+Email is used for account verification and password reset. When `SR_SMTP_HOST` is empty, email features are disabled and users are auto-verified on registration.
+</Note>
+
+## Storage
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `storage_type` | — | `local` | Storage backend: `local` or `s3` |
+| `local_storage_path` | — | `./storage/recordings` | Path for local file storage |
+| `UPLOAD_DIR` | — | `./uploads` | Directory for general file uploads |
+
+### S3 Storage (when `storage_type=s3`)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `S3_BUCKET` | — | — | S3 bucket name |
+| `S3_REGION` | — | — | AWS region |
+| `S3_ENDPOINT` | — | — | S3 endpoint URL |
+| `S3_ACCESS_KEY` | — | — | AWS access key |
+| `S3_SECRET_KEY` | — | — | AWS secret key |
+
+## AI / LLM
+
+LLM settings can also be configured from the **Project Settings → AI/LLM** page. UI settings take priority over environment variables.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ONDOKI_LLM_PROVIDER` | — | — | LLM provider: `openai`, `anthropic`, `ollama`, `copilot`, `custom` |
+| `ONDOKI_LLM_API_KEY` | — | — | API key for the chosen provider |
+| `ONDOKI_LLM_MODEL` | — | — | Model name (e.g., `gpt-4o`, `claude-sonnet-4-20250514`) |
+| `ONDOKI_LLM_BASE_URL` | — | — | Base URL (required for `ollama` and `custom` providers) |
+
+## PII Protection
+
+### SendCloak
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SENDCLOAK_ENABLED` | — | `false` | Enable PII obfuscation before AI requests |
+| `SENDCLOAK_URL` | — | `http://sendcloak:9090` | SendCloak service URL |
+| `SENDCLOAK_STRATEGY` | — | `semantic` | Obfuscation strategy |
+
+### DataVeil
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATAVEIL_ENABLED` | — | `false` | Enable DataVeil privacy proxy |
+| `DATAVEIL_URL` | — | — | DataVeil service URL |
+
+### Presidio
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `PRESIDIO_LANG_PACK` | — | `en` | Language pack: `en` (English) or `eu` (English + German + French + Spanish + Italian) |
+| `PRESIDIO_LANGUAGE` | — | `en` | Default analysis language |
+
+## Video / Media Processing
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | — | — | API key for Whisper transcription |
+| `WHISPER_MODEL` | — | `base` | Whisper model size: `base`, `small`, `medium`, `large` |
+| `ONDOKI_UPLOAD_DIR` | — | `/data/uploads/videos` | Video upload directory (media worker) |
+
+## Generating Secrets
+
+```bash
+# JWT secret
+openssl rand -hex 32
+
+# Encryption key
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Or use the Makefile:
+make generate-key
+
+# Strong password
+openssl rand -base64 24
+```

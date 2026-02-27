@@ -1,0 +1,151 @@
+---
+title: "Reverse Proxy"
+description: "Caddy and Nginx configuration for ondoki."
+---
+
+## Caddy (Default)
+
+ondoki's production Docker Compose uses [Caddy](https://caddyserver.com/) as the reverse proxy. Caddy provides automatic HTTPS certificate provisioning via Let's Encrypt.
+
+### Configuration
+
+The `Caddyfile` at the project root:
+
+```caddyfile
+{$DOMAIN:localhost} {
+    handle /api/* {
+        reverse_proxy backend:8000 {
+            flush_interval -1
+        }
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+```
+
+Key details:
+
+- `{$DOMAIN}` is replaced by the `DOMAIN` environment variable
+- `/api/*` routes to the FastAPI backend on port 8000
+- `/*` routes to the React frontend (served via Nginx on port 80)
+- `flush_interval -1` enables SSE streaming (required for AI chat and inline AI)
+
+### HTTPS
+
+In production, set `DOMAIN` to your actual domain and Caddy will automatically:
+
+1. Obtain a TLS certificate from Let's Encrypt
+2. Redirect HTTP → HTTPS
+3. Renew certificates before expiration
+
+Ensure ports 80 and 443 are accessible from the internet for ACME validation.
+
+### Custom Caddy Config
+
+To customize, edit the `Caddyfile` directly. Common additions:
+
+```caddyfile
+app.yourdomain.com {
+    # Rate limiting
+    rate_limit {
+        zone login {
+            key {remote_host}
+            events 10
+            window 1m
+        }
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    handle /api/* {
+        reverse_proxy backend:8000 {
+            flush_interval -1
+        }
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+```
+
+## Nginx (Alternative)
+
+If you prefer Nginx, create an `nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name app.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name app.yourdomain.com;
+
+    ssl_certificate /etc/ssl/certs/your-cert.pem;
+    ssl_certificate_key /etc/ssl/private/your-key.pem;
+
+    # API proxy
+    location /api/ {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE streaming support
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
+
+    # WebSocket support
+    location /api/v1/auth/ws/ {
+        proxy_pass http://backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400s;
+    }
+
+    # MCP endpoint
+    location /mcp {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Frontend
+    location / {
+        proxy_pass http://frontend:80;
+        proxy_set_header Host $host;
+    }
+}
+```
+
+<Warning>
+If using Nginx, ensure you configure SSE support (`proxy_buffering off`) for the `/api/` location. Without this, AI chat and inline AI streaming will not work correctly.
+</Warning>
+
+### WebSocket Support
+
+The notification WebSocket endpoint is at `/api/v1/auth/ws/notifications`. Ensure your reverse proxy passes the `Upgrade` and `Connection` headers for WebSocket connections.
+
+## Frontend Nginx
+
+The React frontend container uses its own internal Nginx to serve the built SPA. Its configuration handles:
+
+- SPA routing: all 404s redirect to `/index.html`
+- API proxying at `/api/*` (for development/standalone use)
+- SSE support with buffering disabled
+- Read timeout of 300s for streaming responses
+
+This internal Nginx is separate from the external reverse proxy and requires no manual configuration.

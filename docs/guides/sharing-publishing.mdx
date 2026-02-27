@@ -1,0 +1,104 @@
+---
+title: "Sharing & Publishing"
+description: "Share documents and workflows with team members or publish public links."
+---
+
+## Overview
+
+ondoki provides multiple ways to share content: team-based project access with role-based permissions, per-resource sharing via email, and public links for unauthenticated access.
+
+## Project-Based Access
+
+Every document and workflow belongs to a project. Project members have access based on their role:
+
+| Role | View | Comment | Edit | Manage Members | Delete Project |
+|------|------|---------|------|----------------|----------------|
+| **Viewer** | Yes | — | — | — | — |
+| **Member** | Yes | Yes | — | — | — |
+| **Editor** | Yes | Yes | Yes | — | — |
+| **Admin** | Yes | Yes | Yes | Yes | — |
+| **Owner** | Yes | Yes | Yes | Yes | Yes |
+
+### Managing Members
+
+Admins and Owners can manage project membership:
+
+- **Add member**: `POST /api/v1/projects/{project_id}/members` with email and role
+- **Update role**: `PUT /api/v1/projects/{project_id}/members/{user_id}`
+- **Remove member**: `DELETE /api/v1/projects/{project_id}/members/{user_id}`
+
+Navigate to **Team** in the sidebar to manage members in the UI.
+
+## Per-Resource Sharing
+
+Share individual documents or workflows with specific users, even if they aren't project members:
+
+**Endpoint:** `POST /api/v1/shared/share`
+
+```json
+{
+  "resource_type": "document",
+  "resource_id": "doc_abc123",
+  "shared_with_email": "colleague@example.com",
+  "permission": "view"
+}
+```
+
+| Permission | Description |
+|------------|-------------|
+| `view` | Read-only access |
+| `edit` | Read and write access |
+
+Shared resources appear in the **Shared with Me** page for the recipient.
+
+### Managing Shares
+
+- **List shares**: `GET /api/v1/shared/shares`
+- **Revoke share**: `DELETE /api/v1/shared/shares/{share_id}`
+
+## Public Links
+
+Generate a public link for a document or workflow that anyone can access without logging in:
+
+**Endpoint:** `POST /api/v1/documents/{doc_id}/share`
+
+This generates a unique share token. The public URL format is:
+
+- Documents: `/public/document/{token}`
+- Workflows: `/public/workflow/{token}`
+
+Public links are read-only. Revoke by removing the share token.
+
+## Privacy Controls
+
+### Private Resources
+
+Mark documents, workflows, or folders as **private**:
+
+- Only the owner can see private resources
+- Explicitly shared users can also access them
+- Private resources are excluded from search results for other users
+
+### Private Folders
+
+Folders can be marked private. All content within a private folder inherits the privacy setting.
+
+## Comments
+
+Team members can leave threaded comments on documents and workflows:
+
+- **Create comment**: Attach to a specific resource
+- **Reply**: Nested replies within a comment thread
+- **Resolve**: Mark a comment thread as resolved
+
+Comments are scoped to the project and respect role-based access.
+
+## Audit Trail
+
+All sharing actions are tracked in the [audit log](/guides/sharing-publishing):
+
+- Who shared what with whom
+- When resources were accessed via public links
+- When shares were revoked
+
+Navigate to **Audit Log** in the sidebar (Admin+ role required).

@@ -1,0 +1,202 @@
+---
+title: "Project Structure"
+description: "Codebase layout and key directories."
+---
+
+## Top-Level Structure
+
+```
+ondoki-web/
+├── api/                        # Python FastAPI backend
+├── app/                        # React + Vite frontend
+├── docker-compose.yml          # Base development stack
+├── docker-compose.dev.yml      # Development overrides (hot-reload)
+├── docker-compose.prod.yml     # Production stack (Caddy + GHCR images)
+├── docker-compose.test.yml     # E2E test stack
+├── Caddyfile                   # Reverse proxy config
+├── Makefile                    # Development commands
+├── .env.example                # Environment variable reference
+├── CONTRIBUTING.md             # Contribution guidelines
+├── LICENSE                     # MIT License
+└── docs/                       # Mintlify documentation
+```
+
+## Backend (`api/`)
+
+```
+api/
+├── main.py                     # FastAPI app initialization, middleware, router mounting
+├── requirements.txt            # Python dependencies
+├── requirements-mcp.txt        # MCP-specific dependencies
+├── Dockerfile                  # Backend container build
+├── alembic/                    # Database migrations
+│   ├── alembic.ini
+│   ├── env.py
+│   └── versions/               # Migration files
+└── app/
+    ├── models.py               # SQLAlchemy ORM models (24 tables)
+    ├── database.py             # AsyncSession, engine, Base
+    ├── security.py             # Auth decorators, permission checks
+    ├── utils.py                # ID generation, helpers
+    │
+    ├── core/
+    │   ├── config.py           # Settings from environment variables
+    │   └── jwt.py              # JWT token signing/verification
+    │
+    ├── routers/                # API endpoint handlers
+    │   ├── auth.py             # Authentication (login, register, OAuth PKCE, WebSocket)
+    │   ├── document.py         # Document CRUD, sharing, export
+    │   ├── project.py          # Project and member management
+    │   ├── process_recording.py # Workflow recording, steps, export
+    │   ├── folder.py           # Folder hierarchy
+    │   ├── chat.py             # LLM chat completions (SSE)
+    │   ├── inline_ai.py        # Editor inline AI commands
+    │   ├── search.py           # Unified hybrid search
+    │   ├── knowledge.py        # Knowledge base file upload
+    │   ├── git_sync.py         # Git export config/execution
+    │   ├── video_import.py     # Video upload and processing
+    │   ├── audit.py            # Audit log queries and export
+    │   ├── analytics.py        # Usage analytics
+    │   ├── mcp_keys.py         # MCP API key management
+    │   ├── comments.py         # Threaded comments
+    │   ├── context_links.py    # URL/app → resource linking
+    │   ├── shared.py           # Per-resource sharing
+    │   └── ...                 # Additional routers
+    │
+    ├── schemas/                # Pydantic request/response models
+    │   ├── document.py
+    │   ├── project.py
+    │   ├── process_recording.py
+    │   └── ...
+    │
+    ├── crud/                   # Database query layer
+    │   ├── document.py
+    │   ├── project.py
+    │   ├── process_recording.py
+    │   └── ...
+    │
+    ├── services/               # Business logic
+    │   ├── llm.py              # LLM gateway (OpenAI, Anthropic, Ollama)
+    │   ├── embeddings.py       # Vector embedding generation
+    │   ├── indexer.py          # Semantic search indexing
+    │   ├── search_indexer.py   # Full-text search indexing
+    │   ├── auto_processor.py   # Workflow auto-processing pipeline
+    │   ├── git_sync_service.py # Git operations
+    │   ├── video_processor.py  # Video processing
+    │   ├── audit.py            # Audit logging
+    │   ├── analytics.py        # Analytics calculations
+    │   ├── usage_tracker.py    # LLM token/cost tracking
+    │   ├── crypto.py           # Encryption/decryption
+    │   ├── dataveil.py         # DataVeil privacy proxy
+    │   ├── sendcloak.py        # PII masking
+    │   ├── ingest/
+    │   │   └── extract.py      # PDF/DOCX/TXT extraction
+    │   └── ai_tools/           # AI function calling tools (16 tools)
+    │       ├── rag_search.py
+    │       ├── create_page.py
+    │       ├── read_workflow.py
+    │       └── ...
+    │
+    ├── mcp_server.py           # Model Context Protocol server
+    ├── mcp_auth.py             # MCP API key validation
+    │
+    ├── middleware/
+    │   └── rate_limit.py       # Chat rate limiter
+    │
+    ├── tasks/
+    │   └── ai_tasks.py         # Celery async tasks
+    │
+    └── templates/              # Email templates
+```
+
+## Frontend (`app/`)
+
+```
+app/
+├── src/
+│   ├── main.tsx                # React Router setup, route definitions
+│   ├── App.css                 # Global styles
+│   ├── index.css               # Tailwind imports
+│   │
+│   ├── pages/                  # Route page components (23+ pages)
+│   │   ├── EditorPage.tsx      # Document editor
+│   │   ├── LoginPage.tsx       # Authentication
+│   │   ├── WorkflowPage.tsx    # Workflow viewer
+│   │   ├── KnowledgeBase.tsx   # Knowledge management
+│   │   ├── KnowledgeGraph.tsx  # Visual knowledge graph
+│   │   ├── Analytics.tsx       # Analytics dashboard
+│   │   ├── AuditLog.tsx        # Audit log viewer
+│   │   ├── VideoImport.tsx     # Video upload interface
+│   │   ├── ContextLinks.tsx    # Context link management
+│   │   └── ...
+│   │
+│   ├── components/             # Reusable UI components
+│   │   ├── ui/                 # Radix UI wrapped primitives
+│   │   ├── Chat/               # AI chat interface
+│   │   ├── Editor/             # TipTap editor components
+│   │   ├── Settings/           # Settings panels
+│   │   ├── Comments/           # Comment system
+│   │   ├── workflow/           # Workflow editor components
+│   │   ├── search/             # Search interface
+│   │   ├── spotlight/          # Command palette (Cmd+K)
+│   │   ├── Layout.tsx          # Main layout wrapper
+│   │   ├── application-navbar.tsx # Sidebar navigation
+│   │   ├── RequireAuth.tsx     # Auth guard HOC
+│   │   └── ErrorBoundary.tsx   # Error handling
+│   │
+│   ├── api/                    # API client functions
+│   │   ├── auth.ts
+│   │   ├── documents.ts
+│   │   ├── workflows.ts
+│   │   ├── chat.ts
+│   │   ├── knowledge.ts
+│   │   ├── analytics.ts
+│   │   └── ...
+│   │
+│   ├── hooks/                  # Custom React hooks
+│   │   ├── api/                # API-specific hooks
+│   │   ├── use-mobile.ts
+│   │   ├── use-zoom-pan.ts
+│   │   └── ...
+│   │
+│   ├── providers/              # React context providers
+│   │   ├── auth-provider.tsx   # Authentication state
+│   │   └── project-provider.tsx # Active project context
+│   │
+│   ├── lib/                    # Utilities
+│   │   ├── apiClient.ts        # Axios instance configuration
+│   │   ├── tiptap-utils.ts     # TipTap helper functions
+│   │   ├── queryKeys.ts        # TanStack Query key factory
+│   │   └── color.ts            # Color utilities
+│   │
+│   ├── types/                  # TypeScript type definitions
+│   ├── services/               # Frontend business logic
+│   └── utils/                  # Helper utilities
+│
+├── tests/                      # Test files
+│   ├── e2e/                    # Playwright E2E tests
+│   └── unit/                   # Jest unit tests
+│
+├── package.json                # Dependencies and scripts
+├── vite.config.ts              # Vite build configuration
+├── tailwind.config.ts          # Tailwind CSS configuration
+├── tsconfig.json               # TypeScript configuration
+├── nginx.conf                  # Production Nginx config (SPA)
+└── Dockerfile                  # Frontend container build
+```
+
+## Key Patterns
+
+### Backend
+
+- **Router → CRUD → Model** — routers handle HTTP, CRUD handles queries, models define schema
+- **Services** — business logic lives in `services/`, not in routers
+- **Async throughout** — all database operations use SQLAlchemy async sessions
+- **Dependency injection** — FastAPI's `Depends()` for auth, DB sessions, etc.
+
+### Frontend
+
+- **Pages → Components → API** — pages compose components, components call API functions
+- **TanStack Query** — server state management with automatic caching and revalidation
+- **Zustand** — minimal global state (e.g., sidebar state)
+- **API client** — centralized Axios instance with interceptors for auth

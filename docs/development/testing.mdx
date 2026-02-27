@@ -1,0 +1,160 @@
+---
+title: "Testing"
+description: "Running backend, frontend, and end-to-end tests."
+---
+
+## Overview
+
+ondoki has three test layers:
+
+| Layer | Tool | Directory |
+|-------|------|-----------|
+| **Backend** | pytest + pytest-asyncio | `api/tests/` |
+| **Frontend** | Jest | `app/tests/unit/`, `app/src/**/__tests__/` |
+| **E2E** | Playwright | `app/tests/e2e/` |
+
+## Running All Tests
+
+```bash
+make test   # Runs backend + frontend tests
+```
+
+## Backend Tests
+
+Backend tests run inside Docker using pytest with async support.
+
+```bash
+# Via Makefile (recommended — runs inside Docker)
+make test-backend
+
+# Or manually (local)
+cd api
+python -m pytest tests/ -v
+```
+
+### How It Works
+
+The Makefile:
+
+1. Creates a `ondoki_test` database (if it doesn't exist)
+2. Enables the `vector` extension
+3. Runs pytest inside the backend container with test-specific environment variables
+
+### Test Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL_TEST` | *(auto-composed)* | Test database connection string |
+| `TEST_DB_NAME` | `ondoki_test` | Test database name |
+| `ONDOKI_ENCRYPTION_KEY` | Test key | Encryption key for tests |
+| `JWT_SECRET` | `test-secret` | JWT secret for tests |
+
+### pytest Configuration
+
+From `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+```
+
+All async tests run automatically without needing `@pytest.mark.asyncio`.
+
+### Key Dependencies
+
+- `pytest` >= 8.0
+- `pytest-asyncio` >= 1.0.0
+- `testcontainers` 4.10.0 (for isolated database containers)
+
+## Frontend Tests
+
+Frontend unit tests use Jest.
+
+```bash
+# Via Makefile
+make test-frontend
+
+# Or manually
+cd app
+npx jest --passWithNoTests
+
+# Or with pnpm
+cd app
+pnpm test
+```
+
+### Test Location
+
+Tests can be placed in:
+
+- `app/tests/unit/` — dedicated test directory
+- `app/src/**/__tests__/` — co-located with source files
+
+## End-to-End Tests
+
+E2E tests use Playwright and run against a dedicated test backend with an isolated database.
+
+```bash
+make test-e2e
+```
+
+### How It Works
+
+The Makefile:
+
+1. Creates the test database
+2. Starts a `test-backend` service on port 8001 (isolated from dev)
+3. Waits for the test backend to be healthy
+4. Runs Alembic migrations on the test database
+5. Runs Playwright tests (which start their own frontend on port 5174)
+6. Stops the test backend after tests complete
+
+### E2E Configuration
+
+| Variable | Value |
+|----------|-------|
+| `API_URL` | `http://localhost:8001` |
+| `PLAYWRIGHT_BASE_URL` | `http://localhost:5174` |
+| `VITE_API_URL` | `http://localhost:8001` |
+| `VITE_API_BASE_URL` | `http://localhost:8001/api/v1` |
+
+### Running Specific Tests
+
+```bash
+# Run a specific test file
+make test-e2e ARGS="tests/e2e/login.spec.ts"
+
+# Run tests with a specific tag
+make test-e2e ARGS="--grep 'login'"
+```
+
+## Linting
+
+```bash
+make lint
+```
+
+This runs:
+
+- **Backend:** `ruff check .` (Python linting)
+- **Frontend:** `tsc --noEmit` (TypeScript type checking)
+
+## Test Database
+
+The test database (`ondoki_test`) is separate from the development database (`ondoki`). It uses the same PostgreSQL instance but is isolated:
+
+```bash
+# Create the test database manually
+make test-db
+```
+
+This creates the database and enables the `vector` extension if they don't exist.
+
+## CI
+
+Tests run automatically on pull requests via GitHub Actions. The CI pipeline runs:
+
+1. Backend tests (pytest)
+2. Frontend tests (Jest)
+3. Linting (ruff + tsc)

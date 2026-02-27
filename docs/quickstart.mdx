@@ -1,0 +1,98 @@
+---
+title: "Quick Start"
+description: "Get ondoki running in 5 minutes with Docker Compose."
+---
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose v2+
+- At least 2 GB of available RAM
+
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/myfoxit/ondoki-web.git
+cd ondoki-web
+```
+
+## 2. Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Generate the required secrets:
+
+```bash
+# JWT signing key
+openssl rand -hex 32
+# Paste the output as JWT_SECRET in .env
+
+# Encryption key for API keys at rest
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Paste the output as ONDOKI_ENCRYPTION_KEY in .env
+```
+
+Edit `.env` and set at minimum:
+
+| Variable | Value |
+|----------|-------|
+| `JWT_SECRET` | Output from `openssl rand -hex 32` |
+| `ONDOKI_ENCRYPTION_KEY` | Output from the Fernet key generator |
+| `POSTGRES_PASSWORD` | A strong password (change from the default) |
+
+## 3. Start the Stack
+
+```bash
+docker compose up -d
+```
+
+This starts:
+- **PostgreSQL 16** with pgvector (vector search)
+- **Redis 7** (caching and message queue)
+- **Gotenberg 8** (PDF export)
+- **FastAPI backend** (API server)
+- **Celery media worker** (video/audio processing)
+- **React frontend** (web UI)
+
+## 4. Open ondoki
+
+| Service | URL |
+|---------|-----|
+| **App** | [http://localhost](http://localhost) |
+| **API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) |
+
+Register your first user account at `http://localhost`. The first user becomes the project owner.
+
+## 5. Configure AI (Optional)
+
+Navigate to **Project Settings → AI/LLM** and enter your API key:
+
+| Provider | What You Need |
+|----------|---------------|
+| OpenAI | API key from [platform.openai.com](https://platform.openai.com) |
+| Anthropic | API key from [console.anthropic.com](https://console.anthropic.com) |
+| Ollama | Local Ollama instance URL (e.g., `http://host.docker.internal:11434`) |
+
+AI enables: inline editor commands, context-aware chat, auto-annotation of workflow steps, and auto-generation of titles/summaries/tags.
+
+<Note>
+AI features are optional. ondoki works fully without an LLM configured — you just won't have AI-powered features like auto-annotation and chat.
+</Note>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Recording Workflows" icon="video" href="/guides/recording-workflows">
+    Set up the desktop app or Chrome extension and capture your first workflow.
+  </Card>
+  <Card title="Document Editor" icon="file-lines" href="/guides/document-editor">
+    Learn the rich editor features — slash commands, blocks, inline AI.
+  </Card>
+  <Card title="Self-Hosting Guide" icon="server" href="/self-hosting/docker-compose">
+    Production deployment with Caddy, HTTPS, and proper security.
+  </Card>
+  <Card title="MCP Integration" icon="plug" href="/integrations/mcp">
+    Connect ondoki to Claude, Cursor, or other AI agents.
+  </Card>
+</CardGroup>

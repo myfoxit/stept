@@ -1,0 +1,105 @@
+---
+title: "Upgrades"
+description: "How to upgrade ondoki between versions."
+---
+
+## Upgrade Process
+
+<Steps>
+  <Step title="Back Up">
+    Back up your database and `.env` file before upgrading.
+
+    ```bash
+    # Database backup
+    docker compose exec db pg_dump -U postgres -Fc ondoki > backup-$(date +%Y%m%d).dump
+
+    # Save env
+    cp .env .env.backup
+    ```
+  </Step>
+  <Step title="Pull Latest Code">
+    ```bash
+    cd ondoki-web
+    git pull origin master
+    ```
+  </Step>
+  <Step title="Check for New Environment Variables">
+    Compare your `.env` with `.env.example` for any new variables:
+
+    ```bash
+    diff .env .env.example
+    ```
+
+    Add any new required variables to your `.env`.
+  </Step>
+  <Step title="Pull or Build New Images">
+    **Production (pre-built images):**
+    ```bash
+    docker compose -f docker-compose.prod.yml pull
+    ```
+
+    **Development (build locally):**
+    ```bash
+    docker compose build
+    ```
+  </Step>
+  <Step title="Run Database Migrations">
+    ```bash
+    # Start just the database first
+    docker compose -f docker-compose.prod.yml up -d db
+
+    # Wait for it to be healthy, then run migrations
+    docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+    ```
+  </Step>
+  <Step title="Start Updated Services">
+    ```bash
+    docker compose -f docker-compose.prod.yml up -d
+    ```
+  </Step>
+  <Step title="Verify">
+    ```bash
+    # Check all services are healthy
+    docker compose -f docker-compose.prod.yml ps
+
+    # Check backend health
+    curl https://yourdomain.com/api/health
+    ```
+  </Step>
+</Steps>
+
+## Rolling Back
+
+If something goes wrong:
+
+```bash
+# Stop services
+docker compose -f docker-compose.prod.yml down
+
+# Restore database
+docker compose -f docker-compose.prod.yml up -d db
+docker compose exec -i db pg_restore -U postgres -d ondoki --clean < backup.dump
+
+# Check out previous version
+git checkout <previous-commit>
+
+# Restart with previous images
+docker compose -f docker-compose.prod.yml up -d
+```
+
+<Warning>
+Alembic migrations may not have downgrade paths for all changes. Test upgrades in a staging environment first when possible.
+</Warning>
+
+## Checking the Current Version
+
+```bash
+# Current git commit
+git log --oneline -1
+
+# Current database migration
+docker compose exec backend alembic current
+
+# Container image versions
+docker compose -f docker-compose.prod.yml images
+```

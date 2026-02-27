@@ -1,0 +1,151 @@
+---
+title: "Local Setup"
+description: "Set up the ondoki development environment."
+---
+
+## Prerequisites
+
+- **Docker** and Docker Compose v2+
+- **Node.js 20+** and **pnpm**
+- **Python 3.12+**
+- **Git**
+
+## Docker Development (Recommended)
+
+The fastest way to get started:
+
+```bash
+git clone https://github.com/myfoxit/ondoki-web.git
+cd ondoki-web
+cp .env.example .env
+```
+
+Edit `.env` and set the required secrets:
+
+```bash
+JWT_SECRET=dev-secret-change-in-production
+ONDOKI_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+```
+
+Start the development stack:
+
+```bash
+make dev
+```
+
+This runs `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`, which starts all services with hot-reload enabled.
+
+| Service | URL |
+|---------|-----|
+| Frontend (Vite dev server) | http://localhost:5173 |
+| Backend (FastAPI with reload) | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| PostgreSQL | localhost:5432 |
+
+### Development Overrides
+
+The `docker-compose.dev.yml` file overrides the base config for development:
+
+- Backend runs with `--reload` for live code reloading
+- Frontend runs with `pnpm dev --host 0.0.0.0` on port 5173
+- Source code is volume-mounted for live editing
+- `VITE_API_URL` is set to `http://localhost:8000/api/v1`
+
+### Useful Commands
+
+```bash
+make dev-logs         # Stream logs from all services
+make dev-down         # Stop the development stack
+make restart-backend  # Restart just the backend
+make migrate          # Run database migrations
+make clean            # Remove all containers and volumes
+```
+
+## Manual Setup (Without Docker)
+
+If you prefer to run services directly on your machine.
+
+### Database and Redis
+
+You'll need PostgreSQL 16 with pgvector and Redis 7 running locally, or you can start just the infrastructure services via Docker:
+
+```bash
+docker compose up -d db redis gotenberg
+```
+
+### Backend
+
+```bash
+cd api
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Set environment variables:
+
+```bash
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ondoki"
+export REDIS_URL="redis://localhost:6379/0"
+export JWT_SECRET="dev-secret"
+export ONDOKI_ENCRYPTION_KEY="your-fernet-key"
+export GOTENBERG_URL="http://localhost:3000"
+```
+
+Run migrations and start the server:
+
+```bash
+alembic upgrade head
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
+cd app
+pnpm install
+```
+
+Create `app/.env.local`:
+
+```
+VITE_API_URL=http://localhost:8000/api/v1
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Start the dev server:
+
+```bash
+pnpm dev   # → http://localhost:5173
+```
+
+## Generating Secrets
+
+```bash
+# JWT secret
+openssl rand -hex 32
+
+# Encryption key
+make generate-key
+# Or manually:
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+## IDE Setup
+
+### VS Code
+
+Recommended extensions:
+
+- **Python** (ms-python.python)
+- **Pylance** (ms-python.vscode-pylance)
+- **ESLint** (dbaeumer.vscode-eslint)
+- **Tailwind CSS IntelliSense** (bradlc.vscode-tailwindcss)
+
+### Python Path
+
+Point your IDE to the virtual environment:
+
+```
+api/.venv/bin/python
+```

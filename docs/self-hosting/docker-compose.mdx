@@ -1,0 +1,142 @@
+---
+title: "Docker Compose"
+description: "Production deployment with Docker Compose."
+---
+
+## Overview
+
+ondoki ships with three Docker Compose files:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Base development stack |
+| `docker-compose.dev.yml` | Development overrides (hot-reload) |
+| `docker-compose.prod.yml` | Production stack with Caddy, GHCR images |
+
+For production, use `docker-compose.prod.yml`.
+
+## Production Setup
+
+### Prerequisites
+
+- Docker and Docker Compose v2+
+- A domain name (for automatic HTTPS via Caddy)
+- At least 2 GB RAM
+
+### 1. Clone and Configure
+
+```bash
+git clone https://github.com/myfoxit/ondoki-web.git
+cd ondoki-web
+cp .env.example .env
+```
+
+### 2. Set Required Variables
+
+Edit `.env` with production values:
+
+```bash
+# Domain for Caddy HTTPS
+DOMAIN=app.yourdomain.com
+
+# Security keys (generate fresh values)
+JWT_SECRET=$(openssl rand -hex 32)
+ONDOKI_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+
+# Database
+POSTGRES_USER=ondoki
+POSTGRES_PASSWORD=<strong-random-password>
+
+# Frontend URL
+FRONTEND_URL=https://app.yourdomain.com
+
+# CORS
+CORS_ORIGINS=https://app.yourdomain.com,ondoki://
+CORS_ORIGIN_REGEX=^https://.*\.yourdomain\.com$
+
+# Redis password
+REDIS_PASSWORD=<strong-random-password>
+```
+
+See [Environment Variables](/self-hosting/environment-variables) for the full reference.
+
+### 3. Start the Stack
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### 4. Verify
+
+```bash
+# Check all services are healthy
+docker compose -f docker-compose.prod.yml ps
+
+# Check backend health
+curl https://app.yourdomain.com/api/health
+```
+
+## Services
+
+The production stack includes:
+
+| Service | Image | Purpose |
+|---------|-------|---------|
+| `caddy` | `caddy:2-alpine` | Reverse proxy with automatic HTTPS |
+| `db` | `pgvector/pgvector:pg16` | PostgreSQL with vector search |
+| `redis` | `redis:7-alpine` | Cache, pub/sub, task queue |
+| `gotenberg` | `gotenberg/gotenberg:8` | PDF generation |
+| `backend` | `ghcr.io/myfoxit/ondoki-web-api:latest` | FastAPI backend |
+| `media-worker` | `ghcr.io/myfoxit/ondoki-web-api:latest` | Celery worker for video processing |
+| `frontend` | `ghcr.io/myfoxit/ondoki-web-app:latest` | React SPA served via Nginx |
+
+### Optional Services
+
+Enable PII protection with the `privacy` profile:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile privacy up -d
+```
+
+This adds:
+- **SendCloak** — PII obfuscation proxy
+- **Presidio** — Microsoft's NER-based PII detection
+
+## Volumes
+
+| Volume | Contents |
+|--------|----------|
+| `db-data` | PostgreSQL data |
+| `caddy-data` | HTTPS certificates |
+| `caddy-config` | Caddy configuration |
+| `file-storage` | Uploaded files and recordings |
+| `uploads` | General file uploads |
+
+<Warning>
+Back up the `db-data` volume regularly. It contains all your data. Also back up your `.env` file — the encryption key is required to decrypt API keys stored in the database.
+</Warning>
+
+## Networking
+
+All services communicate on the `ondoki-network` bridge network. In production:
+
+- Only Caddy exposes ports 80 and 443
+- PostgreSQL is **not** exposed to the host
+- Redis requires password authentication
+
+## Health Checks
+
+| Service | Health Check |
+|---------|-------------|
+| `db` | `pg_isready` |
+| `redis` | `redis-cli ping` |
+| `gotenberg` | HTTP GET on `/health` |
+| `backend` | HTTP GET on `/health` (30s start period) |
+
+## Updating
+
+See [Upgrades](/self-hosting/upgrades) for the update procedure.
+
+## Scaling
+
+The backend is stateless and supports horizontal scaling. WebSocket notifications use Redis pub/sub for multi-server delivery. To run multiple backend instances, use a container orchestrator (Docker Swarm, Kubernetes) and point them at the same PostgreSQL and Redis instances.

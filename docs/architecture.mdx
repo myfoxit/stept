@@ -1,0 +1,213 @@
+---
+title: "Architecture"
+description: "System architecture, components, and data flow."
+---
+
+## System Overview
+
+```
+                         ┌──────────────────┐
+                         │     Caddy         │  ← HTTPS / reverse proxy
+                         │   :80 / :443      │
+                         └────┬────────┬─────┘
+                              │        │
+                    /api/*    │        │  /*
+                              ▼        ▼
+                    ┌──────────┐  ┌──────────┐
+                    │ FastAPI  │  │  React   │
+                    │ Backend  │  │ Frontend │
+                    │  :8000   │  │   :80    │
+                    └────┬─────┘  └──────────┘
+                         │
+            ┌────────────┼────────────┐
+            ▼            ▼            ▼
+     ┌───────────┐ ┌──────────┐ ┌──────────┐
+     │ PostgreSQL│ │  Redis   │ │Gotenberg │
+     │ + pgvector│ │  Cache   │ │ PDF Gen  │
+     │   :5432   │ │  :6379   │ │  :3000   │
+     └───────────┘ └──────────┘ └──────────┘
+
+     ┌───────────────────────────────────────┐
+     │        Optional Services              │
+     │  SendCloak → Presidio (PII)           │
+     │  Celery Media Worker (video/audio)    │
+     └───────────────────────────────────────┘
+```
+
+## Components
+
+### Caddy (Reverse Proxy)
+
+Caddy handles all incoming traffic and routes requests:
+
+- `/api/*` → FastAPI backend (port 8000)
+- `/*` → React frontend (port 80)
+- Automatic HTTPS certificate provisioning in production
+- SSE streaming support with `flush_interval -1`
+
+In development, the frontend Vite dev server proxies API requests directly.
+
+### FastAPI Backend
+
+The Python backend is the core of ondoki. It provides:
+
+| Area | Details |
+|------|---------|
+| **API** | 20+ router groups under `/api/v1/` |
+| **Auth** | Session cookies, OAuth 2.0 PKCE (desktop clients), API keys (MCP) |
+| **AI** | LLM gateway (OpenAI, Anthropic, Ollama), 16 AI tools with function calling |
+| **MCP** | Model Context Protocol server at `/mcp` (FastMCP, stateless HTTP) |
+| **Search** | Hybrid FTS + semantic via PostgreSQL tsvector and pgvector |
+| **Export** | PDF (Gotenberg), Markdown, HTML, DOCX |
+| **WebSocket** | Real-time notifications via Redis pub/sub (multi-server) |
+| **Middleware** | CORS, CSRF, GZip, rate limiting, request ID logging |
+
+### React Frontend
+
+Single-page application with 23+ pages:
+
+| Area | Technologies |
+|------|--------------|
+| **Routing** | React Router 7 |
+| **State** | Zustand (global), TanStack Query (server state) |
+| **Editor** | TipTap 3 (block-based, extensible) |
+| **UI** | Tailwind CSS + Radix UI primitives |
+| **Charts** | Recharts |
+| **HTTP** | Axios |
+
+### PostgreSQL + pgvector
+
+Primary datastore with 24 tables. Key capabilities:
+
+- **Full-text search**: `tsvector` columns on documents, workflows, and steps with `plainto_tsquery` and prefix matching
+- **Vector search**: pgvector extension stores 1536-dimensional embeddings for semantic similarity
+- **Soft deletes**: Documents and workflows use `deleted_at` timestamps
+- **Materialized paths**: Folders use path-based hierarchy for efficient tree queries
+
+### Redis
+
+Used for three purposes:
+
+1. **Caching** — Session data and temporary state
+2. **WebSocket pub/sub** — Multi-server real-time notification delivery
+3. **Celery broker** — Task queue for async media processing jobs
+
+### Gotenberg
+
+Headless Chrome service for converting HTML/documents to PDF. Used for workflow and document export.
+
+### Celery Media Worker
+
+Async worker process for video import pipeline:
+
+1. Extract audio from video
+2. Transcribe audio (Whisper)
+3. Extract key frames
+4. Analyze frames with AI
+5. Generate step-by-step guide
+
+### SendCloak + Presidio (Optional)
+
+Privacy layer that obfuscates PII before data reaches AI providers:
+
+- **Presidio** — Microsoft's NER-based PII detection engine
+- **SendCloak** — Proxy that intercepts AI requests, masks PII, and de-masks responses
+- Supports English and European languages (en, de, fr, es, it)
+
+## Data Flow
+
+### Workflow Recording
+
+```
+Desktop App / Chrome Extension
+        │
+        ▼
+  POST /api/v1/process-recording/session/create
+        │
+        ├── Upload metadata (JSON)
+        ├── Upload step screenshots (images)
+        │
+        ▼
+  POST /api/v1/process-recording/session/{id}/finalize
+        │
+        ▼
+  Auto-Processing Pipeline (async)
+        ├── Generate title (LLM)
+        ├── Generate summary (LLM)
+        ├── Generate tags (LLM)
+        ├── Annotate each step (LLM)
+        ├── Generate guide markdown (LLM)
+        ├── Index for full-text search (tsvector)
+        └── Generate embeddings (pgvector)
+```
+
+### Search Query
+
+```
+User Query: "how to deploy"
+        │
+        ▼
+  GET /api/v1/search/unified-v2?q=how+to+deploy
+        │
+        ├── Full-text search (tsvector + tsquery)
+        ├── Semantic search (pgvector cosine similarity)
+        ├── Trigram fallback (for typos)
+        │
+        ▼
+  RRF Fusion (Reciprocal Rank Fusion)
+        │
+        ├── Combine rankings from all sources
+        ├── Apply boosts (view count, recency, type)
+        │
+        ▼
+  Ranked Results with Highlighted Snippets
+```
+
+### MCP Access
+
+```
+External AI Agent (Claude, Cursor, etc.)
+        │
+        ▼
+  /mcp (FastMCP HTTP transport)
+        │
+        ├── API key validation
+        ├── Project scoping
+        │
+        ▼
+  Available Tools:
+        ├── list_projects
+        ├── search_pages
+        ├── search_workflows
+        ├── read_document
+        ├── read_workflow
+        ├── read_folder
+        └── create_context_link
+```
+
+## Database Schema (Key Tables)
+
+| Table | Purpose |
+|-------|---------|
+| `user` | User accounts with email/password auth |
+| `project` | Team projects with ownership |
+| `project_members` | M:N with roles (Viewer → Owner) |
+| `document` | Rich text documents (TipTap JSON content) |
+| `document_version` | Document version history |
+| `folder` | Hierarchical folders (materialized path) |
+| `processrecordingsession` | Workflow recordings with AI-generated metadata |
+| `processrecordingstep` | Individual steps with screenshots and annotations |
+| `processrecordingfile` | Uploaded screenshot files |
+| `embedding` | pgvector embeddings for semantic search |
+| `knowledgesource` | Uploaded knowledge files (PDF, DOCX, etc.) |
+| `knowledgelink` | Relationships between resources |
+| `contextlink` | URL/app pattern → resource mappings |
+| `gitsyncconfig` | Git export configuration per project |
+| `auditlog` | Action tracking for compliance |
+| `llmusage` | Token/cost tracking per LLM call |
+| `mcpapikey` | Project-scoped API keys for MCP |
+| `session` | Browser session tokens |
+| `refreshtoken` | OAuth refresh tokens for desktop clients |
+| `comment` | Threaded comments on resources |
+| `resourceshare` | Per-resource sharing with permissions |
+| `appsettings` | Key-value config store (LLM settings) |

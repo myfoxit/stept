@@ -1,0 +1,137 @@
+---
+title: "Video Import"
+description: "Upload video files and automatically generate step-by-step workflows."
+---
+
+## Overview
+
+ondoki can convert video recordings into step-by-step workflows. Upload a video file, and an async processing pipeline extracts frames, transcribes audio, and generates annotated steps with AI.
+
+## Supported Formats
+
+| Format | Extension |
+|--------|-----------|
+| MP4 | `.mp4` |
+| MOV | `.mov` |
+| AVI | `.avi` |
+| MKV | `.mkv` |
+| WebM | `.webm` |
+| M4V | `.m4v` |
+
+**Maximum file size:** 2 GB
+
+## How It Works
+
+<Steps>
+  <Step title="Upload Video">
+    Upload a video file via the **Video Import** page or the API. The file is validated and saved to disk.
+  </Step>
+  <Step title="Queue Processing">
+    A `MediaProcessingJob` is created and queued for the Celery media worker.
+  </Step>
+  <Step title="Extract Audio">
+    Audio is extracted from the video for transcription.
+  </Step>
+  <Step title="Transcribe">
+    Audio is transcribed using Whisper (configurable model size: base, small, medium, large).
+  </Step>
+  <Step title="Extract Key Frames">
+    Key frames are extracted from the video at regular intervals.
+  </Step>
+  <Step title="Analyze & Generate">
+    AI analyzes the frames and transcript to generate annotated steps with titles and descriptions.
+  </Step>
+  <Step title="Create Workflow">
+    A new `ProcessRecordingSession` is created with source_type "video", containing the generated steps and guide.
+  </Step>
+</Steps>
+
+## Processing Stages
+
+You can track progress via the status endpoint:
+
+| Stage | Description |
+|-------|-------------|
+| `uploading` | File is being uploaded |
+| `queued` | Job is queued for processing |
+| `extracting_audio` | Audio track being extracted |
+| `transcribing` | Audio being transcribed to text |
+| `extracting_frames` | Key frames being extracted |
+| `analyzing` | AI analyzing content |
+| `generating` | Generating steps and guide |
+| `done` | Processing complete |
+| `failed` | Processing failed (check error) |
+
+Progress is tracked as a percentage (0–100%).
+
+## API
+
+### Upload
+
+```
+POST /api/v1/video-import/upload
+Content-Type: multipart/form-data
+
+file: <video file>
+project_id: <project_id>
+```
+
+Returns: `session_id`, `job_id`, `task_id`
+
+### Check Status
+
+```
+GET /api/v1/video-import/status/{session_id}
+```
+
+Returns:
+
+```json
+{
+  "status": "processing",
+  "processing_stage": "transcribing",
+  "progress": 45,
+  "video_filename": "demo.mp4",
+  "video_size_bytes": 52428800,
+  "estimated_frames": 120,
+  "frame_count": 0,
+  "has_guide": false
+}
+```
+
+### Check Job Status
+
+```
+GET /api/v1/video-import/jobs/{job_id}
+```
+
+## Requirements
+
+Video import requires:
+
+1. **Celery media worker** — must be running (`media-worker` service in docker-compose)
+2. **Whisper model** — configured via `WHISPER_MODEL` env var (default: `base`)
+3. **OpenAI API key** — if using OpenAI's Whisper API (set `OPENAI_API_KEY`)
+
+<Warning>
+Without the media worker running, video uploads will be accepted but processing will not start. The job will remain in `queued` status.
+</Warning>
+
+## Whisper Model Sizes
+
+| Model | Size | Speed | Accuracy |
+|-------|------|-------|----------|
+| `base` | 74 MB | Fast | Good for clear audio |
+| `small` | 244 MB | Medium | Better accuracy |
+| `medium` | 769 MB | Slower | High accuracy |
+| `large` | 1.5 GB | Slowest | Best accuracy |
+
+Set via `WHISPER_MODEL` environment variable. Larger models require more RAM and processing time.
+
+## Retry Behavior
+
+Failed processing jobs are retried up to 3 times (configurable via `max_attempts`). The job status tracks:
+
+- Number of attempts
+- Error messages
+- Start and finish timestamps

@@ -1,0 +1,83 @@
+---
+title: "What is ondoki?"
+description: "Open-source process documentation platform. Record workflows, build guides, search everything with AI."
+---
+
+## Overview
+
+**ondoki** is a self-hosted platform for capturing, organizing, and sharing process documentation. It helps teams turn screen recordings into step-by-step guides, write rich documents, and build a searchable knowledge base — all enhanced by AI.
+
+<CardGroup cols={2}>
+  <Card title="Workflow Recording" icon="video">
+    Capture clicks, keystrokes, and screenshots from a desktop app or Chrome extension. Each step is recorded with context.
+  </Card>
+  <Card title="Rich Document Editor" icon="file-lines">
+    Block-based TipTap editor with slash commands, inline AI, images, tables, code blocks, and multiple page layouts.
+  </Card>
+  <Card title="AI-Powered Search" icon="magnifying-glass">
+    Hybrid full-text + semantic vector search with reciprocal rank fusion. Find anything across documents, workflows, and knowledge sources.
+  </Card>
+  <Card title="Team Collaboration" icon="users">
+    Projects with role-based access, per-resource sharing, threaded comments, audit logging, and analytics.
+  </Card>
+</CardGroup>
+
+## Why ondoki?
+
+Most process documentation tools are either too simple (screenshot-and-annotate) or too complex (enterprise knowledge management). ondoki sits in the middle:
+
+- **Capture is fast** — record a workflow from the desktop app and ondoki auto-generates titles, summaries, tags, and per-step descriptions using AI.
+- **Editing is flexible** — a full block editor for when you need to write, not just capture.
+- **Search actually works** — hybrid search combines keyword matching with semantic understanding, so you find what you need even with imprecise queries.
+- **AI is built in** — chat with an AI that has full context on your documents and workflows. Use inline AI to write, summarize, expand, or translate directly in the editor.
+- **Self-hosted and open** — your data stays on your infrastructure. MIT licensed.
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Workflow Recording** | Desktop app and Chrome extension capture user actions with screenshots |
+| **Document Editor** | TipTap-based block editor with slash commands, drag-and-drop, multiple layouts |
+| **Inline AI** | Write, summarize, improve, expand, simplify, translate, explain — directly in the editor |
+| **AI Chat** | Context-aware LLM chat with function calling (supports OpenAI, Anthropic, Ollama) |
+| **Hybrid Search** | Full-text (tsvector) + semantic (pgvector) with RRF fusion and trigram fallback |
+| **Knowledge Base** | Upload PDFs, DOCX, TXT, MD — content is extracted, embedded, and searchable |
+| **Context Links** | Map URL patterns, app names, or window titles to relevant documentation |
+| **Video Import** | Upload videos (MP4, MOV, etc.) — async pipeline extracts frames, transcribes audio, generates guides |
+| **MCP Server** | Expose your knowledge to Claude, Cursor, or any MCP-compatible AI agent |
+| **Git Sync** | One-way export to GitHub, GitLab, or Bitbucket as Markdown |
+| **Audit Log** | Track all actions with filtering and CSV export |
+| **Analytics** | Usage metrics, stale content detection, knowledge gap analysis |
+| **Public Sharing** | Share documents and workflows via public links — no login required |
+| **Privacy Controls** | Optional PII obfuscation via SendCloak + Presidio |
+
+## How It Works
+
+<Steps>
+  <Step title="Capture a Workflow">
+    Use the ondoki desktop app or Chrome extension to record a process. Each click, keystroke, and navigation is captured as a step with a screenshot.
+  </Step>
+  <Step title="AI Processes the Recording">
+    ondoki automatically generates a title, summary, tags, difficulty rating, and per-step descriptions using your configured LLM.
+  </Step>
+  <Step title="Edit and Enrich">
+    Refine the auto-generated content in the workflow editor. Add additional steps, reorder, or merge. Write supporting documents in the rich editor.
+  </Step>
+  <Step title="Organize and Share">
+    Organize content into projects and folders. Share with team members via roles, or publish public links for external access.
+  </Step>
+  <Step title="Search and Reuse">
+    Find any piece of knowledge using hybrid search. Let AI agents access your documentation via MCP. Export to Git or PDF.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get ondoki running in 5 minutes with Docker Compose.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Understand how the components fit together.
+  </Card>
+</CardGroup>

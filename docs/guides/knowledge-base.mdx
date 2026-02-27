@@ -1,0 +1,89 @@
+---
+title: "Knowledge Base"
+description: "Upload and index documents for AI-powered search and retrieval."
+---
+
+## Overview
+
+The knowledge base lets you upload external documents (PDFs, Word files, plain text, Markdown) into ondoki. Uploaded content is extracted, indexed for full-text search, and embedded for semantic search — making it available to the AI chat, MCP server, and search.
+
+## Supported File Types
+
+| Format | Extension | Extraction |
+|--------|-----------|------------|
+| **PDF** | `.pdf` | Text extraction via PyMuPDF |
+| **Word** | `.docx` | Text extraction via python-docx |
+| **Plain Text** | `.txt` | Direct text ingestion |
+| **Markdown** | `.md` | Direct text ingestion |
+
+## Uploading Knowledge
+
+Upload files via **Knowledge Base** in the sidebar or via the API:
+
+**Endpoint:** `POST /api/v1/knowledge/upload`
+
+The upload process:
+
+<Steps>
+  <Step title="File Upload">
+    File is uploaded and stored on disk.
+  </Step>
+  <Step title="Text Extraction">
+    Content is extracted from the file format into plain text.
+  </Step>
+  <Step title="Full-Text Indexing">
+    Extracted text is indexed for keyword search.
+  </Step>
+  <Step title="Vector Embedding">
+    Content is embedded in the background for semantic search.
+  </Step>
+</Steps>
+
+## Source Types
+
+Knowledge sources are categorized by origin:
+
+| Type | Description |
+|------|-------------|
+| `UPLOAD` | Manually uploaded files |
+| `WEB_CLIP` | Content clipped from web pages |
+| `SLACK` | Imported from Slack |
+| `MEETING` | Meeting notes/transcripts |
+| `GIT_PR` | Pull request content from Git |
+
+<Note>
+Currently, `UPLOAD` is the primary supported source type. Other types are defined in the schema for future integrations.
+</Note>
+
+## Knowledge Links
+
+ondoki supports linking resources together with typed relationships:
+
+| Link Type | Description |
+|-----------|-------------|
+| `RELATED` | General relationship |
+| `DEPENDS_ON` | Dependency relationship |
+| `SUPERSEDES` | Newer version replaces older |
+| `PART_OF` | Component of a larger whole |
+
+Links can be created manually or auto-detected with a confidence score.
+
+## Knowledge Graph
+
+The **Knowledge Graph** page provides a visual representation of relationships between documents, workflows, and knowledge sources. Navigate to it from the sidebar.
+
+## Managing Knowledge Sources
+
+**List sources:** `GET /api/v1/knowledge/sources`
+
+**Delete a source:** `DELETE /api/v1/knowledge/sources/{source_id}`
+
+Deleting a knowledge source removes the file, extracted content, and associated embeddings.
+
+## How Knowledge Integrates with AI
+
+Knowledge base content is available to:
+
+1. **Search** — appears in unified search results alongside documents and workflows
+2. **AI Chat** — the `rag_search` tool queries knowledge embeddings to provide context
+3. **MCP** — external AI agents can search and access knowledge content

@@ -1,0 +1,120 @@
+---
+title: "Document Editor"
+description: "Rich text editing with blocks, slash commands, and inline AI."
+---
+
+## Overview
+
+ondoki includes a full-featured block-based document editor built on [TipTap](https://tiptap.dev/). It supports slash commands, drag-and-drop blocks, images, tables, code blocks, and inline AI — similar to Notion or Outline.
+
+## Page Layouts
+
+Documents support multiple page layouts:
+
+| Layout | Description |
+|--------|-------------|
+| `full` | Full-width layout, no margins |
+| `document` | Centered content with comfortable reading width |
+| `a4` | A4 paper dimensions (useful for print-ready docs) |
+| `letter` | US Letter dimensions |
+
+Set the layout from the document settings or via the API (`page_layout` field).
+
+## Editor Features
+
+### Slash Commands
+
+Type `/` anywhere in the editor to open the command menu. Available commands include:
+
+- **Headings** (H1, H2, H3)
+- **Lists** (bullet, numbered, checklist)
+- **Code block** with syntax highlighting
+- **Table**
+- **Image** upload
+- **Divider**
+- **AI commands** (`/ai` to access inline AI)
+
+### Block Editing
+
+Each content element is a block that can be:
+
+- **Dragged** to reorder
+- **Deleted** individually
+- **Converted** between types (e.g., paragraph → heading)
+
+### Rich Content
+
+- **Images** — upload and embed inline images
+- **Tables** — create and edit tables with rows/columns
+- **Code blocks** — syntax-highlighted code with language selection
+- **Checklists** — interactive task lists
+- **Blockquotes** — styled quote blocks
+- **Horizontal rules** — section dividers
+
+### Inline AI
+
+With an LLM configured, the editor provides AI-powered text commands:
+
+| Command | What It Does |
+|---------|-------------|
+| `write` | Generate text from a prompt |
+| `summarize` | Condense selected text |
+| `improve` | Rewrite for clarity and quality |
+| `expand` | Add detail to selected text |
+| `simplify` | Make text easier to understand |
+| `translate` | Translate to another language |
+| `explain` | Add explanation of selected content |
+
+Access inline AI via the `/ai` slash command or the AI toolbar button. Results stream in real-time via SSE.
+
+## Document Management
+
+### Versioning
+
+Documents track a `version` number that increments on each save. Version history is stored in the `document_version` table with:
+
+- Version number
+- Full content snapshot (JSON)
+- Document name at that version
+- Byte size
+- Created by user
+
+### Privacy and Sharing
+
+- **Private documents** — only visible to the owner and explicitly shared users
+- **Public links** — generate a share token for read-only access without login
+- **Team sharing** — share with specific users via email with view or edit permissions
+- **Role-based access** — project role determines base access level
+
+### Document Locking
+
+Documents support optimistic locking with `locked_by` and `locked_at` fields to prevent concurrent editing conflicts.
+
+### Folders
+
+Organize documents into folders with:
+
+- **Hierarchical nesting** — unlimited folder depth
+- **Materialized paths** — efficient tree queries
+- **Privacy** — per-folder privacy settings
+- **Icons** — emoji or icon identifiers
+- **Drag-and-drop** — reorder and move documents between folders
+
+### Export
+
+Documents can be exported as:
+
+- **PDF** — via Gotenberg (headless Chrome rendering)
+- **Markdown** — TipTap JSON → Markdown conversion
+- **HTML** — rendered HTML output
+- **Git** — one-way export to GitHub/GitLab/Bitbucket via [Git Sync](/integrations/git-sync)
+
+### Soft Delete
+
+Deleted documents go to trash and can be restored. Permanent deletion removes the document and all associated data.
+
+## Content Storage
+
+Document content is stored as TipTap JSON in the `content` column. A `search_text` column contains extracted plain text for full-text search, and a `search_tsv` column contains the PostgreSQL tsvector for fast keyword queries.
+
+Semantic embeddings are generated separately and stored in the `embedding` table for vector similarity search.

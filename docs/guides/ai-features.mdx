@@ -1,0 +1,146 @@
+---
+title: "AI Features"
+description: "Inline AI, context-aware chat, auto-annotation, and AI tool calling."
+---
+
+## Overview
+
+ondoki integrates AI throughout the platform — from auto-processing workflow recordings to inline text editing to a full chat interface. All AI features are optional and require an LLM provider to be configured.
+
+## Supported Providers
+
+Configure your LLM in **Project Settings → AI/LLM** or via environment variables.
+
+| Provider | Models | Notes |
+|----------|--------|-------|
+| **OpenAI** | GPT-4o, GPT-4, GPT-3.5-turbo, etc. | Most commonly used |
+| **Anthropic** | Claude Opus, Sonnet, Haiku | Full function calling support |
+| **Ollama** | Llama, Mistral, any local model | Self-hosted, no API key needed |
+| **Custom** | Any OpenAI-compatible endpoint | Set `ONDOKI_LLM_BASE_URL` |
+
+<Note>
+LLM settings configured in the UI (Project Settings) take priority over environment variables. This allows different projects to use different providers.
+</Note>
+
+## Inline AI
+
+The editor includes seven AI commands accessible via the `/ai` slash command:
+
+| Command | Description |
+|---------|-------------|
+| **Write** | Generate new text from a prompt |
+| **Summarize** | Condense selected text into a brief summary |
+| **Improve** | Rewrite selected text for clarity and quality |
+| **Expand** | Add more detail to selected text |
+| **Simplify** | Make selected text easier to understand |
+| **Translate** | Translate selected text to another language |
+| **Explain** | Generate an explanation of selected content |
+
+Responses stream in real-time via Server-Sent Events (SSE) and insert directly into the editor at the cursor position.
+
+**Endpoint:** `POST /api/v1/chat/inline`
+
+## AI Chat
+
+The chat interface provides a context-aware AI assistant that understands your documents and workflows.
+
+### Features
+
+- **Streaming responses** — real-time output via SSE
+- **Function calling** — the AI can use tools to search, create, and modify content
+- **Context injection** — automatically includes relevant workflow/document context
+- **Conversation history** — maintains context across messages
+
+### AI Tools
+
+The chat AI has access to 16 tools:
+
+| Tool | What It Does |
+|------|-------------|
+| `rag_search` | Semantic search across documents and workflows |
+| `create_page` | Create a new document |
+| `update_page` | Modify document content |
+| `read_document` | Fetch and read a document |
+| `read_workflow` | Fetch a workflow with all steps |
+| `analyze_workflow` | AI analysis of a workflow |
+| `rename_workflow` | Change a workflow title |
+| `rename_steps` | Bulk rename workflow steps |
+| `merge_steps` | Combine multiple steps |
+| `suggest_workflow` | Generate workflow suggestions |
+| `search_pages` | Full-text search on documents |
+| `list_workflows` | Browse accessible workflows |
+| `create_folder` | Create folder structure |
+| `add_context_link` | Create URL → resource associations |
+
+**Endpoint:** `POST /api/v1/chat/chat/completions`
+
+## Auto-Processing
+
+When a workflow recording is finalized, ondoki automatically runs an AI pipeline:
+
+<Steps>
+  <Step title="Title Generation">
+    Generates a descriptive title based on the recorded steps and window titles.
+  </Step>
+  <Step title="Summary">
+    Creates a 50–150 word summary of what the workflow demonstrates.
+  </Step>
+  <Step title="Tagging">
+    Suggests topic tags for categorization and search.
+  </Step>
+  <Step title="Difficulty Assessment">
+    Rates the workflow as Easy, Medium, or Advanced based on complexity.
+  </Step>
+  <Step title="Time Estimation">
+    Estimates how long it would take someone to follow the workflow.
+  </Step>
+  <Step title="Step Annotation">
+    For each step, generates a title and description explaining what happens. Identifies the UI element being interacted with and categorizes the action.
+  </Step>
+  <Step title="Guide Generation">
+    Produces a complete step-by-step guide in Markdown format.
+  </Step>
+</Steps>
+
+You can re-trigger annotation on individual steps via the **Annotate** button in the workflow editor.
+
+**Endpoint:** `POST /api/v1/process-recording/steps/{step_id}/annotate`
+
+## Privacy and PII Protection
+
+ondoki supports optional PII obfuscation before data reaches AI providers:
+
+### SendCloak
+
+[SendCloak](https://github.com/myfoxit/sendcloak) is a proxy that intercepts LLM requests, detects PII using Microsoft Presidio, replaces it with synthetic data, and de-masks the AI response.
+
+Enable it with:
+
+```bash
+SENDCLOAK_ENABLED=true
+docker compose --profile privacy up -d
+```
+
+### DataVeil
+
+An alternative privacy proxy that masks sensitive data in AI requests. Configure via `DATAVEIL_ENABLED` and `DATAVEIL_URL` environment variables.
+
+## Circuit Breaker
+
+The LLM gateway includes a circuit breaker pattern to handle provider outages gracefully:
+
+- After **3 consecutive failures**, the circuit opens for **60 seconds**
+- During the cooldown, requests return an error immediately instead of timing out
+- The circuit automatically resets after the cooldown period
+
+## Usage Tracking
+
+All LLM calls are tracked in the `llmusage` table with:
+
+- Input/output token counts
+- Estimated cost in USD
+- Model and provider used
+- Endpoint type (chat, inline, annotation, guide)
+- User and project association
+
+View usage data in the **Analytics Dashboard**.
