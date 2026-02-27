@@ -897,18 +897,14 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!state.isRecording || state.isPaused) return;
 
-  state.stepCounter++;
-  const step = {
-    stepNumber: state.stepCounter,
-    timestamp: new Date().toISOString(),
+  addStep({
     actionType: 'Navigate',
-    windowTitle: 'New Tab',
+    pageTitle: 'New Tab',
     description: 'Open new tab',
-    screenshotDataUrl: null,
     url: tab.url || 'chrome://newtab',
-  };
-  state.steps.push(step);
-  chrome.runtime.sendMessage({ type: 'STEP_ADDED', step }).catch(() => {});
+    windowSize: { width: 0, height: 0 },
+    viewportSize: { width: 0, height: 0 },
+  });
 
   // Inject content script into new tab once it loads
   if (tab.id) {
