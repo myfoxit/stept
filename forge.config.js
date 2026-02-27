@@ -2,6 +2,7 @@ module.exports = {
   packagerConfig: {
     asar: true,
     icon: './assets/icon',
+    extraResource: ['native'],
     protocols: [
       {
         name: 'Ondoki Protocol',

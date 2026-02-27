@@ -36,6 +36,8 @@ export class ContextWatcherService extends EventEmitter {
   private projectId: string = '';
 
   private nativeBinaryPath: string;
+  private restartAttempts: number = 0;
+  private readonly MAX_RESTART_ATTEMPTS = 5;
 
   private readonly IGNORE_APPS = ['electron', 'ondoki desktop', 'ondoki-desktop'];
 
@@ -43,12 +45,12 @@ export class ContextWatcherService extends EventEmitter {
     super();
     if (process.platform === 'darwin') {
       this.nativeBinaryPath = app.isPackaged
-        ? path.join(path.dirname(app.getPath('exe')), '..', 'Resources', 'native', 'macos', 'window-info')
+        ? path.join(process.resourcesPath, 'native', 'macos', 'window-info')
         : path.join(__dirname, '..', '..', 'native', 'macos', 'window-info');
     } else {
       // Windows — try packaged path first, then dev paths
       const candidates = [
-        path.join(path.dirname(app.getPath('exe')), '..', 'Resources', 'native', 'windows', 'window-info.exe'),
+        path.join(process.resourcesPath, 'native', 'windows', 'window-info.exe'),
         path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'window-info.exe'),
         path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.exe'),
       ];
@@ -71,6 +73,7 @@ export class ContextWatcherService extends EventEmitter {
 
   start() {
     if (this.watchProcess) return;
+    this.restartAttempts = 0;
     this.spawnWatcher();
   }
 
@@ -129,6 +132,7 @@ export class ContextWatcherService extends EventEmitter {
         const event = JSON.parse(line);
         if (event.type === 'ready') {
           console.log('[context-watcher] Native watcher ready');
+          this.restartAttempts = 0;
           return;
         }
         if (event.type === 'change') {
@@ -140,12 +144,20 @@ export class ContextWatcherService extends EventEmitter {
     });
 
     this.watchProcess.on('exit', (code) => {
-      console.log(`[context-watcher] Native watcher exited (code ${code}), restarting in 3s...`);
       this.watchProcess = null;
       this.readline = null;
+
+      this.restartAttempts++;
+      if (this.restartAttempts > this.MAX_RESTART_ATTEMPTS) {
+        console.warn(`[context-watcher] Native watcher exited (code ${code}). Max retries (${this.MAX_RESTART_ATTEMPTS}) reached — stopping.`);
+        return;
+      }
+
+      const delay = Math.min(3000 * Math.pow(2, this.restartAttempts - 1), 60000);
+      console.log(`[context-watcher] Native watcher exited (code ${code}), retry ${this.restartAttempts}/${this.MAX_RESTART_ATTEMPTS} in ${delay}ms...`);
       setTimeout(() => {
         if (this.apiBaseUrl && this.accessToken) this.spawnWatcher();
-      }, 3000);
+      }, delay);
     });
   }
 
