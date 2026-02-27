@@ -36,11 +36,23 @@ let state = {
 let authReady = false;
 let authReadyPromise;
 let authReadyResolve;
-authReadyPromise = new Promise(resolve => { authReadyResolve = resolve; });
+authReadyPromise = new Promise((resolve) => {
+  authReadyResolve = resolve;
+});
 
 // Initialize state from storage — restore ALL auth state
 chrome.storage.local.get(
-  ['accessToken', 'refreshToken', 'currentUser', 'userProjects', 'selectedProjectId', 'isRecording', 'recordingStartTime', 'stepCounter', 'persistedSteps'],
+  [
+    'accessToken',
+    'refreshToken',
+    'currentUser',
+    'userProjects',
+    'selectedProjectId',
+    'isRecording',
+    'recordingStartTime',
+    'stepCounter',
+    'persistedSteps',
+  ],
   async (result) => {
     if (result.selectedProjectId) {
       state.selectedProjectId = result.selectedProjectId;
@@ -50,7 +62,7 @@ chrome.storage.local.get(
       state.recordingStartTime = result.recordingStartTime || Date.now();
       state.stepCounter = result.stepCounter || 0;
       chrome.action.setBadgeText({ text: 'REC' });
-      chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
+      chrome.action.setBadgeBackgroundColor({ color: '#3ab08a' });
     }
 
     // Restore persisted steps (survives SW restarts)
@@ -76,11 +88,15 @@ chrome.storage.local.get(
     }
 
     // BUG-C001: First-run check — prompt user to configure API URL if not set
-    const apiCheck = await new Promise(r => chrome.storage.local.get(['apiBaseUrl'], r));
+    const apiCheck = await new Promise((r) =>
+      chrome.storage.local.get(['apiBaseUrl'], r),
+    );
     if (!apiCheck.apiBaseUrl) {
       chrome.action.setBadgeText({ text: '!' });
       chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
-      chrome.action.setTitle({ title: 'Ondoki — Please configure your API URL in settings' });
+      chrome.action.setTitle({
+        title: 'Ondoki — Please configure your API URL in settings',
+      });
     }
 
     authReady = true;
@@ -115,8 +131,13 @@ async function persistSteps() {
   } catch (e) {
     // Quota exceeded — persist steps without screenshots as fallback
     debugLog('Steps persistence failed, retrying without screenshots:', e);
-    const lightweight = state.steps.map(s => ({ ...s, screenshotDataUrl: null }));
-    await chrome.storage.local.set({ persistedSteps: lightweight }).catch(() => {});
+    const lightweight = state.steps.map((s) => ({
+      ...s,
+      screenshotDataUrl: null,
+    }));
+    await chrome.storage.local
+      .set({ persistedSteps: lightweight })
+      .catch(() => {});
   }
 }
 
@@ -317,7 +338,12 @@ async function tryAutoLogin() {
     debugLog('Auto-login failed:', error);
   }
 
-  await chrome.storage.local.remove(['refreshToken', 'accessToken', 'currentUser', 'userProjects']);
+  await chrome.storage.local.remove([
+    'refreshToken',
+    'accessToken',
+    'currentUser',
+    'userProjects',
+  ]);
   state.refreshToken = null;
   state.accessToken = null;
   state.isAuthenticated = false;
@@ -345,7 +371,13 @@ async function logout() {
   state.userProjects = [];
   state.selectedProjectId = null;
 
-  await chrome.storage.local.remove(['refreshToken', 'accessToken', 'currentUser', 'userProjects', 'selectedProjectId']);
+  await chrome.storage.local.remove([
+    'refreshToken',
+    'accessToken',
+    'currentUser',
+    'userProjects',
+    'selectedProjectId',
+  ]);
 }
 
 async function fetchUserInfo() {
@@ -384,7 +416,9 @@ async function fetchUserProjects() {
 async function ensureContentScript(tabId) {
   try {
     // First try pinging the existing content script
-    const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' }).catch(() => null);
+    const response = await chrome.tabs
+      .sendMessage(tabId, { type: 'PING' })
+      .catch(() => null);
     if (response && response.alive) return true;
   } catch (e) {
     // No content script, need to inject
@@ -396,7 +430,7 @@ async function ensureContentScript(tabId) {
       files: ['content.js'],
     });
     // Small delay for script to initialize
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     return true;
   } catch (e) {
     debugLog('Failed to inject content script into tab', tabId, e);
@@ -427,14 +461,16 @@ function startRecording(projectId) {
       ) {
         const injected = await ensureContentScript(tab.id);
         if (injected) {
-          chrome.tabs.sendMessage(tab.id, { type: 'START_RECORDING' }).catch(() => {});
+          chrome.tabs
+            .sendMessage(tab.id, { type: 'START_RECORDING' })
+            .catch(() => {});
         }
       }
     }
   });
 
   chrome.action.setBadgeText({ text: 'REC' });
-  chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
+  chrome.action.setBadgeBackgroundColor({ color: '#3ab08a' });
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]?.id) {
@@ -474,7 +510,7 @@ function pauseRecording() {
 function resumeRecording() {
   state.isPaused = false;
   chrome.action.setBadgeText({ text: 'REC' });
-  chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
+  chrome.action.setBadgeBackgroundColor({ color: '#3ab08a' });
 
   // Broadcast resume to all content scripts
   chrome.tabs.query({}, (tabs) => {
@@ -494,14 +530,21 @@ function resumeRecording() {
 
 async function captureScreenshot() {
   return new Promise((resolve) => {
-    chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 70 }, (dataUrl) => {
-      if (chrome.runtime.lastError) {
-        debugLog('Screenshot capture failed:', chrome.runtime.lastError.message);
-        resolve(null);
-        return;
-      }
-      resolve(dataUrl);
-    });
+    chrome.tabs.captureVisibleTab(
+      null,
+      { format: 'jpeg', quality: 70 },
+      (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          debugLog(
+            'Screenshot capture failed:',
+            chrome.runtime.lastError.message,
+          );
+          resolve(null);
+          return;
+        }
+        resolve(dataUrl);
+      },
+    );
   });
 }
 
@@ -546,7 +589,10 @@ async function drawClickMarker(screenshotDataUrl, clickPos, viewportSize) {
     ctx.fillStyle = '#22c55e';
     ctx.fill();
 
-    const resultBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+    const resultBlob = await canvas.convertToBlob({
+      type: 'image/jpeg',
+      quality: 0.7,
+    });
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result);
@@ -564,10 +610,12 @@ async function addStep(stepData) {
   if (state.steps.length >= MAX_STEPS) {
     debugLog(`Max steps (${MAX_STEPS}) reached, ignoring new step`);
     // MISS-C003: Notify popup/sidepanel that the step limit has been reached
-    chrome.runtime.sendMessage({
-      type: 'MAX_STEPS_REACHED',
-      limit: MAX_STEPS,
-    }).catch(() => {});
+    chrome.runtime
+      .sendMessage({
+        type: 'MAX_STEPS_REACHED',
+        limit: MAX_STEPS,
+      })
+      .catch(() => {});
     return;
   }
 
@@ -575,7 +623,8 @@ async function addStep(stepData) {
 
   // Only capture screenshot for click events, not navigations or typing
   let screenshot = null;
-  const isClickAction = stepData.actionType && stepData.actionType.includes('Click');
+  const isClickAction =
+    stepData.actionType && stepData.actionType.includes('Click');
 
   if (isClickAction) {
     try {
@@ -586,10 +635,12 @@ async function addStep(stepData) {
     }
     // MISS-C002: Notify sidepanel when screenshot capture fails
     if (!screenshot) {
-      chrome.runtime.sendMessage({
-        type: 'SCREENSHOT_FAILED',
-        stepNumber: state.stepCounter,
-      }).catch(() => {});
+      chrome.runtime
+        .sendMessage({
+          type: 'SCREENSHOT_FAILED',
+          stepNumber: state.stepCounter,
+        })
+        .catch(() => {});
     }
   }
 
@@ -658,7 +709,8 @@ async function uploadCapture() {
       throw new Error('Failed to create upload session');
     }
 
-    const { sessionId } = await sessionResponse.json();
+    const data = await sessionResponse.json();
+    const sessionId = data.session_id || data.sessionId;
 
     const metadata = state.steps.map((s) => ({
       stepNumber: s.stepNumber,
@@ -825,7 +877,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'GET_SETTINGS':
         chrome.storage.local.get(['apiBaseUrl'], (result) => {
-          sendResponse({ apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL });
+          sendResponse({
+            apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL,
+          });
         });
         return; // keep channel open
 
@@ -856,11 +910,20 @@ async function trackPageChange(tabId, reason) {
 
   try {
     const tab = await chrome.tabs.get(tabId);
-    if (!tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) return;
+    if (
+      !tab.url ||
+      (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))
+    )
+      return;
 
     // Deduplicate: skip if same tab+url within 2 seconds (tab switch + navigation fire together)
     const now = Date.now();
-    if (lastTrackedPage.tabId === tabId && lastTrackedPage.url === tab.url && now - lastTrackedPage.time < 2000) return;
+    if (
+      lastTrackedPage.tabId === tabId &&
+      lastTrackedPage.url === tab.url &&
+      now - lastTrackedPage.time < 2000
+    )
+      return;
     lastTrackedPage = { tabId, url: tab.url, time: now };
 
     // Suppress navigate step if the last step was a click or Enter within 3s
@@ -868,8 +931,10 @@ async function trackPageChange(tabId, reason) {
     if (state.steps.length > 0) {
       const lastStep = state.steps[state.steps.length - 1];
       const lastStepAge = now - new Date(lastStep.timestamp).getTime();
-      const wasUserAction = lastStep.actionType?.includes('Click') ||
-        (lastStep.actionType === 'Key' && lastStep.description?.includes('Enter'));
+      const wasUserAction =
+        lastStep.actionType?.includes('Click') ||
+        (lastStep.actionType === 'Key' &&
+          lastStep.description?.includes('Enter'));
       if (wasUserAction && lastStepAge < 3000) {
         debugLog('Suppressing navigate step (caused by recent user action)');
         return;
@@ -913,7 +978,9 @@ chrome.tabs.onCreated.addListener((tab) => {
         chrome.tabs.onUpdated.removeListener(injectWhenReady);
         const injected = await ensureContentScript(tab.id);
         if (injected) {
-          chrome.tabs.sendMessage(tab.id, { type: 'START_RECORDING' }).catch(() => {});
+          chrome.tabs
+            .sendMessage(tab.id, { type: 'START_RECORDING' })
+            .catch(() => {});
         }
       }
     };
@@ -936,9 +1003,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   ) {
     const injected = await ensureContentScript(tabId);
     if (injected) {
-      chrome.tabs.sendMessage(tabId, {
-        type: state.isPaused ? 'PAUSE_RECORDING' : 'START_RECORDING',
-      }).catch(() => {});
+      chrome.tabs
+        .sendMessage(tabId, {
+          type: state.isPaused ? 'PAUSE_RECORDING' : 'START_RECORDING',
+        })
+        .catch(() => {});
     }
   }
 });
