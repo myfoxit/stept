@@ -484,7 +484,7 @@ const SpotlightApp: React.FC = () => {
             </p>
             <button
               onClick={handleLogin}
-              className="btn-dark auth-gate-btn"
+              className="btn-accent auth-gate-btn"
             >
               Sign In
             </button>
@@ -497,15 +497,6 @@ const SpotlightApp: React.FC = () => {
               onProjectChange={setSelectedProjectId}
             />
 
-            <SearchBar
-              mode={mode}
-              query={query}
-              inputRef={inputRef}
-              onQueryChange={setQuery}
-              onKeyDown={handleKeyDown}
-              onModeChange={setMode}
-            />
-
             <RecordingControls
               rec={rec}
               duration={duration}
@@ -516,6 +507,15 @@ const SpotlightApp: React.FC = () => {
               onStartChoose={handleStartRecording}
               onStop={handleStopRecording}
               onTogglePause={handleTogglePause}
+            />
+
+            <SearchBar
+              mode={mode}
+              query={query}
+              inputRef={inputRef}
+              onQueryChange={setQuery}
+              onKeyDown={handleKeyDown}
+              onModeChange={setMode}
             />
 
             {contextInfo && contextInfo.appName && (

@@ -18,6 +18,7 @@ import { AuthService } from './auth';
 
 const isDev = process.argv.includes('--development');
 const SPOTLIGHT_PATH = path.join(__dirname, '..', 'renderer', 'spotlight.html');
+const SETTINGS_PATH = path.join(__dirname, '..', 'renderer', 'settings.html');
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
 class OndokiApp {
@@ -448,164 +449,11 @@ class OndokiApp {
       },
     });
 
-    const settingsHtml = this.generateSettingsHtml();
-    this.settingsWindow.loadURL(
-      `data:text/html;charset=utf-8,${encodeURIComponent(settingsHtml)}`,
-    );
+    this.settingsWindow.loadFile(SETTINGS_PATH);
 
     this.settingsWindow.on('closed', () => {
       this.settingsWindow = null;
     });
-  }
-
-  private generateSettingsHtml(): string {
-    return `<!DOCTYPE html><html><head>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'DM Sans', sans-serif; background: #FFFFFF; color: #111111; padding: 24px; }
-  h1 { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 24px; letter-spacing: -0.03em; }
-  .section { margin-bottom: 20px; }
-  .section-title { font-size: 11px; font-weight: 600; color: #A0A0B2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #1A1A2E; }
-  input[type="text"], input[type="url"] { width: 100%; padding: 8px 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: #fff; margin-bottom: 12px; }
-  input:focus { border-color: #1A1A1A; box-shadow: 0 0 0 3px rgba(26,26,26,0.1); }
-  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
-  .toggle { width: 36px; height: 20px; border-radius: 10px; background: #D1D5DB; cursor: pointer; position: relative; transition: background 0.2s; }
-  .toggle.on { background: #1A1A1A; }
-  .toggle-knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-  .toggle.on .toggle-knob { transform: translateX(16px); }
-  .shortcut-input { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: center; }
-  .btn { padding: 10px 24px; border-radius: 10px; border: none; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .btn-primary { background: #1A1A1A; color: #fff; }
-  .btn-primary:hover { background: #333333; }
-  .btn-danger { background: transparent; color: #E14D2A; border: 1px solid #E14D2A; }
-  .btn-danger:hover { background: rgba(255,95,87,0.08); }
-  .footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.07); }
-  .hint { font-size: 11px; color: #A0A0B2; margin-top: -8px; margin-bottom: 12px; }
-</style>
-</head><body>
-<h1>⚙️ Settings</h1>
-
-<div class="section">
-  <div class="section-title">Ondoki Server</div>
-  <label>API URL</label>
-  <input type="url" id="chatApiUrl" placeholder="http://localhost:8000/api/v1">
-  <label>Frontend URL</label>
-  <input type="url" id="frontendUrl" placeholder="http://localhost:5173">
-</div>
-
-<div class="section">
-  <div class="section-title">AI Enhancement</div>
-  <div class="toggle-row">
-    <label style="margin:0">Auto-improve step titles with AI</label>
-    <div class="toggle" id="toggleAnnotate" onclick="toggleAnnotate()"><div class="toggle-knob"></div></div>
-  </div>
-</div>
-
-<div class="section">
-  <div class="section-title">Recording</div>
-  <div class="toggle-row">
-    <label style="margin:0">Minimize when recording starts</label>
-    <div class="toggle" id="toggleMinimize" onclick="toggleMinimize()"><div class="toggle-knob"></div></div>
-  </div>
-</div>
-
-<div class="section">
-  <div class="section-title">Keyboard Shortcuts</div>
-  <label>Open Spotlight</label>
-  <input type="text" id="spotlightShortcut" class="shortcut-input" placeholder="Ctrl+Shift+Space" readonly>
-  <div class="hint">Click and press your desired shortcut</div>
-  <label>Start/Stop Recording</label>
-  <input type="text" id="recordingShortcut" class="shortcut-input" placeholder="Ctrl+Shift+R" readonly>
-  <div class="hint">Click and press your desired shortcut</div>
-</div>
-
-<div class="section">
-  <div class="section-title">Account</div>
-  <div id="accountInfo" style="font-size:13px;color:#6E6E82;margin-bottom:10px;">Loading...</div>
-  <button class="btn btn-danger" onclick="logout()">Sign Out</button>
-</div>
-
-<div class="footer">
-  <button class="btn btn-primary" onclick="save()">Save</button>
-</div>
-
-<script>
-  const api = window.electronAPI;
-  let settings = {};
-  let autoAnnotate = true;
-  let minimizeOnRecord = true;
-
-  async function init() {
-    settings = await api.getSettings();
-    document.getElementById('chatApiUrl').value = settings.chatApiUrl || '';
-    document.getElementById('frontendUrl').value = settings.frontendUrl || '';
-    document.getElementById('spotlightShortcut').value = settings.spotlightShortcut || 'Ctrl+Shift+Space';
-    document.getElementById('recordingShortcut').value = settings.recordingShortcut || 'Ctrl+Shift+R';
-    autoAnnotate = settings.autoAnnotateSteps !== false;
-    minimizeOnRecord = settings.minimizeOnRecord !== false;
-    updateToggle();
-    updateMinimizeToggle();
-
-    const status = await api.getAuthStatus();
-    document.getElementById('accountInfo').textContent = status.isAuthenticated
-      ? 'Signed in as ' + (status.user?.name || status.user?.email || 'User')
-      : 'Not signed in';
-  }
-
-  function updateToggle() {
-    const el = document.getElementById('toggleAnnotate');
-    el.className = autoAnnotate ? 'toggle on' : 'toggle';
-  }
-  function toggleAnnotate() { autoAnnotate = !autoAnnotate; updateToggle(); }
-
-  function updateMinimizeToggle() {
-    const el = document.getElementById('toggleMinimize');
-    el.className = minimizeOnRecord ? 'toggle on' : 'toggle';
-  }
-  function toggleMinimize() { minimizeOnRecord = !minimizeOnRecord; updateMinimizeToggle(); }
-
-  // Shortcut capture
-  ['spotlightShortcut', 'recordingShortcut'].forEach(id => {
-    const input = document.getElementById(id);
-    input.addEventListener('keydown', (e) => {
-      e.preventDefault();
-      const parts = [];
-      if (e.ctrlKey) parts.push('Ctrl');
-      if (e.metaKey) parts.push('Cmd');
-      if (e.altKey) parts.push('Alt');
-      if (e.shiftKey) parts.push('Shift');
-      const key = e.key;
-      if (!['Control','Meta','Alt','Shift'].includes(key)) {
-        parts.push(key === ' ' ? 'Space' : key.length === 1 ? key.toUpperCase() : key);
-        input.value = parts.join('+');
-      }
-    });
-  });
-
-  async function save() {
-    await api.saveSettings({
-      chatApiUrl: document.getElementById('chatApiUrl').value,
-      cloudEndpoint: document.getElementById('chatApiUrl').value.replace(/\\/api\\/v1$/, '/api/v1/process-recording'),
-      frontendUrl: document.getElementById('frontendUrl').value,
-      autoAnnotateSteps: autoAnnotate,
-      minimizeOnRecord: minimizeOnRecord,
-      spotlightShortcut: document.getElementById('spotlightShortcut').value,
-      recordingShortcut: document.getElementById('recordingShortcut').value,
-    });
-    // Notify main process to re-register shortcuts
-    window.close();
-  }
-
-  async function logout() {
-    await api.logout();
-    document.getElementById('accountInfo').textContent = 'Signed out';
-  }
-
-  init();
-</script>
-</body></html>`;
   }
 
   // ─── Picker Window ──────────────────────────────────────────────────────────

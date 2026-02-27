@@ -131,7 +131,7 @@
     height: 100%;
     display: flex;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.01);
+    background: transparent;
   }
   .spotlight-backdrop--centered {
     align-items: center;
@@ -314,8 +314,16 @@
     font-weight: 600;
     font-family: var(--font-display);
     cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .btn-record-all:hover {
+    background: var(--accent-hover);
   }
   .btn-record-all:disabled {
+    background: #ccc;
+    color: #fff;
     cursor: not-allowed;
   }
   .btn-choose {
@@ -739,23 +747,38 @@
     color: var(--accent);
   }
 
-  /* ===== SETTINGS WINDOW (shared classes) ===== */
-  .dialog-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
+  /* ===== SETTINGS PAGE ===== */
+  .settings-page {
+    padding: 24px;
+    max-width: 480px;
+    margin: 0 auto;
   }
-  .field-label {
-    font-size: 12px;
+  .settings-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+  }
+  .settings-section {
+    margin-bottom: 20px;
+  }
+  .settings-section-title {
+    font-size: 11px;
     font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
   }
-  .text-input {
+  .settings-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--dark);
+  }
+  .settings-input {
     width: 100%;
     padding: 8px 12px;
     border: 1px solid rgba(0, 0, 0, 0.1);
@@ -764,32 +787,95 @@
     font-size: 13px;
     outline: none;
     background: var(--card);
+    margin-bottom: 12px;
   }
-  .text-input:focus {
+  .settings-input:focus {
     border-color: var(--dark);
     box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.1);
   }
-  .btn-sm {
-    padding: 6px 16px;
-    border-radius: var(--radius-sm);
+  .settings-input--shortcut {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: center;
+  }
+  .settings-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: -8px;
+    margin-bottom: 12px;
+  }
+  .settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+  .settings-toggle {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: #D1D5DB;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    border: none;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .settings-toggle.on {
+    background: var(--dark);
+  }
+  .settings-toggle-knob {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  .settings-toggle.on .settings-toggle-knob {
+    transform: translateX(16px);
+  }
+  .settings-account {
     font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .settings-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .settings-btn {
+    padding: 10px 24px;
+    border-radius: var(--radius-md);
+    border: none;
+    font-family: var(--font-display);
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    border: none;
+    transition: all 0.15s;
   }
-  .btn-sm.primary {
+  .settings-btn--primary {
     background: var(--dark);
     color: #fff;
   }
-  .btn-sm.primary:hover {
+  .settings-btn--primary:hover {
     background: var(--dark-hover);
   }
-  .btn-sm.ghost {
+  .settings-btn--danger {
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--recording);
+    border: 1px solid var(--recording);
   }
-  .btn-sm.ghost:hover {
-    background: rgba(26, 26, 26, 0.06);
+  .settings-btn--danger:hover {
+    background: var(--recording-light);
   }
 }
 

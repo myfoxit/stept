@@ -1,101 +1,273 @@
-import React, { useEffect, useState } from 'react';
-import { Settings } from '../../main/preload';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import React, { useEffect, useState, useCallback } from 'react';
 
-interface SettingsWindowProps {
-  onClose: () => void;
-  onSettingsChange?: (settings: Settings) => void;
+interface SettingsData {
+  chatApiUrl: string;
+  frontendUrl: string;
+  autoAnnotateSteps: boolean;
+  minimizeOnRecord: boolean;
+  spotlightShortcut: string;
+  recordingShortcut: string;
 }
 
-const SettingsWindow: React.FC<SettingsWindowProps> = ({ onClose, onSettingsChange }) => {
-  const electronAPI = useElectronAPI();
-  const [settings, setSettings] = useState<Settings>({
-    cloudEndpoint: '',
-    chatApiUrl: '',
-    apiKey: '',
-    llmProvider: '',
-    llmApiKey: '',
-    llmModel: '',
-    llmBaseUrl: '',
-    autoAnnotateSteps: true,
-    autoGenerateGuide: false,
-    frontendUrl: 'http://localhost:5173',
-    minimizeOnRecord: true,
-  });
+const defaults: SettingsData = {
+  chatApiUrl: '',
+  frontendUrl: '',
+  autoAnnotateSteps: true,
+  minimizeOnRecord: true,
+  spotlightShortcut: 'Ctrl+Shift+Space',
+  recordingShortcut: 'Ctrl+Shift+R',
+};
+
+// --- Toggle -------------------------------------------------------------------
+
+const Toggle: React.FC<{ value: boolean; onChange: () => void }> = ({
+  value,
+  onChange,
+}) => (
+  <button
+    type="button"
+    className={`settings-toggle${value ? ' on' : ''}`}
+    onClick={onChange}
+  >
+    <div className="settings-toggle-knob" />
+  </button>
+);
+
+// --- ShortcutInput ------------------------------------------------------------
+
+const ShortcutInput: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}> = ({ value, onChange, placeholder }) => {
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      const parts: string[] = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.metaKey) parts.push('Cmd');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      const key = e.key;
+      if (!['Control', 'Meta', 'Alt', 'Shift'].includes(key)) {
+        parts.push(
+          key === ' ' ? 'Space' : key.length === 1 ? key.toUpperCase() : key,
+        );
+        onChange(parts.join('+'));
+      }
+    },
+    [onChange],
+  );
+
+  return (
+    <input
+      type="text"
+      value={value}
+      readOnly
+      placeholder={placeholder}
+      className="settings-input settings-input--shortcut"
+      onKeyDown={handleKeyDown}
+    />
+  );
+};
+
+// --- SettingsWindow -----------------------------------------------------------
+
+const SettingsWindow: React.FC = () => {
+  const [settings, setSettings] = useState<SettingsData>(defaults);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [accountInfo, setAccountInfo] = useState('Loading...');
 
   useEffect(() => {
-    const load = async () => {
-      if (!electronAPI) return;
-      try {
-        const s = await electronAPI.getSettings();
-        setSettings(s);
-      } finally {
+    const init = async () => {
+      const api = window.electronAPI;
+      if (!api) {
         setIsLoading(false);
+        return;
       }
+
+      try {
+        const s = await api.getSettings();
+        setSettings({
+          chatApiUrl: s.chatApiUrl || '',
+          frontendUrl: s.frontendUrl || '',
+          autoAnnotateSteps: s.autoAnnotateSteps !== false,
+          minimizeOnRecord: s.minimizeOnRecord !== false,
+          spotlightShortcut: s.spotlightShortcut || 'Ctrl+Shift+Space',
+          recordingShortcut: s.recordingShortcut || 'Ctrl+Shift+R',
+        });
+      } catch (e) {
+        console.error('Failed to load settings:', e);
+      }
+
+      try {
+        const status = await api.getAuthStatus();
+        setAccountInfo(
+          status.isAuthenticated
+            ? `Signed in as ${status.user?.name || status.user?.email || 'User'}`
+            : 'Not signed in',
+        );
+      } catch {
+        setAccountInfo('Could not fetch account status');
+      }
+
+      setIsLoading(false);
     };
-    load();
-  }, [electronAPI]);
 
-  const handleInputChange = (field: keyof Settings, value: string | boolean) => {
-    setSettings(prev => ({ ...prev, [field]: value }));
-  };
+    init();
+  }, []);
 
-  const handleSave = async () => {
-    if (!electronAPI) return;
+  const update = useCallback(
+    <K extends keyof SettingsData>(field: K, value: SettingsData[K]) => {
+      setSettings((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
+
+  const handleSave = useCallback(async () => {
+    const api = window.electronAPI;
+    if (!api) return;
+
     try {
-      setIsSaving(true);
-      // AI settings are web-managed: keep existing values untouched.
-      const { llmProvider, llmApiKey, llmModel, llmBaseUrl, ...rest } = settings;
-      await electronAPI.saveSettings(rest);
-      onSettingsChange?.(settings);
-      setTimeout(onClose, 200);
+      await api.saveSettings({
+        chatApiUrl: settings.chatApiUrl,
+        cloudEndpoint: settings.chatApiUrl.replace(
+          /\/api\/v1$/,
+          '/api/v1/process-recording',
+        ),
+        frontendUrl: settings.frontendUrl,
+        autoAnnotateSteps: settings.autoAnnotateSteps,
+        minimizeOnRecord: settings.minimizeOnRecord,
+        spotlightShortcut: settings.spotlightShortcut,
+        recordingShortcut: settings.recordingShortcut,
+      });
+      window.close();
     } catch (e) {
       console.error('Failed to save settings:', e);
-    } finally {
-      setIsSaving(false);
     }
-  };
+  }, [settings]);
+
+  const handleLogout = useCallback(async () => {
+    const api = window.electronAPI;
+    if (!api) return;
+
+    try {
+      await api.logout();
+      setAccountInfo('Signed out');
+    } catch (e) {
+      console.error('Logout failed:', e);
+    }
+  }, []);
 
   if (isLoading) {
-    return <div className="dialog-overlay"><div style={{ background: '#fff', borderRadius: 12, padding: 20 }}>Loading…</div></div>;
+    return (
+      <div className="settings-page">
+        <div className="settings-title">Settings</div>
+        <p className="settings-account">Loading...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="dialog-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--card)', borderRadius: 14, width: 440, maxWidth: '92vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>Settings</div>
-        <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ padding: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
-            AI configuration is managed by Ondoki Web.
-          </div>
+    <div className="settings-page">
+      <div className="settings-title">Settings</div>
 
-          <div>
-            <div className="field-label">Frontend URL</div>
-            <input className="text-input" value={settings.frontendUrl || ''} onChange={(e) => handleInputChange('frontendUrl', e.target.value)} />
-          </div>
+      {/* Ondoki Server */}
+      <div className="settings-section">
+        <div className="settings-section-title">Ondoki Server</div>
+        <label className="settings-label">API URL</label>
+        <input
+          type="url"
+          className="settings-input"
+          value={settings.chatApiUrl}
+          onChange={(e) => update('chatApiUrl', e.target.value)}
+          placeholder="http://localhost:8000/api/v1"
+        />
+        <label className="settings-label">Frontend URL</label>
+        <input
+          type="url"
+          className="settings-input"
+          value={settings.frontendUrl}
+          onChange={(e) => update('frontendUrl', e.target.value)}
+          placeholder="http://localhost:5173"
+        />
+      </div>
 
-          <div>
-            <div className="field-label">Chat API URL</div>
-            <input className="text-input" value={settings.chatApiUrl || ''} onChange={(e) => handleInputChange('chatApiUrl', e.target.value)} />
-          </div>
-
-          <div>
-            <div className="field-label">Cloud Endpoint URL</div>
-            <input className="text-input" value={settings.cloudEndpoint || ''} onChange={(e) => handleInputChange('cloudEndpoint', e.target.value)} />
-          </div>
-
-          <div>
-            <div className="field-label">API Key (Optional)</div>
-            <input className="text-input" type="password" value={settings.apiKey || ''} onChange={(e) => handleInputChange('apiKey', e.target.value)} />
-          </div>
+      {/* AI Enhancement */}
+      <div className="settings-section">
+        <div className="settings-section-title">AI Enhancement</div>
+        <div className="settings-toggle-row">
+          <label className="settings-label" style={{ margin: 0 }}>
+            Auto-improve step titles with AI
+          </label>
+          <Toggle
+            value={settings.autoAnnotateSteps}
+            onChange={() =>
+              update('autoAnnotateSteps', !settings.autoAnnotateSteps)
+            }
+          />
         </div>
+      </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', padding: 14 }}>
-          <button className="btn-sm ghost" onClick={onClose} disabled={isSaving}>Cancel</button>
-          <button className="btn-sm primary" onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</button>
+      {/* Recording */}
+      <div className="settings-section">
+        <div className="settings-section-title">Recording</div>
+        <div className="settings-toggle-row">
+          <label className="settings-label" style={{ margin: 0 }}>
+            Minimize when recording starts
+          </label>
+          <Toggle
+            value={settings.minimizeOnRecord}
+            onChange={() =>
+              update('minimizeOnRecord', !settings.minimizeOnRecord)
+            }
+          />
         </div>
+      </div>
+
+      {/* Keyboard Shortcuts */}
+      <div className="settings-section">
+        <div className="settings-section-title">Keyboard Shortcuts</div>
+        <label className="settings-label">Open Spotlight</label>
+        <ShortcutInput
+          value={settings.spotlightShortcut}
+          onChange={(v) => update('spotlightShortcut', v)}
+          placeholder="Ctrl+Shift+Space"
+        />
+        <div className="settings-hint">
+          Click and press your desired shortcut
+        </div>
+        <label className="settings-label">Start/Stop Recording</label>
+        <ShortcutInput
+          value={settings.recordingShortcut}
+          onChange={(v) => update('recordingShortcut', v)}
+          placeholder="Ctrl+Shift+R"
+        />
+        <div className="settings-hint">
+          Click and press your desired shortcut
+        </div>
+      </div>
+
+      {/* Account */}
+      <div className="settings-section">
+        <div className="settings-section-title">Account</div>
+        <div className="settings-account">{accountInfo}</div>
+        <button
+          className="settings-btn settings-btn--danger"
+          onClick={handleLogout}
+        >
+          Sign Out
+        </button>
+      </div>
+
+      {/* Footer */}
+      <div className="settings-footer">
+        <button
+          className="settings-btn settings-btn--primary"
+          onClick={handleSave}
+        >
+          Save
+        </button>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ module.exports = (env, argv) => {
     target: 'electron-renderer',
     entry: {
       spotlight: './src/renderer/spotlight-entry.tsx',
+      settings: './src/renderer/settings-entry.tsx',
     },
     module: {
       rules: [
@@ -58,6 +59,11 @@ module.exports = (env, argv) => {
         template: './src/renderer/spotlight.html',
         filename: 'spotlight.html',
         chunks: ['spotlight'],
+      }),
+      new HtmlWebpackPlugin({
+        template: './src/renderer/settings.html',
+        filename: 'settings.html',
+        chunks: ['settings'],
       }),
     ],
     devServer: {

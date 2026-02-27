@@ -34,6 +34,7 @@ export interface Settings {
   cloudEndpoint: string; chatApiUrl: string; apiKey: string;
   llmProvider: string; llmApiKey: string; llmModel: string; llmBaseUrl: string;
   autoAnnotateSteps: boolean; autoGenerateGuide: boolean; frontendUrl: string;
+  spotlightShortcut: string; recordingShortcut: string;
   minimizeOnRecord: boolean;
 }
 

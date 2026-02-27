@@ -42,7 +42,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
           <button
             onClick={onStartAll}
             disabled={!selectedProjectId}
-            className="btn-dark btn-record-all"
+            className="btn-record-all"
           >
             <Circle size={14} strokeWidth={2.5} />
             Record All
