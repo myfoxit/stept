@@ -346,8 +346,6 @@ async def get_image(
             media_type="image/png",
             headers={
                 "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*",  # Add CORS header
-                "Access-Control-Allow-Credentials": "true"  # Allow cookies
             }
         )
     elif access["type"] == "url":
