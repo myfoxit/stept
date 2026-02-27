@@ -69,6 +69,14 @@ chrome.storage.local.get(
       }
     }
 
+    // BUG-C001: First-run check — prompt user to configure API URL if not set
+    const apiCheck = await new Promise(r => chrome.storage.local.get(['apiBaseUrl'], r));
+    if (!apiCheck.apiBaseUrl) {
+      chrome.action.setBadgeText({ text: '!' });
+      chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
+      chrome.action.setTitle({ title: 'Ondoki — Please configure your API URL in settings' });
+    }
+
     authReady = true;
     authReadyResolve();
   },
@@ -764,6 +772,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'SET_SETTINGS':
         if (message.apiBaseUrl) {
           await chrome.storage.local.set({ apiBaseUrl: message.apiBaseUrl });
+          // BUG-C001: Clear the first-run badge once API URL is configured
+          if (!state.isRecording) {
+            chrome.action.setBadgeText({ text: '' });
+            chrome.action.setTitle({ title: '' });
+          }
         }
         sendResponse({ success: true });
         break;
