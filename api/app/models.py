@@ -146,9 +146,9 @@ class Project(Base):
     id = Column(String(16), primary_key=True, default=gen_suffix)
     name = Column(String(255), index=True)
     # Keep owner_id for backward compatibility and to identify the project creator
-    owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     # Deprecated: use owner relationship instead
-    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
@@ -207,7 +207,7 @@ class Document(Base):
     project = relationship("Project", backref="documents")
     folder = relationship("Folder", back_populates="documents")
     version = Column(Integer, nullable=False, default=1)
-    locked_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    locked_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     locked_at = Column(DateTime, nullable=True)
     
     # Soft delete
@@ -224,7 +224,7 @@ class DocumentVersion(Base):
     content = Column(JSON, nullable=False)
     name = Column(String, nullable=True)
     byte_size = Column(Integer, nullable=True)
-    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
 
@@ -474,9 +474,9 @@ class ResourceShare(Base):
     resource_type = Column(String(20), nullable=False)  # "workflow" or "document"
     resource_id = Column(String(16), nullable=False)
     shared_with_email = Column(String(255), nullable=False)
-    shared_with_user_id = Column(String(16), ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    shared_with_user_id = Column(String(16), ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
     permission = Column(String(10), nullable=False, default="view")  # "view" or "edit"
-    shared_by = Column(String(16), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    shared_by = Column(String(16), ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
     shared_by_user = relationship("User", foreign_keys=[shared_by], backref="shared_resources")
@@ -546,7 +546,7 @@ class Comment(Base):
     user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     resource_type = Column(String(20), nullable=False)  # 'document' or 'workflow'
     resource_id = Column(String(16), nullable=False)
-    parent_id = Column(String(16), ForeignKey("comments.id", ondelete="SET NULL"), nullable=True)
+    parent_id = Column(String(16), ForeignKey("comments.id", ondelete="SET NULL"), nullable=True, index=True)
     content = Column(Text, nullable=False)
     resolved = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
@@ -568,7 +568,7 @@ class ContextLink(Base):
 
     id = Column(String(16), primary_key=True, default=gen_suffix)
     project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # What to match
     match_type = Column(String(20), nullable=False)  # 'url_pattern', 'url_exact', 'url_regex', 'app_name', 'app_exact', 'app_regex', 'window_title', 'window_regex'
@@ -606,7 +606,7 @@ class McpApiKey(Base):
     name = Column(String(100), nullable=False)
     key_hash = Column(String(64), nullable=False, unique=True, index=True)  # SHA-256
     key_prefix = Column(String(12), nullable=False)  # first 8 chars for display
-    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime, server_default=func.now())
     last_used_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -636,7 +636,7 @@ class KnowledgeSource(Base):
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)
     metadata_ = Column("metadata", JSON, nullable=True)
-    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     last_indexed_at = Column(DateTime, nullable=True)
@@ -694,7 +694,7 @@ class KnowledgeLink(Base):
     link_type = Column(SQLEnum(LinkType, name="link_type_enum", values_callable=enum_values, native_enum=False), nullable=False)
     confidence = Column(Float, nullable=True)
     auto_detected = Column(Boolean, nullable=False, default=False)
-    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
     project = relationship("Project", backref="knowledge_links")
