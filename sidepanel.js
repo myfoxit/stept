@@ -302,12 +302,27 @@ newCaptureBtn.addEventListener('click', async () => {
   await refreshState();
 });
 
+// MISS-C002: Show a temporary error toast in the side panel
+function showToast(text, duration = 4000) {
+  const existing = document.querySelector('.toast-error');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-error';
+  toast.textContent = text;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
+}
+
 // Listen for step updates from background
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'STEP_ADDED') {
     steps.push(message.step);
     badgeStepCount.textContent = `· ${steps.length} steps`;
     renderSteps();
+  } else if (message.type === 'SCREENSHOT_FAILED') {
+    // MISS-C002: Show user-visible error when screenshot capture fails
+    showToast('Screenshot failed \u2014 try again');
   } else if (message.type === 'RECORDING_STATE_CHANGED') {
     refreshState();
   }

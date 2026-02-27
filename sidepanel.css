@@ -492,3 +492,24 @@ body {
   0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
 }
+
+/* MISS-C002: Toast error */
+.toast-error {
+  position: fixed;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc2626;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 1000;
+  animation: toast-fade 4s ease forwards;
+}
+
+@keyframes toast-fade {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0; }
+}

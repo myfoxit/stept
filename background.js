@@ -534,7 +534,19 @@ async function addStep(stepData) {
   const isClickAction = stepData.actionType && stepData.actionType.includes('Click');
 
   if (isClickAction) {
-    screenshot = await captureScreenshot();
+    try {
+      screenshot = await captureScreenshot();
+    } catch (e) {
+      debugLog('Screenshot capture threw:', e);
+      screenshot = null;
+    }
+    // MISS-C002: Notify sidepanel when screenshot capture fails
+    if (!screenshot) {
+      chrome.runtime.sendMessage({
+        type: 'SCREENSHOT_FAILED',
+        stepNumber: state.stepCounter,
+      }).catch(() => {});
+    }
   }
 
   const step = {
