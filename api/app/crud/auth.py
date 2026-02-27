@@ -41,6 +41,17 @@ async def _create_session(
 
 
 async def register(db: AsyncSession, *, email: str, password: str, name: Optional[str], user_agent: Optional[str] = None, ip_address: Optional[str] = None):
+    import re
+    from fastapi import HTTPException
+    if len(password) < 8:
+        raise HTTPException(status_code=422, detail="Password must be at least 8 characters long.")
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(status_code=422, detail="Password must contain at least one uppercase letter.")
+    if not re.search(r"[a-z]", password):
+        raise HTTPException(status_code=422, detail="Password must contain at least one lowercase letter.")
+    if not re.search(r"\d", password):
+        raise HTTPException(status_code=422, detail="Password must contain at least one digit.")
+
     norm = normalize_email(email)
     # Enforce uniqueness on normalized email to prevent case/space collisions
     if await db.scalar(select(User).where(User.normalized_email == norm)):
