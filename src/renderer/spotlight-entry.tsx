@@ -1,5 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+import {
+  Search,
+  Sparkles,
+  Settings,
+  ChevronDown,
+  Circle,
+  Monitor,
+  Pause,
+  Square,
+  Play,
+  ArrowRight,
+  FileText,
+  ListChecks,
+  Send,
+  X,
+  Minus,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  ExternalLink,
+} from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +63,28 @@ interface RecState {
 }
 
 type SpotMode = 'search' | 'ai';
+
+// ─── Theme ───────────────────────────────────────────────────────────────────
+
+const theme = {
+  accent: '#3ab08a',
+  accentHover: '#2f9a78',
+  dark: '#1A1A1A',
+  darkHover: '#333333',
+  text: '#1A1A1A',
+  textSecondary: '#6E6E6E',
+  textMuted: '#999999',
+  bg: '#F5F5F5',
+  card: '#ffffff',
+  border: 'rgba(0,0,0,0.07)',
+  borderLight: 'rgba(0,0,0,0.04)',
+  radius: { sm: 8, md: 10, lg: 14, xl: 20 },
+  font: {
+    sans: "'DM Sans', sans-serif",
+    display: "'Outfit', sans-serif",
+    mono: "'JetBrains Mono', monospace",
+  },
+} as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -539,7 +582,7 @@ const SpotlightApp: React.FC = () => {
     borderRadius: 4,
     background: 'rgba(26,26,26,0.08)',
     border: '1px solid rgba(26,26,26,0.12)',
-    fontFamily: "'JetBrains Mono', monospace",
+    fontFamily: theme.font.mono,
     fontSize: 10,
     fontWeight: 500,
     color: '#666666',
@@ -574,7 +617,7 @@ const SpotlightApp: React.FC = () => {
             textAlign: 'center',
             color: '#999999',
             fontSize: 13,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: theme.font.sans,
           }}
         >
           Loading...
@@ -607,7 +650,7 @@ const SpotlightApp: React.FC = () => {
             '0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
           border: '1px solid #E0E0E0',
           overflow: 'hidden',
-          fontFamily: "'DM Sans', sans-serif",
+          fontFamily: theme.font.sans,
           animation: 'spotlightIn 0.15s ease-out',
         }}
       >
@@ -625,10 +668,10 @@ const SpotlightApp: React.FC = () => {
             </div>
             <div
               style={{
-                fontFamily: "'Outfit', sans-serif",
+                fontFamily: theme.font.display,
                 fontWeight: 800,
                 fontSize: 20,
-                color: '#1A1A1A',
+                color: theme.dark,
                 letterSpacing: '-0.03em',
                 marginBottom: 8,
               }}
@@ -647,24 +690,16 @@ const SpotlightApp: React.FC = () => {
             </p>
             <button
               onClick={handleLogin}
+              className="btn-dark"
               style={{
                 padding: '10px 32px',
                 borderRadius: 10,
                 border: 'none',
-                background: '#1A1A1A',
-                color: '#fff',
                 fontSize: 14,
                 fontWeight: 600,
-                fontFamily: "'Outfit', sans-serif",
+                fontFamily: theme.font.display,
                 cursor: 'pointer',
-                transition: 'background 0.15s',
               }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = '#333333')
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = '#1A1A1A')
-              }
             >
               Sign In
             </button>
@@ -719,7 +754,7 @@ const SpotlightApp: React.FC = () => {
                       borderRadius: 8,
                       border: '1px solid rgba(0,0,0,0.1)',
                       background: '#F5F5F5',
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: theme.font.sans,
                       fontSize: 12,
                       fontWeight: 500,
                       color: '#1A1A1A',
@@ -737,7 +772,10 @@ const SpotlightApp: React.FC = () => {
                       <option value="">No projects</option>
                     )}
                   </select>
-                  <svg
+                  <ChevronDown
+                    size={12}
+                    color={theme.textMuted}
+                    strokeWidth={2.5}
                     style={{
                       position: 'absolute',
                       right: 8,
@@ -745,15 +783,7 @@ const SpotlightApp: React.FC = () => {
                       transform: 'translateY(-50%)',
                       pointerEvents: 'none',
                     }}
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#999999"
-                    strokeWidth="2.5"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
+                  />
                 </div>
 
                 {/* Settings gear */}
@@ -773,19 +803,7 @@ const SpotlightApp: React.FC = () => {
                     transition: 'all 0.15s',
                   }}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#6E6E6E"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                  </svg>
+                  <Settings size={14} color={theme.textSecondary} strokeWidth={2} />
                 </button>
               </div>
             </div>
@@ -800,25 +818,11 @@ const SpotlightApp: React.FC = () => {
                 borderBottom: '1px solid rgba(0,0,0,0.07)',
               }}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#1A1A1A"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {mode === 'search' ? (
-                  <>
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </>
-                ) : (
-                  <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                )}
-              </svg>
+              {mode === 'search' ? (
+                <Search size={16} color={theme.dark} strokeWidth={2} />
+              ) : (
+                <Sparkles size={16} color={theme.dark} strokeWidth={2} />
+              )}
               <input
                 ref={inputRef}
                 type="text"
@@ -835,7 +839,7 @@ const SpotlightApp: React.FC = () => {
                   border: 'none',
                   background: 'none',
                   fontSize: 14,
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: theme.font.sans,
                   color: '#1A1A1A',
                   outline: 'none',
                 }}
@@ -857,11 +861,11 @@ const SpotlightApp: React.FC = () => {
                     border: 'none',
                     fontSize: 11,
                     fontWeight: 600,
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: theme.font.display,
                     cursor: 'pointer',
                     background:
                       mode === 'search' ? 'rgba(26,26,26,0.08)' : '#fff',
-                    color: mode === 'search' ? '#1A1A1A' : '#999999',
+                    color: mode === 'search' ? theme.dark : theme.textMuted,
                   }}
                 >
                   Search
@@ -874,25 +878,16 @@ const SpotlightApp: React.FC = () => {
                     borderLeft: '1px solid rgba(0,0,0,0.08)',
                     fontSize: 11,
                     fontWeight: 600,
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: theme.font.display,
                     cursor: 'pointer',
                     background: mode === 'ai' ? 'rgba(26,26,26,0.08)' : '#fff',
-                    color: mode === 'ai' ? '#1A1A1A' : '#999999',
+                    color: mode === 'ai' ? theme.dark : theme.textMuted,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 3,
                   }}
                 >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                  </svg>
+                  <Sparkles size={10} strokeWidth={2.5} />
                   AI
                 </button>
               </div>
@@ -911,6 +906,7 @@ const SpotlightApp: React.FC = () => {
                   <button
                     onClick={() => doStartRecording({ type: 'all-displays' })}
                     disabled={!selectedProjectId}
+                    className="btn-dark"
                     style={{
                       flex: 1,
                       display: 'flex',
@@ -920,39 +916,19 @@ const SpotlightApp: React.FC = () => {
                       padding: '9px 16px',
                       borderRadius: 10,
                       border: 'none',
-                      background: selectedProjectId ? '#1A1A1A' : '#ccc',
-                      color: '#fff',
                       fontSize: 13,
                       fontWeight: 600,
-                      fontFamily: "'Outfit', sans-serif",
+                      fontFamily: theme.font.display,
                       cursor: selectedProjectId ? 'pointer' : 'not-allowed',
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedProjectId)
-                        e.currentTarget.style.background = '#333333';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedProjectId)
-                        e.currentTarget.style.background = '#1A1A1A';
                     }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <circle cx="12" cy="12" r="4" fill="currentColor" />
-                    </svg>
+                    <Circle size={14} strokeWidth={2.5} />
                     Record All
                   </button>
                   <button
                     onClick={handleStartRecording}
                     disabled={!selectedProjectId}
+                    className="btn-outline"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -960,42 +936,14 @@ const SpotlightApp: React.FC = () => {
                       gap: 4,
                       padding: '9px 14px',
                       borderRadius: 10,
-                      border: '1.5px solid rgba(26,26,26,0.15)',
-                      background: 'rgba(26,26,26,0.04)',
-                      color: selectedProjectId ? '#1A1A1A' : '#ccc',
+                      color: selectedProjectId ? theme.dark : '#ccc',
                       fontSize: 12,
                       fontWeight: 600,
-                      fontFamily: "'Outfit', sans-serif",
+                      fontFamily: theme.font.display,
                       cursor: selectedProjectId ? 'pointer' : 'not-allowed',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedProjectId) {
-                        e.currentTarget.style.background =
-                          'rgba(26,26,26,0.08)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedProjectId) {
-                        e.currentTarget.style.background =
-                          'rgba(26,26,26,0.04)';
-                      }
                     }}
                   >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="2" y="3" width="20" height="14" rx="2" />
-                      <line x1="8" y1="21" x2="16" y2="21" />
-                      <line x1="12" y1="17" x2="12" y2="21" />
-                    </svg>
+                    <Monitor size={12} strokeWidth={2.5} />
                     Choose...
                   </button>
                 </div>
@@ -1037,7 +985,7 @@ const SpotlightApp: React.FC = () => {
                       )}
                       <span
                         style={{
-                          fontFamily: "'Outfit', sans-serif",
+                          fontFamily: theme.font.display,
                           fontSize: 13,
                           fontWeight: 700,
                           color: rec.isPaused ? '#6E6E6E' : '#E14D2A',
@@ -1054,7 +1002,7 @@ const SpotlightApp: React.FC = () => {
                           fontSize: 13,
                           fontWeight: 600,
                           color: '#E14D2A',
-                          fontFamily: "'JetBrains Mono', monospace",
+                          fontFamily: theme.font.mono,
                         }}
                       >
                         {formatDuration(duration)}
@@ -1082,11 +1030,11 @@ const SpotlightApp: React.FC = () => {
                         fontSize: 12,
                         fontWeight: 500,
                         cursor: 'pointer',
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: theme.font.sans,
                         color: '#1A1A1A',
                       }}
                     >
-                      {rec.isPaused ? '▶ Resume' : '⏸ Pause'}
+                      {rec.isPaused ? (<><Play size={12} /> Resume</>) : (<><Pause size={12} /> Pause</>)}
                     </button>
                     <button
                       onClick={handleStopRecording}
@@ -1099,10 +1047,10 @@ const SpotlightApp: React.FC = () => {
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: theme.font.sans,
                       }}
                     >
-                      ⏹ Stop
+                      <Square size={12} fill="currentColor" /> Stop
                     </button>
                   </div>
                 </div>
@@ -1132,10 +1080,9 @@ const SpotlightApp: React.FC = () => {
                   borderBottom: '1px solid rgba(0,0,0,0.05)',
                 }}
               >
-                {uploadStatus === 'uploading' && '⬆️ Uploading recording...'}
-                {uploadStatus === 'success' &&
-                  '✅ Recording uploaded successfully'}
-                {uploadStatus === 'error' && `❌ Upload failed: ${uploadError}`}
+                {uploadStatus === 'uploading' && <><Upload size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Uploading recording...</>}
+                {uploadStatus === 'success' && <><CheckCircle size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Recording uploaded successfully</>}
+                {uploadStatus === 'error' && <><AlertCircle size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> Upload failed: {uploadError}</>}
               </div>
             )}
 
@@ -1157,7 +1104,7 @@ const SpotlightApp: React.FC = () => {
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: '#E14D2A',
+                    background: theme.accent,
                     flexShrink: 0,
                   }}
                 />
@@ -1280,16 +1227,13 @@ const SpotlightApp: React.FC = () => {
                         width: 52,
                         height: 52,
                         borderRadius: 14,
-                        background: 'rgba(225,77,42,0.08)',
+                        background: 'rgba(58,176,138,0.08)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E14D2A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.3-4.3" />
-                      </svg>
+                      <Search size={24} color={theme.accent} strokeWidth={2} />
                     </div>
                     <span style={{ fontSize: 13, color: '#999999', fontWeight: 500 }}>
                       Start typing to search
@@ -1379,16 +1323,7 @@ const SpotlightApp: React.FC = () => {
                             marginTop: 2,
                           }}
                         >
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#1A1A1A"
-                            strokeWidth="2.5"
-                          >
-                            <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                          </svg>
+                          <Sparkles size={12} color={theme.dark} strokeWidth={2.5} />
                         </div>
                       )}
                       <div
@@ -1402,7 +1337,7 @@ const SpotlightApp: React.FC = () => {
                               ? '14px 14px 4px 14px'
                               : '4px 14px 14px 14px',
                           background:
-                            msg.role === 'user' ? '#e14d2a' : '#F5F5F5',
+                            msg.role === 'user' ? theme.accent : theme.bg,
                           color: msg.role === 'user' ? '#fff' : '#1A1A1A',
                           border:
                             msg.role === 'assistant'
@@ -1431,16 +1366,7 @@ const SpotlightApp: React.FC = () => {
                           marginTop: 2,
                         }}
                       >
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#1A1A1A"
-                          strokeWidth="2.5"
-                        >
-                          <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                        </svg>
+                        <Sparkles size={12} color={theme.dark} strokeWidth={2.5} />
                       </div>
                       <div
                         style={{
@@ -1479,7 +1405,7 @@ const SpotlightApp: React.FC = () => {
                         border: 'none',
                         background: 'none',
                         fontSize: 13,
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: theme.font.sans,
                         color: '#1A1A1A',
                         outline: 'none',
                       }}
@@ -1500,18 +1426,7 @@ const SpotlightApp: React.FC = () => {
                         opacity: !query.trim() || isChatLoading ? 0.5 : 1,
                       }}
                     >
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#fff"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                      >
-                        <path d="M5 12h14" />
-                        <path d="m12 5 7 7-7 7" />
-                      </svg>
+                      <Send size={11} color="#fff" strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>
@@ -1653,32 +1568,9 @@ const ResultItem: React.FC<{
         }}
       >
         {isWorkflow ? (
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#1A1A1A"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
+          <ListChecks size={14} color={theme.dark} strokeWidth={2} />
         ) : (
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#888888"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-          </svg>
+          <FileText size={14} color="#888888" strokeWidth={2} />
         )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1707,20 +1599,7 @@ const ResultItem: React.FC<{
         </div>
       </div>
       {isHighlighted && (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#999999"
-          strokeWidth="2"
-          strokeLinecap="round"
-          style={{ flexShrink: 0 }}
-        >
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-          <polyline points="15 3 21 3 21 9" />
-          <line x1="10" y1="14" x2="21" y2="3" />
-        </svg>
+        <ExternalLink size={14} color={theme.textMuted} strokeWidth={2} style={{ flexShrink: 0 }} />
       )}
     </div>
   );
@@ -1754,7 +1633,7 @@ styleEl.textContent = `
   .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
 
-  ::selection { background: rgba(225,77,42,0.2); }
+  ::selection { background: rgba(58,176,138,0.2); }
   input::placeholder { color: #999999; }
 `;
 document.head.appendChild(styleEl);
