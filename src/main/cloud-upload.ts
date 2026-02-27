@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { app } from 'electron';
 import { SettingsManager } from './settings';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,6 +9,7 @@ export interface UploadResult {
   error?: string;
   url?: string;
   recordingId?: string;
+  localFallbackPath?: string;
 }
 
 export interface UploadProgress {
@@ -28,6 +30,9 @@ export class CloudUploadService extends EventEmitter {
     this.settingsManager = settingsManager;
   }
 
+  private static readonly MAX_RETRIES = 3;
+  private static readonly RETRY_DELAYS_MS = [1000, 2000, 4000];
+
   public async uploadRecording(
     steps: any[],
     userId?: string,
@@ -44,46 +49,94 @@ export class CloudUploadService extends EventEmitter {
       throw new Error('Cloud endpoint not configured');
     }
 
-    try {
-      // Step 1: Create upload session
-      this.emitProgress('Preparing upload...', 0, 0, 0);
-      const sessionId = await this.createSession(baseUrl, accessToken, userId, projectId);
-      if (!sessionId) {
-        throw new Error('Failed to create upload session');
+    let lastError: Error | undefined;
+
+    for (let attempt = 1; attempt <= CloudUploadService.MAX_RETRIES; attempt++) {
+      try {
+        const result = await this.attemptUpload(steps, baseUrl, accessToken, userId, projectId);
+        return result;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`Upload attempt ${attempt}/${CloudUploadService.MAX_RETRIES} failed:`, lastError.message);
+
+        if (attempt < CloudUploadService.MAX_RETRIES) {
+          const delay = CloudUploadService.RETRY_DELAYS_MS[attempt - 1];
+          this.emitProgress(`Upload failed, retrying in ${delay / 1000}s... (attempt ${attempt + 1}/${CloudUploadService.MAX_RETRIES})`, 0, 0, 0);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-
-      // Step 2: Upload metadata
-      this.emitProgress('Uploading metadata...', 0, 0, 10);
-      await this.uploadMetadata(baseUrl, accessToken, sessionId, steps);
-
-      // Step 3: Upload images
-      const stepsWithImages = steps.filter(s => s.screenshotPath && fs.existsSync(s.screenshotPath));
-      const totalFiles = stepsWithImages.length;
-      let currentFile = 0;
-
-      for (const step of stepsWithImages) {
-        currentFile++;
-        this.emitProgress(
-          `Uploading image ${currentFile}/${totalFiles}...`,
-          currentFile, totalFiles,
-          10 + Math.round((currentFile / totalFiles) * 80)
-        );
-
-        await this.uploadImage(baseUrl, accessToken, sessionId, step.stepNumber, step.screenshotPath);
-      }
-
-      // Step 4: Finalize
-      this.emitProgress('Finalizing upload...', totalFiles, totalFiles, 95);
-      await this.finalizeSession(baseUrl, accessToken, sessionId);
-
-      this.emitProgress('Upload completed successfully!', totalFiles, totalFiles, 100);
-
-      return { success: true, recordingId: sessionId };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.emit('upload-failed', msg);
-      return { success: false, error: msg };
     }
+
+    // All retries exhausted — save locally as fallback
+    const msg = lastError?.message || 'Upload failed after all retries';
+    console.error('All upload retries exhausted, saving recording locally');
+    const fallbackPath = this.saveRecordingLocally(steps);
+    this.emit('upload-failed', msg);
+    return { success: false, error: `${msg}. Recording saved locally at: ${fallbackPath}`, localFallbackPath: fallbackPath };
+  }
+
+  private async attemptUpload(
+    steps: any[],
+    baseUrl: string,
+    accessToken: string,
+    userId?: string,
+    projectId?: string
+  ): Promise<UploadResult> {
+    // Step 1: Create upload session
+    this.emitProgress('Preparing upload...', 0, 0, 0);
+    const sessionId = await this.createSession(baseUrl, accessToken, userId, projectId);
+    if (!sessionId) {
+      throw new Error('Failed to create upload session');
+    }
+
+    // Step 2: Upload metadata
+    this.emitProgress('Uploading metadata...', 0, 0, 10);
+    await this.uploadMetadata(baseUrl, accessToken, sessionId, steps);
+
+    // Step 3: Upload images
+    const stepsWithImages = steps.filter(s => s.screenshotPath && fs.existsSync(s.screenshotPath));
+    const totalFiles = stepsWithImages.length;
+    let currentFile = 0;
+
+    for (const step of stepsWithImages) {
+      currentFile++;
+      this.emitProgress(
+        `Uploading image ${currentFile}/${totalFiles}...`,
+        currentFile, totalFiles,
+        10 + Math.round((currentFile / totalFiles) * 80)
+      );
+
+      await this.uploadImage(baseUrl, accessToken, sessionId, step.stepNumber, step.screenshotPath);
+    }
+
+    // Step 4: Finalize
+    this.emitProgress('Finalizing upload...', totalFiles, totalFiles, 95);
+    await this.finalizeSession(baseUrl, accessToken, sessionId);
+
+    this.emitProgress('Upload completed successfully!', totalFiles, totalFiles, 100);
+
+    return { success: true, recordingId: sessionId };
+  }
+
+  private saveRecordingLocally(steps: any[]): string {
+    const fallbackDir = path.join(app.getPath('userData'), 'Ondoki', 'failed-uploads');
+    fs.mkdirSync(fallbackDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fallbackPath = path.join(fallbackDir, `recording-${timestamp}.json`);
+
+    const data = {
+      savedAt: new Date().toISOString(),
+      reason: 'Cloud upload failed after all retries',
+      steps: steps.map(s => ({
+        ...s,
+        screenshotPath: s.screenshotPath && fs.existsSync(s.screenshotPath) ? s.screenshotPath : undefined,
+      })),
+    };
+
+    fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf-8');
+    console.log(`Recording saved locally: ${fallbackPath}`);
+    return fallbackPath;
   }
 
   private async createSession(
