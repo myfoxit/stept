@@ -33,6 +33,7 @@ import { AnalyticsDashboardPage } from "@/pages/analytics-dashboard";
 import { KnowledgeGraphPage } from "@/pages/knowledge-graph";
 import VideoImportPage from "@/pages/video-import";
 import TrashPage from "@/pages/trash";
+import NotFoundPage from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient();
 
@@ -127,7 +128,7 @@ createRoot(document.getElementById("root")!).render(
                       element={<PublicDocumentPage />}
                     />
 
-                    <Route path="*" element={<p>Page not found</p>} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                   <ChatPanel />
                 </SpotlightProvider>
