@@ -182,19 +182,51 @@ function stopRecordingTimer() {
 }
 
 // Event Listeners
+// MISS-C006: Show inline error instead of generic alert
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  el.innerHTML = msg;
+  el.classList.remove('hidden');
+
+  // Wire up settings link click if present
+  const link = el.querySelector('.error-settings-link');
+  if (link) {
+    link.addEventListener('click', () => {
+      const details = document.querySelector('.settings-details');
+      if (details) details.open = true;
+      el.classList.add('hidden');
+    });
+  }
+}
+
+function hideLoginError() {
+  const el = document.getElementById('loginError');
+  el.classList.add('hidden');
+}
+
 loginBtn.addEventListener('click', async () => {
   loginBtn.disabled = true;
   loginBtn.textContent = 'Signing in...';
+  hideLoginError();
 
   try {
     const result = await sendMessage({ type: 'LOGIN' });
     if (result.success) {
       await refreshState();
     } else {
-      alert('Login failed: ' + (result.error || 'Unknown error'));
+      const errMsg = result.error || 'Unknown error';
+      if (errMsg.includes('net::') || errMsg.includes('NetworkError') || errMsg.includes('Failed to fetch')) {
+        showLoginError('Cannot connect to ondoki server. Check your API URL in <span class="error-settings-link">settings</span>.');
+      } else {
+        showLoginError('Login failed: ' + errMsg);
+      }
     }
   } catch (error) {
-    alert('Login failed: ' + error.message);
+    if (error.message.includes('net::') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+      showLoginError('Cannot connect to ondoki server. Check your API URL in <span class="error-settings-link">settings</span>.');
+    } else {
+      showLoginError('Login failed: ' + error.message);
+    }
   } finally {
     loginBtn.disabled = false;
     loginBtn.textContent = 'Sign In';
