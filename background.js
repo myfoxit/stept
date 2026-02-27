@@ -475,6 +475,21 @@ function resumeRecording() {
   state.isPaused = false;
   chrome.action.setBadgeText({ text: 'REC' });
   chrome.action.setBadgeBackgroundColor({ color: '#D94F3D' });
+
+  // Broadcast resume to all content scripts
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (
+        tab.id &&
+        tab.url &&
+        (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
+      ) {
+        chrome.tabs
+          .sendMessage(tab.id, { type: 'RESUME_RECORDING' })
+          .catch(() => {});
+      }
+    });
+  });
 }
 
 async function captureScreenshot() {
