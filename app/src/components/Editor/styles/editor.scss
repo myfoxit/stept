@@ -108,35 +108,35 @@ body,
 }
 
 .tiptap.ProseMirror a {
-  color: #e14d2a;
+  color: #3ab08a;
   text-decoration: underline;
   text-decoration-color: rgba(108, 92, 231, 0.12);
   text-underline-offset: 3px;
 }
 
 .tiptap.ProseMirror a:hover {
-  text-decoration-color: #e14d2a;
+  text-decoration-color: #3ab08a;
 }
 
 .tiptap.ProseMirror code {
   font-family: "DM Mono", monospace;
   font-size: 0.86em;
-  background: #ebd8d3;
-  border: 1px solid #dda599;
+  background: #dce6e2;
+  border: 1px solid #9bc0b4;
   padding: 2px 7px;
   border-radius: 5px;
-  color: #e14d2a;
+  color: #3ab08a;
 }
 
 .tiptap.ProseMirror blockquote {
-  border-left: 3px solid #e14d2a;
+  border-left: 3px solid #3ab08a;
   padding-left: 18px;
   color: #a5a2b4;
   font-style: italic;
 }
 
 .tiptap.ProseMirror li::marker {
-  color: #e14d2a;
+  color: #3ab08a;
 }
 
 :root[data-page-layout="a4"] .ondoki-editor-wrapper {
