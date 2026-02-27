@@ -32,8 +32,6 @@ interface TokenResponse {
 }
 
 export class AuthService extends EventEmitter {
-  private static readonly API_BASE_URL = 'http://localhost:8000/api/v1';
-  private static readonly WS_BASE_URL = 'ws://localhost:8000/api/v1';
   private static readonly REDIRECT_URI = 'ondoki://auth/callback';
 
   private accessToken?: string;
@@ -48,9 +46,19 @@ export class AuthService extends EventEmitter {
 
   constructor(private settingsManager: SettingsManager) {
     super();
-    
+
     // Load refresh token on startup
     this.refreshToken = this.settingsManager.getRefreshToken();
+  }
+
+  private getApiBaseUrl(): string {
+    const settings = this.settingsManager.getSettings();
+    return (settings.chatApiUrl || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+  }
+
+  private getWsBaseUrl(): string {
+    const apiUrl = this.getApiBaseUrl();
+    return apiUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
   }
 
   public async getStatus(): Promise<AuthStatus> {
@@ -73,7 +81,7 @@ export class AuthService extends EventEmitter {
     try {
       console.log('Attempting auto-login with refresh token...');
       
-      const response = await fetch(`${AuthService.API_BASE_URL}/auth/token`, {
+      const response = await fetch(`${this.getApiBaseUrl()}/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -123,7 +131,7 @@ export class AuthService extends EventEmitter {
       this.state = this.generateState();
 
       // Build authorization URL
-      const authUrl = new URL(`${AuthService.API_BASE_URL}/auth/authorize`);
+      const authUrl = new URL(`${this.getApiBaseUrl()}/auth/authorize`);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('code_challenge', codeChallenge);
       authUrl.searchParams.set('code_challenge_method', 'S256');
@@ -170,7 +178,7 @@ export class AuthService extends EventEmitter {
       }
 
       // Exchange code for tokens
-      const response = await fetch(`${AuthService.API_BASE_URL}/auth/token`, {
+      const response = await fetch(`${this.getApiBaseUrl()}/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -224,7 +232,7 @@ export class AuthService extends EventEmitter {
       // Revoke tokens on server if possible
       if (this.refreshToken) {
         try {
-          await fetch(`${AuthService.API_BASE_URL}/auth/revoke`, {
+          await fetch(`${this.getApiBaseUrl()}/auth/revoke`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -266,7 +274,7 @@ export class AuthService extends EventEmitter {
     if (!this.accessToken) return;
 
     try {
-      const response = await fetch(`${AuthService.API_BASE_URL}/auth/me`, {
+      const response = await fetch(`${this.getApiBaseUrl()}/auth/me`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
         },
@@ -287,7 +295,7 @@ export class AuthService extends EventEmitter {
     if (!this.accessToken || !this.currentUser) return;
 
     try {
-      const response = await fetch(`${AuthService.API_BASE_URL}/projects/${this.currentUser.id}`, {
+      const response = await fetch(`${this.getApiBaseUrl()}/projects/${this.currentUser.id}`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
         },
@@ -316,7 +324,7 @@ export class AuthService extends EventEmitter {
       // Disconnect existing connection
       await this.disconnectWebSocket();
 
-      const wsUrl = `${AuthService.WS_BASE_URL}/auth/ws/notifications?token=${encodeURIComponent(this.accessToken)}`;
+      const wsUrl = `${this.getWsBaseUrl()}/auth/ws/notifications?token=${encodeURIComponent(this.accessToken)}`;
       console.log('Connecting to WebSocket:', wsUrl);
 
       this.webSocket = new WebSocket(wsUrl);
