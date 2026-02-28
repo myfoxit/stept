@@ -35,7 +35,6 @@ class OndokiApp {
   private isRecording = false;
   private isAuthenticated = false;
   private isStartingRecording = false;
-  private lastSpotlightShowTime = 0;
   private normalTrayIcon: Electron.NativeImage | null = null;
   private recordingTrayIcon: Electron.NativeImage | null = null;
 
@@ -270,9 +269,10 @@ class OndokiApp {
     if (
       this.spotlightWindow &&
       !this.spotlightWindow.isDestroyed() &&
-      this.spotlightWindow.isVisible()
+      this.spotlightWindow.isVisible() &&
+      this.spotlightWindow.isFocused()
     ) {
-      this.hideSpotlightWindow();
+      this.spotlightWindow.minimize();
     } else {
       this.showSpotlightWindow();
     }
@@ -283,20 +283,9 @@ class OndokiApp {
       this.createSpotlightWindow();
     }
 
-    const mouseDisplay = this.getMouseDisplay();
-    const workArea = mouseDisplay.workArea;
-    const winWidth = 620;
-    const winHeight = 560;
-    const x = workArea.x + Math.round((workArea.width - winWidth) / 2);
-    const y = workArea.y + Math.round(workArea.height * 0.16);
-
-    this.spotlightWindow!.setBounds({
-      x,
-      y,
-      width: winWidth,
-      height: winHeight,
-    });
-    this.lastSpotlightShowTime = Date.now();
+    if (this.spotlightWindow!.isMinimized()) {
+      this.spotlightWindow!.restore();
+    }
     this.spotlightWindow!.show();
     this.spotlightWindow!.focus();
     this.spotlightWindow!.webContents.send(
@@ -307,24 +296,23 @@ class OndokiApp {
 
   private hideSpotlightWindow(): void {
     if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
-      this.spotlightWindow.hide();
+      this.spotlightWindow.minimize();
     }
   }
 
   private createSpotlightWindow(): void {
+    const windowIcon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'icon256.png'));
     this.spotlightWindow = new BrowserWindow({
-      width: 560,
-      height: 520,
+      width: 620,
+      height: 560,
       show: false,
       frame: false,
       transparent: true,
       backgroundColor: '#00000000',
       resizable: false,
-      movable: false,
-      alwaysOnTop: true,
-      skipTaskbar: true,
       fullscreenable: false,
-      hasShadow: false,
+      hasShadow: true,
+      icon: windowIcon,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -332,39 +320,8 @@ class OndokiApp {
       },
     });
 
-    this.spotlightWindow.setVisibleOnAllWorkspaces(true);
-
-    this.spotlightWindow.on('blur', () => {
-      // Don't hide if not authenticated — user needs to see the login UI
-      if (!this.isAuthenticated) return;
-      // Don't hide if recording — user needs to see the mini status
-      if (this.isRecording) return;
-      // Don't hide during recording countdown
-      if (this.isStartingRecording) return;
-      // Don't hide if settings window is open (focus just moved there)
-      if (this.settingsWindow && !this.settingsWindow.isDestroyed()) return;
-      // Don't hide if picker window is open
-      if (this.pickerWindow && !this.pickerWindow.isDestroyed()) return;
-      // Debounce: ignore blur within 2s of showing (macOS focus/load quirk)
-      if (Date.now() - this.lastSpotlightShowTime < 2000) return;
-      setTimeout(() => {
-        if (
-          this.spotlightWindow &&
-          !this.spotlightWindow.isDestroyed() &&
-          this.spotlightWindow.isVisible()
-        ) {
-          this.hideSpotlightWindow();
-        }
-      }, 100);
-    });
-
     this.spotlightWindow.on('closed', () => {
       this.spotlightWindow = null;
-    });
-
-    // Reset blur debounce when page finishes loading (prevents premature hide on startup)
-    this.spotlightWindow.webContents.on('did-finish-load', () => {
-      this.lastSpotlightShowTime = Date.now();
     });
 
     this.spotlightWindow.loadFile(SPOTLIGHT_PATH).catch((err: Error) => {
@@ -438,7 +395,6 @@ class OndokiApp {
       height: 520,
       title: 'Ondoki Settings',
       icon: windowIcon,
-      alwaysOnTop: true,
       resizable: false,
       minimizable: false,
       maximizable: false,
@@ -592,7 +548,6 @@ class OndokiApp {
       resizable: false,
       minimizable: false,
       maximizable: false,
-      alwaysOnTop: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -943,8 +898,6 @@ class OndokiApp {
         console.error('Auth callback error:', error);
       }
     }
-    // Prevent blur-hide during macOS focus transition from the browser callback
-    this.lastSpotlightShowTime = Date.now();
     setTimeout(() => this.showSpotlightWindow(), 300);
   }
 }
