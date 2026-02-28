@@ -18,8 +18,6 @@ const defaults: SettingsData = {
   recordingShortcut: 'Ctrl+Shift+R',
 };
 
-// --- Toggle -------------------------------------------------------------------
-
 const Toggle: React.FC<{ value: boolean; onChange: () => void }> = ({
   value,
   onChange,
@@ -32,8 +30,6 @@ const Toggle: React.FC<{ value: boolean; onChange: () => void }> = ({
     <div className="settings-toggle-knob" />
   </button>
 );
-
-// --- ShortcutInput ------------------------------------------------------------
 
 const ShortcutInput: React.FC<{
   value: string;
@@ -70,8 +66,6 @@ const ShortcutInput: React.FC<{
     />
   );
 };
-
-// --- SettingsWindow -----------------------------------------------------------
 
 const SettingsWindow: React.FC = () => {
   const [settings, setSettings] = useState<SettingsData>(defaults);
@@ -172,92 +166,103 @@ const SettingsWindow: React.FC = () => {
     <div className="settings-page">
       <div className="settings-title">Settings</div>
 
-      {/* Ondoki Server */}
+      {/* Server Configuration */}
       <div className="settings-section">
-        <div className="settings-section-title">Ondoki Server</div>
-        <label className="settings-label">API URL</label>
-        <input
-          type="url"
-          className="settings-input"
-          value={settings.chatApiUrl}
-          onChange={(e) => update('chatApiUrl', e.target.value)}
-          placeholder="http://localhost:8000/api/v1"
-        />
-        <label className="settings-label">Frontend URL</label>
-        <input
-          type="url"
-          className="settings-input"
-          value={settings.frontendUrl}
-          onChange={(e) => update('frontendUrl', e.target.value)}
-          placeholder="http://localhost:5173"
-        />
+        <div className="settings-section-title">Server Configuration</div>
+        <div className="settings-card">
+          <label className="settings-label">API URL</label>
+          <input
+            type="url"
+            className="settings-input"
+            value={settings.chatApiUrl}
+            onChange={(e) => update('chatApiUrl', e.target.value)}
+            placeholder="http://localhost:8000/api/v1"
+          />
+          <label className="settings-label">Frontend URL</label>
+          <input
+            type="url"
+            className="settings-input"
+            value={settings.frontendUrl}
+            onChange={(e) => update('frontendUrl', e.target.value)}
+            placeholder="http://localhost:5173"
+            style={{ marginBottom: 0 }}
+          />
+        </div>
       </div>
 
       {/* AI Enhancement */}
       <div className="settings-section">
         <div className="settings-section-title">AI Enhancement</div>
-        <div className="settings-toggle-row">
-          <label className="settings-label" style={{ margin: 0 }}>
-            Auto-improve step titles with AI
-          </label>
-          <Toggle
-            value={settings.autoAnnotateSteps}
-            onChange={() =>
-              update('autoAnnotateSteps', !settings.autoAnnotateSteps)
-            }
-          />
+        <div className="settings-card">
+          <div className="settings-toggle-row" style={{ padding: 0 }}>
+            <label className="settings-label" style={{ margin: 0 }}>
+              Auto-improve step titles with AI
+            </label>
+            <Toggle
+              value={settings.autoAnnotateSteps}
+              onChange={() =>
+                update('autoAnnotateSteps', !settings.autoAnnotateSteps)
+              }
+            />
+          </div>
         </div>
       </div>
 
       {/* Recording */}
       <div className="settings-section">
         <div className="settings-section-title">Recording</div>
-        <div className="settings-toggle-row">
-          <label className="settings-label" style={{ margin: 0 }}>
-            Minimize when recording starts
-          </label>
-          <Toggle
-            value={settings.minimizeOnRecord}
-            onChange={() =>
-              update('minimizeOnRecord', !settings.minimizeOnRecord)
-            }
-          />
+        <div className="settings-card">
+          <div className="settings-toggle-row" style={{ padding: 0 }}>
+            <label className="settings-label" style={{ margin: 0 }}>
+              Minimize when recording starts
+            </label>
+            <Toggle
+              value={settings.minimizeOnRecord}
+              onChange={() =>
+                update('minimizeOnRecord', !settings.minimizeOnRecord)
+              }
+            />
+          </div>
         </div>
       </div>
 
       {/* Keyboard Shortcuts */}
       <div className="settings-section">
         <div className="settings-section-title">Keyboard Shortcuts</div>
-        <label className="settings-label">Open Spotlight</label>
-        <ShortcutInput
-          value={settings.spotlightShortcut}
-          onChange={(v) => update('spotlightShortcut', v)}
-          placeholder="Ctrl+Shift+Space"
-        />
-        <div className="settings-hint">
-          Click and press your desired shortcut
-        </div>
-        <label className="settings-label">Start/Stop Recording</label>
-        <ShortcutInput
-          value={settings.recordingShortcut}
-          onChange={(v) => update('recordingShortcut', v)}
-          placeholder="Ctrl+Shift+R"
-        />
-        <div className="settings-hint">
-          Click and press your desired shortcut
+        <div className="settings-card">
+          <label className="settings-label">Open Spotlight</label>
+          <ShortcutInput
+            value={settings.spotlightShortcut}
+            onChange={(v) => update('spotlightShortcut', v)}
+            placeholder="Ctrl+Shift+Space"
+          />
+          <div className="settings-hint">
+            Click and press your desired shortcut
+          </div>
+          <label className="settings-label">Start/Stop Recording</label>
+          <ShortcutInput
+            value={settings.recordingShortcut}
+            onChange={(v) => update('recordingShortcut', v)}
+            placeholder="Ctrl+Shift+R"
+          />
+          <div className="settings-hint">
+            Click and press your desired shortcut
+          </div>
         </div>
       </div>
 
       {/* Account */}
       <div className="settings-section">
         <div className="settings-section-title">Account</div>
-        <div className="settings-account">{accountInfo}</div>
-        <button
-          className="settings-btn settings-btn--danger"
-          onClick={handleLogout}
-        >
-          Sign Out
-        </button>
+        <div className="settings-card">
+          <div className="settings-account">{accountInfo}</div>
+          <button
+            className="settings-btn settings-btn--danger"
+            onClick={handleLogout}
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {/* Footer */}

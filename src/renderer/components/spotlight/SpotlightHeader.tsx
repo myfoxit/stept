@@ -18,6 +18,7 @@ export const SpotlightHeader: React.FC<SpotlightHeaderProps> = ({
     {/* Logo */}
     <div className="header-logo">
       <OndokiLogo />
+      <span className="header-brand-text">ondoki</span>
     </div>
 
     {/* Project selector */}

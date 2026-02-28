@@ -476,18 +476,19 @@ const SpotlightApp: React.FC = () => {
         {!auth.isAuthenticated ? (
           <div className="auth-gate">
             <div className="auth-gate-logo">
-              <OndokiLogo width={38} height={36} />
+              <OndokiLogo width={80} height={76} />
             </div>
             <div className="auth-gate-title">ondoki</div>
             <p className="auth-gate-desc">
-              Sign in to start recording and searching your workflows.
+              Record and search your workflows
             </p>
             <button
               onClick={handleLogin}
-              className="btn-accent auth-gate-btn"
+              className="auth-gate-btn"
             >
               Sign In
             </button>
+            <div className="auth-gate-version">v2.1.0</div>
           </div>
         ) : (
           <>
