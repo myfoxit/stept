@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { X as CloseIcon } from "lucide-react"
 import "@/components/Editor/Nodes/image-upload-node/image-upload-node.scss"
 import { isValidPosition } from "@/components/Editor/utils/editor-utils"
+import { Fragment } from "@tiptap/pm/model"
 
 export interface FileItem {
   /**
@@ -468,12 +469,19 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
           }
         })
 
-        props.editor
-          .chain()
-          .focus()
-          .deleteRange({ from: pos, to: pos + props.node.nodeSize })
-          .insertContentAt(pos, imageNodes)
-          .run()
+        // Use the ProseMirror transaction API directly to replace the upload
+        // node with image node(s). Using chain().deleteRange().insertContentAt()
+        // fails silently because positions shift after the delete within the
+        // same chain, leaving the upload preview card visible instead of the image.
+        const { state, view } = props.editor
+        const from = pos
+        const to = pos + props.node.nodeSize
+        const nodes = imageNodes.map((n) =>
+          state.schema.nodes.image.create(n.attrs)
+        )
+        const tr = state.tr.replaceWith(from, to, Fragment.from(nodes))
+        view.dispatch(tr)
+        props.editor.commands.focus()
       }
     }
   }
