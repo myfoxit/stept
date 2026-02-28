@@ -77,13 +77,9 @@ function updateUI(state) {
     populateProjects(state.userProjects, state.selectedProjectId);
 
     if (state.isRecording) {
-      if (currentDisplayMode === 'sidepanel') {
-        // In sidepanel mode, all controls are in the side panel
-        showIdlePanel();
-        startBtn.textContent = 'Recording — check side panel';
-        startBtn.disabled = true;
-      } else if (currentDisplayMode === 'dock') {
+      if (currentDisplayMode === 'dock') {
         // In dock mode, recording controls are in the dock overlay
+        // Just show a minimal status in popup
         showIdlePanel();
         startBtn.textContent = 'Recording in progress...';
         startBtn.disabled = true;
