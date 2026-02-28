@@ -314,7 +314,16 @@ deleteAllBtn.addEventListener('click', async () => {
 
 completeBtn.addEventListener('click', async () => {
   await sendMessage({ type: 'STOP_RECORDING' });
+
+  // Auto-upload immediately (#3)
   showUploadPanel();
+  uploadBtn.disabled = true;
+  backBtn.disabled = true;
+  uploadTitle.textContent = 'Uploading...';
+  uploadMessage.textContent = 'Please wait while we upload your capture';
+  progressBar.classList.remove('hidden');
+  uploadActions.classList.add('hidden');
+  await performUpload();
 });
 
 backBtn.addEventListener('click', async () => {
