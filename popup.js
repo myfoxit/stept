@@ -26,8 +26,11 @@ const progressFill = document.getElementById('progressFill');
 const uploadStatus = document.getElementById('uploadStatus');
 const apiUrlInput = document.getElementById('apiUrlInput');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const modeSidePanelBtn = document.getElementById('modeSidePanel');
+const modeDockBtn = document.getElementById('modeDock');
 
 let recordingInterval = null;
+let currentDisplayMode = 'sidepanel';
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -46,6 +49,13 @@ async function loadSettings() {
   if (settings.apiBaseUrl) {
     apiUrlInput.value = settings.apiBaseUrl;
   }
+  currentDisplayMode = settings.displayMode || 'sidepanel';
+  updateModeButtons();
+}
+
+function updateModeButtons() {
+  modeSidePanelBtn.classList.toggle('active', currentDisplayMode === 'sidepanel');
+  modeDockBtn.classList.toggle('active', currentDisplayMode === 'dock');
 }
 
 // Refresh state from background
@@ -67,9 +77,22 @@ function updateUI(state) {
     populateProjects(state.userProjects, state.selectedProjectId);
 
     if (state.isRecording) {
-      showRecordingPanel(state);
+      if (currentDisplayMode === 'dock') {
+        // In dock mode, recording controls are in the dock overlay
+        // Just show a minimal status in popup
+        showIdlePanel();
+        startBtn.textContent = 'Recording in progress...';
+        startBtn.disabled = true;
+      } else {
+        showRecordingPanel(state);
+      }
     } else {
       showIdlePanel();
+      startBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Start Capture`;
     }
   } else {
     loginPanel.classList.remove('hidden');
@@ -253,7 +276,13 @@ startBtn.addEventListener('click', async () => {
   if (!projectId) return;
 
   await sendMessage({ type: 'START_RECORDING', projectId });
-  await sendMessage({ type: 'OPEN_SIDE_PANEL' });
+
+  if (currentDisplayMode === 'sidepanel') {
+    await sendMessage({ type: 'OPEN_SIDE_PANEL' });
+  } else {
+    // Dock mode — dock overlay is injected by content script
+    await sendMessage({ type: 'SHOW_DOCK' });
+  }
   window.close();
 });
 
@@ -343,6 +372,18 @@ uploadBtn.addEventListener('click', async () => {
     uploadStatus.textContent =
       'Upload failed: ' + (result.error || 'Unknown error');
   }
+});
+
+modeSidePanelBtn.addEventListener('click', async () => {
+  currentDisplayMode = 'sidepanel';
+  updateModeButtons();
+  await sendMessage({ type: 'SET_DISPLAY_MODE', displayMode: 'sidepanel' });
+});
+
+modeDockBtn.addEventListener('click', async () => {
+  currentDisplayMode = 'dock';
+  updateModeButtons();
+  await sendMessage({ type: 'SET_DISPLAY_MODE', displayMode: 'dock' });
 });
 
 saveSettingsBtn.addEventListener('click', async () => {

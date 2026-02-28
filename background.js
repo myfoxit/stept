@@ -472,9 +472,23 @@ function startRecording(projectId) {
   chrome.action.setBadgeText({ text: 'REC' });
   chrome.action.setBadgeBackgroundColor({ color: '#3ab08a' });
 
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]?.id) {
-      chrome.sidePanel.open({ tabId: tabs[0].id }).catch(() => {});
+  // Open side panel or dock based on display mode
+  chrome.storage.local.get(['displayMode'], (result) => {
+    const mode = result.displayMode || 'sidepanel';
+    if (mode === 'sidepanel') {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.sidePanel.open({ tabId: tabs[0].id }).catch(() => {});
+        }
+      });
+    } else {
+      // Dock mode — show dock overlay in active tab
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (tabs[0]?.id) {
+          await ensureContentScript(tabs[0].id);
+          chrome.tabs.sendMessage(tabs[0].id, { type: 'SHOW_DOCK' }).catch(() => {});
+        }
+      });
     }
   });
 }
@@ -493,6 +507,9 @@ function stopRecording() {
       ) {
         chrome.tabs
           .sendMessage(tab.id, { type: 'STOP_RECORDING' })
+          .catch(() => {});
+        chrome.tabs
+          .sendMessage(tab.id, { type: 'HIDE_DOCK' })
           .catch(() => {});
       }
     });
@@ -628,7 +645,17 @@ async function addStep(stepData) {
 
   if (isClickAction) {
     try {
+      // Hide dock overlay before screenshot so it's not captured
+      const activeTab = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, tabs => r(tabs[0])));
+      if (activeTab?.id) {
+        await chrome.tabs.sendMessage(activeTab.id, { type: 'HIDE_DOCK_TEMP' }).catch(() => {});
+        await new Promise(r => setTimeout(r, 50));
+      }
       screenshot = await captureScreenshot();
+      // Restore dock
+      if (activeTab?.id) {
+        await chrome.tabs.sendMessage(activeTab.id, { type: 'SHOW_DOCK_TEMP' }).catch(() => {});
+      }
     } catch (e) {
       debugLog('Screenshot capture threw:', e);
       screenshot = null;
@@ -669,6 +696,15 @@ async function addStep(stepData) {
   chrome.runtime
     .sendMessage({ type: 'STEP_ADDED', step: step })
     .catch(() => {});
+
+  // Also notify content scripts (for dock step counter)
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+        chrome.tabs.sendMessage(tab.id, { type: 'STEP_ADDED', step: step }).catch(() => {});
+      }
+    });
+  });
 }
 
 function deleteStep(stepNumber) {
@@ -876,9 +912,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
 
       case 'GET_SETTINGS':
-        chrome.storage.local.get(['apiBaseUrl'], (result) => {
+        chrome.storage.local.get(['apiBaseUrl', 'displayMode'], (result) => {
           sendResponse({
             apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL,
+            displayMode: result.displayMode || 'sidepanel',
           });
         });
         return; // keep channel open
@@ -892,6 +929,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             chrome.action.setTitle({ title: '' });
           }
         }
+        sendResponse({ success: true });
+        break;
+
+      case 'SET_DISPLAY_MODE':
+        await chrome.storage.local.set({ displayMode: message.displayMode });
+        sendResponse({ success: true });
+        break;
+
+      case 'SHOW_DOCK':
+        // Send message to active tab's content script to show dock
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+          if (tabs[0]?.id) {
+            await ensureContentScript(tabs[0].id);
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'SHOW_DOCK' }).catch(() => {});
+          }
+        });
+        sendResponse({ success: true });
+        break;
+
+      case 'HIDE_DOCK':
+        // Send to all tabs to hide dock
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach((tab) => {
+            if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+              chrome.tabs.sendMessage(tab.id, { type: 'HIDE_DOCK' }).catch(() => {});
+            }
+          });
+        });
         sendResponse({ success: true });
         break;
 

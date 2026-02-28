@@ -69,6 +69,33 @@
       <span class="duration-label" id="recordingTime">00:00</span>
     </div>
 
+    <!-- Login Panel (shown in side panel mode when not authenticated) -->
+    <div id="spLoginPanel" class="sp-auth-panel hidden">
+      <div class="sp-auth-content">
+        <p class="sp-welcome">Welcome to Ondoki</p>
+        <p class="sp-subtitle">Sign in to start recording processes</p>
+        <button id="spLoginBtn" class="btn btn-primary">Sign In</button>
+        <div id="spLoginError" class="sp-error hidden"></div>
+      </div>
+    </div>
+
+    <!-- Setup Panel (authenticated but not recording) -->
+    <div id="spSetupPanel" class="sp-auth-panel hidden">
+      <div class="sp-auth-content">
+        <p id="spGreeting" class="sp-welcome">Hello!</p>
+        <select id="spProjectSelector" class="sp-select">
+          <option value="">Select project</option>
+        </select>
+        <button id="spStartBtn" class="btn btn-primary" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Start Capture
+        </button>
+        <button id="spLogoutBtn" class="btn btn-outline btn-sm" style="margin-top:12px; width:auto; padding:8px 24px;">Sign Out</button>
+      </div>
+    </div>
+
     <!-- Steps list -->
     <div class="steps-list" id="stepsList">
       <div class="empty-state" id="emptyState">

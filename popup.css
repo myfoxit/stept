@@ -356,6 +356,43 @@ h3 {
   line-height: 1.4;
 }
 
+/* Mode selector */
+.mode-selector {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1.5px solid #d6d3d1;
+  border-radius: 8px;
+  background: white;
+  font-size: 12px;
+  font-weight: 500;
+  color: #57534e;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  border-color: #a8a29e;
+  background: #f5f4f2;
+}
+
+.mode-btn.active {
+  border-color: #3ab08a;
+  background: rgba(58, 176, 138, 0.08);
+  color: #3ab08a;
+  font-weight: 600;
+}
+
 .inline-error a,
 .inline-error .error-settings-link {
   color: #3ab08a;

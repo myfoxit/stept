@@ -105,6 +105,72 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Side Panel Auth Panels */
+.sp-auth-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-auth-panel.hidden {
+  display: none !important;
+}
+
+.sp-auth-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.sp-welcome {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.sp-subtitle {
+  font-size: 13px;
+  color: #a8a29e;
+  margin-bottom: 8px;
+}
+
+.sp-select {
+  width: 100%;
+  padding: 10px 36px 10px 14px;
+  border: 1.5px solid #d6d3d1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+}
+
+.sp-select:focus {
+  outline: none;
+  border-color: #3ab08a;
+  box-shadow: 0 0 0 3px rgba(58, 176, 138, 0.12);
+}
+
+.sp-error {
+  width: 100%;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 12px;
+}
+
 /* Steps list */
 .steps-list {
   flex: 1;

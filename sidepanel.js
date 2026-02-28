@@ -1,3 +1,13 @@
+// Side panel auth elements
+const spLoginPanel = document.getElementById('spLoginPanel');
+const spSetupPanel = document.getElementById('spSetupPanel');
+const spLoginBtn = document.getElementById('spLoginBtn');
+const spLoginError = document.getElementById('spLoginError');
+const spGreeting = document.getElementById('spGreeting');
+const spProjectSelector = document.getElementById('spProjectSelector');
+const spStartBtn = document.getElementById('spStartBtn');
+const spLogoutBtn = document.getElementById('spLogoutBtn');
+
 const stepsList = document.getElementById('stepsList');
 const emptyState = document.getElementById('emptyState');
 const badgeStepCount = document.getElementById('badgeStepCount');
@@ -34,8 +44,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function refreshState() {
   const state = await sendMessage({ type: 'GET_STATE' });
-  const stepsResult = await sendMessage({ type: 'GET_STEPS' });
 
+  if (!state.isAuthenticated) {
+    // Show login panel
+    spLoginPanel.classList.remove('hidden');
+    spSetupPanel.classList.add('hidden');
+    stepsList.classList.add('hidden');
+    footer.classList.add('hidden');
+    recordingBadge.style.display = 'none';
+    return;
+  }
+
+  if (!state.isRecording) {
+    // Show setup panel (project selector + start)
+    spLoginPanel.classList.add('hidden');
+    spSetupPanel.classList.remove('hidden');
+    stepsList.classList.add('hidden');
+    footer.classList.add('hidden');
+    recordingBadge.style.display = 'none';
+
+    const displayName = state.currentUser?.name || state.currentUser?.email || 'User';
+    spGreeting.textContent = `Hello, ${displayName}!`;
+
+    // Populate projects
+    spProjectSelector.innerHTML = '<option value="">Select project</option>';
+    if (state.userProjects?.length) {
+      state.userProjects.forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        if (p.id === state.selectedProjectId) opt.selected = true;
+        spProjectSelector.appendChild(opt);
+      });
+      spStartBtn.disabled = !state.selectedProjectId;
+    }
+    return;
+  }
+
+  // Recording state — show steps
+  spLoginPanel.classList.add('hidden');
+  spSetupPanel.classList.add('hidden');
+  stepsList.classList.remove('hidden');
+  footer.classList.remove('hidden');
+  recordingBadge.style.display = '';
+
+  const stepsResult = await sendMessage({ type: 'GET_STEPS' });
   steps = stepsResult.steps || [];
   updateUI(state);
   renderSteps();
@@ -299,6 +352,44 @@ newCaptureBtn.addEventListener('click', async () => {
   }
   badgeStepCount.textContent = '';
   recordingTimeEl.textContent = '00:00';
+  await refreshState();
+});
+
+// Side panel auth event listeners
+spLoginBtn.addEventListener('click', async () => {
+  spLoginBtn.disabled = true;
+  spLoginBtn.textContent = 'Signing in...';
+  spLoginError.classList.add('hidden');
+  try {
+    const result = await sendMessage({ type: 'LOGIN' });
+    if (result.success) {
+      await refreshState();
+    } else {
+      spLoginError.textContent = 'Login failed: ' + (result.error || 'Unknown error');
+      spLoginError.classList.remove('hidden');
+    }
+  } catch (e) {
+    spLoginError.textContent = 'Login failed: ' + e.message;
+    spLoginError.classList.remove('hidden');
+  } finally {
+    spLoginBtn.disabled = false;
+    spLoginBtn.textContent = 'Sign In';
+  }
+});
+
+spLogoutBtn.addEventListener('click', async () => {
+  await sendMessage({ type: 'LOGOUT' });
+  await refreshState();
+});
+
+spProjectSelector.addEventListener('change', () => {
+  spStartBtn.disabled = !spProjectSelector.value;
+});
+
+spStartBtn.addEventListener('click', async () => {
+  const projectId = spProjectSelector.value;
+  if (!projectId) return;
+  await sendMessage({ type: 'START_RECORDING', projectId });
   await refreshState();
 });
 
