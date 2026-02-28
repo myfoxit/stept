@@ -101,8 +101,26 @@ chrome.storage.local.get(
 
     authReady = true;
     authReadyResolve();
+
+    // Apply display mode on startup
+    await applyDisplayMode();
   },
 );
+
+// Switch between popup (dock mode) and sidePanel (sidepanel mode)
+async function applyDisplayMode() {
+  const { displayMode } = await chrome.storage.local.get(['displayMode']);
+  const mode = displayMode || 'sidepanel';
+  if (mode === 'sidepanel') {
+    // Clicking icon opens side panel
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    chrome.action.setPopup({ popup: '' }); // disable popup
+  } else {
+    // Clicking icon opens popup
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+    chrome.action.setPopup({ popup: 'popup.html' });
+  }
+}
 
 // Helper to persist auth state
 async function persistAuth() {
@@ -934,6 +952,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'SET_DISPLAY_MODE':
         await chrome.storage.local.set({ displayMode: message.displayMode });
+        await applyDisplayMode();
         sendResponse({ success: true });
         break;
 
@@ -1019,8 +1038,17 @@ async function trackPageChange(tabId, reason) {
   }
 }
 
-chrome.tabs.onActivated.addListener((activeInfo) => {
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
   trackPageChange(activeInfo.tabId, 'tab-switch');
+
+  // Show dock on switched-to tab in dock mode
+  if (state.isRecording) {
+    const { displayMode } = await chrome.storage.local.get(['displayMode']);
+    if ((displayMode || 'sidepanel') === 'dock') {
+      await ensureContentScript(activeInfo.tabId);
+      chrome.tabs.sendMessage(activeInfo.tabId, { type: 'SHOW_DOCK' }).catch(() => {});
+    }
+  }
 });
 
 // Detect new tab creation
@@ -1073,6 +1101,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           type: state.isPaused ? 'PAUSE_RECORDING' : 'START_RECORDING',
         })
         .catch(() => {});
+
+      // Show dock on newly loaded tabs in dock mode
+      const { displayMode } = await chrome.storage.local.get(['displayMode']);
+      if ((displayMode || 'sidepanel') === 'dock') {
+        chrome.tabs.sendMessage(tabId, { type: 'SHOW_DOCK' }).catch(() => {});
+      }
     }
   }
 });

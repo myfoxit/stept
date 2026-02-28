@@ -595,3 +595,66 @@ body {
     opacity: 0;
   }
 }
+
+/* Settings in side panel */
+.sp-settings-details {
+  margin-top: 16px;
+  width: 100%;
+}
+.sp-settings-toggle {
+  cursor: pointer;
+  font-size: 13px;
+  color: #78716c;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  padding: 6px 0;
+}
+.sp-settings-content {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #57534e;
+  margin-top: 4px;
+}
+.sp-settings-input {
+  padding: 8px 12px;
+  border: 1.5px solid #d6d3d1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.sp-settings-input:focus {
+  border-color: #3ab08a;
+  box-shadow: 0 0 0 2px rgba(58,176,138,0.15);
+}
+.sp-mode-selector {
+  display: flex;
+  gap: 8px;
+}
+.sp-mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid #d6d3d1;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.sp-mode-btn:hover {
+  border-color: #3ab08a;
+}
+.sp-mode-btn.active {
+  background: #3ab08a;
+  color: white;
+  border-color: #3ab08a;
+}

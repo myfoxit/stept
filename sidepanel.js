@@ -314,7 +314,9 @@ deleteAllBtn.addEventListener('click', async () => {
 
 completeBtn.addEventListener('click', async () => {
   await sendMessage({ type: 'STOP_RECORDING' });
+  // Auto-upload immediately
   showUploadPanel();
+  await performUpload();
 });
 
 backBtn.addEventListener('click', async () => {
@@ -391,6 +393,41 @@ spStartBtn.addEventListener('click', async () => {
   if (!projectId) return;
   await sendMessage({ type: 'START_RECORDING', projectId });
   await refreshState();
+});
+
+// Settings in side panel
+const spModeSidePanelBtn = document.getElementById('spModeSidePanel');
+const spModeDockBtn = document.getElementById('spModeDock');
+const spApiUrlInput = document.getElementById('spApiUrlInput');
+const spSaveSettingsBtn = document.getElementById('spSaveSettingsBtn');
+
+// Load settings
+sendMessage({ type: 'GET_SETTINGS' }).then((settings) => {
+  if (settings.apiBaseUrl) spApiUrlInput.value = settings.apiBaseUrl;
+  const mode = settings.displayMode || 'sidepanel';
+  spModeSidePanelBtn.classList.toggle('active', mode === 'sidepanel');
+  spModeDockBtn.classList.toggle('active', mode === 'dock');
+});
+
+spModeSidePanelBtn.addEventListener('click', async () => {
+  spModeSidePanelBtn.classList.add('active');
+  spModeDockBtn.classList.remove('active');
+  await sendMessage({ type: 'SET_DISPLAY_MODE', displayMode: 'sidepanel' });
+});
+
+spModeDockBtn.addEventListener('click', async () => {
+  spModeDockBtn.classList.add('active');
+  spModeSidePanelBtn.classList.remove('active');
+  await sendMessage({ type: 'SET_DISPLAY_MODE', displayMode: 'dock' });
+});
+
+spSaveSettingsBtn.addEventListener('click', async () => {
+  const url = spApiUrlInput.value.trim();
+  if (url) {
+    await sendMessage({ type: 'SET_SETTINGS', apiBaseUrl: url });
+    spSaveSettingsBtn.textContent = 'Saved!';
+    setTimeout(() => { spSaveSettingsBtn.textContent = 'Save'; }, 1500);
+  }
 });
 
 // MISS-C002: Show a temporary error toast in the side panel

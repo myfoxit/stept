@@ -93,6 +93,19 @@
           Start Capture
         </button>
         <button id="spLogoutBtn" class="btn btn-outline btn-sm" style="margin-top:12px; width:auto; padding:8px 24px;">Sign Out</button>
+        <details class="sp-settings-details">
+          <summary class="sp-settings-toggle">⚙ Settings</summary>
+          <div class="sp-settings-content">
+            <label class="sp-settings-label">Display Mode</label>
+            <div class="sp-mode-selector">
+              <button id="spModeSidePanel" class="sp-mode-btn active" data-mode="sidepanel">Side Panel</button>
+              <button id="spModeDock" class="sp-mode-btn" data-mode="dock">Dock</button>
+            </div>
+            <label class="sp-settings-label" for="spApiUrlInput">API URL</label>
+            <input id="spApiUrlInput" class="sp-settings-input" type="url" placeholder="https://app.ondoki.com/api/v1">
+            <button id="spSaveSettingsBtn" class="btn btn-outline btn-sm">Save</button>
+          </div>
+        </details>
       </div>
     </div>
 
