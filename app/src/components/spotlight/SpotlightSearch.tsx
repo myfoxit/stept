@@ -9,6 +9,9 @@ import {
   IconSparkles,
   IconLoader2,
   IconArrowRight,
+  IconArrowLeft,
+  IconWorldWww,
+  IconDeviceDesktop,
 } from '@tabler/icons-react';
 import {
   CommandDialog,
@@ -44,6 +47,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchType, setSearchType] = useState<'keyword' | 'semantic'>('keyword');
+  const [showWorkflowChooser, setShowWorkflowChooser] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -53,6 +57,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       setQuery('');
       setResults([]);
       setSearchType('keyword');
+      setShowWorkflowChooser(false);
     }
   }, [open]);
 
@@ -142,8 +147,8 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       )}
 
       <CommandList className="max-h-[400px]">
-        {/* Idle state: Quick Actions */}
-        {!hasQuery && (
+        {/* Idle state: Quick Actions or Workflow Type Chooser */}
+        {!hasQuery && !showWorkflowChooser && (
           <CommandGroup heading="Quick Actions">
             <CommandItem
               onSelect={async () => {
@@ -160,16 +165,16 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
             >
               <IconFileText className="mr-2 h-4 w-4" />
               New Page
-              <CommandShortcut>⌘N</CommandShortcut>
+              <CommandShortcut>⌘⇧N</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => {
-                onOpenChange(false);
+                setShowWorkflowChooser(true);
               }}
             >
               <IconListDetails className="mr-2 h-4 w-4" />
               New Workflow
-              <CommandShortcut>⌘W</CommandShortcut>
+              <IconArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
             </CommandItem>
             <CommandItem
               onSelect={() => {
@@ -178,8 +183,45 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
               }}
             >
               <IconSettings className="mr-2 h-4 w-4" />
-              Settings
-              <CommandShortcut>⌘,</CommandShortcut>
+              Project Settings
+              <CommandShortcut>⌘⇧,</CommandShortcut>
+            </CommandItem>
+          </CommandGroup>
+        )}
+
+        {/* Workflow type chooser sub-menu */}
+        {!hasQuery && showWorkflowChooser && (
+          <CommandGroup heading="New Workflow">
+            <CommandItem
+              onSelect={() => {
+                setShowWorkflowChooser(false);
+              }}
+            >
+              <IconArrowLeft className="mr-2 h-4 w-4 text-muted-foreground" />
+              Back
+            </CommandItem>
+            <CommandSeparator />
+            <CommandItem
+              onSelect={() => {
+                onOpenChange(false);
+                // Open the browser extension recording flow
+                window.dispatchEvent(new CustomEvent('ondoki:start-browser-workflow'));
+              }}
+            >
+              <IconWorldWww className="mr-2 h-4 w-4" />
+              Browser Workflow
+              <span className="ml-auto text-xs text-muted-foreground">Record in browser</span>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                onOpenChange(false);
+                // Open the desktop recording flow
+                window.dispatchEvent(new CustomEvent('ondoki:start-desktop-workflow'));
+              }}
+            >
+              <IconDeviceDesktop className="mr-2 h-4 w-4" />
+              Desktop Workflow
+              <span className="ml-auto text-xs text-muted-foreground">Record on desktop</span>
             </CommandItem>
           </CommandGroup>
         )}

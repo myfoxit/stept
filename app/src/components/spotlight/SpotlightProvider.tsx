@@ -23,10 +23,13 @@ export function SpotlightProvider({ children }: { children: ReactNode }) {
   const openSpotlight = useCallback(() => setIsOpen(true), []);
   const closeSpotlight = useCallback(() => setIsOpen(false), []);
 
-  // Global Cmd+K / Ctrl+K shortcut
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const mod = e.metaKey || e.ctrlKey;
+
+      // Cmd+K / Ctrl+K — toggle spotlight
+      if (mod && e.key === 'k') {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       }
