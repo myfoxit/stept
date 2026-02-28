@@ -2,9 +2,63 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import { useSearchParams } from 'react-router-dom';
+
+// ---------------------------------------------------------------------------
+// Validation helpers (mirrors backend: api/app/crud/auth.py + Pydantic EmailStr)
+// ---------------------------------------------------------------------------
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateEmail(email: string): string | null {
+  if (!email) return null; // don't nag on empty
+  if (!EMAIL_RE.test(email)) return 'Please enter a valid email address.';
+  return null;
+}
+
+interface PasswordCheck {
+  label: string;
+  met: boolean;
+}
+
+function getPasswordChecks(pw: string): PasswordCheck[] {
+  return [
+    { label: 'At least 8 characters', met: pw.length >= 8 },
+    { label: 'One uppercase letter', met: /[A-Z]/.test(pw) },
+    { label: 'One lowercase letter', met: /[a-z]/.test(pw) },
+    { label: 'One digit', met: /\d/.test(pw) },
+  ];
+}
+
+function validatePassword(pw: string): string | null {
+  if (!pw) return null;
+  const checks = getPasswordChecks(pw);
+  const failing = checks.filter((c) => !c.met);
+  if (failing.length > 0) return failing.map((c) => c.label).join(', ');
+  return null;
+}
+
+// Small inline validation message component
+function FieldError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <p className="text-destructive text-xs mt-1">{message}</p>;
+}
+
+// Password strength checklist shown while typing
+function PasswordChecklist({ password }: { password: string }) {
+  if (!password) return null;
+  const checks = getPasswordChecks(password);
+  return (
+    <ul className="mt-1.5 space-y-0.5 text-xs">
+      {checks.map((c) => (
+        <li key={c.label} className={cn('flex items-center gap-1', c.met ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground')}>
+          {c.met ? '✓' : '○'} {c.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export type AuthView = 'login' | 'register' | 'reset';
 interface AuthFormProps extends React.ComponentProps<'form'> {
@@ -22,6 +76,8 @@ export function LoginForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailError = useMemo(() => (emailTouched ? validateEmail(email) : null), [email, emailTouched]);
   const [searchParams] = useSearchParams();
   const [deviceAuth, setDeviceAuth] = useState(false);
 
@@ -88,7 +144,10 @@ export function LoginForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
+            className={cn(emailError && 'border-destructive')}
           />
+          <FieldError message={emailError} />
         </div>
         <div className="grid gap-3">
           <div className="flex items-center">
@@ -152,10 +211,19 @@ export function RegisterForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const emailError = useMemo(() => (emailTouched ? validateEmail(email) : null), [email, emailTouched]);
+  const passwordError = useMemo(() => (passwordTouched ? validatePassword(password) : null), [password, passwordTouched]);
+  const isValid = !validateEmail(email) && !validatePassword(password) && email && password;
   const [searchParams] = useSearchParams();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Mark all touched to show errors
+    setEmailTouched(true);
+    setPasswordTouched(true);
+    if (validateEmail(email) || validatePassword(password)) return;
     setLoading(true);
     try {
       await doRegister({ email, password, name });
@@ -205,7 +273,10 @@ export function RegisterForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
+            className={cn(emailError && 'border-destructive')}
           />
+          <FieldError message={emailError} />
         </div>
         <div className="grid gap-3">
           <Label htmlFor="reg-password">Password</Label>
@@ -214,10 +285,13 @@ export function RegisterForm({
             type="password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); }}
+            onBlur={() => setPasswordTouched(true)}
+            className={cn(passwordError && 'border-destructive')}
           />
+          <PasswordChecklist password={password} />
         </div>
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full" disabled={loading || !isValid}>
           {loading ? 'Creating…' : 'Create account'}
         </Button>
       </div>
