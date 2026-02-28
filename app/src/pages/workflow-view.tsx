@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconPencil, IconShare, IconDownload } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -607,13 +607,35 @@ export function WorkflowView() {
 
   return (
     <div>
-      <SiteHeader name={typedWorkflow.name || 'Workflow'} />
+      <SiteHeader name={typedWorkflow.name || 'Workflow'}>
+        <div className="flex items-center gap-2">
+          {isEditMode ? (
+            <Button size="sm" onClick={handleToggleEdit}>
+              Done Editing
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={handleToggleEdit}>
+              <IconPencil className="mr-1 h-3 w-3" />
+              Edit
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={handleShare}>
+            <IconShare className="mr-1 h-3 w-3" />
+            Share
+          </Button>
+          <Button size="sm" onClick={handleShare}>
+            <IconDownload className="mr-1 h-3 w-3" />
+            Export
+          </Button>
+        </div>
+      </SiteHeader>
       
       <div className="min-h-screen bg-white rounded-2xl">
         <WorkflowBanner
           isEditMode={isEditMode}
           onToggleEdit={handleToggleEdit}
           onShare={handleShare}
+          isPrivate={(typedWorkflow as any)?.is_private !== false}
         />
 
         <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">

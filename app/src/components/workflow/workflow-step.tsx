@@ -122,7 +122,7 @@ export function WorkflowStep({
               ) : (
                 <div
                   className={`w-full rounded-sm px-2 py-1 text-sm font-medium text-slate-800 transition
-                    ${isEditMode ? 'cursor-pointer hover:bg-primary/5 hover:text-primary700' : ''}`}
+                    ${isEditMode ? 'cursor-pointer hover:bg-primary/10 hover:text-primary' : ''}`}
                   onClick={() => isEditMode && setEditingTitle(true)}
                 >
                   {titleDraft}
@@ -241,9 +241,9 @@ export function WorkflowStep({
                     transform: 'translate(-50%, -50%)',
                   }}
                 >
-                  <div className="absolute -inset-4 rounded-full bg-green-500/20 animate-pulse" />
-                  <div className="relative h-8 w-8 rounded-full border-2 border-green-500 bg-green-500/30">
-                    <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-green-500" />
+                  <div className="absolute -inset-4 rounded-full bg-primary/20 animate-pulse" />
+                  <div className="relative h-8 w-8 rounded-full border-2 border-primary bg-primary/30">
+                    <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
                   </div>
                 </div>
               )}

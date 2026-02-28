@@ -45,7 +45,7 @@ export function WorkflowHeader({
   const iconValue =
     iconOverride?.value || (workflow as any).icon_value || "IconPencil";
   const iconColor =
-    iconOverride?.color || (workflow as any).icon_color || "#6C5CE7";
+    iconOverride?.color || (workflow as any).icon_color || "#3ab08a";
 
   const renderIcon = () => {
     if (iconType === "favicon" && iconValue) {
@@ -112,11 +112,11 @@ export function WorkflowHeader({
         >
           {renderIcon()}
         </button>
-        <div className="flex-1 space-y-1">
+        <div className="flex-1 min-w-0 space-y-1">
           {/* NEW: make title editable in edit mode */}
           {isEditMode ? (
             <input
-              className="w-full bg-transparent text-2xl font-bold text-slate-900 outline-none rounded-md focus:ring-2 focus:ring-red-200 px-1"
+              className="w-full bg-transparent text-2xl font-bold text-slate-900 outline-none rounded-md focus:ring-2 focus:ring-primary/30 px-1"
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={submitTitle}
@@ -132,7 +132,7 @@ export function WorkflowHeader({
               aria-label="Workflow title"
             />
           ) : (
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-2xl font-bold text-slate-900 truncate">
               {workflow.title ?? "Untitled workflow"}
             </h1>
           )}
