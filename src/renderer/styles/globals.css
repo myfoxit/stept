@@ -70,10 +70,15 @@
     padding: 0;
     box-sizing: border-box;
   }
+  html {
+    height: 100%;
+  }
   body {
     font-family: var(--font-sans);
-    background: transparent;
+    background: var(--card, #FFFFFF);
     color: var(--text-primary);
+    margin: 0;
+    height: 100%;
     font-size: 15px;
     font-weight: 500;
     line-height: 1.5;
@@ -140,26 +145,24 @@
     width: 100%;
     height: 100%;
     display: flex;
-    justify-content: center;
-    background: transparent;
+    flex-direction: column;
+    background: var(--card, #FFFFFF);
   }
   .spotlight-backdrop--centered {
-    align-items: center;
+    /* no-op with frame */
   }
 
   .spotlight-card {
     width: 100%;
-    max-width: 94vw;
     background: var(--card);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-light);
-    border: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
     overflow: hidden;
     font-family: var(--font-sans);
-    animation: spotlightIn 0.15s ease-out;
     display: flex;
     flex-direction: column;
-    min-height: 360px;
+    flex: 1;
   }
 
   .spotlight-loading {
