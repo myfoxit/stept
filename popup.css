@@ -77,6 +77,7 @@ body {
   background: #3ab08a;
   color: white;
   font-weight: 600;
+  margin-top: 4px;
 }
 
 .btn-complete:hover:not(:disabled) {
@@ -94,7 +95,7 @@ body {
 }
 
 .btn-sm {
-  padding: 8px 16px;
+  padding: 10px 16px;
   font-size: 13px;
 }
 
@@ -109,8 +110,9 @@ body {
 
 .btn-group {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
+  margin: 4px 0;
 }
 
 .btn-group .btn {
@@ -120,19 +122,30 @@ body {
 /* Form elements */
 .select {
   width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #eeeceb;
+  padding: 10px 36px 10px 14px;
+  border: 1.5px solid #d6d3d1;
   border-radius: 8px;
   font-size: 14px;
   background: white;
   cursor: pointer;
   font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.select:hover {
+  border-color: #a8a29e;
 }
 
 .select:focus {
   outline: none;
   border-color: #3ab08a;
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.1);
+  box-shadow: 0 0 0 3px rgba(58, 176, 138, 0.12);
 }
 
 /* Settings */
@@ -144,7 +157,18 @@ body {
   font-size: 12px;
   color: #a8a29e;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 6px 0;
+  letter-spacing: 0.02em;
+}
+
+.settings-toggle::marker {
+  font-size: 10px;
+}
+
+.settings-details summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .settings-content {
@@ -234,9 +258,9 @@ body {
 
 /* Logout button */
 .logout-btn {
-  margin-top: 24px;
+  margin-top: 28px;
   width: auto;
-  padding: 8px 24px;
+  padding: 10px 28px;
 }
 
 /* Steps preview */
