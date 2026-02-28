@@ -148,7 +148,7 @@
   }
 
   .spotlight-card {
-    width: 530px;
+    width: 100%;
     max-width: 94vw;
     background: var(--card);
     border-radius: var(--radius-xl);
