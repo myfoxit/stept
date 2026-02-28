@@ -29,6 +29,7 @@ export const updateWorkflow = (
     icon_type?: 'tabler' | 'favicon';
     icon_value?: string;
     icon_color?: string;
+    is_private?: boolean;
   }
 ) =>
   request<WorkflowRead>({

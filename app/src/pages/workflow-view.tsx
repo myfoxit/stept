@@ -21,7 +21,13 @@ import { ImageUploadModal } from '@/components/workflow/image-upload-modal';
 import { ShareExportModal } from '@/components/workflow/share-export-modal';
 import { GuidePanel } from '@/components/workflow/guide-panel';
 import { SmartStepOverlay } from '@/components/workflow/smart-step-card';
-import { formatDuration } from '@/utils/workflow';
+import {
+  formatDuration,
+  getMostUsedSite,
+  getFaviconUrl,
+  generateSmartTitle,
+  isDefaultTitle,
+} from '@/utils/workflow';
 import {
   createStep,
   updateStep,
@@ -114,6 +120,53 @@ export function WorkflowView() {
       setIconOverride({ type: t, value: v, color: c });
     }
   }, [typedWorkflow]);
+
+  // ── Auto-assign favicon & smart title on first load (#26) ────────────────
+  const autoAppliedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!typedWorkflow || !workflowId) return;
+    // Only run once per workflow
+    if (autoAppliedRef.current === workflowId) return;
+    autoAppliedRef.current = workflowId;
+
+    const wfSteps = (typedWorkflow?.metadata ?? []) as import('@/types/workflow').WorkflowStep[];
+    if (wfSteps.length === 0) return;
+
+    const wf = typedWorkflow as any;
+
+    // Auto-favicon: only if no icon has been set yet
+    if (!wf.icon_type && !wf.icon_value) {
+      const mostUsed = getMostUsedSite(wfSteps);
+      if (mostUsed?.domain) {
+        const faviconPath = getFaviconUrl(mostUsed.domain);
+        setIconOverride({ type: 'favicon', value: faviconPath });
+        // Persist to backend (fire-and-forget)
+        updateWorkflowMutation.mutateAsync({
+          workflowId,
+          icon_type: 'favicon',
+          icon_value: faviconPath,
+        }).catch(() => {});
+      }
+    }
+
+    // Smart title: only if current title is a generic default
+    const currentName = wf.name || wf.title || '';
+    if (isDefaultTitle(currentName)) {
+      const smartTitle = generateSmartTitle(
+        wfSteps,
+        currentName,
+        wf.generated_title,
+      );
+      if (smartTitle && smartTitle !== currentName) {
+        updateWorkflowMutation.mutateAsync({
+          workflowId,
+          name: smartTitle,
+        }).then(() => {
+          refreshWorkflow();
+        }).catch(() => {});
+      }
+    }
+  }, [typedWorkflow, workflowId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = React.useMemo(
     () =>
