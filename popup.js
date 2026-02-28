@@ -279,8 +279,35 @@ deleteBtn.addEventListener('click', async () => {
 
 completeBtn.addEventListener('click', async () => {
   await sendMessage({ type: 'STOP_RECORDING' });
-  const result = await sendMessage({ type: 'GET_STEPS' });
-  showPreviewPanel(result.steps || []);
+
+  // Auto-upload immediately without extra prompt (#3)
+  showUploadPanel();
+  progressFill.style.width = '0%';
+  uploadStatus.textContent = 'Starting upload...';
+
+  let progress = 0;
+  const progressInterval = setInterval(() => {
+    progress += 10;
+    if (progress <= 90) {
+      progressFill.style.width = progress + '%';
+    }
+  }, 500);
+
+  const result = await sendMessage({ type: 'UPLOAD' });
+
+  clearInterval(progressInterval);
+  progressFill.style.width = '100%';
+
+  if (result.success) {
+    uploadStatus.textContent = 'Upload complete!';
+    setTimeout(async () => {
+      await sendMessage({ type: 'CLEAR_STEPS' });
+      showIdlePanel();
+    }, 2000);
+  } else {
+    uploadStatus.textContent =
+      'Upload failed: ' + (result.error || 'Unknown error');
+  }
 });
 
 closePreviewBtn.addEventListener('click', async () => {
