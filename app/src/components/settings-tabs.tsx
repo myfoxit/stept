@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { IconExternalLink } from '@tabler/icons-react';
 import { useProject } from '@/providers/project-provider';
 
-const tabs = [
+const tabs: { label: string; path: string; external?: boolean }[] = [
   { label: 'General', path: 'settings' },
   { label: 'AI', path: 'settings/ai' },
   { label: 'Privacy', path: 'settings/privacy' },
@@ -13,6 +14,7 @@ const tabs = [
   { label: 'Knowledge Graph', path: '/knowledge-graph' },
   { label: 'Video → Guide', path: '/video-import' },
   { label: 'Audit Log', path: '/audit' },
+  { label: 'Documentation', path: 'https://docs.ondoki.app', external: true },
 ];
 
 export function SettingsTabs() {
@@ -35,6 +37,21 @@ export function SettingsTabs() {
           isActive = location.pathname === href;
         } else {
           isActive = location.pathname === tab.path;
+        }
+
+        if (tab.external) {
+          return (
+            <a
+              key={tab.label}
+              href={tab.path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors border-transparent text-muted-foreground hover:text-foreground hover:border-border inline-flex items-center gap-1"
+            >
+              {tab.label}
+              <IconExternalLink size={14} />
+            </a>
+          );
         }
 
         return (
