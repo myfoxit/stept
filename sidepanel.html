@@ -12,89 +12,102 @@
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-         <svg
-                  style={{ width: "38px", height: "36px" }}
-                  width="38"
-                  height="36"
-                  viewBox="0 0 38 36"
-                >
-                  <rect
-                    x="0"
-                    y="4"
-                    width="32"
-                    height="32"
-                    rx="9"
-                    fill="#3AB08A"
-                  />
-                  <rect
-                    x="7"
-                    y="11"
-                    width="10"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <rect
-                    x="7"
-                    y="17.5"
-                    width="18"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <rect
-                    x="7"
-                    y="24"
-                    width="14"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <path
-                    d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#3AB08A"
-                  />
-                </svg>
-        <h1>Ondoki</h1>
+        <svg width="28" height="27" viewBox="0 0 38 36">
+          <rect x="0" y="4" width="32" height="32" rx="9" fill="#3AB08A"/>
+          <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+          <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+          <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+          <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#3AB08A"/>
+        </svg>
+        <span class="header-title">Ondoki</span>
       </div>
+
+      <!-- Project selector in header (authenticated only) -->
+      <div class="header-center" id="headerProjectSelector">
+        <select id="spProjectSelector" class="header-select">
+          <option value="">Select project</option>
+        </select>
+      </div>
+
+      <!-- Recording badge (recording only) -->
       <div class="recording-badge" id="recordingBadge">
         <span class="recording-dot"></span>
         <span id="recordingStatus">Recording</span>
-        <span class="badge-step-count" id="badgeStepCount"></span>
+        <span class="badge-sep">·</span>
+        <span class="badge-step-count" id="badgeStepCount">0 steps</span>
+        <span class="badge-sep">·</span>
+        <span class="badge-timer" id="recordingTime">00:00</span>
       </div>
+
+      <!-- Settings gear -->
+      <button class="header-icon-btn" id="settingsToggleBtn" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
     </header>
 
-    <!-- Duration (small, in a sub-header row) -->
-    <div class="duration-bar">
-      <span class="duration-label" id="recordingTime">00:00</span>
-    </div>
-
-    <!-- Login Panel (shown in side panel mode when not authenticated) -->
+    <!-- Login Panel -->
     <div id="spLoginPanel" class="sp-auth-panel hidden">
       <div class="sp-auth-content">
+        <div class="login-illustration">
+          <svg width="64" height="64" viewBox="0 0 38 36">
+            <rect x="0" y="4" width="32" height="32" rx="9" fill="#3AB08A"/>
+            <rect x="7" y="11" width="10" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="17.5" width="18" height="3.5" rx="1.75" fill="white"/>
+            <rect x="7" y="24" width="14" height="3.5" rx="1.75" fill="white"/>
+            <path d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z" fill="#3AB08A"/>
+          </svg>
+        </div>
         <p class="sp-welcome">Welcome to Ondoki</p>
-        <p class="sp-subtitle">Sign in to start recording processes</p>
-        <button id="spLoginBtn" class="btn btn-primary">Sign In</button>
+        <p class="sp-subtitle">Sign in to start capturing workflows</p>
+        <button id="spLoginBtn" class="btn btn-cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Sign In
+        </button>
         <div id="spLoginError" class="sp-error hidden"></div>
       </div>
     </div>
 
-    <!-- Setup Panel (authenticated but not recording) -->
+    <!-- Setup Panel (authenticated, not recording) -->
     <div id="spSetupPanel" class="sp-auth-panel hidden">
-      <div class="sp-auth-content">
-        <p id="spGreeting" class="sp-welcome">Hello!</p>
-        <select id="spProjectSelector" class="sp-select">
-          <option value="">Select project</option>
-        </select>
-        <button id="spStartBtn" class="btn btn-primary" disabled>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
+      <div class="sp-setup-content">
+        <!-- Greeting -->
+        <p id="spGreeting" class="sp-greeting">Hello!</p>
+
+        <!-- Start Capture CTA -->
+        <button id="spStartBtn" class="btn btn-cta" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>
           </svg>
           Start Capture
         </button>
-        <button id="spLogoutBtn" class="btn btn-outline btn-sm" style="margin-top:12px; width:auto; padding:8px 24px;">Sign Out</button>
-        <details class="sp-settings-details">
-          <summary class="sp-settings-toggle">⚙ Settings</summary>
+
+        <!-- Empty state for workflow list -->
+        <div class="workflow-empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#D6D3D1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="9" y1="21" x2="9" y2="9"/>
+          </svg>
+          <p>Your captured workflows will appear here</p>
+        </div>
+
+        <!-- Settings accordion at bottom -->
+        <details class="sp-settings-details" id="settingsAccordion">
+          <summary class="sp-settings-toggle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Settings
+          </summary>
           <div class="sp-settings-content">
             <label class="sp-settings-label">Display Mode</label>
             <div class="sp-mode-selector">
@@ -104,6 +117,8 @@
             <label class="sp-settings-label" for="spApiUrlInput">API URL</label>
             <input id="spApiUrlInput" class="sp-settings-input" type="url" placeholder="https://app.ondoki.com/api/v1">
             <button id="spSaveSettingsBtn" class="btn btn-outline btn-sm">Save</button>
+            <div class="settings-divider"></div>
+            <button id="spLogoutBtn" class="btn btn-outline btn-sm btn-danger-subtle">Sign Out</button>
           </div>
         </details>
       </div>
@@ -112,7 +127,7 @@
     <!-- Steps list -->
     <div class="steps-list" id="stepsList">
       <div class="empty-state" id="emptyState">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="1.5">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D6D3D1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 6v6l4 2"/>
         </svg>
@@ -121,10 +136,10 @@
       </div>
     </div>
 
-    <!-- Upload Panel (shown after completing) -->
+    <!-- Upload Panel -->
     <div class="upload-panel hidden" id="uploadPanel">
       <div class="upload-content">
-        <svg class="upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3ab08a" stroke-width="2">
+        <svg class="upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3AB08A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="17 8 12 3 7 8"/>
           <line x1="12" y1="3" x2="12" y2="15"/>
@@ -145,7 +160,7 @@
       </div>
     </div>
 
-    <!-- Footer controls - Scribe-like bottom toolbar -->
+    <!-- Footer controls -->
     <footer class="footer" id="footer">
       <div class="footer-left">
         <button id="pauseBtn" class="footer-icon-btn" title="Pause">
@@ -155,7 +170,7 @@
           </svg>
         </button>
         <button id="deleteAllBtn" class="footer-icon-btn" title="Delete capture">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"/>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
           </svg>

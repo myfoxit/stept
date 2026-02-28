@@ -7,6 +7,9 @@ const spGreeting = document.getElementById('spGreeting');
 const spProjectSelector = document.getElementById('spProjectSelector');
 const spStartBtn = document.getElementById('spStartBtn');
 const spLogoutBtn = document.getElementById('spLogoutBtn');
+const headerProjectSelector = document.getElementById('headerProjectSelector');
+const settingsToggleBtn = document.getElementById('settingsToggleBtn');
+const settingsAccordion = document.getElementById('settingsAccordion');
 
 const stepsList = document.getElementById('stepsList');
 const emptyState = document.getElementById('emptyState');
@@ -37,6 +40,13 @@ const newCaptureBtn = document.getElementById('newCaptureBtn');
 let recordingInterval = null;
 let steps = [];
 
+// Settings gear toggles the settings accordion in setup panel
+settingsToggleBtn.addEventListener('click', () => {
+  if (settingsAccordion && spSetupPanel && !spSetupPanel.classList.contains('hidden')) {
+    settingsAccordion.open = !settingsAccordion.open;
+  }
+});
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await refreshState();
@@ -51,7 +61,8 @@ async function refreshState() {
     spSetupPanel.classList.add('hidden');
     stepsList.classList.add('hidden');
     footer.classList.add('hidden');
-    recordingBadge.style.display = 'none';
+    recordingBadge.classList.remove('visible');
+    headerProjectSelector.classList.add('hidden');
     return;
   }
 
@@ -61,10 +72,11 @@ async function refreshState() {
     spSetupPanel.classList.remove('hidden');
     stepsList.classList.add('hidden');
     footer.classList.add('hidden');
-    recordingBadge.style.display = 'none';
+    recordingBadge.classList.remove('visible');
+    headerProjectSelector.classList.remove('hidden');
 
     const displayName = state.currentUser?.name || state.currentUser?.email || 'User';
-    spGreeting.textContent = `Hello, ${displayName}!`;
+    spGreeting.textContent = `Hello, ${displayName}`;
 
     // Populate projects
     spProjectSelector.innerHTML = '<option value="">Select project</option>';
@@ -86,7 +98,8 @@ async function refreshState() {
   spSetupPanel.classList.add('hidden');
   stepsList.classList.remove('hidden');
   footer.classList.remove('hidden');
-  recordingBadge.style.display = '';
+  recordingBadge.classList.add('visible');
+  headerProjectSelector.classList.add('hidden');
 
   const stepsResult = await sendMessage({ type: 'GET_STEPS' });
   steps = stepsResult.steps || [];
@@ -100,7 +113,7 @@ async function refreshState() {
 
 function updateUI(state) {
   // Update badge with step count
-  badgeStepCount.textContent = steps.length > 0 ? `· ${steps.length} steps` : '';
+  badgeStepCount.textContent = `${steps.length} steps`;
 
   if (state.isPaused) {
     recordingBadge.classList.add('paused');
@@ -274,7 +287,7 @@ async function performUpload() {
   if (result.success) {
     uploadTitle.textContent = 'Upload Complete!';
     uploadMessage.textContent = 'Your capture has been saved to the cloud';
-    uploadStatus.textContent = '✓ Successfully uploaded';
+    uploadStatus.textContent = '\u2713 Successfully uploaded';
     uploadStatus.classList.add('upload-success');
     uploadActions.classList.add('hidden');
     uploadDoneActions.classList.remove('hidden');
@@ -336,7 +349,6 @@ backBtn.addEventListener('click', async () => {
 uploadBtn.addEventListener('click', performUpload);
 
 newCaptureBtn.addEventListener('click', async () => {
-  // Get the last used project ID and start a fresh recording
   const state = await sendMessage({ type: 'GET_STATE' });
   const projectId = state.selectedProjectId;
 
@@ -352,7 +364,7 @@ newCaptureBtn.addEventListener('click', async () => {
   if (emptyStateEl) {
     emptyStateEl.style.display = 'flex';
   }
-  badgeStepCount.textContent = '';
+  badgeStepCount.textContent = '0 steps';
   recordingTimeEl.textContent = '00:00';
   await refreshState();
 });
@@ -446,13 +458,11 @@ function showToast(text, duration = 4000) {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'STEP_ADDED') {
     steps.push(message.step);
-    badgeStepCount.textContent = `· ${steps.length} steps`;
+    badgeStepCount.textContent = `${steps.length} steps`;
     renderSteps();
   } else if (message.type === 'SCREENSHOT_FAILED') {
-    // MISS-C002: Show user-visible error when screenshot capture fails
     showToast('Screenshot failed \u2014 try again');
   } else if (message.type === 'MAX_STEPS_REACHED') {
-    // MISS-C003: Show warning when step limit is reached
     showToast(`Maximum steps reached (${message.limit}). Stop recording to save.`, 6000);
   } else if (message.type === 'RECORDING_STATE_CHANGED') {
     refreshState();
