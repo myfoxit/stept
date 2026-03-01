@@ -175,7 +175,15 @@ export const handleImageUpload = async (
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText)
-          resolve(response.url)
+          // Backend returns relative URL like /api/v1/uploads/image/xxx.
+          // In dev the API runs on a different origin so make it absolute.
+          const baseUrl = getApiBaseUrl()
+          let imageUrl = response.url
+          if (imageUrl.startsWith('/') && baseUrl.startsWith('http')) {
+            const origin = new URL(baseUrl).origin
+            imageUrl = origin + imageUrl
+          }
+          resolve(imageUrl)
         } catch {
           reject(new Error('Invalid response from server'))
         }
