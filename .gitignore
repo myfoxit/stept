@@ -50,3 +50,4 @@ storage/
 app/dist/
 *.egg-info/
 app/.pnpm-store
+app/playwright/
