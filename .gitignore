@@ -49,3 +49,4 @@ storage/
 # Build artifacts
 app/dist/
 *.egg-info/
+app/.pnpm-store

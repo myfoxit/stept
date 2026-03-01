@@ -2,23 +2,23 @@ import {
   LoginForm,
   RegisterForm,
   ResetPasswordForm,
-} from '@/components/Authentication/login';
-import type { AuthView } from '@/components/Authentication/login';
-import { useState } from 'react';
-import { GalleryVerticalEnd } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+} from "@/components/Authentication/login";
+import type { AuthView } from "@/components/Authentication/login";
+import { useState } from "react";
+import { GalleryVerticalEnd } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
-  const [view, setView] = useState<AuthView>('login');
+  const [view, setView] = useState<AuthView>("login");
   const navigate = useNavigate();
 
-  const onSuccess = () => navigate('/');
+  const onSuccess = () => navigate("/");
 
   const renderForm = () => {
     switch (view) {
-      case 'register':
+      case "register":
         return <RegisterForm onSwitch={setView} onSuccess={onSuccess} />;
-      case 'reset':
+      case "reset":
         return <ResetPasswordForm onSwitch={setView} />;
       default:
         return <LoginForm onSwitch={setView} onSuccess={onSuccess} />;
@@ -41,10 +41,13 @@ export default function LoginPage() {
         </div>
       </div>
       <div className="bg-muted relative hidden lg:block">
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+        <div className="absolute inset-0 flex stretch">
           <div className="text-center">
-            <div className="text-6xl font-bold text-primary/30">ondoki</div>
-            <p className="mt-2 text-lg text-muted-foreground">Document collaboration, reimagined.</p>
+            <img
+              src="/login_side_banner.png"
+              alt=""
+              className="max-w-full h-full object-contain rounded-lg"
+            />
           </div>
         </div>
       </div>
