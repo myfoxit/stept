@@ -183,24 +183,39 @@ export function DragMenu() {
 
   const isImageNode = node?.type.name === 'image' || node?.type.name === 'imageUpload';
 
-  // Dynamic positioning — center handle on the node, capped for very tall multi-line blocks
+  // Align drag handle with the first line of the block.
+  // Placement is "left-start" (default), so the handle is at the top of the
+  // reference rect. We use a custom offset middleware that reads the actual
+  // DOM element to find where the first line of content sits, accounting for
+  // padding, borders, and margins that vary per block type.
   const computePositionConfig = React.useMemo(() => ({
     middleware: [
-      offset(({ rects }: any) => {
-        const nodeHeight = rects.reference.height;
-        const handleHeight = 24; // h-6 = 24px
-        // Center vertically, but for very tall blocks (3+ lines, >80px),
-        // cap it so handle stays near the top (first ~line area)
-        // For tall blocks (multi-line text, lists), align with the first line
-        // instead of centering on the entire block.
-        // Default floating-ui centers the handle vertically on the reference.
-        // Negative crossAxis moves it up toward the first line.
-        const halfNode = nodeHeight / 2;
-        const firstLineCenter = handleHeight / 2 + 4; // ~16px from top
-        const shift = nodeHeight > 48 ? -(halfNode - firstLineCenter) : 0;
+      offset(({ rects, elements }: any) => {
+        const ref = elements.reference as HTMLElement;
+        if (!ref) return { mainAxis: 0, crossAxis: 0 };
+
+        // Get the first line position by finding the first text/content child
+        // and measuring where it actually sits relative to the reference top.
+        const lineHeight = parseFloat(getComputedStyle(ref).lineHeight) || 24;
+        const firstLineCenter = lineHeight / 2; // center of first line from content top
+
+        // For wrapper elements (ul, ol, blockquote), look at the first child
+        // element's position relative to the wrapper to find the real first line
+        const firstChild = ref.querySelector('p, li, code, span, div');
+        let extraOffset = 0;
+        if (firstChild) {
+          const refRect = ref.getBoundingClientRect();
+          const childRect = firstChild.getBoundingClientRect();
+          extraOffset = childRect.top - refRect.top;
+        }
+
+        const handleHeight = 24;
+        // Push down so handle center aligns with first line center
+        const crossAxis = extraOffset + firstLineCenter - handleHeight / 2;
+
         return {
-          mainAxis: 8,
-          crossAxis: shift,
+          mainAxis: 0,
+          crossAxis: Math.max(0, crossAxis),
         };
       }),
     ],
