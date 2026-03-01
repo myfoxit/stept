@@ -30,9 +30,42 @@ export default function LoginPage() {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
-            <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-              <GalleryVerticalEnd className="size-4" />
-            </div>
+            <svg
+              style={{ width: "38px", height: "36px" }}
+              width="38"
+              height="36"
+              viewBox="0 0 38 36"
+            >
+              <rect x="0" y="4" width="32" height="32" rx="9" fill="#3AB08A" />
+              <rect
+                x="7"
+                y="11"
+                width="10"
+                height="3.5"
+                rx="1.75"
+                fill="white"
+              />
+              <rect
+                x="7"
+                y="17.5"
+                width="18"
+                height="3.5"
+                rx="1.75"
+                fill="white"
+              />
+              <rect
+                x="7"
+                y="24"
+                width="14"
+                height="3.5"
+                rx="1.75"
+                fill="white"
+              />
+              <path
+                d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
+                fill="#3AB08A"
+              />
+            </svg>
             ondoki
           </a>
         </div>
@@ -42,13 +75,7 @@ export default function LoginPage() {
       </div>
       <div className="bg-muted relative hidden lg:block">
         <div className="absolute inset-0 flex stretch">
-          <div className="text-center">
-            <img
-              src="/login_side_banner.png"
-              alt=""
-              className="max-w-full h-full object-contain rounded-lg"
-            />
-          </div>
+          <div className="text-center"></div>
         </div>
       </div>
     </div>

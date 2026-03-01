@@ -109,7 +109,7 @@ services:
       - ondoki-network
 
   media-worker:
-    image: ghcr.io/myfoxit/ondoki-web-api:latest
+    image: ghcr.io/myfoxit/ondoki-web-media-worker:latest
     container_name: ondoki-media-worker
     restart: unless-stopped
     command: celery -A app.tasks worker --loglevel=info --queues=celery,media --concurrency=1
