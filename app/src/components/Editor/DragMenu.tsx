@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { useCurrentEditor } from '@tiptap/react';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
 import type { Node as PMNode } from '@tiptap/pm/model';
-import { offset } from '@floating-ui/dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,9 +84,42 @@ export function DragMenu() {
   const [node, setNode] = useState<PMNode | null>(null);
   const [nodePos, setNodePos] = useState(-1);
 
-  const handleNodeChange = useCallback((data: { node: PMNode | null; pos: number }) => {
+  const dragHandleRef = React.useRef<HTMLDivElement>(null);
+
+  const handleNodeChange = useCallback((data: { node: PMNode | null; pos: number; editor: any }) => {
     if (data.node) setNode(data.node);
     setNodePos(data.pos);
+
+    // Align handle with the first line of the block by measuring the DOM
+    if (data.editor && data.pos >= 0) {
+      requestAnimationFrame(() => {
+        try {
+          const view = data.editor.view;
+          const dom = view.nodeDOM(data.pos) as HTMLElement | null;
+          if (!dom || !dragHandleRef.current) return;
+
+          // Find the first text-containing child
+          const firstContent = dom.querySelector('li, p, code, h1, h2, h3, h4, h5, h6') || dom;
+          const domRect = dom.getBoundingClientRect();
+          const contentRect = firstContent.getBoundingClientRect();
+
+          // How far the first content line is from the block's top
+          const topDelta = contentRect.top - domRect.top;
+
+          // Get line height
+          const computed = getComputedStyle(firstContent);
+          const lh = parseFloat(computed.lineHeight) || parseFloat(computed.fontSize) * 1.5 || 24;
+
+          // Shift: we want handle center at first-line center
+          const handleH = dragHandleRef.current.offsetHeight || 24;
+          const shift = topDelta + (lh / 2) - (handleH / 2);
+
+          dragHandleRef.current.style.transform = `translateY(${Math.round(Math.max(0, shift))}px)`;
+        } catch {
+          // ignore
+        }
+      });
+    }
   }, []);
 
   // Lock drag handle when menu is open
@@ -183,37 +215,6 @@ export function DragMenu() {
 
   const isImageNode = node?.type.name === 'image' || node?.type.name === 'imageUpload';
 
-  // Align handle vertically with the center of the first line of text.
-  // Default placement is "left-start" which puts handle at the very top
-  // of the block element. We shift it down to the first line center.
-  const computePositionConfig = React.useMemo(() => ({
-    middleware: [
-      offset(({ elements }: any) => {
-        const ref = elements.reference as HTMLElement;
-        if (!ref) return { mainAxis: 0, crossAxis: 0 };
-
-        // Find the first leaf content element to measure actual text position
-        const firstContent = ref.querySelector('li, p, code, h1, h2, h3, h4, h5, h6, td, th, .node-view-wrapper')
-          || ref;
-
-        const refRect = ref.getBoundingClientRect();
-        const contentRect = firstContent.getBoundingClientRect();
-
-        // Distance from block top to first content element top
-        const topOffset = contentRect.top - refRect.top;
-
-        // Get line height of the content element
-        const computed = getComputedStyle(firstContent);
-        const lineHeight = parseFloat(computed.lineHeight) || parseFloat(computed.fontSize) * 1.5 || 24;
-
-        // We want handle center at first line center
-        const handleHeight = 24;
-        const crossAxis = topOffset + (lineHeight / 2) - (handleHeight / 2);
-
-        return { mainAxis: 0, crossAxis: Math.round(crossAxis) };
-      }),
-    ],
-  }), []);
 
 
   if (!editor) return null;
@@ -225,9 +226,9 @@ export function DragMenu() {
     <DragHandle
       editor={editor}
       onNodeChange={handleNodeChange}
-      computePositionConfig={computePositionConfig}
     >
       <div
+        ref={dragHandleRef}
         className="flex items-center gap-0.5"
         style={hasTextSelection ? { opacity: 0, pointerEvents: 'none' } : {}}
       >
