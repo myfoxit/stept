@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { useCurrentEditor } from '@tiptap/react';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
 import type { Node as PMNode } from '@tiptap/pm/model';
-import { offset } from '@floating-ui/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,9 +55,8 @@ const HIGHLIGHT_COLORS = [
 // ---------------------------------------------------------------------------
 // Node name helper
 // ---------------------------------------------------------------------------
-function getNodeDisplayName(editor: any): string {
-  const { selection } = editor.state;
-  const node = selection.$from.parent;
+function getNodeDisplayName(node: PMNode | null): string {
+  if (!node) return 'Block';
   const names: Record<string, string> = {
     paragraph: 'Paragraph',
     heading: `Heading ${node.attrs?.level || ''}`,
@@ -68,7 +66,7 @@ function getNodeDisplayName(editor: any): string {
     blockquote: 'Blockquote',
     codeBlock: 'Code Block',
     image: 'Image',
-    imageUpload: 'Image',
+    imageUpload: 'Image Upload',
     horizontalRule: 'Divider',
     table: 'Table',
   };
@@ -126,7 +124,6 @@ export function DragMenu() {
 
   const duplicateNode = useCallback(() => {
     if (!editor || nodePos < 0 || !node) return;
-    // Get the full node at the tracked position and insert a copy after it
     const resolvedPos = editor.state.doc.resolve(nodePos);
     const endOfNode = nodePos + (resolvedPos.nodeAfter?.nodeSize || 0);
     const nodeJSON = resolvedPos.nodeAfter?.toJSON();
@@ -146,7 +143,6 @@ export function DragMenu() {
 
   const resetFormatting = useCallback(() => {
     if (!editor || nodePos < 0) return;
-    // Select all text in the node first, then clear
     const resolvedPos = editor.state.doc.resolve(nodePos);
     const nodeAfter = resolvedPos.nodeAfter;
     if (nodeAfter && nodeAfter.isTextblock) {
@@ -162,10 +158,8 @@ export function DragMenu() {
 
   const handleSlashInsert = useCallback(() => {
     if (!editor || nodePos < 0) return;
-    // Insert a slash at the end of the current node to trigger slash menu
     const pos = nodePos + (node?.nodeSize || 1);
     editor.chain().focus().insertContentAt(pos, { type: 'paragraph' }).run();
-    // After inserting paragraph, type /
     setTimeout(() => {
       editor.chain().focus().insertContent('/').run();
     }, 50);
@@ -183,29 +177,6 @@ export function DragMenu() {
 
   const isImageNode = node?.type.name === 'image' || node?.type.name === 'imageUpload';
 
-  // Dynamic positioning — center handle on the node, capped for very tall multi-line blocks
-  const computePositionConfig = React.useMemo(() => ({
-    middleware: [
-      offset(({ rects }: any) => {
-        const nodeHeight = rects.reference.height;
-        const handleHeight = 24; // h-6 = 24px
-        // Center vertically, but for very tall blocks (3+ lines, >80px),
-        // cap it so handle stays near the top (first ~line area)
-        // For tall blocks (multi-line text, lists), align with the first line
-        // instead of centering on the entire block.
-        // Default floating-ui centers the handle vertically on the reference.
-        // Negative crossAxis moves it up toward the first line.
-        const halfNode = nodeHeight / 2;
-        const firstLineCenter = handleHeight / 2 + 4; // ~16px from top
-        const shift = nodeHeight > 48 ? -(halfNode - firstLineCenter) : 0;
-        return {
-          mainAxis: 8,
-          crossAxis: shift,
-        };
-      }),
-    ],
-  }), []);
-
   if (!editor) return null;
 
   const { from, to, empty } = editor.state.selection;
@@ -215,7 +186,6 @@ export function DragMenu() {
     <DragHandle
       editor={editor}
       onNodeChange={handleNodeChange}
-      computePositionConfig={computePositionConfig}
     >
       <div
         className="flex items-center gap-0.5"
@@ -248,7 +218,7 @@ export function DragMenu() {
           <DropdownMenuContent align="start" className="w-52">
             {/* Node label */}
             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-              {getNodeDisplayName(editor)}
+              {getNodeDisplayName(node)}
             </DropdownMenuLabel>
 
             {/* Color submenu */}
@@ -257,7 +227,6 @@ export function DragMenu() {
                 <Palette className="mr-2 h-4 w-4" /> Color
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-56 p-2">
-                {/* Text colors */}
                 <p className="px-2 py-1 text-xs text-muted-foreground font-medium">Text color</p>
                 <div className="grid grid-cols-5 gap-1.5 px-2 pb-2">
                   {TEXT_COLORS.map((c) => (
@@ -267,7 +236,6 @@ export function DragMenu() {
                       className="h-6 w-6 rounded-full border-2 border-transparent hover:border-ring transition-all hover:scale-110"
                       style={{ backgroundColor: c.value || 'currentColor' }}
                       onClick={() => {
-                        // Select entire node content before applying color
                         if (nodePos >= 0) {
                           const resolvedPos = editor.state.doc.resolve(nodePos);
                           const nodeAfter = resolvedPos.nodeAfter;
@@ -284,7 +252,6 @@ export function DragMenu() {
                   ))}
                 </div>
                 <DropdownMenuSeparator />
-                {/* Highlight colors */}
                 <p className="px-2 py-1 text-xs text-muted-foreground font-medium">Highlight</p>
                 <div className="grid grid-cols-5 gap-1.5 px-2 pb-1">
                   {HIGHLIGHT_COLORS.map((c) => (
@@ -297,7 +264,6 @@ export function DragMenu() {
                       )}
                       style={{ backgroundColor: c.value || '#f3f4f6' }}
                       onClick={() => {
-                        // Select entire node content before applying highlight
                         if (nodePos >= 0) {
                           const resolvedPos = editor.state.doc.resolve(nodePos);
                           const nodeAfter = resolvedPos.nodeAfter;
