@@ -23,6 +23,11 @@
 
   &.ri-resizing {
     cursor: col-resize;
+
+    .ri-image {
+      outline: 2px solid hsl(var(--primary) / 0.4);
+      border-radius: 4px;
+    }
   }
 }
 
@@ -134,11 +139,81 @@
   max-height: 50%;
   background: hsl(var(--primary));
   border-radius: 4px;
-  opacity: 0.5;
-  transition: opacity 0.1s, height 0.1s;
+  opacity: 0.4;
+  transition: opacity 0.15s, height 0.15s, background 0.15s;
 
   .ri-resize-handle:hover & {
-    opacity: 0.8;
+    opacity: 0.7;
     height: 50px;
+  }
+
+  .resizable-image-wrapper.ri-resizing & {
+    opacity: 0.9;
+    height: 60px;
+    background: hsl(var(--primary));
+  }
+}
+
+/* Width indicator during resize */
+.ri-width-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  animation: ri-fade-in 0.1s ease forwards;
+  z-index: 10;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lightbox modal */
+.ri-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  cursor: zoom-out;
+  opacity: 0;
+  animation: ri-fade-in 0.2s ease forwards;
+}
+
+.ri-lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.ri-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
   }
 }
