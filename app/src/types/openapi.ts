@@ -139,10 +139,12 @@ export interface TextContainerUpdate {
 
 export interface ProcessRecordingSession {
   id: string;
+  session_id?: string;
   user_id?: string;
   client_name?: string;
   status: string;
   name?: string;
+  title?: string;
   project_id?: string;
   folder_id?: string | null;
   position?: number;

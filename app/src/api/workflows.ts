@@ -165,7 +165,7 @@ export async function uploadStepImage(
 }
 
 export const getFilteredWorkflows = (
-  projectId: string,
+  projectId?: string,
   folderId?: string,
   sortBy: 'created_at' | 'updated_at' | 'name' = 'created_at',
   sortOrder: 'asc' | 'desc' = 'desc',
@@ -176,7 +176,7 @@ export const getFilteredWorkflows = (
     method: 'GET',
     url: '/process-recording/workflows/filtered',
     params: {
-      project_id: projectId,
+      ...(projectId ? { project_id: projectId } : {}),
       folder_id: folderId,
       sort_by: sortBy,
       sort_order: sortOrder,

@@ -32,13 +32,21 @@ import {
   unifiedSearch,
   type UnifiedSearchResult,
 } from '@/api/spotlight';
+import { getFolderTree, type FolderTreeRead } from '@/api/folders';
+
+export type SpotlightMode = 'default' | 'insert-workflow';
 
 interface SpotlightSearchProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set to 'insert-workflow', only shows workflows and calls onInsertWorkflow instead of navigating. */
+  mode?: SpotlightMode;
+  /** Called when a workflow is selected in insert-workflow mode. */
+  onInsertWorkflow?: (workflowId: string) => void;
 }
 
-export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
+export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsertWorkflow }: SpotlightSearchProps) {
+  const isInsertMode = mode === 'insert-workflow';
   const navigate = useNavigate();
   const { selectedProject, selectedProjectId } = useProject();
   const { openPanel, sendMessage } = useChat();
@@ -50,6 +58,23 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   const [showWorkflowChooser, setShowWorkflowChooser] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Preload all workflows for insert mode
+  const [allWorkflows, setAllWorkflows] = useState<FolderTreeRead[]>([]);
+  useEffect(() => {
+    if (!isInsertMode || !open || !selectedProjectId) return;
+    getFolderTree(selectedProjectId).then((tree) => {
+      const wfs: FolderTreeRead[] = [];
+      const walk = (nodes: FolderTreeRead[]) => {
+        for (const n of nodes) {
+          if (n.is_workflow) wfs.push(n);
+          if (n.children?.length) walk(n.children);
+        }
+      };
+      walk(tree);
+      setAllWorkflows(wfs);
+    }).catch(() => {});
+  }, [isInsertMode, open, selectedProjectId]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -90,6 +115,10 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
   }, [query, selectedProjectId]);
 
   const handleSelect = (result: UnifiedSearchResult) => {
+    if (mode === 'insert-workflow' && result.type === 'workflow') {
+      onInsertWorkflow?.(result.id);
+      return;
+    }
     onOpenChange(false);
     if (result.type === 'workflow') {
       navigate(`/workflow/${result.id}`);
@@ -97,6 +126,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       navigate(`/editor/${result.id}`);
     }
   };
+
 
   const handleStepSelect = (workflowId: string, stepNumber: number) => {
     onOpenChange(false);
@@ -120,19 +150,19 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Spotlight Search"
-      description="Search workflows, pages, or ask AI"
+      title={isInsertMode ? "Insert Workflow" : "Spotlight Search"}
+      description={isInsertMode ? "Search and select a workflow to insert" : "Search workflows, pages, or ask AI"}
       showCloseButton={false}
       shouldFilter={false}
     >
       <CommandInput
-        placeholder="Search workflows, pages, or ask AI..."
+        {...{ placeholder: isInsertMode ? "Search workflows to insert…" : "Search workflows, pages, or ask AI..." }}
         value={query}
         onValueChange={setQuery}
       />
 
       {/* Search mode indicator */}
-      {hasQuery && (
+      {hasQuery && !isInsertMode && (
         <div className="flex items-center gap-2 border-b px-3 py-1.5">
           <Badge variant="outline" className="gap-1 text-xs">
             {searchType === 'semantic' ? (
@@ -148,7 +178,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
 
       <CommandList className="max-h-[400px]">
         {/* Idle state: Quick Actions or Workflow Type Chooser */}
-        {!hasQuery && !showWorkflowChooser && (
+        {!hasQuery && !showWorkflowChooser && !isInsertMode && (
           <CommandGroup heading="Quick Actions">
             <CommandItem
               onSelect={async () => {
@@ -190,7 +220,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
         )}
 
         {/* Workflow type chooser sub-menu */}
-        {!hasQuery && showWorkflowChooser && (
+        {!hasQuery && showWorkflowChooser && !isInsertMode && (
           <CommandGroup heading="New Workflow">
             <CommandItem
               onSelect={() => {
@@ -226,6 +256,28 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
           </CommandGroup>
         )}
 
+        {/* Insert mode: show all workflows when idle */}
+        {!hasQuery && isInsertMode && (
+          <CommandGroup heading="All Workflows">
+            {allWorkflows.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">No workflows found</div>
+            ) : (
+              allWorkflows.map((wf) => (
+                <CommandItem
+                  key={wf.id}
+                  value={wf.name || 'Untitled Workflow'}
+                  onSelect={() => {
+                    onInsertWorkflow?.(wf.id);
+                  }}
+                >
+                  <IconListDetails className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">{wf.name || 'Untitled Workflow'}</span>
+                </CommandItem>
+              ))
+            )}
+          </CommandGroup>
+        )}
+
         {/* No results */}
         {hasQuery && !isSearching && !hasResults && (
           <CommandEmpty>
@@ -256,7 +308,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
         )}
 
         {/* Documents / Pages */}
-        {documents.length > 0 && (
+        {documents.length > 0 && !isInsertMode && (
           <CommandGroup heading={`Pages (${documents.length})`}>
             {documents.map((doc) => (
               <CommandItem key={doc.id} onSelect={() => handleSelect(doc)}>
@@ -279,7 +331,7 @@ export function SpotlightSearch({ open, onOpenChange }: SpotlightSearchProps) {
       </CommandList>
 
       {/* Footer: result count + Ask AI suggestion */}
-      {hasQuery && !isSearching && (
+      {hasQuery && !isSearching && !isInsertMode && (
         <div className="flex items-center justify-between border-t px-3 py-2">
           <span className="text-xs text-muted-foreground">
             {results.length} result{results.length !== 1 ? 's' : ''}

@@ -129,13 +129,12 @@ async def test_register_missing_name(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_empty_password(async_client: AsyncClient):
-    """Registration with empty password succeeds (no server-side min length)."""
+    """Registration with empty password is rejected by validation."""
     resp = await async_client.post(
         "/api/v1/auth/register",
         json={"email": "empty@test.com", "password": "", "name": "emptypass"},
     )
-    # API currently accepts empty password — no validation
-    assert resp.status_code == 200
+    assert resp.status_code == 422
 
 
 # ─────────────── Multiple sessions ──────────────────────────────

@@ -46,11 +46,13 @@ test-backend: test-db
 		-e JWT_SECRET=$(TEST_JWT_SECRET) \
 		backend python -m pytest tests/ -v --tb=short
 
-# Ensure the test database and pgvector extension exist
+# Drop and recreate test database for a guaranteed clean slate
 test-db:
-	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -tc \
-		"SELECT 1 FROM pg_database WHERE datname = '$(TEST_DB_NAME)'" | grep -q 1 || \
-		$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -c "CREATE DATABASE $(TEST_DB_NAME)"
+	@echo "Resetting test database $(TEST_DB_NAME)…"
+	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -c \
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$(TEST_DB_NAME)' AND pid <> pg_backend_pid()" >/dev/null 2>&1 || true
+	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -c "DROP DATABASE IF EXISTS $(TEST_DB_NAME)" >/dev/null 2>&1
+	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -c "CREATE DATABASE $(TEST_DB_NAME)"
 	@$(COMPOSE_DEV) exec db psql -U $(TEST_DB_USER) -d $(TEST_DB_NAME) -c "CREATE EXTENSION IF NOT EXISTS vector" 2>/dev/null || true
 
 # E2E tests against Docker dev environment

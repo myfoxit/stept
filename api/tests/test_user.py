@@ -52,12 +52,11 @@ async def test_list_users(async_client: AsyncClient, auth_headers: dict):
 
 
 @pytest.mark.asyncio
-async def test_list_users_returns_created_user(
+async def test_create_user_returns_data(
     async_client: AsyncClient, auth_headers: dict
 ):
-    """Users created via /users/ should appear in the list."""
-    # Create a user
-    await async_client.post(
+    """POST /users/ returns the created user with correct fields."""
+    resp = await async_client.post(
         "/api/v1/users/",
         json={
             "email": "findme@test.com",
@@ -66,9 +65,33 @@ async def test_list_users_returns_created_user(
         },
         headers=auth_headers,
     )
+    assert resp.status_code in (200, 201), f"Create user failed: {resp.text}"
+    data = resp.json()
+    assert data["email"] == "findme@test.com"
+    assert data["name"] == "findme"
+    assert "id" in data
 
-    # List users
-    resp = await async_client.get("/api/v1/users/")
+
+@pytest.mark.asyncio
+async def test_list_users_scoped_to_project_peers(
+    async_client: AsyncClient, auth_headers: dict, test_project: dict
+):
+    """GET /users/ only returns users who share a project."""
+    # Create a second user via registration (not in any project)
+    await async_client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "outsider@test.com",
+            "password": "Outside123!",
+            "name": "outsider",
+        },
+    )
+
+    # List users — outsider should NOT appear (no shared project)
+    resp = await async_client.get("/api/v1/users/", headers=auth_headers)
     assert resp.status_code == 200
     emails = [u["email"] for u in resp.json()]
-    assert "findme@test.com" in emails
+    assert "outsider@test.com" not in emails
+
+    # The authenticated user themselves should appear
+    assert "test@example.com" in emails

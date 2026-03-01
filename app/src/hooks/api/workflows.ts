@@ -45,8 +45,7 @@ export const useFilteredWorkflows = (
 ) =>
   useQuery<ProcessRecordingSession[], ApiError>({
     queryKey: ['workflows', 'filtered', projectId, folderId, sortBy, sortOrder],
-    queryFn: () => getFilteredWorkflows(projectId!, folderId, sortBy, sortOrder),
-    enabled: !!projectId,
+    queryFn: () => getFilteredWorkflows(projectId, folderId, sortBy, sortOrder),
   });
 
 // Update workflow

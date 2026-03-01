@@ -26,12 +26,11 @@ import { useAutoSave } from '@/components/Editor/hooks/useAutoSave';
 import { PAGE_FORMATS } from '@/components/Editor/Extensions/pagination';
 
 
-import { listWorkflows } from '@/api/workflows';
-import type { ProcessRecordingSession } from '@/types/openapi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDocument, useSaveDocument, useAllTextContainer, useTextContainer } from '@/hooks/api/documents';
 import { queryKeys } from '@/lib/queryKeys';
 import { AICommandPanel, AI_COMMANDS } from '@/components/Editor/Extensions/ai-commands';
+import { SpotlightSearch } from '@/components/spotlight/SpotlightSearch';
 
 
 export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
@@ -109,9 +108,8 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
 
   const { data: containers = [] } = useAllTextContainer();
 
-  // Workflow picker state
-  const [showWorkflowPicker, setShowWorkflowPicker] = useState(false);
-  const [availableWorkflows, setAvailableWorkflows] = useState<ProcessRecordingSession[]>([]);
+  // Workflow insert via spotlight
+  const [workflowInsertMode, setWorkflowInsertMode] = useState(false);
 
   // Inline AI writer state
   const [aiCommandCoords, setAiCommandCoords] = useState<{ x: number; y: number } | null>(null);
@@ -129,20 +127,12 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
     return () => window.removeEventListener('ondoki:ai-inline-write', handler);
   }, []);
 
-  // Listen for workflow insert events
+  // Listen for workflow insert events — opens spotlight in insert mode
   useEffect(() => {
-    const handler = async () => {
-      try {
-        const workflows = await listWorkflows(50, 0);
-        setAvailableWorkflows(workflows);
-        setShowWorkflowPicker(true);
-      } catch (err) {
-        console.error('Failed to fetch workflows:', err);
-      }
-    };
+    const handler = () => setWorkflowInsertMode(true);
     window.addEventListener('ondoki:insert-workflow', handler);
     return () => window.removeEventListener('ondoki:insert-workflow', handler);
-  }, [editor]);
+  }, []);
 
   // Text container insert
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
@@ -286,38 +276,21 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
           )}
         </EditorContent>
 
-        {/* Workflow Picker Modal */}
-        {showWorkflowPicker && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowWorkflowPicker(false)}>
-            <div className="bg-background rounded-lg shadow-xl p-4 w-96 max-h-96 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-sm font-semibold mb-3">Insert Workflow</h3>
-              {availableWorkflows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No workflows found.</p>
-              ) : (
-                <ul className="space-y-1">
-                  {availableWorkflows.map((wf) => (
-                    <li key={wf.session_id}>
-                      <button
-                        className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent"
-                        onClick={() => {
-                          if (editor) {
-                            editor.chain().focus().insertContent({
-                              type: 'process-recording-node',
-                              attrs: { sessionId: wf.session_id },
-                            }).run();
-                          }
-                          setShowWorkflowPicker(false);
-                        }}
-                      >
-                        {wf.title || wf.name || 'Untitled Workflow'}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Workflow Picker */}
+        <SpotlightSearch
+          open={workflowInsertMode}
+          onOpenChange={setWorkflowInsertMode}
+          mode="insert-workflow"
+          onInsertWorkflow={(workflowId) => {
+            if (editor) {
+              editor.chain().focus().insertContent({
+                type: 'process-recording-node',
+                attrs: { sessionId: workflowId },
+              }).run();
+            }
+            setWorkflowInsertMode(false);
+          }}
+        />
       </EditorContext.Provider>
     </div>
   );

@@ -15,6 +15,18 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Drop all existing tables first to make this migration re-runnable
+    # (e.g. when alembic_version was lost but tables remain)
+    conn = op.get_bind()
+    result = conn.execute(sa.text(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+        "AND tablename != 'alembic_version'"
+    ))
+    existing = [row[0] for row in result.fetchall()]
+    if existing:
+        table_list = ", ".join(f'"{t}"' for t in existing)
+        conn.execute(sa.text(f"DROP TABLE IF EXISTS {table_list} CASCADE"))
+
     # ------------------------------------------------------------------
     # 1. users
     # ------------------------------------------------------------------
