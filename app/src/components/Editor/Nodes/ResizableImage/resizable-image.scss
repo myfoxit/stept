@@ -45,64 +45,43 @@
   transition: outline 0.15s ease;
 }
 
-/* Hover toolbar */
-.ri-toolbar {
+/* Dot menu — top right corner */
+.ri-dot-menu {
   position: absolute;
   top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 8px;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 6px;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   opacity: 0;
-  animation: ri-fade-in 0.15s ease forwards;
+  animation: ri-fade-in 0.12s ease forwards;
 }
 
-@keyframes ri-fade-in {
-  to { opacity: 1; }
-}
-
-.ri-toolbar-btn {
+.ri-dot-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
   border: none;
-  background: transparent;
-  border-radius: 4px;
+  background: hsl(var(--background) / 0.9);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   cursor: pointer;
   color: hsl(var(--muted-foreground));
-  transition: background 0.1s, color 0.1s;
+  transition: background 0.1s, color 0.1s, box-shadow 0.1s;
+  backdrop-filter: blur(4px);
 
   &:hover {
-    background: hsl(var(--accent));
-    color: hsl(var(--accent-foreground));
-  }
-
-  &.ri-active {
-    background: hsl(var(--accent));
-    color: hsl(var(--primary));
-  }
-
-  &.ri-toolbar-btn-danger:hover {
-    background: hsl(var(--destructive) / 0.1);
-    color: hsl(var(--destructive));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
   }
 }
 
-.ri-toolbar-divider {
-  width: 1px;
-  height: 18px;
-  background: hsl(var(--border));
-  margin: 0 2px;
+@keyframes ri-fade-in {
+  to { opacity: 1; }
 }
+
+
 
 /* Resize handles */
 .ri-resize-handle {

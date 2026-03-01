@@ -7,8 +7,16 @@ import {
   Expand,
   Trash2,
   Download,
+  EllipsisVertical,
   X,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import './resizable-image.scss'
 
 export const ResizableImageComponent: React.FC<NodeViewProps> = ({
@@ -22,6 +30,7 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
   const [isHovered, setIsHovered] = React.useState(false)
   const [isResizing, setIsResizing] = React.useState(false)
   const [showLightbox, setShowLightbox] = React.useState(false)
+  const [menuOpen, setMenuOpen] = React.useState(false)
   const [currentWidth, setCurrentWidth] = React.useState<number | null>(
     width ? parseInt(width, 10) : null
   )
@@ -35,7 +44,6 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
     widthRef.current = currentWidth
   }, [currentWidth])
 
-  // Close lightbox on Escape
   React.useEffect(() => {
     if (!showLightbox) return
     const onKey = (e: KeyboardEvent) => {
@@ -91,13 +99,8 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch {
-      // Fallback: open in new tab if fetch fails (CORS)
       window.open(src, '_blank')
     }
-  }
-
-  const handleAlignment = (align: string) => {
-    updateAttributes({ alignment: align })
   }
 
   const alignClass =
@@ -110,56 +113,52 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
     maxWidth: '100%',
   }
 
+  const showDot = isEditable && (isHovered || selected || menuOpen) && !isResizing
+
   return (
     <>
       <NodeViewWrapper
         className={`resizable-image-wrapper ${alignClass} ${selected ? 'ri-selected' : ''} ${isResizing ? 'ri-resizing' : ''}`}
         ref={containerRef}
-          onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => { if (!isResizing) setIsHovered(false) }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => { if (!isResizing && !menuOpen) setIsHovered(false) }}
       >
-        {/* Hover toolbar */}
-        {isEditable && (isHovered || selected) && !isResizing && (
-          <div className="ri-toolbar" contentEditable={false}>
-            <button
-              className={`ri-toolbar-btn ${alignment === 'left' ? 'ri-active' : ''}`}
-              onClick={() => handleAlignment('left')}
-              title="Align left"
-            >
-              <AlignLeft size={14} />
-            </button>
-            <button
-              className={`ri-toolbar-btn ${alignment === 'center' ? 'ri-active' : ''}`}
-              onClick={() => handleAlignment('center')}
-              title="Align center"
-            >
-              <AlignCenter size={14} />
-            </button>
-            <button
-              className={`ri-toolbar-btn ${alignment === 'right' ? 'ri-active' : ''}`}
-              onClick={() => handleAlignment('right')}
-              title="Align right"
-            >
-              <AlignRight size={14} />
-            </button>
-            <div className="ri-toolbar-divider" />
-            <button
-              className="ri-toolbar-btn"
-              onClick={() => setShowLightbox(true)}
-              title="View full size"
-            >
-              <Expand size={14} />
-            </button>
-            <button className="ri-toolbar-btn" onClick={handleDownload} title="Download">
-              <Download size={14} />
-            </button>
-            <button className="ri-toolbar-btn ri-toolbar-btn-danger" onClick={deleteNode} title="Delete">
-              <Trash2 size={14} />
-            </button>
-          </div>
-        )}
-
         <div className="ri-image-container">
+          {/* Dot menu — top right */}
+          {showDot && (
+            <div className="ri-dot-menu" contentEditable={false}>
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button className="ri-dot-btn" title="Image options">
+                    <EllipsisVertical size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => updateAttributes({ alignment: 'left' })}>
+                    <AlignLeft className="mr-2 h-4 w-4" /> Align left
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateAttributes({ alignment: 'center' })}>
+                    <AlignCenter className="mr-2 h-4 w-4" /> Align center
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateAttributes({ alignment: 'right' })}>
+                    <AlignRight className="mr-2 h-4 w-4" /> Align right
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowLightbox(true)}>
+                    <Expand className="mr-2 h-4 w-4" /> View full size
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownload}>
+                    <Download className="mr-2 h-4 w-4" /> Download
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={deleteNode} className="text-destructive focus:text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+
           {/* Left resize handle */}
           {isEditable && (isHovered || selected || isResizing) && (
             <div
@@ -181,11 +180,8 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
             onDoubleClick={() => setShowLightbox(true)}
           />
 
-          {/* Width indicator while resizing */}
           {isResizing && currentWidth && (
-            <div className="ri-width-indicator">
-              {currentWidth}px
-            </div>
+            <div className="ri-width-indicator">{currentWidth}px</div>
           )}
 
           {/* Right resize handle */}
@@ -200,7 +196,6 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
         </div>
       </NodeViewWrapper>
 
-      {/* Lightbox modal */}
       {showLightbox && (
         <div className="ri-lightbox" onClick={() => setShowLightbox(false)}>
           <button
