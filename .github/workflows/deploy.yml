@@ -180,7 +180,7 @@ jobs:
             # Wait for backend health
             echo "Waiting for backend..."
             for i in $(seq 1 30); do
-              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              if docker compose -f docker-compose.prod.yml exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
                 echo "Backend healthy!"
                 break
               fi
