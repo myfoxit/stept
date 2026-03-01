@@ -45,39 +45,7 @@
   transition: outline 0.15s ease;
 }
 
-/* Drag handle — left side of image */
-.ri-drag-handle {
-  position: absolute;
-  left: -28px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 28px;
-  border-radius: 4px;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  color: hsl(var(--muted-foreground));
-  cursor: grab;
-  opacity: 0;
-  animation: ri-fade-in 0.12s ease forwards;
-  transition: background 0.1s, color 0.1s;
-
-  &:hover {
-    background: hsl(var(--accent));
-    color: hsl(var(--accent-foreground));
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-/* Hover toolbar — top center */
+/* Hover toolbar */
 .ri-toolbar {
   position: absolute;
   top: 8px;

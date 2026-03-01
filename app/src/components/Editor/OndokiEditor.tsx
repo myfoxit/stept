@@ -16,6 +16,7 @@ import '@/components/Editor/styles/editor.scss';
 // Editor components
 import { FloatingToolbarContent } from '@/components/Editor/FloatingToolbar';
 import { MobileToolbar } from '@/components/Editor/MobileToolbar';
+import { DragMenu } from '@/components/Editor/DragMenu';
 
 // Hooks
 import { useOndokiEditor } from '@/components/Editor/hooks/useOndokiEditor';
@@ -270,6 +271,7 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
 
       <EditorContext.Provider value={{ editor }}>
         <EditorContent editor={editor} role="presentation" className="ondoki-editor-content">
+          <DragMenu />
           {editor && <FloatingToolbarContent editor={editor} />}
           <MobileToolbar />
 

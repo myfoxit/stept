@@ -7,7 +7,6 @@ import {
   Expand,
   Trash2,
   Download,
-  GripVertical,
   X,
 } from 'lucide-react'
 import './resizable-image.scss'
@@ -18,7 +17,6 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
   deleteNode,
   selected,
   editor,
-  getPos,
 }) => {
   const { src, alt, title, width, alignment = 'center' } = node.attrs
   const [isHovered, setIsHovered] = React.useState(false)
@@ -37,6 +35,7 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
     widthRef.current = currentWidth
   }, [currentWidth])
 
+  // Close lightbox on Escape
   React.useEffect(() => {
     if (!showLightbox) return
     const onKey = (e: KeyboardEvent) => {
@@ -92,19 +91,13 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch {
+      // Fallback: open in new tab if fetch fails (CORS)
       window.open(src, '_blank')
     }
   }
 
   const handleAlignment = (align: string) => {
     updateAttributes({ alignment: align })
-  }
-
-  const handleDragStart = (e: React.DragEvent) => {
-    const pos = getPos()
-    if (typeof pos !== 'number') return
-    // Select the node so ProseMirror picks it up for drag
-    editor.commands.setNodeSelection(pos)
   }
 
   const alignClass =
@@ -117,71 +110,56 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
     maxWidth: '100%',
   }
 
-  const showControls = isEditable && (isHovered || selected) && !isResizing
-
   return (
     <>
       <NodeViewWrapper
         className={`resizable-image-wrapper ${alignClass} ${selected ? 'ri-selected' : ''} ${isResizing ? 'ri-resizing' : ''}`}
         ref={containerRef}
-        onMouseEnter={() => setIsHovered(true)}
+          onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => { if (!isResizing) setIsHovered(false) }}
       >
-        <div className="ri-image-container">
-          {/* Drag handle — left side */}
-          {showControls && (
-            <div
-              className="ri-drag-handle"
-              contentEditable={false}
-              draggable
-              onDragStart={handleDragStart}
-              title="Drag to move"
+        {/* Hover toolbar */}
+        {isEditable && (isHovered || selected) && !isResizing && (
+          <div className="ri-toolbar" contentEditable={false}>
+            <button
+              className={`ri-toolbar-btn ${alignment === 'left' ? 'ri-active' : ''}`}
+              onClick={() => handleAlignment('left')}
+              title="Align left"
             >
-              <GripVertical size={14} />
-            </div>
-          )}
+              <AlignLeft size={14} />
+            </button>
+            <button
+              className={`ri-toolbar-btn ${alignment === 'center' ? 'ri-active' : ''}`}
+              onClick={() => handleAlignment('center')}
+              title="Align center"
+            >
+              <AlignCenter size={14} />
+            </button>
+            <button
+              className={`ri-toolbar-btn ${alignment === 'right' ? 'ri-active' : ''}`}
+              onClick={() => handleAlignment('right')}
+              title="Align right"
+            >
+              <AlignRight size={14} />
+            </button>
+            <div className="ri-toolbar-divider" />
+            <button
+              className="ri-toolbar-btn"
+              onClick={() => setShowLightbox(true)}
+              title="View full size"
+            >
+              <Expand size={14} />
+            </button>
+            <button className="ri-toolbar-btn" onClick={handleDownload} title="Download">
+              <Download size={14} />
+            </button>
+            <button className="ri-toolbar-btn ri-toolbar-btn-danger" onClick={deleteNode} title="Delete">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )}
 
-          {/* Toolbar — top center */}
-          {showControls && (
-            <div className="ri-toolbar" contentEditable={false}>
-              <button
-                className={`ri-toolbar-btn ${alignment === 'left' ? 'ri-active' : ''}`}
-                onClick={() => handleAlignment('left')}
-                title="Align left"
-              >
-                <AlignLeft size={14} />
-              </button>
-              <button
-                className={`ri-toolbar-btn ${alignment === 'center' ? 'ri-active' : ''}`}
-                onClick={() => handleAlignment('center')}
-                title="Align center"
-              >
-                <AlignCenter size={14} />
-              </button>
-              <button
-                className={`ri-toolbar-btn ${alignment === 'right' ? 'ri-active' : ''}`}
-                onClick={() => handleAlignment('right')}
-                title="Align right"
-              >
-                <AlignRight size={14} />
-              </button>
-              <div className="ri-toolbar-divider" />
-              <button
-                className="ri-toolbar-btn"
-                onClick={() => setShowLightbox(true)}
-                title="View full size"
-              >
-                <Expand size={14} />
-              </button>
-              <button className="ri-toolbar-btn" onClick={handleDownload} title="Download">
-                <Download size={14} />
-              </button>
-              <button className="ri-toolbar-btn ri-toolbar-btn-danger" onClick={deleteNode} title="Delete">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          )}
-
+        <div className="ri-image-container">
           {/* Left resize handle */}
           {isEditable && (isHovered || selected || isResizing) && (
             <div
@@ -222,7 +200,7 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
         </div>
       </NodeViewWrapper>
 
-      {/* Lightbox */}
+      {/* Lightbox modal */}
       {showLightbox && (
         <div className="ri-lightbox" onClick={() => setShowLightbox(false)}>
           <button
