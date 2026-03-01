@@ -244,7 +244,7 @@ export function FloatingToolbarContent({ editor }: { editor: any }) {
         const { selection } = state;
         const { from, to, empty } = selection;
         if (empty) return false;
-        if (isNodeSelection(selection) && selection.node.type.name !== 'image') return false;
+        if (isNodeSelection(selection)) return false;
         // Don't show on code blocks
         if (ed.isActive('codeBlock')) return false;
         return from !== to;

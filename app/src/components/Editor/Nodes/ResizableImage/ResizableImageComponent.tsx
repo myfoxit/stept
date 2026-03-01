@@ -115,8 +115,7 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
       <NodeViewWrapper
         className={`resizable-image-wrapper ${alignClass} ${selected ? 'ri-selected' : ''} ${isResizing ? 'ri-resizing' : ''}`}
         ref={containerRef}
-        data-drag-handle=""
-        onMouseEnter={() => setIsHovered(true)}
+          onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => { if (!isResizing) setIsHovered(false) }}
       >
         {/* Hover toolbar */}
