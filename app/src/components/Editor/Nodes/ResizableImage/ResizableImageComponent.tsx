@@ -113,6 +113,19 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
     maxWidth: '100%',
   }
 
+  // When menu closes, reset hover unless mouse is still over the container
+  const handleMenuChange = React.useCallback((open: boolean) => {
+    setMenuOpen(open)
+    if (!open) {
+      // Check if mouse is still over the image
+      requestAnimationFrame(() => {
+        if (containerRef.current && !containerRef.current.matches(':hover')) {
+          setIsHovered(false)
+        }
+      })
+    }
+  }, [])
+
   const showDot = isEditable && (isHovered || selected || menuOpen) && !isResizing
 
   return (
@@ -127,7 +140,7 @@ export const ResizableImageComponent: React.FC<NodeViewProps> = ({
           {/* Dot menu — top right */}
           {showDot && (
             <div className="ri-dot-menu" contentEditable={false}>
-              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenu open={menuOpen} onOpenChange={handleMenuChange}>
                 <DropdownMenuTrigger asChild>
                   <button className="ri-dot-btn" title="Image options">
                     <EllipsisVertical size={16} />
