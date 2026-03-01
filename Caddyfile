@@ -1,4 +1,6 @@
-:80 {
+:443 {
+    tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin-key.pem
+
     handle /api/* {
         reverse_proxy backend:8000 {
             flush_interval -1
@@ -7,4 +9,8 @@
     handle {
         reverse_proxy frontend:80
     }
+}
+
+:80 {
+    respond "OK" 200
 }
