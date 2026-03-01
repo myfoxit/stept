@@ -6,7 +6,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import { Color, TextStyle } from '@tiptap/extension-text-style'
 import Typography from '@tiptap/extension-typography'
 import UniqueID from '@tiptap/extension-unique-id'
-import { Image } from '@tiptap/extension-image'
+import { ResizableImage } from '@/components/Editor/Nodes/ResizableImage'
 import { Placeholder, Selection } from '@tiptap/extensions'
 import { useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -57,7 +57,7 @@ export function useOndokiEditor({ readOnly = false }: { readOnly?: boolean } = {
       Highlight.configure({ multicolor: true }),
       Selection,
 
-      Image,
+      ResizableImage,
       ImageUploadNode.configure({
         accept: 'image/*',
         maxSize: MAX_FILE_SIZE,

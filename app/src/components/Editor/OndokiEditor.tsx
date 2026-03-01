@@ -8,6 +8,7 @@ import '@/components/Editor/styles/code-block.scss';
 import '@/components/Editor/styles/horizontal-rule.scss';
 import '@/components/Editor/styles/list.scss';
 import '@/components/Editor/styles/image.scss';
+import '@/components/Editor/Nodes/ResizableImage/resizable-image.scss';
 import '@/components/Editor/styles/heading.scss';
 import '@/components/Editor/styles/paragraph.scss';
 import '@/components/Editor/styles/editor.scss';

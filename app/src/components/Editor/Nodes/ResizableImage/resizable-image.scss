@@ -1,0 +1,144 @@
+.resizable-image-wrapper {
+  position: relative;
+  display: flex;
+  margin: 1rem 0;
+  line-height: 0;
+  cursor: default;
+  user-select: none;
+
+  &.ri-align-left {
+    justify-content: flex-start;
+  }
+  &.ri-align-center {
+    justify-content: center;
+  }
+  &.ri-align-right {
+    justify-content: flex-end;
+  }
+
+  &.ri-selected .ri-image {
+    outline: 2px solid hsl(var(--primary));
+    border-radius: 4px;
+  }
+
+  &.ri-resizing {
+    cursor: col-resize;
+  }
+}
+
+.ri-image-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.ri-image {
+  display: block;
+  border-radius: 6px;
+  max-width: 100%;
+  height: auto;
+  transition: outline 0.15s ease;
+}
+
+/* Hover toolbar */
+.ri-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  animation: ri-fade-in 0.15s ease forwards;
+}
+
+@keyframes ri-fade-in {
+  to { opacity: 1; }
+}
+
+.ri-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  transition: background 0.1s, color 0.1s;
+
+  &:hover {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  &.ri-active {
+    background: hsl(var(--accent));
+    color: hsl(var(--primary));
+  }
+
+  &.ri-toolbar-btn-danger:hover {
+    background: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+  }
+}
+
+.ri-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: hsl(var(--border));
+  margin: 0 2px;
+}
+
+/* Resize handles */
+.ri-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+
+  .resizable-image-wrapper:hover &,
+  .resizable-image-wrapper.ri-selected &,
+  .resizable-image-wrapper.ri-resizing & {
+    opacity: 1;
+  }
+}
+
+.ri-resize-left {
+  left: -4px;
+}
+
+.ri-resize-right {
+  right: -4px;
+}
+
+.ri-resize-bar {
+  width: 4px;
+  height: 40px;
+  max-height: 50%;
+  background: hsl(var(--primary));
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.1s, height 0.1s;
+
+  .ri-resize-handle:hover & {
+    opacity: 0.8;
+    height: 50px;
+  }
+}
