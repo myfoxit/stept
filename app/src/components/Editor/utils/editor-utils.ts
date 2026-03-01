@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/lib/apiClient'
 import type { Node as TiptapNode } from '@tiptap/pm/model'
 import { NodeSelection } from '@tiptap/pm/state'
 import type { Editor } from '@tiptap/react'
@@ -190,7 +191,7 @@ export const handleImageUpload = async (
       abortSignal.addEventListener('abort', () => xhr.abort())
     }
 
-    xhr.open('POST', '/api/v1/uploads/image')
+    xhr.open('POST', `${getApiBaseUrl()}/uploads/image`)
     xhr.withCredentials = true
     xhr.send(formData)
   })

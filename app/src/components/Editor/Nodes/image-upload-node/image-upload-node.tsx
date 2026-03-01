@@ -457,31 +457,69 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
     const urls = await uploadFiles(files)
 
     if (urls.length > 0) {
-      const pos = props.getPos()
+      try {
+        const pos = props.getPos()
 
-      if (isValidPosition(pos)) {
-        const imageNodes = urls.map((url, index) => {
+        if (!isValidPosition(pos)) {
+          console.error("[ImageUpload] Invalid position from getPos()")
+          return
+        }
+
+        const imageContent = urls.map((url, index) => {
           const filename =
             files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
           return {
-            type: "image",
+            type: "image" as const,
             attrs: { src: url, alt: filename, title: filename },
           }
         })
 
-        // Use the ProseMirror transaction API directly to replace the upload
-        // node with image node(s). Using chain().deleteRange().insertContentAt()
-        // fails silently because positions shift after the delete within the
-        // same chain, leaving the upload preview card visible instead of the image.
-        const { state, view } = props.editor
+        // Get fresh state from the editor view to avoid stale references
+        const { view } = props.editor
+        const { state } = view
+        const imageType = state.schema.nodes.image
+
+        if (!imageType) {
+          console.error("[ImageUpload] Image node type not found in schema, falling back to insertContent")
+          // Fallback: delete upload node and insert via commands
+          props.editor.chain()
+            .focus()
+            .deleteRange({ from: pos, to: pos + props.node.nodeSize })
+            .run()
+          props.editor.chain()
+            .focus()
+            .insertContentAt(pos, imageContent)
+            .run()
+          return
+        }
+
+        // Use ProseMirror transaction API to atomically replace the upload
+        // node with image node(s). chain().deleteRange().insertContentAt()
+        // fails silently because positions shift after the delete.
         const from = pos
         const to = pos + props.node.nodeSize
-        const nodes = imageNodes.map((n) =>
-          state.schema.nodes.image.create(n.attrs)
+        const nodes = imageContent.map((n) =>
+          imageType.create(n.attrs)
         )
         const tr = state.tr.replaceWith(from, to, Fragment.from(nodes))
         view.dispatch(tr)
         props.editor.commands.focus()
+      } catch (error) {
+        console.error("[ImageUpload] Failed to replace upload node with image:", error)
+        // Last resort fallback: try to insert images at current cursor
+        try {
+          const imageContent = urls.map((url, index) => ({
+            type: "image" as const,
+            attrs: {
+              src: url,
+              alt: files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown",
+              title: files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown",
+            },
+          }))
+          props.editor.commands.insertContent(imageContent)
+        } catch (fallbackError) {
+          console.error("[ImageUpload] Fallback insertion also failed:", fallbackError)
+        }
       }
     }
   }
