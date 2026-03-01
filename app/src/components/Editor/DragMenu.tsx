@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { useCurrentEditor } from '@tiptap/react';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
 import type { Node as PMNode } from '@tiptap/pm/model';
-import { offset } from '@floating-ui/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -183,43 +182,7 @@ export function DragMenu() {
 
   const isImageNode = node?.type.name === 'image' || node?.type.name === 'imageUpload';
 
-  // Align drag handle with the first line of the block.
-  // Placement is "left-start" (default), so the handle is at the top of the
-  // reference rect. We use a custom offset middleware that reads the actual
-  // DOM element to find where the first line of content sits, accounting for
-  // padding, borders, and margins that vary per block type.
-  const computePositionConfig = React.useMemo(() => ({
-    middleware: [
-      offset(({ rects, elements }: any) => {
-        const ref = elements.reference as HTMLElement;
-        if (!ref) return { mainAxis: 0, crossAxis: 0 };
 
-        // Get the first line position by finding the first text/content child
-        // and measuring where it actually sits relative to the reference top.
-        const lineHeight = parseFloat(getComputedStyle(ref).lineHeight) || 24;
-        const firstLineCenter = lineHeight / 2; // center of first line from content top
-
-        // For wrapper elements (ul, ol, blockquote), look at the first child
-        // element's position relative to the wrapper to find the real first line
-        const firstChild = ref.querySelector('p, li, code, span, div');
-        let extraOffset = 0;
-        if (firstChild) {
-          const refRect = ref.getBoundingClientRect();
-          const childRect = firstChild.getBoundingClientRect();
-          extraOffset = childRect.top - refRect.top;
-        }
-
-        const handleHeight = 24;
-        // Push down so handle center aligns with first line center
-        const crossAxis = extraOffset + firstLineCenter - handleHeight / 2;
-
-        return {
-          mainAxis: 0,
-          crossAxis: Math.max(0, crossAxis),
-        };
-      }),
-    ],
-  }), []);
 
   if (!editor) return null;
 
@@ -230,7 +193,6 @@ export function DragMenu() {
     <DragHandle
       editor={editor}
       onNodeChange={handleNodeChange}
-      computePositionConfig={computePositionConfig}
     >
       <div
         className="flex items-center gap-0.5"
