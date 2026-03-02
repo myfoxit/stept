@@ -11,7 +11,6 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Collections.Concurrent;
 using System.Threading;
 using System.Windows.Automation;
 
@@ -738,76 +737,7 @@ namespace Ondoki.Native
             }
         }
 
-        // ---- Background element detection (avoids UIA deadlock in hook callback) ----
-
-        abstract class HookEvent { }
         
-        class ClickHookEvent : HookEvent
-        {
-            public POINT pt;
-            public int button;
-            public string windowJson;
-            public string screenshotPath;
-            public string monBoundsJson;
-            public double scale;
-            public long ts;
-            public IntPtr rootHwnd;
-        }
-        
-        class RawJsonEvent : HookEvent
-        {
-            public string json;
-        }
-
-        static readonly ConcurrentQueue<HookEvent> _eventQueue = new ConcurrentQueue<HookEvent>();
-        static readonly AutoResetEvent _eventSignal = new AutoResetEvent(false);
-        static volatile bool _hooksRunning;
-        static Thread _eventThread;
-
-        static void EventProcessingWorker()
-        {
-            while (_hooksRunning)
-            {
-                _eventSignal.WaitOne(200);
-                while (_eventQueue.TryDequeue(out HookEvent evt))
-                {
-                    if (evt is RawJsonEvent raw)
-                    {
-                        // Keys, scrolls, etc — already serialized, just write
-                        WriteEvent(raw.json);
-                    }
-                    else if (evt is ClickHookEvent click)
-                    {
-                        // Clicks need UIA element detection (safe on this thread)
-                        string elementJson;
-                        try
-                        {
-                            elementJson = click.rootHwnd != IntPtr.Zero
-                                ? GetElementJson(click.pt.X, click.pt.Y, click.rootHwnd)
-                                : Json.Null;
-                        }
-                        catch
-                        {
-                            elementJson = Json.Null;
-                        }
-
-                        string screenshotJson = click.screenshotPath != null ? Json.Str(click.screenshotPath) : "null";
-                        WriteEvent(Json.Obj(
-                            ("type", Json.Str("click")),
-                            ("x", Json.Num(click.pt.X)),
-                            ("y", Json.Num(click.pt.Y)),
-                            ("button", Json.Num(click.button)),
-                            ("window", click.windowJson),
-                            ("element", elementJson),
-                            ("scale", Json.Num(click.scale)),
-                            ("monitorBounds", click.monBoundsJson),
-                            ("timestamp", Json.Num(click.ts)),
-                            ("screenshotPath", screenshotJson)
-                        ));
-                    }
-                }
-            }
-        }
 
         static List<string> GetModifiers()
         {
@@ -857,21 +787,18 @@ namespace Ondoki.Native
                     var mr = monInfo.rcMonitor;
                     string monBoundsJson = Json.Rect(mr.Left, mr.Top, mr.Right - mr.Left, mr.Bottom - mr.Top);
 
-                    // Enqueue for background processing — UIA uses COM cross-process
-                    // calls that DEADLOCK when called from within WH_MOUSE_LL.
-                    // ALL events go through the same queue to preserve ordering.
-                    _eventQueue.Enqueue(new ClickHookEvent
-                    {
-                        pt = pt,
-                        button = button,
-                        windowJson = windowJson,
-                        screenshotPath = screenshotPath,
-                        monBoundsJson = monBoundsJson,
-                        scale = scale,
-                        ts = ts,
-                        rootHwnd = rootHwnd
-                    });
-                    _eventSignal.Set();
+                    string screenshotJson = screenshotPath != null ? Json.Str(screenshotPath) : "null";
+                    WriteEvent(Json.Obj(
+                        ("type", Json.Str("click")),
+                        ("x", Json.Num(pt.X)),
+                        ("y", Json.Num(pt.Y)),
+                        ("button", Json.Num(button)),
+                        ("window", windowJson),
+                        ("scale", Json.Num(scale)),
+                        ("monitorBounds", monBoundsJson),
+                        ("timestamp", Json.Num(ts)),
+                        ("screenshotPath", screenshotJson)
+                    ));
                 }
                 else if (msg == Win32.WM_MOUSEWHEEL)
                 {
@@ -882,7 +809,7 @@ namespace Ondoki.Native
                     // For scroll, get cursor position (hookStruct.pt is screen coords)
                     string windowJson = BuildWindowJsonAtPoint(pt);
 
-                    _eventQueue.Enqueue(new RawJsonEvent { json = Json.Obj(
+                    WriteEvent(Json.Obj(
                         ("type", Json.Str("scroll")),
                         ("x", Json.Num(pt.X)),
                         ("y", Json.Num(pt.Y)),
@@ -890,8 +817,7 @@ namespace Ondoki.Native
                         ("deltaY", Json.Num(deltaY)),
                         ("window", windowJson),
                         ("timestamp", Json.Num(ts))
-                    ) });
-                    _eventSignal.Set();
+                    ));
                 }
             }
 
@@ -913,15 +839,14 @@ namespace Ondoki.Native
                     var fgHwnd = Win32.GetForegroundWindow();
                     string windowJson = fgHwnd != IntPtr.Zero ? BuildWindowJson(fgHwnd) : Json.Null;
 
-                    _eventQueue.Enqueue(new RawJsonEvent { json = Json.Obj(
+                    WriteEvent(Json.Obj(
                         ("type", Json.Str("key")),
                         ("keycode", Json.Num((int)hookStruct.vkCode)),
                         ("scancode", Json.Num((int)hookStruct.scanCode)),
                         ("modifiers", Json.StrArr(mods)),
                         ("window", windowJson),
                         ("timestamp", Json.Num(ts))
-                    ) });
-                    _eventSignal.Set();
+                    ));
                 }
             }
 
@@ -950,14 +875,6 @@ namespace Ondoki.Native
                 Environment.Exit(1);
             }
 
-            // Start background thread for UIA element detection
-            _hooksRunning = true;
-            _eventThread = new Thread(EventProcessingWorker)
-            {
-                IsBackground = true,
-                Name = "UIA-ElementDetection"
-            };
-            _eventThread.Start();
 
             // Send ready message — coords are in physical pixel space (DPI aware)
             WriteEvent(Json.Obj(
@@ -988,34 +905,6 @@ namespace Ondoki.Native
             {
                 Win32.TranslateMessage(ref msg);
                 Win32.DispatchMessage(ref msg);
-            }
-
-            // Shut down background event processing thread
-            _hooksRunning = false;
-            _eventSignal.Set();
-            _eventThread.Join(3000);
-            
-            // Drain any remaining events (write clicks without element data for speed)
-            while (_eventQueue.TryDequeue(out HookEvent remaining))
-            {
-                if (remaining is RawJsonEvent rawRemaining)
-                    WriteEvent(rawRemaining.json);
-                else if (remaining is ClickHookEvent clickRemaining)
-                {
-                    string ssJson = clickRemaining.screenshotPath != null ? Json.Str(clickRemaining.screenshotPath) : "null";
-                    WriteEvent(Json.Obj(
-                        ("type", Json.Str("click")),
-                        ("x", Json.Num(clickRemaining.pt.X)),
-                        ("y", Json.Num(clickRemaining.pt.Y)),
-                        ("button", Json.Num(clickRemaining.button)),
-                        ("window", clickRemaining.windowJson),
-                        ("element", Json.Null),
-                        ("scale", Json.Num(clickRemaining.scale)),
-                        ("monitorBounds", clickRemaining.monBoundsJson),
-                        ("timestamp", Json.Num(clickRemaining.ts)),
-                        ("screenshotPath", ssJson)
-                    ));
-                }
             }
 
             Win32.UnhookWindowsHookEx(mouseHook);

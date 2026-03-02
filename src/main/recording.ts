@@ -672,11 +672,22 @@ export class RecordingService extends EventEmitter {
       }
     }
 
-    // Extract element info
-    console.log(`[DIAG] element data:`, JSON.stringify(event.element));
-    const elementName = this.formatElementName(event.element);
-    const elementRole = event.element?.role || '';
-    const elementDescription = event.element?.description || event.element?.title || event.element?.help || '';
+    // Query element info from the persistent serve-mode process (async, no deadlock)
+    // The hooks process doesn't send element data — UIA deadlocks in hook callbacks.
+    // Instead we query the separate serve-mode process which runs UIA on a normal thread.
+    let element: NativeElementInfo | null = null;
+    try {
+      const pointResult = await this.screenshotService.execNative(['point', String(event.x), String(event.y)]);
+      if (pointResult?.element) {
+        element = pointResult.element as NativeElementInfo;
+      }
+    } catch (e) {
+      // Serve process unavailable — proceed without element data
+    }
+    console.log(`[DIAG] element data:`, JSON.stringify(element));
+    const elementName = this.formatElementName(element);
+    const elementRole = element?.role || '';
+    const elementDescription = element?.description || element?.title || element?.help || '';
 
     // Screenshot — use the display where the click happened
     const captureRegion = this.getCaptureRegion();
@@ -753,7 +764,7 @@ export class RecordingService extends EventEmitter {
     const buttonType = buttonTypes[event.button] || 'Left';
     const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
 
-    const { description, confidence } = this.buildClickDescription(clickLabel, elementName, elementRole, elementDescription, windowTitle, event.element);
+    const { description, confidence } = this.buildClickDescription(clickLabel, elementName, elementRole, elementDescription, windowTitle, element);
 
     const step: RecordedStep = {
       stepNumber: this.stepCount,

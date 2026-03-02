@@ -238,7 +238,7 @@ export class ScreenshotService {
   // Native command execution
   // ------------------------------------------------------------------
 
-  private async execNative(args: string[]): Promise<any> {
+  public async execNative(args: string[]): Promise<any> {
     if (!this.nativeAvailable || !this.nativeBinaryPath) {
       return null;
     }
