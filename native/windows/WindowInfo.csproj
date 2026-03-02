@@ -7,7 +7,7 @@
     <RootNamespace>Ondoki.Native</RootNamespace>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <PublishTrimmed>true</PublishTrimmed>
+    <PublishTrimmed>false</PublishTrimmed>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
