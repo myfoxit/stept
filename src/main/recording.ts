@@ -63,19 +63,6 @@ interface NativeElementInfo {
   value: string;
   description: string;
   subrole: string;
-  roleDescription: string;
-  placeholder: string;
-  help: string;
-  identifier?: string;
-  automationId?: string;
-  nameFromParent?: string;
-}
-
-interface ElementConfidence {
-  score: number;
-  bestLabel: string;
-  bestRole: string;
-  source: string;
 }
 
 interface NativeDisplaysEvent {
@@ -127,7 +114,6 @@ export interface RecordedStep {
   ownerApp?: string;
   generatedTitle?: string;
   generatedDescription?: string;
-  elementConfidence?: ElementConfidence;
 }
 
 export interface RecordingState {
@@ -672,22 +658,21 @@ export class RecordingService extends EventEmitter {
       }
     }
 
-    // Query element info from the persistent serve-mode process (async, no deadlock)
-    // The hooks process doesn't send element data — UIA deadlocks in hook callbacks.
-    // Instead we query the separate serve-mode process which runs UIA on a normal thread.
-    let element: NativeElementInfo | null = null;
-    try {
-      const pointResult = await this.screenshotService.execNative(['point', String(event.x), String(event.y)]);
-      if (pointResult?.element) {
-        element = pointResult.element as NativeElementInfo;
-      }
-    } catch (e) {
-      // Serve process unavailable — proceed without element data
+    // Query element info from the persistent serve-mode process (runs UIA safely on a normal thread)
+    // Hooks don't send element data — UIA deadlocks in WH_MOUSE_LL hook callbacks.
+    let element: NativeElementInfo | null = event.element || null;
+    if (!element || !element.title) {
+      try {
+        const pointResult = await this.screenshotService.execNative(['point', String(event.x), String(event.y)]);
+        if (pointResult?.element && pointResult.element.title) {
+          element = pointResult.element as NativeElementInfo;
+        }
+      } catch {}
     }
     console.log(`[DIAG] element data:`, JSON.stringify(element));
     const elementName = this.formatElementName(element);
     const elementRole = element?.role || '';
-    const elementDescription = element?.description || element?.title || element?.help || '';
+    const elementDescription = element?.description || element?.title || '';
 
     // Screenshot — use the display where the click happened
     const captureRegion = this.getCaptureRegion();
@@ -764,7 +749,7 @@ export class RecordingService extends EventEmitter {
     const buttonType = buttonTypes[event.button] || 'Left';
     const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
 
-    const { description, confidence } = this.buildClickDescription(clickLabel, elementName, elementRole, elementDescription, windowTitle, element);
+    const description = this.buildClickDescription(clickLabel, elementName, elementRole, elementDescription, windowTitle);
 
     const step: RecordedStep = {
       stepNumber: this.stepCount,
@@ -787,7 +772,6 @@ export class RecordingService extends EventEmitter {
       elementRole: elementRole || undefined,
       elementDescription: elementDescription || undefined,
       ownerApp: ownerApp || undefined,
-      elementConfidence: confidence,
     };
 
     this.emit('step-recorded', step);
@@ -822,7 +806,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Scroll',
         windowTitle,
-        description: `Scroll ${this.scrollAccumulator > 0 ? 'down' : 'up'}`,
+        description: `Scroll ${this.scrollAccumulator > 0 ? 'down' : 'up'} in ${this.shortenWindowTitle(windowTitle)}`,
         scrollDelta: this.scrollAccumulator,
         globalMousePosition: pt,
         relativeMousePosition: { x: 0, y: 0 },
@@ -1014,89 +998,13 @@ export class RecordingService extends EventEmitter {
     if (element.title) return element.title;
     if (element.description) return element.description;
     if (element.value && element.value.length < 50) return element.value;
-    if (element.placeholder) return element.placeholder;
-    if (element.roleDescription) return element.roleDescription;
+    if (element.role) return element.role.replace(/^AX/, '');
     return '';
   }
 
   /** Strip AX prefix and convert to human-readable lowercase: AXButton -> button */
   private humanReadableRole(role: string): string {
     return role.replace(/^AX/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
-  }
-
-  private isActionableRole(role: string): boolean {
-    return RecordingService.ACTIONABLE_ROLES.has(role);
-  }
-
-  private isFieldRole(role: string): boolean {
-    return RecordingService.FIELD_ROLES.has(role);
-  }
-
-  private humanizeRole(role: string): string {
-    const map: Record<string, string> = {
-      AXButton: 'button', AXLink: 'link', AXMenuItem: 'menu item',
-      AXTab: 'tab', AXPopUpButton: 'dropdown', AXCheckBox: 'checkbox',
-      AXRadioButton: 'radio button', AXMenuBarItem: 'menu', AXImage: 'image',
-      AXTextField: 'text field', AXTextArea: 'text area', AXComboBox: 'combo box',
-      AXSearchField: 'search field', AXSecureTextField: 'password field',
-      AXStaticText: 'text', AXHeading: 'heading',
-      Button: 'button', Hyperlink: 'link', MenuItem: 'menu item',
-      TabItem: 'tab', CheckBox: 'checkbox', RadioButton: 'radio button',
-      Edit: 'text field', Document: 'text area', ComboBox: 'combo box',
-      Text: 'text', ListItem: 'list item',
-    };
-    return map[role] || this.humanReadableRole(role);
-  }
-
-  private scoreElement(element: NativeElementInfo | null): ElementConfidence {
-    if (!element) {
-      return { score: 0, bestLabel: '', bestRole: '', source: 'none' };
-    }
-
-    let score = 0;
-    let bestLabel = '';
-    let source = 'none';
-
-    if (element.title) {
-      score = element.nameFromParent === 'true' ? 0.4 : 0.9;
-      bestLabel = element.title;
-      source = element.nameFromParent === 'true' ? 'title-from-parent' : 'title';
-    } else if (element.description) {
-      score = 0.8;
-      bestLabel = element.description;
-      source = 'description';
-    } else if (element.value && (this.isActionableRole(element.role) || this.isFieldRole(element.role))) {
-      score = 0.7;
-      bestLabel = element.value;
-      source = 'value';
-    } else if (element.placeholder) {
-      score = 0.65;
-      bestLabel = element.placeholder;
-      source = 'placeholder';
-    } else if (element.help) {
-      score = 0.5;
-      bestLabel = element.help;
-      source = 'help';
-    }
-
-    // Boost for actionable roles
-    if (this.isActionableRole(element.role)) {
-      score = Math.min(1, score + 0.1);
-    }
-
-    // Penalties
-    if (bestLabel.length > 80) {
-      score *= 0.5;
-    }
-    if (/^https?:\/\//i.test(bestLabel)) {
-      score *= 0.4;
-    }
-    if (/\n.*\n/s.test(bestLabel)) {
-      score *= 0.3;
-    }
-
-    const bestRole = this.humanizeRole(element.role);
-    return { score, bestLabel, bestRole, source };
   }
 
   /** Shorten window title by stripping common browser suffixes */
@@ -1116,48 +1024,62 @@ export class RecordingService extends EventEmitter {
     return shortened || title;
   }
 
-  private static readonly ELEMENT_CONFIDENCE_THRESHOLD = 0.6;
-
   private static readonly ACTIONABLE_ROLES = new Set([
     'AXButton', 'AXLink', 'AXMenuItem', 'AXTab', 'AXPopUpButton',
     'AXCheckBox', 'AXRadioButton', 'AXMenuBarItem', 'AXImage',
-    'Button', 'Hyperlink', 'MenuItem', 'TabItem', 'CheckBox', 'RadioButton',
   ]);
 
   private static readonly FIELD_ROLES = new Set([
     'AXTextField', 'AXTextArea', 'AXComboBox', 'AXSearchField', 'AXSecureTextField',
-    'Edit', 'Document', 'ComboBox',
   ]);
 
   /** Build a rich type description, truncating long text */
-  private buildTypeDescription(text: string, _windowTitle: string): string {
+  private buildTypeDescription(text: string, windowTitle: string): string {
     const displayText = text.length > 40 ? text.slice(0, 40) + '...' : text;
-    return `Type "${displayText}"`;
+    const shortTitle = this.shortenWindowTitle(windowTitle);
+    return `Type "${displayText}" in ${shortTitle}`;
   }
 
-  /** Build a rich click description using confidence scoring */
+  /** Build a rich click description using accessibility data with smart fallbacks */
   private buildClickDescription(
     clickLabel: string,
-    _elementName: string,
-    _elementRole: string,
-    _elementDescription: string,
-    _windowTitle: string,
-    element: NativeElementInfo | null,
-  ): { description: string; confidence: ElementConfidence } {
+    elementName: string,
+    elementRole: string,
+    elementDescription: string,
+    windowTitle: string,
+  ): string {
     const verb = clickLabel === 'Double Click' ? 'Double-click' :
                  clickLabel === 'Triple Click' ? 'Triple-click' :
                  clickLabel === 'Right Click' ? 'Right-click' : 'Click';
 
-    const confidence = this.scoreElement(element);
-
-    if (confidence.score >= RecordingService.ELEMENT_CONFIDENCE_THRESHOLD && confidence.bestLabel) {
-      const label = confidence.bestLabel.length > 60
-        ? confidence.bestLabel.slice(0, 60) + '...'
-        : confidence.bestLabel;
-      return { description: `${verb} "${label}"`, confidence };
+    // 1. Named actionable element (button, link, menu item, tab, etc.)
+    if (elementName && RecordingService.ACTIONABLE_ROLES.has(elementRole)) {
+      return `${verb} "${elementName}"`;
     }
 
-    return { description: `${verb} here`, confidence };
+    // 2. Named field element (text field, combo box, etc.)
+    if (elementName && RecordingService.FIELD_ROLES.has(elementRole)) {
+      return `${verb} on ${elementName} field`;
+    }
+
+    // 3. Has a name but unknown role — still useful
+    if (elementName) {
+      return `${verb} "${elementName}"`;
+    }
+
+    // 4. Has description but no name
+    if (elementDescription) {
+      return `${verb} "${elementDescription}"`;
+    }
+
+    // 5. Has role but no name/description
+    if (elementRole) {
+      return `${verb} on ${this.humanReadableRole(elementRole)}`;
+    }
+
+    // 6. Fallback: use shortened window title
+    const shortTitle = this.shortenWindowTitle(windowTitle);
+    return `${verb} in ${shortTitle}`;
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {

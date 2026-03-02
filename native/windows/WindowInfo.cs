@@ -249,7 +249,7 @@ namespace Ondoki.Native
             );
 
         public static string Element(string role, string title, string value, string description, string className,
-            string roleDescription = "", string placeholder = "", string help = "", string automationId = "", bool nameFromParent = false) =>
+            string roleDescription = "", string placeholder = "", string help = "", string automationId = "") =>
             Obj(
                 ("role", Str(role)),
                 ("title", Str(title)),
@@ -259,8 +259,7 @@ namespace Ondoki.Native
                 ("roleDescription", Str(roleDescription)),
                 ("placeholder", Str(placeholder)),
                 ("help", Str(help)),
-                ("automationId", Str(automationId)),
-                ("nameFromParent", nameFromParent ? "true" : "false")
+                ("automationId", Str(automationId))
             );
     }
 
@@ -407,7 +406,6 @@ namespace Ondoki.Native
                 catch { }
 
                 // If name is empty, walk up parents (max 8) to find one with a name
-                bool nameFromParent = false;
                 if (string.IsNullOrEmpty(name))
                 {
                     var walker = TreeWalker.ControlViewWalker;
@@ -420,7 +418,6 @@ namespace Ondoki.Native
                         if (!string.IsNullOrEmpty(parentName))
                         {
                             name = parentName;
-                            nameFromParent = true;
                             break;
                         }
                     }
@@ -435,8 +432,7 @@ namespace Ondoki.Native
                     controlType,
                     "",
                     helpText,
-                    automationId,
-                    nameFromParent
+                    automationId
                 );
             }
             catch
@@ -447,15 +443,8 @@ namespace Ondoki.Native
 
         static string GetElementJson(int x, int y, IntPtr rootHwnd)
         {
-            // Try UIA first — richer data, with 200ms timeout to avoid blocking the event queue
-            string uiaResult = null;
-            try
-            {
-                var uiaTask = System.Threading.Tasks.Task.Run(() => GetElementViaUIA(x, y));
-                if (uiaTask.Wait(200))
-                    uiaResult = uiaTask.Result;
-            }
-            catch { }
+            // Try UIA first — richer data
+            string uiaResult = GetElementViaUIA(x, y);
             if (uiaResult != null) return uiaResult;
 
             // Fall back to MSAA
@@ -737,8 +726,6 @@ namespace Ondoki.Native
             }
         }
 
-        
-
         static List<string> GetModifiers()
         {
             var mods = new List<string>();
@@ -771,16 +758,14 @@ namespace Ondoki.Native
                 if (msg == Win32.WM_LBUTTONDOWN || msg == Win32.WM_RBUTTONDOWN || msg == Win32.WM_MBUTTONDOWN)
                 {
                     // Capture screenshot FIRST — synchronous BitBlt before anything else
-                    // BitBlt is GDI and safe to call from the hook callback
+                    // This runs in the low-level hook, before the click reaches the target app
                     string screenshotPath = CaptureDisplayAtPoint(pt.X, pt.Y);
 
                     int button = msg == Win32.WM_LBUTTONDOWN ? 1 : msg == Win32.WM_RBUTTONDOWN ? 2 : 3;
+                    string windowJson = BuildWindowJsonAtPoint(pt);
+                    string elementJson = Json.Null; // UIA deadlocks in hook callback — element enrichment happens in TypeScript via serve process
 
-                    // Collect all NON-UIA data (pure Win32/GDI calls — safe from hook)
-                    var hwnd = Win32.WindowFromPoint(pt);
-                    var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
-                    string windowJson = rootHwnd != IntPtr.Zero ? BuildWindowJson(rootHwnd) : Json.Null;
-
+                    // Get physical monitor bounds for accurate multi-monitor positioning
                     var hMonitor = Win32.MonitorFromPoint(pt, Win32.MONITOR_DEFAULTTONEAREST);
                     var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
                     Win32.GetMonitorInfo(hMonitor, ref monInfo);
@@ -794,6 +779,7 @@ namespace Ondoki.Native
                         ("y", Json.Num(pt.Y)),
                         ("button", Json.Num(button)),
                         ("window", windowJson),
+                        ("element", elementJson),
                         ("scale", Json.Num(scale)),
                         ("monitorBounds", monBoundsJson),
                         ("timestamp", Json.Num(ts)),
@@ -874,7 +860,6 @@ namespace Ondoki.Native
                 Console.Error.WriteLine("Failed to install keyboard hook");
                 Environment.Exit(1);
             }
-
 
             // Send ready message — coords are in physical pixel space (DPI aware)
             WriteEvent(Json.Obj(
