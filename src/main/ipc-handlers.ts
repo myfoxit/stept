@@ -53,34 +53,10 @@ export function setupIpcHandlers(
 
       // Reset annotation service for new recording
       smartAnnotation.clearQueue();
-      smartAnnotation.removeAllListeners('step-annotated');
-
-      // Listen for annotation results — update stored step and notify renderer
-      smartAnnotation.on('step-annotated', (annotatedStep) => {
-        const idx = currentRecordingSteps.findIndex(
-          (s) => s.stepNumber === annotatedStep.stepNumber
-        );
-        if (idx !== -1) {
-          currentRecordingSteps[idx] = {
-            ...currentRecordingSteps[idx],
-            generatedTitle: annotatedStep.generatedTitle,
-            generatedDescription: annotatedStep.generatedDescription,
-          };
-        }
-        if (!event.sender.isDestroyed()) {
-          event.sender.send('step-annotated', annotatedStep);
-        }
-      });
 
       recordingService.on('step-recorded', (step) => {
         currentRecordingSteps.push(step);
         event.sender.send('step-recorded', step);
-
-        // Enqueue for AI annotation if available (async, non-blocking)
-        const aiAvailable = settingsManager.isLlmConfigured() || !!authService.getAccessToken();
-        if (aiAvailable) {
-          smartAnnotation.enqueueStep(step);
-        }
       });
 
       recordingService.on('state-changed', (state) => {
@@ -100,18 +76,48 @@ export function setupIpcHandlers(
       await recordingService.stopRecording();
       app.emit('recording-stopped');
 
-      // Auto-upload immediately
       if (currentRecordingSteps.length > 0 && currentProjectId) {
         event.sender.send('upload:started');
+
+        // Batch-annotate the full workflow before uploading (10s timeout)
+        let workflowTitle: string | undefined;
+        const aiAvailable = settingsManager.isLlmConfigured() || !!authService.getAccessToken();
+        if (aiAvailable) {
+          try {
+            const annotationPromise = smartAnnotation.annotateWorkflow(currentRecordingSteps);
+            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000));
+            const annotation = await Promise.race([annotationPromise, timeoutPromise]);
+
+            if (annotation) {
+              workflowTitle = annotation.workflowTitle;
+              // Apply per-step titles to the recorded steps
+              for (const stepAnnotation of annotation.steps) {
+                const idx = currentRecordingSteps.findIndex(
+                  (s) => s.stepNumber === stepAnnotation.stepNumber
+                );
+                if (idx !== -1) {
+                  currentRecordingSteps[idx].generatedTitle = stepAnnotation.title;
+                }
+              }
+              console.log(`[SmartAnnotation] Workflow annotated: "${workflowTitle}" (${annotation.steps.length} steps)`);
+            } else {
+              console.warn('[SmartAnnotation] Annotation timed out after 10s, uploading raw data');
+            }
+          } catch (annotationError) {
+            console.error('[SmartAnnotation] Annotation failed, uploading raw data:', annotationError);
+          }
+        }
+
         try {
           const result = await cloudUploadService.uploadRecording(
             currentRecordingSteps,
             currentUserId,
-            currentProjectId
+            currentProjectId,
+            workflowTitle
           );
           event.sender.send('upload:complete', result);
 
-          // Open the workflow in browser (like Scribe does)
+          // Open the workflow in browser
           if (result?.url) {
             shell.openExternal(result.url);
           } else if (result?.recordingId) {

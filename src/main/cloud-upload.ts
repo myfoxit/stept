@@ -36,7 +36,8 @@ export class CloudUploadService extends EventEmitter {
   public async uploadRecording(
     steps: any[],
     userId?: string,
-    projectId?: string
+    projectId?: string,
+    workflowTitle?: string
   ): Promise<UploadResult> {
     const accessToken = this.accessTokenProvider();
     if (!accessToken) {
@@ -53,7 +54,7 @@ export class CloudUploadService extends EventEmitter {
 
     for (let attempt = 1; attempt <= CloudUploadService.MAX_RETRIES; attempt++) {
       try {
-        const result = await this.attemptUpload(steps, baseUrl, accessToken, userId, projectId);
+        const result = await this.attemptUpload(steps, baseUrl, accessToken, userId, projectId, workflowTitle);
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -80,11 +81,12 @@ export class CloudUploadService extends EventEmitter {
     baseUrl: string,
     accessToken: string,
     userId?: string,
-    projectId?: string
+    projectId?: string,
+    workflowTitle?: string
   ): Promise<UploadResult> {
     // Step 1: Create upload session
     this.emitProgress('Preparing upload...', 0, 0, 0);
-    const sessionId = await this.createSession(baseUrl, accessToken, userId, projectId);
+    const sessionId = await this.createSession(baseUrl, accessToken, userId, projectId, workflowTitle);
     if (!sessionId) {
       throw new Error('Failed to create upload session');
     }
@@ -144,20 +146,25 @@ export class CloudUploadService extends EventEmitter {
   }
 
   private async createSession(
-    baseUrl: string, token: string, userId?: string, projectId?: string
+    baseUrl: string, token: string, userId?: string, projectId?: string, workflowTitle?: string
   ): Promise<string | null> {
+    const payload: Record<string, any> = {
+      timestamp: new Date().toISOString(),
+      client: 'OndokiDesktop-Electron',
+      user_id: userId,
+      project_id: projectId,
+    };
+    if (workflowTitle) {
+      payload.workflow_title = workflowTitle;
+    }
+
     const response = await fetch(`${baseUrl}/session/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        timestamp: new Date().toISOString(),
-        client: 'OndokiDesktop-Electron',
-        user_id: userId,
-        project_id: projectId,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
