@@ -12,6 +12,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Windows.Automation;
 
 namespace Ondoki.Native
 {
@@ -247,13 +248,18 @@ namespace Ondoki.Native
                 ("layer", Num(0))
             );
 
-        public static string Element(string role, string title, string value, string description, string className) =>
+        public static string Element(string role, string title, string value, string description, string className,
+            string roleDescription = "", string placeholder = "", string help = "", string automationId = "") =>
             Obj(
                 ("role", Str(role)),
                 ("title", Str(title)),
                 ("value", Str(value)),
                 ("description", Str(description)),
-                ("subrole", Str(className))
+                ("subrole", Str(className)),
+                ("roleDescription", Str(roleDescription)),
+                ("placeholder", Str(placeholder)),
+                ("help", Str(help)),
+                ("automationId", Str(automationId))
             );
     }
 
@@ -372,8 +378,76 @@ namespace Ondoki.Native
             return displays;
         }
 
+        static string GetElementViaUIA(int x, int y)
+        {
+            try
+            {
+                var point = new System.Windows.Point(x, y);
+                var el = AutomationElement.FromPoint(point);
+                if (el == null) return null;
+
+                string name = el.Current.Name ?? "";
+                string controlType = el.Current.ControlType?.ProgrammaticName?.Replace("ControlType.", "") ?? "";
+                string helpText = "";
+                try { helpText = el.Current.HelpText ?? ""; } catch { }
+                string className = el.Current.ClassName ?? "";
+                string automationId = el.Current.AutomationId ?? "";
+
+                // Try ValuePattern for value
+                string value = "";
+                try
+                {
+                    if (el.TryGetCurrentPattern(ValuePattern.Pattern, out object pattern))
+                    {
+                        value = ((ValuePattern)pattern).Current.Value ?? "";
+                        if (value.Length > 200) value = value.Substring(0, 200);
+                    }
+                }
+                catch { }
+
+                // If name is empty, walk up parents (max 8) to find one with a name
+                if (string.IsNullOrEmpty(name))
+                {
+                    var walker = TreeWalker.ControlViewWalker;
+                    var current = el;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        current = walker.GetParent(current);
+                        if (current == null || current == AutomationElement.RootElement) break;
+                        string parentName = current.Current.Name ?? "";
+                        if (!string.IsNullOrEmpty(parentName))
+                        {
+                            name = parentName;
+                            break;
+                        }
+                    }
+                }
+
+                return Json.Element(
+                    controlType,
+                    name,
+                    value,
+                    "",
+                    className,
+                    controlType,
+                    "",
+                    helpText,
+                    automationId
+                );
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         static string GetElementJson(int x, int y, IntPtr rootHwnd)
         {
+            // Try UIA first — richer data
+            string uiaResult = GetElementViaUIA(x, y);
+            if (uiaResult != null) return uiaResult;
+
+            // Fall back to MSAA
             var pt = new POINT { X = x, Y = y };
             try
             {

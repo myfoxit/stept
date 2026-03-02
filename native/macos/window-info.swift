@@ -49,6 +49,9 @@ struct ElementInfo: Codable {
     let value: String
     let description: String
     let subrole: String
+    let roleDescription: String
+    let placeholder: String
+    let help: String
 }
 
 struct MouseResult: Codable {
@@ -187,35 +190,138 @@ func getWindowAtPoint(_ point: CGPoint) -> WindowResult? {
     return nil
 }
 
+// Roles that typically carry meaningful text for UI actions
+let actionableRoles: Set<String> = [
+    "AXButton", "AXLink", "AXStaticText", "AXMenuItem", "AXTab",
+    "AXTextField", "AXTextArea", "AXCheckBox", "AXPopUpButton",
+    "AXHeading", "AXRadioButton", "AXMenuBarItem", "AXImage",
+    "AXComboBox", "AXSearchField", "AXSecureTextField",
+]
+
+func axAttr(_ el: AXUIElement, _ name: String) -> String {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, name as CFString, &value)
+    return (value as? String) ?? ""
+}
+
+func axValue(_ el: AXUIElement) -> String {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &value)
+    if let str = value as? String {
+        return String(str.prefix(200))
+    }
+    return ""
+}
+
+func axChildren(_ el: AXUIElement) -> [AXUIElement] {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, kAXChildrenAttribute as CFString, &value)
+    return (value as? [AXUIElement]) ?? []
+}
+
+func axParent(_ el: AXUIElement) -> AXUIElement? {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, kAXParentAttribute as CFString, &value)
+    return value as! AXUIElement?
+}
+
+/// Check if an element has meaningful identifying text
+func hasMeaningfulText(_ el: AXUIElement) -> Bool {
+    let title = axAttr(el, kAXTitleAttribute)
+    if !title.isEmpty { return true }
+    let desc = axAttr(el, kAXDescriptionAttribute)
+    if !desc.isEmpty { return true }
+    let role = axAttr(el, kAXRoleAttribute)
+    if actionableRoles.contains(role) {
+        let val = axValue(el)
+        if !val.isEmpty { return true }
+    }
+    return false
+}
+
+/// Drill down into children to find the deepest meaningful element.
+/// For single-child containers, keep descending. For multiple children,
+/// prefer actionable roles with meaningful text.
+func drillDown(_ el: AXUIElement, depth: Int) -> AXUIElement {
+    if depth > 15 { return el }
+    let children = axChildren(el)
+    if children.isEmpty { return el }
+
+    if children.count == 1 {
+        // Single child — keep going deeper
+        return drillDown(children[0], depth: depth + 1)
+    }
+
+    // Multiple children — prefer actionable ones with text
+    for child in children {
+        let role = axAttr(child, kAXRoleAttribute)
+        if actionableRoles.contains(role) && hasMeaningfulText(child) {
+            return drillDown(child, depth: depth + 1)
+        }
+    }
+    // No actionable child with text — try any child with text
+    for child in children {
+        if hasMeaningfulText(child) {
+            return drillDown(child, depth: depth + 1)
+        }
+    }
+    // Nothing better found — return current element
+    return el
+}
+
+/// Walk up parent chain to find nearest ancestor with meaningful text
+func walkUp(_ el: AXUIElement, maxLevels: Int) -> AXUIElement? {
+    var current = el
+    for _ in 0..<maxLevels {
+        guard let parent = axParent(current) else { return nil }
+        if hasMeaningfulText(parent) { return parent }
+        current = parent
+    }
+    return nil
+}
+
+func buildElementInfo(_ el: AXUIElement) -> ElementInfo {
+    return ElementInfo(
+        role: axAttr(el, kAXRoleAttribute),
+        title: axAttr(el, kAXTitleAttribute),
+        value: axValue(el),
+        description: axAttr(el, kAXDescriptionAttribute),
+        subrole: axAttr(el, kAXSubroleAttribute),
+        roleDescription: axAttr(el, kAXRoleDescriptionAttribute),
+        placeholder: axAttr(el, kAXPlaceholderValueAttribute),
+        help: axAttr(el, kAXHelpAttribute)
+    )
+}
+
 func getElementAtPoint(_ point: CGPoint, pid: Int) -> ElementInfo? {
     let app = AXUIElementCreateApplication(pid_t(pid))
-    
+
     var element: AXUIElement?
     let err = AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element)
-    guard err == .success, let el = element else {
+    guard err == .success, let hitElement = element else {
         return nil
     }
-    
-    func attr(_ name: String) -> String {
-        var value: AnyObject?
-        AXUIElementCopyAttributeValue(el, name as CFString, &value)
-        return (value as? String) ?? ""
+
+    // 1. Drill down into children to find deepest meaningful element
+    let deepest = drillDown(hitElement, depth: 0)
+
+    // 2. If the deepest element has meaningful text, use it
+    if hasMeaningfulText(deepest) {
+        return buildElementInfo(deepest)
     }
-    
-    return ElementInfo(
-        role: attr(kAXRoleAttribute),
-        title: attr(kAXTitleAttribute),
-        value: {
-            var value: AnyObject?
-            AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &value)
-            if let str = value as? String {
-                return String(str.prefix(200))
-            }
-            return ""
-        }(),
-        description: attr(kAXDescriptionAttribute),
-        subrole: attr(kAXSubroleAttribute)
-    )
+
+    // 3. Walk up from deepest to find nearest ancestor with text
+    if let ancestor = walkUp(deepest, maxLevels: 10) {
+        return buildElementInfo(ancestor)
+    }
+
+    // 4. Try walking up from the original hit element too
+    if let ancestor = walkUp(hitElement, maxLevels: 10) {
+        return buildElementInfo(ancestor)
+    }
+
+    // 5. Fallback: return info from the original hit element
+    return buildElementInfo(hitElement)
 }
 
 func getDisplayForPoint(_ point: CGPoint) -> DisplayInfo {
