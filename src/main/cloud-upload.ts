@@ -111,11 +111,15 @@ export class CloudUploadService extends EventEmitter {
 
     // Step 4: Finalize
     this.emitProgress('Finalizing upload...', totalFiles, totalFiles, 95);
-    await this.finalizeSession(baseUrl, accessToken, sessionId);
+    const finalizeData = await this.finalizeSession(baseUrl, accessToken, sessionId);
 
     this.emitProgress('Upload completed successfully!', totalFiles, totalFiles, 100);
 
-    return { success: true, recordingId: sessionId };
+    return {
+      success: true,
+      url: finalizeData?.url,
+      recordingId: finalizeData?.workflow_id || finalizeData?.workflowId || finalizeData?.id || sessionId,
+    };
   }
 
   private saveRecordingLocally(steps: any[]): string {
@@ -225,7 +229,7 @@ export class CloudUploadService extends EventEmitter {
 
   private async finalizeSession(
     baseUrl: string, token: string, sessionId: string
-  ): Promise<void> {
+  ): Promise<Record<string, any> | null> {
     const response = await fetch(`${baseUrl}/session/${sessionId}/finalize`, {
       method: 'POST',
       headers: {
@@ -233,9 +237,15 @@ export class CloudUploadService extends EventEmitter {
       },
     });
 
-    // Finalize is best-effort
     if (!response.ok) {
       console.warn(`Finalize returned ${response.status}`);
+      return null;
+    }
+
+    try {
+      return await response.json();
+    } catch {
+      return null;
     }
   }
 
