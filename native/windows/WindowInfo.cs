@@ -11,6 +11,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Windows.Automation;
 
@@ -726,6 +727,61 @@ namespace Ondoki.Native
             }
         }
 
+        // ---- Background element detection (avoids UIA deadlock in hook callback) ----
+
+        struct ClickQueueItem
+        {
+            public POINT pt;
+            public int button;
+            public string windowJson;
+            public string screenshotPath;
+            public string monBoundsJson;
+            public double scale;
+            public long ts;
+            public IntPtr rootHwnd;
+        }
+
+        static readonly ConcurrentQueue<ClickQueueItem> _clickQueue = new ConcurrentQueue<ClickQueueItem>();
+        static readonly AutoResetEvent _clickSignal = new AutoResetEvent(false);
+        static volatile bool _hooksRunning;
+        static Thread _elementThread;
+
+        static void ElementDetectionWorker()
+        {
+            while (_hooksRunning)
+            {
+                _clickSignal.WaitOne(200);
+                while (_clickQueue.TryDequeue(out ClickQueueItem item))
+                {
+                    string elementJson;
+                    try
+                    {
+                        elementJson = item.rootHwnd != IntPtr.Zero
+                            ? GetElementJson(item.pt.X, item.pt.Y, item.rootHwnd)
+                            : Json.Null;
+                    }
+                    catch
+                    {
+                        elementJson = Json.Null;
+                    }
+
+                    string screenshotJson = item.screenshotPath != null ? Json.Str(item.screenshotPath) : "null";
+                    WriteEvent(Json.Obj(
+                        ("type", Json.Str("click")),
+                        ("x", Json.Num(item.pt.X)),
+                        ("y", Json.Num(item.pt.Y)),
+                        ("button", Json.Num(item.button)),
+                        ("window", item.windowJson),
+                        ("element", elementJson),
+                        ("scale", Json.Num(item.scale)),
+                        ("monitorBounds", item.monBoundsJson),
+                        ("timestamp", Json.Num(item.ts)),
+                        ("screenshotPath", screenshotJson)
+                    ));
+                }
+            }
+        }
+
         static List<string> GetModifiers()
         {
             var mods = new List<string>();
@@ -758,33 +814,36 @@ namespace Ondoki.Native
                 if (msg == Win32.WM_LBUTTONDOWN || msg == Win32.WM_RBUTTONDOWN || msg == Win32.WM_MBUTTONDOWN)
                 {
                     // Capture screenshot FIRST — synchronous BitBlt before anything else
-                    // This runs in the low-level hook, before the click reaches the target app
+                    // BitBlt is GDI and safe to call from the hook callback
                     string screenshotPath = CaptureDisplayAtPoint(pt.X, pt.Y);
 
                     int button = msg == Win32.WM_LBUTTONDOWN ? 1 : msg == Win32.WM_RBUTTONDOWN ? 2 : 3;
-                    string windowJson = BuildWindowJsonAtPoint(pt);
-                    string elementJson = BuildElementJsonAtPoint(pt);
 
-                    // Get physical monitor bounds for accurate multi-monitor positioning
+                    // Collect all NON-UIA data (pure Win32/GDI calls — safe from hook)
+                    var hwnd = Win32.WindowFromPoint(pt);
+                    var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
+                    string windowJson = rootHwnd != IntPtr.Zero ? BuildWindowJson(rootHwnd) : Json.Null;
+
                     var hMonitor = Win32.MonitorFromPoint(pt, Win32.MONITOR_DEFAULTTONEAREST);
                     var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
                     Win32.GetMonitorInfo(hMonitor, ref monInfo);
                     var mr = monInfo.rcMonitor;
                     string monBoundsJson = Json.Rect(mr.Left, mr.Top, mr.Right - mr.Left, mr.Bottom - mr.Top);
 
-                    string screenshotJson = screenshotPath != null ? Json.Str(screenshotPath) : "null";
-                    WriteEvent(Json.Obj(
-                        ("type", Json.Str("click")),
-                        ("x", Json.Num(pt.X)),
-                        ("y", Json.Num(pt.Y)),
-                        ("button", Json.Num(button)),
-                        ("window", windowJson),
-                        ("element", elementJson),
-                        ("scale", Json.Num(scale)),
-                        ("monitorBounds", monBoundsJson),
-                        ("timestamp", Json.Num(ts)),
-                        ("screenshotPath", screenshotJson)
-                    ));
+                    // Enqueue for background element detection (UIA uses COM cross-process
+                    // calls that DEADLOCK when called from within WH_MOUSE_LL)
+                    _clickQueue.Enqueue(new ClickQueueItem
+                    {
+                        pt = pt,
+                        button = button,
+                        windowJson = windowJson,
+                        screenshotPath = screenshotPath,
+                        monBoundsJson = monBoundsJson,
+                        scale = scale,
+                        ts = ts,
+                        rootHwnd = rootHwnd
+                    });
+                    _clickSignal.Set();
                 }
                 else if (msg == Win32.WM_MOUSEWHEEL)
                 {
@@ -861,6 +920,15 @@ namespace Ondoki.Native
                 Environment.Exit(1);
             }
 
+            // Start background thread for UIA element detection
+            _hooksRunning = true;
+            _elementThread = new Thread(ElementDetectionWorker)
+            {
+                IsBackground = true,
+                Name = "UIA-ElementDetection"
+            };
+            _elementThread.Start();
+
             // Send ready message — coords are in physical pixel space (DPI aware)
             WriteEvent(Json.Obj(
                 ("type", Json.Str("ready")),
@@ -891,6 +959,11 @@ namespace Ondoki.Native
                 Win32.TranslateMessage(ref msg);
                 Win32.DispatchMessage(ref msg);
             }
+
+            // Shut down background element detection thread
+            _hooksRunning = false;
+            _clickSignal.Set();
+            _elementThread.Join(2000);
 
             Win32.UnhookWindowsHookEx(mouseHook);
             Win32.UnhookWindowsHookEx(keyboardHook);
