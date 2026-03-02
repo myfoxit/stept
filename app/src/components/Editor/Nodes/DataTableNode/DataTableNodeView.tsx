@@ -1,6 +1,6 @@
 import React from 'react';
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
-import { IconTable } from '@tabler/icons-react';
+import { Table } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -19,7 +19,7 @@ export function DataTableNodeView({
       )}
     >
       <div className="flex flex-col items-center justify-center min-h-[100px] border-2 border-dashed rounded-lg bg-muted/20 p-4">
-        <IconTable className="h-8 w-8 text-muted-foreground mb-2" />
+        <Table className="h-8 w-8 text-muted-foreground mb-2" />
         <p className="text-sm text-muted-foreground">
           Table embedding is no longer available.
         </p>

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as TablerIcons from '@tabler/icons-react';
+import { icons, type LucideIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
+const toLucideName = (name: string) => name.replace(/^Icon/, '');
+
 interface IconPickerModalProps {
   open: boolean;
   onClose: () => void;
@@ -18,13 +20,13 @@ interface IconPickerModalProps {
   currentIcon?: { type: string; value: string; color?: string };
 }
 
-// Popular Tabler icons for workflows
+// Popular icons for workflows (lucide PascalCase names)
 const POPULAR_ICONS = [
-  'IconPencil', 'IconChecklist', 'IconSettings', 'IconDatabase',
-  'IconChart', 'IconFolder', 'IconFile', 'IconCode', 'IconBrandChrome',
-  'IconClick', 'IconMouse', 'IconKeyboard', 'IconScreenshot',
-  'IconCamera', 'IconVideo', 'IconMail', 'IconBell', 'IconCalendar',
-  'IconClock', 'IconDownload', 'IconUpload', 'IconShare', 'IconLink',
+  'Pencil', 'ListChecks', 'Settings', 'Database',
+  'BarChart3', 'Folder', 'File', 'Code', 'Chrome',
+  'MousePointerClick', 'Mouse', 'Keyboard', 'Camera',
+  'Camera', 'Video', 'Mail', 'Bell', 'Calendar',
+  'Clock', 'Download', 'Upload', 'Share2', 'Link',
 ];
 
 const COLORS = [
@@ -40,7 +42,7 @@ export function IconPickerModal({
   currentIcon,
 }: IconPickerModalProps) {
   const [selectedTab, setSelectedTab] = React.useState<'tabler' | 'favicon'>(currentIcon?.type === 'favicon' ? 'favicon' : 'tabler');
-  const [selectedIcon, setSelectedIcon] = React.useState(currentIcon?.value || 'IconPencil');
+  const [selectedIcon, setSelectedIcon] = React.useState(toLucideName(currentIcon?.value || 'Pencil'));
   const [selectedColor, setSelectedColor] = React.useState(currentIcon?.color || '#D94F3D');
   const [faviconUrl, setFaviconUrl] = React.useState('');
 
@@ -49,7 +51,7 @@ export function IconPickerModal({
     if (!open) return;
     const type = (currentIcon?.type === 'favicon' ? 'favicon' : 'tabler') as 'tabler' | 'favicon';
     setSelectedTab(type);
-    setSelectedIcon(currentIcon?.value || 'IconPencil');
+    setSelectedIcon(toLucideName(currentIcon?.value || 'Pencil'));
     setSelectedColor(currentIcon?.color || '#D94F3D');
 
     if (type === 'favicon') {
@@ -91,12 +93,12 @@ export function IconPickerModal({
 
   const filteredIcons = React.useMemo(() => {
     if (!searchQuery) return POPULAR_ICONS;
-    return Object.keys(TablerIcons)
-      .filter(name => name.startsWith('Icon') && name.toLowerCase().includes(searchQuery.toLowerCase()))
+    return Object.keys(icons)
+      .filter(name => name.toLowerCase().includes(searchQuery.toLowerCase()))
       .slice(0, 24);
   }, [searchQuery]);
 
-  const IconComponent = (TablerIcons as any)[selectedIcon] || TablerIcons.IconPencil;
+  const IconComponent = icons[selectedIcon as keyof typeof icons] || icons['Pencil'];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -140,7 +142,7 @@ export function IconPickerModal({
 
             <div className="grid grid-cols-6 gap-2">
               {filteredIcons.map((iconName) => {
-                const Icon = (TablerIcons as any)[iconName];
+                const Icon = icons[iconName as keyof typeof icons];
                 if (!Icon) return null;
                 return (
                   <button

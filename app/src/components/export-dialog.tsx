@@ -9,13 +9,13 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
-  IconDownload,
-  IconFileTypePdf,
-  IconFileTypeHtml,
-  IconMarkdown,
-  IconFileTypeDocx,
-  IconLoader2,
-} from '@tabler/icons-react';
+  Download,
+  FileType,
+  FileCode,
+  FileDown,
+  FileOutput,
+  Loader2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 export type ExportFormat = 'pdf' | 'html' | 'markdown' | 'docx';
@@ -37,31 +37,31 @@ const exportOptions: {
   format: ExportFormat;
   label: string;
   description: string;
-  icon: typeof IconFileTypePdf;
+  icon: typeof FileType;
 }[] = [
   {
     format: 'pdf',
     label: 'PDF Document',
     description: 'Best for printing and sharing',
-    icon: IconFileTypePdf,
+    icon: FileType,
   },
   {
     format: 'docx',
     label: 'Word Document',
     description: 'Editable in Microsoft Word',
-    icon: IconFileTypeDocx,
+    icon: FileOutput,
   },
   {
     format: 'html',
     label: 'HTML File',
     description: 'View in any web browser',
-    icon: IconFileTypeHtml,
+    icon: FileCode,
   },
   {
     format: 'markdown',
     label: 'Markdown',
     description: 'Plain text with formatting',
-    icon: IconMarkdown,
+    icon: FileDown,
   },
 ];
 
@@ -99,7 +99,7 @@ export function ExportDialog({
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm" disabled={disabled}>
-            <IconDownload className="h-4 w-4 mr-2" />
+            <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
         )}
@@ -123,7 +123,7 @@ export function ExportDialog({
               >
                 <div className="flex items-center gap-3 w-full">
                   {isCurrentlyExporting ? (
-                    <IconLoader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : (
                     <Icon className="h-5 w-5 text-muted-foreground" />
                   )}

@@ -11,15 +11,15 @@ import {
 
 // tabler‑icons
 import {
-  IconBold,
-  IconItalic,
-  IconStrikethrough,
-  IconAlignLeft,
-  IconAlignCenter,
-  IconAlignRight,
-  IconPalette,
-  IconX,
-} from '@tabler/icons-react';
+  Bold,
+  Italic,
+  Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Palette,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Props = { editor: Editor };
@@ -60,7 +60,7 @@ export const FormatBubbleMenu: React.FC<Props> = ({ editor }) => {
           )}
           onClick={() => editor.chain().focus().toggleBold().run()}
         >
-          <IconBold size={18} />
+          <Bold size={18} />
         </Button>
 
         <Button
@@ -72,7 +72,7 @@ export const FormatBubbleMenu: React.FC<Props> = ({ editor }) => {
           )}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >
-          <IconItalic size={18} />
+          <Italic size={18} />
         </Button>
 
         <Button
@@ -84,7 +84,7 @@ export const FormatBubbleMenu: React.FC<Props> = ({ editor }) => {
           )}
           onClick={() => editor.chain().focus().toggleStrike().run()}
         >
-          <IconStrikethrough size={18} />
+          <Strikethrough size={18} />
         </Button>
 
         {/* ——— Alignment ——— */}
@@ -93,10 +93,10 @@ export const FormatBubbleMenu: React.FC<Props> = ({ editor }) => {
         {(['left', 'center', 'right'] as const).map((align) => {
           const Icon =
             align === 'left'
-              ? IconAlignLeft
+              ? AlignLeft
               : align === 'center'
-              ? IconAlignCenter
-              : IconAlignRight;
+              ? AlignCenter
+              : AlignRight;
 
           return (
             <Button
@@ -129,7 +129,7 @@ export const FormatBubbleMenu: React.FC<Props> = ({ editor }) => {
                   'outline outline-2 outline-primary'
               )}
             >
-              <IconPalette size={18} />
+              <Palette size={18} />
             </Button>
           </PopoverTrigger>
 
@@ -141,7 +141,7 @@ export const FormatBubbleMenu: React.FC<Props> = ({ editor }) => {
                 onClick={clearColor}
                 title="Clear color"
               >
-                <IconX size={16} />
+                <X size={16} />
               </Button>
 
               {/* full html picker for custom colors */}

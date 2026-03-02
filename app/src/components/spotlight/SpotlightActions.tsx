@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { IconCheck, IconX, IconLoader2 } from '@tabler/icons-react';
+import { Check, X, Loader2 } from 'lucide-react';
 import { confirmAction } from '@/api/spotlight';
 
 export interface ActionCard {
@@ -63,9 +63,9 @@ export function SpotlightActions({
               onClick={() => handleConfirm(action)}
             >
               {executing[action.id] ? (
-                <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
               ) : (
-                <IconCheck className="mr-1 h-3 w-3" />
+                <Check className="mr-1 h-3 w-3" />
               )}
               Confirm
             </Button>
@@ -76,7 +76,7 @@ export function SpotlightActions({
               disabled={executing[action.id]}
               onClick={() => handleDismiss(action)}
             >
-              <IconX className="h-3 w-3" />
+              <X className="h-3 w-3" />
             </Button>
           </div>
         </div>

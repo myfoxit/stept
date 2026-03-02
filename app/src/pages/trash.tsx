@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { IconTrash, IconRestore, IconTrashX, IconFile, IconRoute } from '@tabler/icons-react';
+import { Trash2, Undo2, Trash, File, Route } from 'lucide-react';
 import { getDeletedDocuments, restoreDocument, permanentDeleteDocument } from '@/api/documents';
 import { getDeletedWorkflows, restoreWorkflow, permanentDeleteWorkflow } from '@/api/workflows';
 import { Button } from '@/components/ui/button';
@@ -101,7 +101,7 @@ export default function TrashPage() {
   return (
     <div className="mx-auto max-w-3xl p-6">
       <div className="mb-6 flex items-center gap-3">
-        <IconTrash className="h-6 w-6 text-muted-foreground" />
+        <Trash2 className="h-6 w-6 text-muted-foreground" />
         <h1 className="text-2xl font-bold">Trash</h1>
       </div>
 
@@ -110,7 +110,7 @@ export default function TrashPage() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <IconTrash className="mb-4 h-12 w-12 text-muted-foreground/30" />
+            <Trash2 className="mb-4 h-12 w-12 text-muted-foreground/30" />
             <p className="text-muted-foreground">Trash is empty</p>
           </CardContent>
         </Card>
@@ -121,9 +121,9 @@ export default function TrashPage() {
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   {item.type === 'document' ? (
-                    <IconFile className="h-5 w-5 text-blue-500" />
+                    <File className="h-5 w-5 text-blue-500" />
                   ) : (
-                    <IconRoute className="h-5 w-5 text-purple-500" />
+                    <Route className="h-5 w-5 text-purple-500" />
                   )}
                   <div>
                     <p className="font-medium">{item.name || 'Untitled'}</p>
@@ -139,7 +139,7 @@ export default function TrashPage() {
                     variant="outline"
                     onClick={() => handleRestore(item)}
                   >
-                    <IconRestore className="mr-1 h-4 w-4" />
+                    <Undo2 className="mr-1 h-4 w-4" />
                     Restore
                   </Button>
                   <Button
@@ -147,7 +147,7 @@ export default function TrashPage() {
                     variant="destructive"
                     onClick={() => handlePermanentDelete(item)}
                   >
-                    <IconTrashX className="mr-1 h-4 w-4" />
+                    <Trash className="mr-1 h-4 w-4" />
                     Delete
                   </Button>
                 </div>

@@ -21,8 +21,8 @@ jest.mock('@/components/ui/button', () => ({
 }));
 
 // Mock tabler icons
-jest.mock('@tabler/icons-react', () => ({
-  IconSend: () => <span data-testid="icon-send">Send</span>,
+jest.mock('lucide-react', () => ({
+  Send: () => <span data-testid="icon-send">Send</span>,
 }));
 
 import { ChatInput } from '../ChatInput';

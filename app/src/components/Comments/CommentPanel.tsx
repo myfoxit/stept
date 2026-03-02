@@ -8,13 +8,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  IconCheck,
-  IconTrash,
-  IconPencil,
-  IconCornerDownRight,
-  IconX,
-  IconSend,
-} from '@tabler/icons-react';
+  Check,
+  Trash2,
+  Pencil,
+  CornerDownRight,
+  X,
+  Send,
+} from 'lucide-react';
 import {
   listComments,
   createComment,
@@ -233,7 +233,7 @@ export function CommentPanel({
                     Save
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                    <IconX className="h-3 w-3" />
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               </div>
@@ -256,7 +256,7 @@ export function CommentPanel({
                       setReplyContent('');
                     }}
                   >
-                    <IconCornerDownRight className="mr-0.5 h-3 w-3" />
+                    <CornerDownRight className="mr-0.5 h-3 w-3" />
                     Reply
                   </Button>
                 )}
@@ -267,7 +267,7 @@ export function CommentPanel({
                     className="h-6 px-1.5 text-xs"
                     onClick={() => handleResolve(comment.id)}
                   >
-                    <IconCheck className="mr-0.5 h-3 w-3" />
+                    <Check className="mr-0.5 h-3 w-3" />
                     {comment.resolved ? 'Unresolve' : 'Resolve'}
                   </Button>
                 )}
@@ -281,7 +281,7 @@ export function CommentPanel({
                       setEditContent(comment.content);
                     }}
                   >
-                    <IconPencil className="h-3 w-3" />
+                    <Pencil className="h-3 w-3" />
                   </Button>
                 )}
                 {isOwn && (
@@ -291,7 +291,7 @@ export function CommentPanel({
                     className="h-6 px-1.5 text-xs text-red-500 hover:text-red-600"
                     onClick={() => handleDelete(comment.id)}
                   >
-                    <IconTrash className="h-3 w-3" />
+                    <Trash2 className="h-3 w-3" />
                   </Button>
                 )}
               </div>
@@ -320,10 +320,10 @@ export function CommentPanel({
                 onClick={() => handleReply(comment.id)}
                 disabled={loading || !replyContent.trim()}
               >
-                <IconSend className="h-3 w-3" />
+                <Send className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setReplyTo(null)}>
-                <IconX className="h-3 w-3" />
+                <X className="h-3 w-3" />
               </Button>
             </div>
           </div>
@@ -364,7 +364,7 @@ export function CommentPanel({
             onClick={handleSubmit}
             disabled={loading || !newContent.trim()}
           >
-            <IconSend  />
+            <Send  />
             Comment
           </Button>
         </div>

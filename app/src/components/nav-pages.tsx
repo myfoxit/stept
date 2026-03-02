@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, ClipboardCheck, Copy, File, FileText, Files, Folder, FolderOpen, FolderPlus, Globe, Inbox, LayoutGrid, Lock, Monitor, MoreHorizontal, Move, Pencil, Play, Plus, Share2, Trash2 } from 'lucide-react';
 import * as React from "react";
 import {
   SidebarGroup,
@@ -22,32 +23,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  IconDots,
-  IconEdit,
-  IconShare3,
-  IconTrash,
-  IconCopy,
-  IconArrowsMove,
-} from "@tabler/icons-react";
-import {
-  FileText,
-  File,
-  FolderPlus,
-  Plus,
-  Inbox,
-  ChevronRight,
-  ChevronDown,
-  FolderOpen,
-  Folder,
-  Files,
-  Lock,
-  Globe,
-  Monitor,
-  LayoutGrid,
-  Play,
-  ClipboardCheck,
-} from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
 import {
@@ -533,7 +508,7 @@ function NavPageItem({
                   )}
                   data-testid="folder-menu-button"
                 >
-                  <IconDots className="size-4" />
+                  <MoreHorizontal className="size-4" />
                   <span className="sr-only">More</span>
                 </button>
               </DropdownMenuTrigger>
@@ -543,7 +518,7 @@ function NavPageItem({
                 align="start"
               >
                 <DropdownMenuItem onSelect={() => setEditOpen(true)}>
-                  <IconEdit className="mr-2 size-4" />
+                  <Pencil className="mr-2 size-4" />
                   Rename
                 </DropdownMenuItem>
 
@@ -634,7 +609,7 @@ function NavPageItem({
                     }
                   }}
                 >
-                  <IconCopy className="mr-2 size-4" />
+                  <Copy className="mr-2 size-4" />
                   Duplicate
                 </DropdownMenuItem>
 
@@ -644,7 +619,7 @@ function NavPageItem({
                     onSelect={() => setDeleteOpen(true)}
                     className="text-destructive"
                   >
-                    <IconTrash className="mr-2 size-4" />
+                    <Trash2 className="mr-2 size-4" />
                     Delete
                   </DropdownMenuItem>
                 )}

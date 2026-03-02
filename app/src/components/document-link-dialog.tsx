@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { IconLink } from '@tabler/icons-react';
+import { Link } from 'lucide-react';
 
 interface DocumentLinkDialogProps {
   docId: string;
@@ -26,7 +26,7 @@ export function DocumentLinkDialog({ docId }: DocumentLinkDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm">
-          <IconLink className="h-4 w-4 mr-2" />
+          <Link className="h-4 w-4 mr-2" />
           Link Document
         </Button>
       </DialogTrigger>

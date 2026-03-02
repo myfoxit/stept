@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { SettingsLayout } from '@/components/settings-layout';
 import {
-  IconShieldCheck,
-  IconDownload,
-} from '@tabler/icons-react';
+  ShieldCheck,
+  Download,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,7 +71,7 @@ export function AuditLogPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-end">
           <Button variant="outline" onClick={handleExport}>
-            <IconDownload className="h-4 w-4 mr-2" />
+            <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
         </div>

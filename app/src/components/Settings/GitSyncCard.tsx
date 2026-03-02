@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
-  IconBrandGithub,
-  IconBrandGitlab,
-  IconUpload,
-  IconPlugConnected,
-  IconEye,
-  IconEyeOff,
-  IconCheck,
-  IconX,
-  IconLoader2,
-} from '@tabler/icons-react';
+  Github,
+  GitBranch,
+  Upload,
+  Plug,
+  Eye,
+  EyeOff,
+  Check,
+  X,
+  Loader2,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,9 +34,9 @@ import {
 } from '@/api/git-sync';
 
 const PROVIDERS = [
-  { value: 'github', label: 'GitHub', icon: IconBrandGithub },
-  { value: 'gitlab', label: 'GitLab', icon: IconBrandGitlab },
-  { value: 'bitbucket', label: 'Bitbucket', icon: IconUpload },
+  { value: 'github', label: 'GitHub', icon: Github },
+  { value: 'gitlab', label: 'GitLab', icon: GitBranch },
+  { value: 'bitbucket', label: 'Bitbucket', icon: Upload },
 ] as const;
 
 export function GitSyncCard() {
@@ -145,7 +145,7 @@ export function GitSyncCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <IconBrandGithub className="h-5 w-5" />
+          <Github className="h-5 w-5" />
           Export to Git
         </CardTitle>
         <CardDescription>
@@ -215,7 +215,7 @@ export function GitSyncCard() {
                 onClick={() => setShowToken(!showToken)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                {showToken ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
+                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
@@ -224,9 +224,9 @@ export function GitSyncCard() {
         {/* Status */}
         {config?.last_sync_status && (
           <div className="flex items-center gap-2 rounded-md border p-3 text-sm">
-            {config.last_sync_status === 'success' && <IconCheck className="h-4 w-4 text-green-500" />}
-            {config.last_sync_status === 'error' && <IconX className="h-4 w-4 text-destructive" />}
-            {config.last_sync_status === 'in_progress' && <IconLoader2 className="h-4 w-4 animate-spin" />}
+            {config.last_sync_status === 'success' && <Check className="h-4 w-4 text-green-500" />}
+            {config.last_sync_status === 'error' && <X className="h-4 w-4 text-destructive" />}
+            {config.last_sync_status === 'in_progress' && <Loader2 className="h-4 w-4 animate-spin" />}
             <div>
               <span className="font-medium capitalize">{config.last_sync_status}</span>
               {config.last_sync_at && (
@@ -244,17 +244,17 @@ export function GitSyncCard() {
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleTest} variant="outline" size="sm" disabled={testing || !repoUrl || !token}>
-            {testing ? <IconLoader2 className="mr-1 h-4 w-4 animate-spin" /> : <IconPlugConnected className="mr-1 h-4 w-4" />}
+            {testing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plug className="mr-1 h-4 w-4" />}
             Test
           </Button>
           <Button onClick={handleSave} size="sm" disabled={saving || !repoUrl || !token}>
-            {saving ? <IconLoader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+            {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             {config ? 'Update' : 'Save'}
           </Button>
           {config && (
             <>
               <Button onClick={handleExport} size="sm" variant="secondary" disabled={exporting}>
-                {exporting ? <IconLoader2 className="mr-1 h-4 w-4 animate-spin" /> : <IconUpload className="mr-1 h-4 w-4" />}
+                {exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />}
                 Export to Git
               </Button>
               <Button onClick={handleDelete} size="sm" variant="ghost" className="text-destructive">

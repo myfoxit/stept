@@ -1,5 +1,5 @@
 import * as React from "react";
-import * as TablerIcons from "@tabler/icons-react";
+import { icons } from "lucide-react";
 import type { Workflow } from "@/types/workflow";
 import { IconPickerModal } from "./icon-picker-modal";
 import { cn } from "@/lib/utils";
@@ -43,7 +43,7 @@ export function WorkflowHeader({
   const iconType =
     iconOverride?.type || (workflow as any).icon_type || "tabler";
   const iconValue =
-    iconOverride?.value || (workflow as any).icon_value || "IconPencil";
+    iconOverride?.value || (workflow as any).icon_value || "Pencil";
   const iconColor =
     iconOverride?.color || (workflow as any).icon_color || "#3ab08a";
 
@@ -61,17 +61,8 @@ export function WorkflowHeader({
         />
       );
     } else {
-      const IconComponent = (TablerIcons as any)[iconValue] || (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
-        </svg>
-      );
+      const lucideName = iconValue.replace(/^Icon/, '');
+      const IconComponent = icons[lucideName as keyof typeof icons] || icons['Pencil'];
 
       return <IconComponent className="h-8 w-8 text-white" />;
     }

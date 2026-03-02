@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IconChartBar, IconCoin, IconMessage, IconLoader2 } from '@tabler/icons-react';
+import { BarChart3, Coins, MessageSquare, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiClient } from '@/lib/apiClient';
@@ -38,7 +38,7 @@ export function AiUsageCard() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <IconChartBar className="h-4 w-4" />
+            <BarChart3 className="h-4 w-4" />
             AI Usage
           </CardTitle>
           <Select value={days} onValueChange={setDays}>
@@ -57,7 +57,7 @@ export function AiUsageCard() {
       <CardContent>
         {loading ? (
           <div className="flex items-center justify-center py-4">
-            <IconLoader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : !usage ? (
           <p className="text-sm text-muted-foreground">Unable to load usage data.</p>
@@ -67,14 +67,14 @@ export function AiUsageCard() {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <IconMessage className="h-3 w-3" />
+                <MessageSquare className="h-3 w-3" />
                 Requests
               </p>
               <p className="text-lg font-semibold">{formatNumber(usage.request_count)}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <IconChartBar className="h-3 w-3" />
+                <BarChart3 className="h-3 w-3" />
                 Tokens
               </p>
               <p className="text-lg font-semibold">{formatNumber(usage.total_tokens)}</p>
@@ -84,7 +84,7 @@ export function AiUsageCard() {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <IconCoin className="h-3 w-3" />
+                <Coins className="h-3 w-3" />
                 Est. Cost
               </p>
               <p className="text-lg font-semibold">

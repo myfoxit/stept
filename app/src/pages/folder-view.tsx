@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 
-import { IconFolder } from '@tabler/icons-react';
+import { Folder } from 'lucide-react';
 import { useDocument } from '@/hooks/api/documents';
 
 export function FolderView() {
@@ -17,7 +17,7 @@ export function FolderView() {
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4">
-      <IconFolder className="size-16 text-muted-foreground/50" />
+      <Folder className="size-16 text-muted-foreground/50" />
       <h1 className="text-2xl font-semibold">{folder?.name || 'Folder'}</h1>
       <p className="text-muted-foreground">
         Folder view - coming soon

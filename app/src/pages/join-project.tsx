@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/apiClient';
-import { IconLoader2, IconAlertTriangle } from '@tabler/icons-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { useMe } from '@/hooks/api/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
@@ -80,7 +80,7 @@ export function JoinProjectPage() {
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -109,7 +109,7 @@ export function JoinProjectPage() {
     const isWrongEmail = error.toLowerCase().includes('different email');
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <IconAlertTriangle className="h-8 w-8 text-destructive" />
+        <AlertTriangle className="h-8 w-8 text-destructive" />
         <p className="text-sm font-medium text-destructive">{error}</p>
         {isWrongEmail && inviteInfo?.email && (
           <p className="text-xs text-muted-foreground">
@@ -138,7 +138,7 @@ export function JoinProjectPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <IconLoader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin" />
         Joining project…
       </div>
     </div>

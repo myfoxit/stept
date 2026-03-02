@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-  IconUserPlus,
-  IconCrown,
-  IconUser,
-  IconEdit,
-  IconEye,
-} from '@tabler/icons-react';
+  UserPlus,
+  Crown,
+  User,
+  Pencil,
+  Eye,
+} from 'lucide-react';
 import { useProject } from '@/providers/project-provider';
 import { useProjectMembers } from '@/hooks/api/projects';
 import { SiteHeader } from '@/components/site-header';
@@ -13,11 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 
-const roleIcons: Record<string, typeof IconCrown> = {
-  owner: IconCrown,
-  admin: IconUser,
-  editor: IconEdit,
-  viewer: IconEye,
+const roleIcons: Record<string, typeof Crown> = {
+  owner: Crown,
+  admin: User,
+  editor: Pencil,
+  viewer: Eye,
 };
 
 const roleLabels: Record<string, string> = {
@@ -80,7 +80,7 @@ export function TeamPage() {
               onClick={() => navigate(`/projects/${selectedProjectId}/settings`)}
               size="sm"
             >
-              <IconUserPlus className="mr-2 size-4" />
+              <UserPlus className="mr-2 size-4" />
               Invite
             </Button>
           )}
@@ -97,7 +97,7 @@ export function TeamPage() {
         ) : (
           <div className="space-y-2">
             {members.map((member: any) => {
-              const RoleIcon = roleIcons[member.role] || IconUser;
+              const RoleIcon = roleIcons[member.role] || User;
               return (
                 <div
                   key={member.user_id}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { IconX, IconUpload } from '@tabler/icons-react';
+import { X, Upload } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -111,7 +111,7 @@ export function ImageUploadModal({
               disabled={isUploading}
             />
             
-            <IconUpload className="mx-auto h-12 w-12 text-gray-400" />
+            <Upload className="mx-auto h-12 w-12 text-gray-400" />
             <div className="mt-2 text-sm text-gray-600">
               Drag and drop or{' '}
               <button className="text-primary hover:text-primary">

@@ -8,18 +8,18 @@ jest.mock('@/lib/utils', () => ({
 }));
 
 // Mock all tabler icons used
-jest.mock('@tabler/icons-react', () => ({
-  IconTool: (props: any) => <span data-testid="icon-tool" className={props.className}>Tool</span>,
-  IconCheck: (props: any) => <span data-testid="icon-check" className={props.className}>Check</span>,
-  IconX: (props: any) => <span data-testid="icon-x" className={props.className}>X</span>,
-  IconLoader2: (props: any) => <span data-testid="icon-loader" className={props.className}>Loading</span>,
-  IconFile: (props: any) => <span data-testid="icon-file" className={props.className}>File</span>,
-  IconFolder: (props: any) => <span data-testid="icon-folder" className={props.className}>Folder</span>,
-  IconEdit: (props: any) => <span data-testid="icon-edit" className={props.className}>Edit</span>,
-  IconGitMerge: (props: any) => <span data-testid="icon-merge" className={props.className}>Merge</span>,
-  IconChartBar: (props: any) => <span data-testid="icon-chart" className={props.className}>Chart</span>,
-  IconList: (props: any) => <span data-testid="icon-list" className={props.className}>List</span>,
-  IconSearch: (props: any) => <span data-testid="icon-search" className={props.className}>Search</span>,
+jest.mock('lucide-react', () => ({
+  Wrench: (props: any) => <span data-testid="icon-tool" className={props.className}>Tool</span>,
+  Check: (props: any) => <span data-testid="icon-check" className={props.className}>Check</span>,
+  X: (props: any) => <span data-testid="icon-x" className={props.className}>X</span>,
+  Loader2: (props: any) => <span data-testid="icon-loader" className={props.className}>Loading</span>,
+  File: (props: any) => <span data-testid="icon-file" className={props.className}>File</span>,
+  Folder: (props: any) => <span data-testid="icon-folder" className={props.className}>Folder</span>,
+  Pencil: (props: any) => <span data-testid="icon-edit" className={props.className}>Edit</span>,
+  GitMerge: (props: any) => <span data-testid="icon-merge" className={props.className}>Merge</span>,
+  BarChart3: (props: any) => <span data-testid="icon-chart" className={props.className}>Chart</span>,
+  List: (props: any) => <span data-testid="icon-list" className={props.className}>List</span>,
+  Search: (props: any) => <span data-testid="icon-search" className={props.className}>Search</span>,
 }));
 
 import { ChatMessage } from '../ChatMessage';

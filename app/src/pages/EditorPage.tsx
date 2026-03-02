@@ -1,14 +1,8 @@
+import { Download, Eye, Folder as FolderIcon, Lock, Share2 } from 'lucide-react';
 import { useParams } from "react-router-dom";
 import { OndokiEditor } from "@/components/Editor/OndokiEditor";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
-import {
-  IconDownload,
-  IconShare,
-  IconEye,
-  IconLock,
-} from "@tabler/icons-react";
-import { Folder as FolderIcon } from "lucide-react";
 import {
   PageLayoutSelector,
   type PageLayout,
@@ -180,7 +174,7 @@ export default function EditorPage() {
       <SiteHeader name={doc?.name || "Editor"} breadcrumbs={breadcrumbs}>
         {isReadOnly && (
           <Badge variant="secondary" className="gap-1 text-xs">
-            <IconEye className="h-3 w-3" />
+            <Eye className="h-3 w-3" />
             View only
           </Badge>
         )}
@@ -200,7 +194,7 @@ export default function EditorPage() {
             isPrivate={doc?.is_private}
             trigger={
               <Button variant="outline" size="sm">
-                <IconShare />
+                <Share2 />
                 <span className=" hidden md:inline">Share</span>
               </Button>
             }
@@ -213,7 +207,7 @@ export default function EditorPage() {
           description="Choose a format to export your document."
           trigger={
             <Button variant="default" size="sm">
-              <IconDownload />
+              <Download />
               <span className=" hidden md:inline">Export</span>
             </Button>
           }
@@ -233,7 +227,7 @@ export default function EditorPage() {
             className="flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
-              <IconLock className="h-4 w-4" />
+              <Lock className="h-4 w-4" />
               <AlertDescription>
                 {lockStatus?.locked_by_name || "Someone"} is currently editing
                 this document.

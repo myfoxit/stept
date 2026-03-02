@@ -1,12 +1,5 @@
 import * as React from 'react';
-import {
-  IconBulb,
-  IconAlertCircle,
-  IconCamera,
-  IconHeading,
-  IconVideo,
-  IconUpload,
-} from '@tabler/icons-react';
+import { Camera, CircleAlert, Copy, Download, Heading, ImageIcon, Lightbulb, Link, MoreVertical, Pencil, Trash2, Upload, Video } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,15 +13,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import {
-  IconDotsVertical,
-  IconCopy,
-  IconLink,
-  IconPhoto,
-  IconDownload,
-  IconTrash,
-  IconPencil,
-} from '@tabler/icons-react';
 
 interface StepVariantProps {
   stepNumber: number; // still passed but no longer displayed for non-image variants
@@ -59,34 +43,34 @@ function VariantMenu({
             type="button"
             className="invisible flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition group-hover:visible hover:bg-slate-100"
         >
-          <IconDotsVertical className="h-4 w-4" />
+          <MoreVertical className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="text-xs text-slate-400">Step actions</DropdownMenuLabel>
         {onDuplicate && (
           <DropdownMenuItem onClick={onDuplicate}>
-            <IconCopy className="mr-2 h-4 w-4" /> Duplicate Step
+            <Copy className="mr-2 h-4 w-4" /> Duplicate Step
           </DropdownMenuItem>
         )}
         {onCopyLink && (
           <DropdownMenuItem onClick={onCopyLink}>
-            <IconLink className="mr-2 h-4 w-4" /> Copy Link
+            <Link className="mr-2 h-4 w-4" /> Copy Link
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         {onReplaceImage && (
           <DropdownMenuItem onClick={onReplaceImage}>
-            <IconPhoto className="mr-2 h-4 w-4" /> Replace Image
+            <ImageIcon className="mr-2 h-4 w-4" /> Replace Image
           </DropdownMenuItem>
         )}
         {onDownloadImage && (
           <>
             <DropdownMenuItem onClick={() => onDownloadImage(false)}>
-              <IconDownload className="mr-2 h-4 w-4" /> Download Image
+              <Download className="mr-2 h-4 w-4" /> Download Image
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDownloadImage(true)}>
-              <IconDownload className="mr-2 h-4 w-4" /> Download Full
+              <Download className="mr-2 h-4 w-4" /> Download Full
             </DropdownMenuItem>
           </>
         )}
@@ -95,7 +79,7 @@ function VariantMenu({
           onClick={onDelete}
           className="text-red-600 focus:text-red-600"
         >
-          <IconTrash className="mr-2 h-4 w-4" /> Delete Step
+          <Trash2 className="mr-2 h-4 w-4" /> Delete Step
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -156,7 +140,7 @@ export function HeaderStep({
               onClick={() => setEditingTitle(true)}
               className="rounded p-1 text-slate-400 hover:text-slate-600"
             >
-              <IconPencil className="h-4 w-4" />
+              <Pencil className="h-4 w-4" />
             </button>
           )}
           <div className="h-px flex-1 bg-slate-200" />
@@ -242,7 +226,7 @@ export function TipStep({
         </div>
         <div className="flex items-start gap-3 p-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-            <IconBulb className="h-5 w-5 text-green-600" />
+            <Lightbulb className="h-5 w-5 text-green-600" />
           </div>
           <div className="flex-1">
             {editingBody && isEditMode ? (
@@ -335,7 +319,7 @@ export function AlertStep({
         </div>
         <div className="flex items-start gap-3 p-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-            <IconAlertCircle className="h-5 w-5 text-red-600" />
+            <CircleAlert className="h-5 w-5 text-red-600" />
           </div>
           <div className="flex-1">
             {editingBody && isEditMode ? (
@@ -460,7 +444,7 @@ export function EmptyImageStep({
               "rounded-full p-3 transition-colors",
               isDragOver ? "bg-primary/10" : "bg-slate-100 group-hover:bg-slate-200"
             )}>
-              <IconUpload className={cn(
+              <Upload className={cn(
                 "h-8 w-8 transition-colors",
                 isDragOver ? "text-primary600" : "text-slate-400 group-hover:text-slate-600"
               )} />

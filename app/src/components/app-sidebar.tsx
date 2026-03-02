@@ -1,16 +1,8 @@
 "use client";
 
+import { Check, ChevronDown, Eye, HelpCircle, MoreVertical, Pencil, Plus, Search, Settings, Trash2, Users } from 'lucide-react';
 import * as React from "react";
-import {
-  IconPlus,
-  IconChevronDown,
-  IconCheck,
-  IconPencil,
-  IconTrash,
-  IconDotsVertical,
-} from "@tabler/icons-react";
 
-import { Eye, Users, Settings, HelpCircle, Search, Trash2 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -209,7 +201,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   className="size-7 flex items-center justify-center rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
                   title="New Page"
                 >
-                  <IconPlus className="size-4" stroke={2} />
+                  <Plus className="size-4" stroke={2} />
                 </button>
               )}
               <SidebarTrigger className="size-7" />
@@ -235,7 +227,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   onClick={() => setNewProjectDialogOpen(true)}
                   data-testid="create-first-project-btn"
                 >
-                  <IconPlus className="mr-2 size-4" />
+                  <Plus className="mr-2 size-4" />
                   Create Project
                 </Button>
               )}
@@ -252,7 +244,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       <span className="truncate">
                         {selectedProject?.name || "Select Project"}
                       </span>
-                      <IconChevronDown className="size-4 opacity-60" />
+                      <ChevronDown className="size-4 opacity-60" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -279,7 +271,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           </span>
                         )}
                         {p.id === selectedProjectId && (
-                          <IconCheck className="size-4 shrink-0 text-muted-foreground" />
+                          <Check className="size-4 shrink-0 text-muted-foreground" />
                         )}
                         {/* Only show actions menu if user has permissions */}
                         {p.id === selectedProjectId && canEditProject && (
@@ -294,7 +286,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     onClick={(e) => e.stopPropagation()}
                                     data-testid={`project-actions-${p.id}`}
                                   >
-                                    <IconDotsVertical className="size-4" />
+                                    <MoreVertical className="size-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
@@ -321,7 +313,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     className="flex items-center gap-2"
                                     data-testid={`rename-project-${p.id}`}
                                   >
-                                    <IconPencil className="size-4" />
+                                    <Pencil className="size-4" />
                                     Rename
                                   </DropdownMenuItem>
                                   {canDeleteProject && (
@@ -333,7 +325,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                       className="flex items-center gap-2 text-destructive focus:text-destructive"
                                       data-testid={`delete-project-${p.id}`}
                                     >
-                                      <IconTrash className="size-4" />
+                                      <Trash2 className="size-4" />
                                       Delete
                                     </DropdownMenuItem>
                                   )}
@@ -350,7 +342,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       className="text-primary focus:text-primary"
                       data-testid="new-project-dropdown-btn"
                     >
-                      <IconPlus className="mr-2 size-4" />
+                      <Plus className="mr-2 size-4" />
                       New Project
                     </DropdownMenuItem>
                   </DropdownMenuContent>

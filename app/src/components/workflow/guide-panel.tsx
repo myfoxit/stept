@@ -1,13 +1,13 @@
 import * as React from 'react';
 import DOMPurify from 'dompurify';
 import {
-  IconX,
-  IconCopy,
-  IconDownload,
-  IconFileText,
-  IconLoader2,
-  IconCheck,
-} from '@tabler/icons-react';
+  X,
+  Copy,
+  Download,
+  FileText,
+  Loader2,
+  Check,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -125,7 +125,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
         <SheetHeader className="px-6 py-4 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
             <SheetTitle className="flex items-center gap-2">
-              <IconFileText className="h-5 w-5 text-primary" />
+              <FileText className="h-5 w-5 text-primary" />
               Generated Guide
             </SheetTitle>
           </div>
@@ -135,12 +135,12 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
         <div className="flex items-center gap-2 px-6 py-3 border-b bg-slate-50 flex-shrink-0">
           {!isStreaming ? (
             <Button size="sm" onClick={handleStream} variant="default" className="bg-primary hover:bg-primary/90">
-              <IconFileText className="mr-1.5 h-3.5 w-3.5" />
+              <FileText className="mr-1.5 h-3.5 w-3.5" />
               {guideContent ? 'Regenerate' : 'Generate Guide'}
             </Button>
           ) : (
             <Button size="sm" onClick={handleStop} variant="destructive">
-              <IconLoader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               Stop
             </Button>
           )}
@@ -148,11 +148,11 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
           {guideContent && (
             <>
               <Button size="sm" variant="ghost" onClick={handleCopy}>
-                {copied ? <IconCheck className="mr-1.5 h-3.5 w-3.5" /> : <IconCopy className="mr-1.5 h-3.5 w-3.5" />}
+                {copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
                 {copied ? 'Copied' : 'Copy'}
               </Button>
               <Button size="sm" variant="ghost" onClick={handleDownloadMd}>
-                <IconDownload className="mr-1.5 h-3.5 w-3.5" />
+                <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download MD
               </Button>
             </>
@@ -163,7 +163,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
         <ScrollArea className="flex-1 px-6 py-4" ref={scrollRef}>
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-slate-400">
-              <IconLoader2 className="mr-2 h-5 w-5 animate-spin" />
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Loading guide…
             </div>
           ) : guideContent ? (
@@ -173,7 +173,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
-              <IconFileText className="h-12 w-12 mb-3 opacity-40" />
+              <FileText className="h-12 w-12 mb-3 opacity-40" />
               <p className="text-sm font-medium">No guide generated yet</p>
               <p className="text-xs mt-1">Click "Generate Guide" to create a polished documentation</p>
             </div>
@@ -181,7 +181,7 @@ export function GuidePanel({ open, onClose, recordingId, existingGuide }: GuideP
 
           {isStreaming && (
             <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary">
-              <IconLoader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin" />
               Writing…
             </div>
           )}

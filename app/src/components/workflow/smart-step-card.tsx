@@ -1,11 +1,11 @@
 import * as React from 'react';
 import {
-  IconSparkles,
-  IconRefresh,
-  IconPencil,
-  IconLoader2,
-  IconCheck,
-} from '@tabler/icons-react';
+  Sparkles,
+  RefreshCw,
+  Pencil,
+  Loader2,
+  Check,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -95,7 +95,7 @@ export function SmartStepOverlay({
           {/* AI-generated title */}
           {generatedTitle && (
             <div className="flex items-center gap-1.5 mb-1">
-              <IconSparkles className="h-3.5 w-3.5 text-primary500 flex-shrink-0" />
+              <Sparkles className="h-3.5 w-3.5 text-primary500 flex-shrink-0" />
               <span className="text-sm font-medium text-primary900 truncate">{generatedTitle}</span>
             </div>
           )}
@@ -130,9 +130,9 @@ export function SmartStepOverlay({
               title="Re-annotate with AI"
             >
               {isReannotating ? (
-                <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <IconRefresh className="h-3.5 w-3.5" />
+                <RefreshCw className="h-3.5 w-3.5" />
               )}
             </Button>
             <Button
@@ -144,9 +144,9 @@ export function SmartStepOverlay({
               title="Improve description"
             >
               {isImproving ? (
-                <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <IconPencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3.5 w-3.5" />
               )}
             </Button>
           </div>

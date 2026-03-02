@@ -2,15 +2,15 @@ import * as React from 'react';
 import DOMPurify from 'dompurify';
 import { useNavigate } from 'react-router-dom';
 import {
-  IconSearch,
-  IconX,
-  IconFileText,
-  IconArrowRight,
-  IconSparkles,
-  IconLoader2,
-  IconBrain,
-  IconAbc,
-} from '@tabler/icons-react';
+  Search,
+  X,
+  FileText,
+  ArrowRight,
+  Sparkles,
+  Loader2,
+  Brain,
+  CaseSensitive,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { smartSearch, type SearchResult, type SearchResponse } from '@/api/processing';
@@ -111,7 +111,7 @@ export function SearchBar({ className }: SearchBarProps) {
   return (
     <div ref={containerRef} className={`relative ${className || ''}`}>
       <div className="relative">
-        <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           ref={inputRef}
           value={query}
@@ -127,9 +127,9 @@ export function SearchBar({ className }: SearchBarProps) {
             title={searchMode === 'semantic' ? 'Switch to keyword search' : 'Switch to semantic search'}
           >
             {searchMode === 'semantic' ? (
-              <IconBrain className="h-3.5 w-3.5 text-primary" />
+              <Brain className="h-3.5 w-3.5 text-primary" />
             ) : (
-              <IconAbc className="h-3.5 w-3.5" />
+              <CaseSensitive className="h-3.5 w-3.5" />
             )}
           </button>
           {query && (
@@ -138,9 +138,9 @@ export function SearchBar({ className }: SearchBarProps) {
               className="text-muted-foreground hover:text-foreground"
             >
               {isSearching ? (
-                <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <IconX className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" />
               )}
             </button>
           )}
@@ -160,7 +160,7 @@ export function SearchBar({ className }: SearchBarProps) {
                 <span>{totalResults} result{totalResults !== 1 ? 's' : ''}</span>
                 {searchMode === 'semantic' && semanticResults && (
                   <span className="flex items-center gap-1">
-                    <IconBrain className="h-3 w-3" />
+                    <Brain className="h-3 w-3" />
                     {semanticResults.search_type === 'semantic' ? 'AI' : 'Keyword'}
                   </span>
                 )}
@@ -202,7 +202,7 @@ function SearchResultItem({
         onClick={() => onClick(result.recording_id)}
         className="w-full px-3 py-2 text-left hover:bg-accent transition-colors flex items-start gap-2"
       >
-        <IconFileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+        <FileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span
@@ -210,7 +210,7 @@ function SearchResultItem({
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.name_highlighted || result.name) }}
             />
             {result.is_processed && (
-              <IconSparkles className="h-3 w-3 text-primary flex-shrink-0" />
+              <Sparkles className="h-3 w-3 text-primary flex-shrink-0" />
             )}
           </div>
           {result.summary_highlighted && result.summary && (
@@ -229,7 +229,7 @@ function SearchResultItem({
             </div>
           )}
         </div>
-        <IconArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
       </button>
 
       {/* Matching steps within this recording */}
@@ -284,14 +284,14 @@ function SemanticResultItem({
         onClick={() => onClick(result.recording_id)}
         className="w-full px-3 py-2 text-left hover:bg-accent transition-colors flex items-start gap-2"
       >
-        <IconFileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+        <FileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-medium truncate">
               {result.generated_title || result.name}
             </span>
             {result.is_processed && (
-              <IconSparkles className="h-3 w-3 text-primary flex-shrink-0" />
+              <Sparkles className="h-3 w-3 text-primary flex-shrink-0" />
             )}
             <span className={`text-[10px] font-mono px-1 py-0.5 rounded ${scoreColor}`}>
               {scorePercent}%
@@ -312,7 +312,7 @@ function SemanticResultItem({
             </div>
           )}
         </div>
-        <IconArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
       </button>
 
       {/* Matching steps with scores */}

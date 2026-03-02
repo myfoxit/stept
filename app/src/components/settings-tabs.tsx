@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { IconExternalLink } from '@tabler/icons-react';
+import { ExternalLink } from 'lucide-react';
 import { useProject } from '@/providers/project-provider';
 
 const tabs: { label: string; path: string; external?: boolean }[] = [
@@ -49,7 +49,7 @@ export function SettingsTabs() {
               className="whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors border-transparent text-muted-foreground hover:text-foreground hover:border-border inline-flex items-center gap-1"
             >
               {tab.label}
-              <IconExternalLink size={14} />
+              <ExternalLink size={14} />
             </a>
           );
         }

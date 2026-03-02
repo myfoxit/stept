@@ -2,7 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import React, { useState } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
-import { IconChevronDown, IconChevronRight, IconMouse, IconKeyboard, IconScreenShare, IconLayoutList, IconPresentation, IconChevronLeft } from '@tabler/icons-react';
+import { ChevronDown, ChevronRight, Mouse, Keyboard, ScreenShare, LayoutList, Presentation, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import {  getWorkflowImage } from '@/api/workflows';
 import { Button } from '@/components/ui/button';
@@ -61,12 +61,12 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
       case 'click':
       case 'double_click':
       case 'right_click':
-        return <IconMouse className="w-4 h-4" />;
+        return <Mouse className="w-4 h-4" />;
       case 'key_press':
       case 'type':
-        return <IconKeyboard className="w-4 h-4" />;
+        return <Keyboard className="w-4 h-4" />;
       default:
-        return <IconScreenShare className="w-4 h-4" />;
+        return <ScreenShare className="w-4 h-4" />;
     }
   };
 
@@ -93,7 +93,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
       return (
         <div className="w-full h-64 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center">
           <div className="text-center">
-            <IconScreenShare className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+            <ScreenShare className="w-12 h-12 text-gray-400 mx-auto mb-2" />
             <p className="text-sm text-gray-500">Image unavailable</p>
           </div>
         </div>
@@ -164,12 +164,12 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
               >
                 {viewMode === 'slide' ? (
                   <>
-                    <IconLayoutList className="w-4 h-4" />
+                    <LayoutList className="w-4 h-4" />
                     Expand All
                   </>
                 ) : (
                   <>
-                    <IconPresentation className="w-4 h-4" />
+                    <Presentation className="w-4 h-4" />
                     Slide View
                   </>
                 )}
@@ -232,7 +232,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
                       disabled={currentSlideIndex === 0}
                       className="gap-2"
                     >
-                      <IconChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-4 h-4" />
                       Previous
                     </Button>
 
@@ -248,7 +248,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
                       className="gap-2"
                     >
                       Next
-                      <IconChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import {
-  IconLink,
-  IconPlus,
-  IconX,
-  IconWorld,
-  IconDeviceDesktop,
-  IconSearch,
-  IconRegex,
-  IconWindowMaximize,
-  IconApps,
-} from "@tabler/icons-react";
+  Link,
+  Plus,
+  X,
+  Globe,
+  Monitor,
+  Search,
+  Regex,
+  Maximize2,
+  LayoutGrid,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,15 +41,15 @@ interface ContextLinkPanelProps {
   resourceId: string;
 }
 
-const MATCH_ICONS: Record<string, typeof IconWorld> = {
-  url_pattern: IconWorld,
-  url_exact: IconWorld,
-  url_regex: IconRegex,
-  app_name: IconApps,
-  app_exact: IconDeviceDesktop,
-  app_regex: IconRegex,
-  window_title: IconWindowMaximize,
-  window_regex: IconRegex,
+const MATCH_ICONS: Record<string, typeof Globe> = {
+  url_pattern: Globe,
+  url_exact: Globe,
+  url_regex: Regex,
+  app_name: LayoutGrid,
+  app_exact: Monitor,
+  app_regex: Regex,
+  window_title: Maximize2,
+  window_regex: Regex,
 };
 
 type MatchCategory = "url" | "app" | "window";
@@ -269,7 +269,7 @@ export function ContextLinkPanel({
     <div className="flex flex-wrap items-center gap-1.5">
       {/* Existing context links as tags */}
       {links.map((link) => {
-        const Icon = MATCH_ICONS[link.match_type] || IconWorld;
+        const Icon = MATCH_ICONS[link.match_type] || Globe;
         return (
           <Badge
             key={link.id}
@@ -288,7 +288,7 @@ export function ContextLinkPanel({
               onClick={() => handleDelete(link.id)}
               className="ml-0.5 rounded-sm opacity-0 hover:bg-destructive/20 group-hover:opacity-100"
             >
-              <IconX className="h-3 w-3" />
+              <X className="h-3 w-3" />
             </button>
           </Badge>
         );
@@ -302,11 +302,11 @@ export function ContextLinkPanel({
             size="sm"
             className="border-dashed border-1 border-muted h-8 px-2"
           >
-            <IconLink className="h-3 w-3" />
+            <Link className="h-3 w-3" />
             {links.length === 0 ? (
               "Add context"
             ) : (
-              <IconPlus className="h-3 w-3" />
+              <Plus className="h-3 w-3" />
             )}
           </Button>
         </PopoverTrigger>
@@ -327,7 +327,7 @@ export function ContextLinkPanel({
               className="h-6 flex-1 text-xs"
               onClick={() => setSearchMode(true)}
             >
-              <IconSearch className="mr-1 h-3 w-3" />
+              <Search className="mr-1 h-3 w-3" />
               Existing
             </Button>
           </div>
@@ -351,7 +351,7 @@ export function ContextLinkPanel({
                   </p>
                 ) : (
                   searchResults.map((link) => {
-                    const Icon = MATCH_ICONS[link.match_type] || IconWorld;
+                    const Icon = MATCH_ICONS[link.match_type] || Globe;
                     return (
                       <button
                         key={link.id}

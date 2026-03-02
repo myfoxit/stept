@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  IconCopy,
-  IconUserPlus,
-  IconTrash,
-  IconCrown,
-  IconUser,
-  IconEdit,
-  IconEye,
-  IconCheck,
-} from '@tabler/icons-react';
+  Copy,
+  UserPlus,
+  Trash2,
+  Crown,
+  User,
+  Pencil,
+  Eye,
+  Check,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -55,11 +55,11 @@ import { useMe } from '@/hooks/api/auth';
 import { useProjectMembers, useRemoveProjectMember, useUpdateMemberRole } from '@/hooks/api/projects';
 import { SettingsLayout } from '@/components/settings-layout';
 
-const roleIcons: Record<string, typeof IconCrown> = {
-  owner: IconCrown,
-  admin: IconUser,
-  editor: IconEdit,
-  viewer: IconEye,
+const roleIcons: Record<string, typeof Crown> = {
+  owner: Crown,
+  admin: User,
+  editor: Pencil,
+  viewer: Eye,
 };
 
 const roleLabels: Record<string, string> = {
@@ -143,7 +143,7 @@ export function ProjectSettingsPage() {
           <CardTitle>Project Members</CardTitle>
           {canManageMembers && (
             <Button onClick={() => setInviteDialogOpen(true)}>
-              <IconUserPlus className="mr-2 h-4 w-4" />
+              <UserPlus className="mr-2 h-4 w-4" />
               Invite Members
             </Button>
           )}
@@ -163,7 +163,7 @@ export function ProjectSettingsPage() {
               </TableHeader>
               <TableBody>
                 {members.map((member) => {
-                  const RoleIcon = roleIcons[member.role] || IconUser;
+                  const RoleIcon = roleIcons[member.role] || User;
                   const isCurrentUser = member.user_id === currentUser?.id;
                   const isOwner = member.role === 'owner';
                   
@@ -219,7 +219,7 @@ export function ProjectSettingsPage() {
                               size="sm"
                               onClick={() => handleRemoveMember(member.user_id)}
                             >
-                              <IconTrash className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </TableCell>
@@ -253,7 +253,7 @@ export function ProjectSettingsPage() {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive">
-                  <IconTrash className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Delete Project
                 </Button>
               </AlertDialogTrigger>
@@ -337,7 +337,7 @@ export function ProjectSettingsPage() {
                 <div className="flex items-center space-x-2">
                   <Input id="link" value={inviteLink} readOnly className="flex-1" />
                   <Button type="button" size="sm" onClick={copyInviteLink}>
-                    {linkCopied ? <IconCheck className="h-4 w-4" /> : <IconCopy className="h-4 w-4" />}
+                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>

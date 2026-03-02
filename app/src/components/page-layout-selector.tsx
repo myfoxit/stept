@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { IconFileText, IconRectangle, IconFile } from '@tabler/icons-react';
+import { FileText, RectangleHorizontal, File } from 'lucide-react';
 
 export type PageLayout = 'full' | 'document' | 'a4' | 'letter';
 
@@ -16,10 +16,10 @@ interface PageLayoutSelectorProps {
 }
 
 const layoutOptions = [
-  { value: 'full', label: 'Full Width', icon: IconRectangle },
-  { value: 'document', label: 'Document', icon: IconFileText },
-  { value: 'a4', label: 'A4 Paper', icon: IconFile },
-  { value: 'letter', label: 'US Letter', icon: IconFile },
+  { value: 'full', label: 'Full Width', icon: RectangleHorizontal },
+  { value: 'document', label: 'Document', icon: FileText },
+  { value: 'a4', label: 'A4 Paper', icon: File },
+  { value: 'letter', label: 'US Letter', icon: File },
 ] as const;
 
 export function PageLayoutSelector({

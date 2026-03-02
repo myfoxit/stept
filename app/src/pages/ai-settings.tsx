@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  IconBrain,
-  IconPlugConnected,
-  IconShieldLock,
-  IconSparkles,
-} from '@tabler/icons-react';
+  Brain,
+  Plug,
+  ShieldAlert,
+  Sparkles,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -55,7 +55,7 @@ export function AiSettingsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <IconBrain className="h-5 w-5" />
+              <Brain className="h-5 w-5" />
               <CardTitle>LLM Provider</CardTitle>
             </div>
             <LlmStatusBadge config={aiConfig} />
@@ -84,7 +84,7 @@ export function AiSettingsPage() {
 
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
-              <IconPlugConnected className="h-4 w-4" />
+              <Plug className="h-4 w-4" />
               <span>Status:</span>
               {aiConfig?.configured ? (
                 <span className="text-green-500 font-medium">Connected</span>
@@ -93,7 +93,7 @@ export function AiSettingsPage() {
               )}
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <IconShieldLock className="h-4 w-4" />
+              <ShieldAlert className="h-4 w-4" />
               <span>DataVeil:</span>
               {aiConfig?.dataveil_enabled ? (
                 <span className="text-green-500 font-medium">Active</span>
@@ -132,7 +132,7 @@ export function AiSettingsPage() {
               onClick={() => setWizardOpen(true)}
               className="bg-primary hover:bg-primary/90"
             >
-              <IconSparkles className="mr-2 h-4 w-4" />
+              <Sparkles className="mr-2 h-4 w-4" />
               {aiConfig?.configured ? 'Reconfigure AI' : 'Setup AI Provider'}
             </Button>
             <Button

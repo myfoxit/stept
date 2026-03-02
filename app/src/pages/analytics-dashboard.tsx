@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { SettingsLayout } from '@/components/settings-layout';
 import {
-  IconChartBar,
-  IconClock,
-  IconQuestionMark,
-  IconSearch,
-  IconDeviceDesktop,
-} from '@tabler/icons-react';
+  BarChart3,
+  Clock,
+  CircleHelp,
+  Search,
+  Monitor,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -64,7 +64,7 @@ export function AnalyticsDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <IconChartBar className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4" />
                 Top Accessed Resources
               </CardTitle>
             </CardHeader>
@@ -96,7 +96,7 @@ export function AnalyticsDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <IconDeviceDesktop className="h-4 w-4" />
+                <Monitor className="h-4 w-4" />
                 Access by Channel
               </CardTitle>
             </CardHeader>
@@ -120,7 +120,7 @@ export function AnalyticsDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <IconClock className="h-4 w-4" />
+                <Clock className="h-4 w-4" />
                 Stale Resources
               </CardTitle>
             </CardHeader>
@@ -148,7 +148,7 @@ export function AnalyticsDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <IconQuestionMark className="h-4 w-4" />
+                <CircleHelp className="h-4 w-4" />
                 Knowledge Gaps
               </CardTitle>
             </CardHeader>
@@ -173,7 +173,7 @@ export function AnalyticsDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <IconSearch className="h-4 w-4" />
+              <Search className="h-4 w-4" />
               Recent Queries
             </CardTitle>
           </CardHeader>

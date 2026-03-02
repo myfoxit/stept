@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { SettingsLayout } from '@/components/settings-layout';
 import {
-  IconTopologyStarRing3,
-  IconPlus,
-  IconTrash,
-  IconWand,
-} from '@tabler/icons-react';
+  Network,
+  Plus,
+  Trash2,
+  Wand2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -109,11 +109,11 @@ export function KnowledgeGraphPage() {
         <div className="flex items-center justify-end">
             <div className="flex gap-2">
             <Button variant="outline" onClick={handleDetect} disabled={detectMutation.isPending}>
-              <IconWand className="h-4 w-4 mr-2" />
+              <Wand2 className="h-4 w-4 mr-2" />
               Detect Links
             </Button>
             <Button onClick={() => setDialogOpen(true)}>
-              <IconPlus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" />
               Create Link
             </Button>
           </div>
@@ -200,7 +200,7 @@ export function KnowledgeGraphPage() {
                           onClick={() => handleDelete(link.id)}
                           disabled={deleteMutation.isPending}
                         >
-                          <IconTrash className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
                     </TableRow>

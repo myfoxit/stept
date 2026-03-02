@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { IconArrowLeft, IconPlus, IconPencil, IconShare, IconDownload } from '@tabler/icons-react';
+import { ArrowLeft, Plus, Pencil, Share2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -429,7 +429,7 @@ export function WorkflowView() {
               deleted.
             </p>
             <Button onClick={() => navigate(-1)} variant="outline">
-              <IconArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Go Back
             </Button>
           </div>
@@ -615,16 +615,16 @@ export function WorkflowView() {
             </Button>
           ) : (
             <Button size="sm" variant="outline" onClick={handleToggleEdit}>
-              <IconPencil className="mr-1 h-3 w-3" />
+              <Pencil className="mr-1 h-3 w-3" />
               Edit
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={handleShare}>
-            <IconShare className="mr-1 h-3 w-3" />
+            <Share2 className="mr-1 h-3 w-3" />
             Share
           </Button>
           <Button size="sm" onClick={handleShare}>
-            <IconDownload className="mr-1 h-3 w-3" />
+            <Download className="mr-1 h-3 w-3" />
             Export
           </Button>
         </div>
@@ -690,7 +690,7 @@ export function WorkflowView() {
                 <p>No steps have been recorded for this workflow yet.</p>
                 {isEditMode && (
                   <Button size="sm" variant="outline">
-                    <IconPlus className="mr-1 h-3 w-3" />
+                    <Plus className="mr-1 h-3 w-3" />
                     Add your first step
                   </Button>
                 )}

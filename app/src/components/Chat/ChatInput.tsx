@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import { IconSend } from '@tabler/icons-react';
+import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -77,7 +77,7 @@ export function ChatInput({
         disabled={disabled || !value.trim()}
         className="shrink-0"
       >
-        <IconSend className="h-4 w-4" />
+        <Send className="h-4 w-4" />
       </Button>
     </div>
   );

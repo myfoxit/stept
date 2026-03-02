@@ -1,5 +1,5 @@
 import React, { useState, ChangeEvent } from "react";
-import { v4 as uuid } from "uuid";
+const uuid = () => crypto.randomUUID();
 import {
   Command,
   CommandInput,

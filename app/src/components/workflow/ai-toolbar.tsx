@@ -1,12 +1,12 @@
 import * as React from 'react';
 import {
-  IconSparkles,
-  IconFileText,
-  IconTag,
-  IconLoader2,
-  IconCheck,
-  IconAlertCircle,
-} from '@tabler/icons-react';
+  Sparkles,
+  FileText,
+  Tag,
+  Loader2,
+  Check,
+  CircleAlert,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -46,17 +46,17 @@ export function AIToolbar({
         >
           {isProcessing ? (
             <>
-              <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
               Processing…
             </>
           ) : isProcessed ? (
             <>
-              <IconCheck className="mr-1.5 h-4 w-4" />
+              <Check className="mr-1.5 h-4 w-4" />
               Re-process with AI
             </>
           ) : (
             <>
-              <IconSparkles className="mr-1.5 h-4 w-4" />
+              <Sparkles className="mr-1.5 h-4 w-4" />
               Process with AI
             </>
           )}
@@ -70,7 +70,7 @@ export function AIToolbar({
           variant="outline"
           className="border-primary200 hover:bg-primary/5"
         >
-          <IconFileText className="mr-1.5 h-4 w-4" />
+          <FileText className="mr-1.5 h-4 w-4" />
           Generate Guide
         </Button>
 
@@ -83,7 +83,7 @@ export function AIToolbar({
             variant="outline"
             className="border-primary200 hover:bg-primary/5"
           >
-            <IconTag className="mr-1.5 h-4 w-4" />
+            <Tag className="mr-1.5 h-4 w-4" />
             Auto-tag
           </Button>
         )}
@@ -102,7 +102,7 @@ export function AIToolbar({
           )}
           {isProcessed && (
             <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">
-              <IconCheck className="mr-1 h-3 w-3" />
+              <Check className="mr-1 h-3 w-3" />
               AI Processed
             </Badge>
           )}

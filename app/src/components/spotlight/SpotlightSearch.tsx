@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  IconFileText,
-  IconListDetails,
-  IconSettings,
-  IconBrain,
-  IconAbc,
-  IconSparkles,
-  IconLoader2,
-  IconArrowRight,
-  IconArrowLeft,
-  IconWorldWww,
-  IconDeviceDesktop,
-} from '@tabler/icons-react';
+  FileText,
+  ListTree,
+  Settings,
+  Brain,
+  CaseSensitive,
+  Sparkles,
+  Loader2,
+  ArrowRight,
+  ArrowLeft,
+  Globe,
+  Monitor,
+} from 'lucide-react';
 import {
   CommandDialog,
   CommandInput,
@@ -166,13 +166,13 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
         <div className="flex items-center gap-2 border-b px-3 py-1.5">
           <Badge variant="outline" className="gap-1 text-xs">
             {searchType === 'semantic' ? (
-              <IconBrain className="h-3 w-3" />
+              <Brain className="h-3 w-3" />
             ) : (
-              <IconAbc className="h-3 w-3" />
+              <CaseSensitive className="h-3 w-3" />
             )}
             {searchType === 'semantic' ? 'Semantic' : 'Keyword'}
           </Badge>
-          {isSearching && <IconLoader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          {isSearching && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
         </div>
       )}
 
@@ -193,7 +193,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                 }
               }}
             >
-              <IconFileText className="mr-2 h-4 w-4" />
+              <FileText className="mr-2 h-4 w-4" />
               New Page
               <CommandShortcut>⌘⇧N</CommandShortcut>
             </CommandItem>
@@ -202,9 +202,9 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                 setShowWorkflowChooser(true);
               }}
             >
-              <IconListDetails className="mr-2 h-4 w-4" />
+              <ListTree className="mr-2 h-4 w-4" />
               New Workflow
-              <IconArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
+              <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
             </CommandItem>
             <CommandItem
               onSelect={() => {
@@ -212,7 +212,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                 if (selectedProjectId) navigate(`/projects/${selectedProjectId}/settings`);
               }}
             >
-              <IconSettings className="mr-2 h-4 w-4" />
+              <Settings className="mr-2 h-4 w-4" />
               Project Settings
               <CommandShortcut>⌘⇧,</CommandShortcut>
             </CommandItem>
@@ -227,7 +227,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                 setShowWorkflowChooser(false);
               }}
             >
-              <IconArrowLeft className="mr-2 h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="mr-2 h-4 w-4 text-muted-foreground" />
               Back
             </CommandItem>
             <CommandSeparator />
@@ -238,7 +238,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                 window.dispatchEvent(new CustomEvent('ondoki:start-browser-workflow'));
               }}
             >
-              <IconWorldWww className="mr-2 h-4 w-4" />
+              <Globe className="mr-2 h-4 w-4" />
               Browser Workflow
               <span className="ml-auto text-xs text-muted-foreground">Record in browser</span>
             </CommandItem>
@@ -249,7 +249,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                 window.dispatchEvent(new CustomEvent('ondoki:start-desktop-workflow'));
               }}
             >
-              <IconDeviceDesktop className="mr-2 h-4 w-4" />
+              <Monitor className="mr-2 h-4 w-4" />
               Desktop Workflow
               <span className="ml-auto text-xs text-muted-foreground">Record on desktop</span>
             </CommandItem>
@@ -270,7 +270,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
                     onInsertWorkflow?.(wf.id);
                   }}
                 >
-                  <IconListDetails className="mr-2 h-4 w-4 shrink-0" />
+                  <ListTree className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">{wf.name || 'Untitled Workflow'}</span>
                 </CommandItem>
               ))
@@ -290,7 +290,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
           <CommandGroup heading={`Workflows (${workflows.length})`}>
             {workflows.map((wf: any) => (
               <CommandItem key={wf.id} onSelect={() => handleSelect(wf)}>
-                <IconListDetails className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <ListTree className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
                 <div className="flex flex-1 flex-col min-w-0">
                   <span className="truncate">{wf.name}</span>
                   {(wf.snippet || wf.summary) && (
@@ -312,7 +312,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
           <CommandGroup heading={`Pages (${documents.length})`}>
             {documents.map((doc) => (
               <CommandItem key={doc.id} onSelect={() => handleSelect(doc)}>
-                <IconFileText className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <FileText className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
                 <div className="flex flex-1 flex-col min-w-0">
                   <span className="truncate">{doc.name || 'Untitled'}</span>
                   {(doc.preview || (doc as any).snippet) && (
@@ -342,7 +342,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
             className="h-7 gap-1 text-xs"
             onClick={handleAskAI}
           >
-            <IconSparkles className="h-3 w-3" />
+            <Sparkles className="h-3 w-3" />
             Ask AI
           </Button>
         </div>

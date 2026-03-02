@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconTrash, IconBrain, IconTool, IconX, IconMessageCircle } from '@tabler/icons-react';
+import { Trash2, Brain, Wrench, X, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useChat } from './ChatContext';
@@ -61,7 +61,7 @@ export function ChatPanel() {
           className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
           title="Open AI Chat"
         >
-          <IconMessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-6 w-6" />
           {messages.length > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
               {messages.filter(m => m.role === 'assistant').length}
@@ -76,7 +76,7 @@ export function ChatPanel() {
           {/* Header */}
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
-              <IconBrain className="h-5 w-5 text-primary" />
+              <Brain className="h-5 w-5 text-primary" />
               <span className="text-sm font-semibold">AI Chat</span>
               {contextLabel && (
                 <Badge variant="secondary" className="text-xs">
@@ -93,7 +93,7 @@ export function ChatPanel() {
                 title="Clear chat"
                 className="h-7 w-7"
               >
-                <IconTrash className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
@@ -101,7 +101,7 @@ export function ChatPanel() {
                 onClick={closePanel}
                 className="h-7 w-7"
               >
-                <IconX className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
@@ -111,13 +111,13 @@ export function ChatPanel() {
             <div className="flex flex-col gap-3 p-4">
               {messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-muted-foreground">
-                  <IconBrain className="h-8 w-8 opacity-40" />
+                  <Brain className="h-8 w-8 opacity-40" />
                   <p className="text-sm">
                     Ask me anything about your{' '}
                     {contextLabel?.toLowerCase() || 'work'}.
                   </p>
                   <div className="flex items-center gap-1.5 text-xs opacity-50">
-                    <IconTool className="h-3 w-3" />
+                    <Wrench className="h-3 w-3" />
                     <span>I can search, analyze, and help manage your content.</span>
                   </div>
                 </div>

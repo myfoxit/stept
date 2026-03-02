@@ -21,14 +21,14 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import {
-  IconPlus,
-  IconDotsVertical,
-  IconEdit,
-  IconTrash,
-  IconUpload,
-  IconPhoto,
-  IconChevronDown,
-} from '@tabler/icons-react';
+  Plus,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Upload,
+  ImageIcon,
+  ChevronDown,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Page {
@@ -112,7 +112,7 @@ function PageMenuItem({
             className="relative"
           >
             {page.name || 'Untitled'}
-            <IconChevronDown className="size-3 ml-1" />
+            <ChevronDown className="size-3 ml-1" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
@@ -128,7 +128,7 @@ function PageMenuItem({
                   setTempPageName(page.name || '');
                 }}
               >
-                <IconEdit className="size-4 mr-2" />
+                <Pencil className="size-4 mr-2" />
                 Rename
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -139,7 +139,7 @@ function PageMenuItem({
                   }
                 }}
               >
-                <IconPlus className="size-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Subpage
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -163,7 +163,7 @@ function PageMenuItem({
                 className="text-destructive"
                 onClick={() => onDeletePage(page.id)}
               >
-                <IconTrash className="size-4 mr-2" />
+                <Trash2 className="size-4 mr-2" />
                 Delete
               </DropdownMenuItem>
             </>
@@ -193,7 +193,7 @@ function PageMenuItem({
               className="size-5 ml-1 opacity-0 hover:opacity-100"
               onClick={(e) => e.stopPropagation()}
             >
-              <IconDotsVertical className="size-3" />
+              <MoreVertical className="size-3" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -203,7 +203,7 @@ function PageMenuItem({
                 setTempPageName(page.name || '');
               }}
             >
-              <IconEdit className="size-4 mr-2" />
+              <Pencil className="size-4 mr-2" />
               Rename
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -214,7 +214,7 @@ function PageMenuItem({
                 }
               }}
             >
-              <IconPlus className="size-4 mr-2" />
+              <Plus className="size-4 mr-2" />
               Add Subpage
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -222,7 +222,7 @@ function PageMenuItem({
               className="text-destructive"
               onClick={() => onDeletePage(page.id)}
             >
-              <IconTrash className="size-4 mr-2" />
+              <Trash2 className="size-4 mr-2" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -284,7 +284,7 @@ export function ApplicationNavBar({
               />
             ) : (
               <div className="h-8 w-8 bg-muted rounded flex items-center justify-center">
-                <IconPhoto className="size-4 text-muted-foreground" />
+                <ImageIcon className="size-4 text-muted-foreground" />
               </div>
             )}
             
@@ -295,7 +295,7 @@ export function ApplicationNavBar({
                 className="size-6"
                 onClick={() => setLogoDialogOpen(true)}
               >
-                <IconUpload className="size-3" />
+                <Upload className="size-3" />
               </Button>
             )}
           </div>
@@ -345,7 +345,7 @@ export function ApplicationNavBar({
                 variant="ghost"
                 onClick={() => setCreatePageOpen(true)}
               >
-                <IconPlus className="size-4 mr-1" />
+                <Plus className="size-4 mr-1" />
                 Add Page
               </Button>
             )}

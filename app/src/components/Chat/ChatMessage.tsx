@@ -11,18 +11,18 @@ import type {
   ToolResultEvent,
 } from '@/api/chat';
 import {
-  IconTool,
-  IconCheck,
-  IconX,
-  IconLoader2,
-  IconFile,
-  IconFolder,
-  IconEdit,
-  IconGitMerge,
-  IconChartBar,
-  IconList,
-  IconSearch,
-} from '@tabler/icons-react';
+  Wrench,
+  Check,
+  X,
+  Loader2,
+  File,
+  Folder,
+  Pencil,
+  GitMerge,
+  BarChart3,
+  List,
+  Search,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ChatMessageProps {
@@ -32,13 +32,13 @@ interface ChatMessageProps {
 // ── Tool display helpers ─────────────────────────────────────────────────────
 
 const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  create_page: IconFile,
-  create_folder: IconFolder,
-  rename_workflow: IconEdit,
-  merge_steps: IconGitMerge,
-  analyze_workflow: IconChartBar,
-  list_workflows: IconList,
-  suggest_workflow: IconSearch,
+  create_page: File,
+  create_folder: Folder,
+  rename_workflow: Pencil,
+  merge_steps: GitMerge,
+  analyze_workflow: BarChart3,
+  list_workflows: List,
+  suggest_workflow: Search,
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -52,7 +52,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 function ToolCallCard({ toolCall }: { toolCall: ToolCallEvent }) {
-  const Icon = TOOL_ICONS[toolCall.name] || IconTool;
+  const Icon = TOOL_ICONS[toolCall.name] || Wrench;
   const label = TOOL_LABELS[toolCall.name] || toolCall.name;
   const isExecuting = toolCall.status === 'executing';
   const isError = toolCall.status === 'error';
@@ -71,12 +71,12 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallEvent }) {
       <Icon className="h-3.5 w-3.5 shrink-0" />
       <span className="font-medium">{label}</span>
       {isExecuting && (
-        <IconLoader2 className="ml-auto h-3.5 w-3.5 animate-spin" />
+        <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" />
       )}
       {toolCall.status === 'completed' && (
-        <IconCheck className="ml-auto h-3.5 w-3.5" />
+        <Check className="ml-auto h-3.5 w-3.5" />
       )}
-      {isError && <IconX className="ml-auto h-3.5 w-3.5" />}
+      {isError && <X className="ml-auto h-3.5 w-3.5" />}
     </div>
   );
 }
@@ -116,7 +116,7 @@ function PendingConfirmationCard({
   if (confirmed) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm dark:border-green-800 dark:bg-green-900/30">
-        <IconCheck className="h-4 w-4 text-green-600" />
+        <Check className="h-4 w-4 text-green-600" />
         <span className="text-green-700 dark:text-green-400">Done!</span>
       </div>
     );
@@ -134,7 +134,7 @@ function PendingConfirmationCard({
           disabled={confirming}
           className="h-7 text-xs"
         >
-          {confirming ? <IconLoader2 className="mr-1 h-3 w-3 animate-spin" /> : <IconCheck className="mr-1 h-3 w-3" />}
+          {confirming ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Check className="mr-1 h-3 w-3" />}
           Confirm
         </Button>
         <Button
@@ -143,7 +143,7 @@ function PendingConfirmationCard({
           onClick={() => setConfirmed(true)}
           className="h-7 text-xs"
         >
-          <IconX className="mr-1 h-3 w-3" />
+          <X className="mr-1 h-3 w-3" />
           Cancel
         </Button>
       </div>
@@ -178,7 +178,7 @@ function ToolResultCard({ result }: { result: ToolResultEvent }) {
     return (
       <div className="rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400">
         <div className="flex items-center gap-2">
-          <IconFile className="h-3.5 w-3.5" />
+          <File className="h-3.5 w-3.5" />
           <span className="font-medium">
             {message || `Created page: ${data.title || data.document_id}`}
           </span>
@@ -191,7 +191,7 @@ function ToolResultCard({ result }: { result: ToolResultEvent }) {
     return (
       <div className="rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400">
         <div className="flex items-center gap-2">
-          <IconFolder className="h-3.5 w-3.5" />
+          <Folder className="h-3.5 w-3.5" />
           <span className="font-medium">
             {message || `Created folder: ${data.name || data.folder_id}`}
           </span>
@@ -304,7 +304,7 @@ function ToolResultCard({ result }: { result: ToolResultEvent }) {
     return (
       <div className="rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400">
         <div className="flex items-center gap-2">
-          <IconCheck className="h-3.5 w-3.5" />
+          <Check className="h-3.5 w-3.5" />
           <span>{message}</span>
         </div>
       </div>

@@ -1,23 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  IconBrain,
-  IconCheck,
-  IconChevronRight,
-  IconChevronLeft,
-  IconLoader2,
-  IconPlugConnected,
-  IconAlertCircle,
-  IconSparkles,
-  IconServer,
-  IconCloud,
-  IconRobot,
-  IconSettings,
-  IconSearch,
-  IconDeviceDesktop,
-  IconBrandGithub,
-  IconCopy,
-  IconExternalLink,
-} from '@tabler/icons-react';
+  Brain,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
+  Plug,
+  CircleAlert,
+  Sparkles,
+  Server,
+  Cloud,
+  Bot,
+  Settings,
+  Search,
+  Monitor,
+  Github,
+  Copy,
+  ExternalLink,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -69,35 +69,35 @@ const providers: ProviderOption[] = [
     id: 'copilot',
     name: 'GitHub Copilot',
     description: 'Login with GitHub — uses your Copilot subscription (GPT-4o, Claude)',
-    icon: <IconBrandGithub className="h-8 w-8" />,
+    icon: <Github className="h-8 w-8" />,
     requiresKey: false,
   },
   {
     id: 'openai',
     name: 'OpenAI',
     description: 'GPT-4o, GPT-4o-mini, and other OpenAI models',
-    icon: <IconCloud className="h-8 w-8" />,
+    icon: <Cloud className="h-8 w-8" />,
     requiresKey: true,
   },
   {
     id: 'anthropic',
     name: 'Anthropic',
     description: 'Claude 4, Claude 3.5 Sonnet, and other Claude models',
-    icon: <IconBrain className="h-8 w-8" />,
+    icon: <Brain className="h-8 w-8" />,
     requiresKey: true,
   },
   {
     id: 'ollama',
     name: 'Ollama (Local)',
     description: 'Run models locally with Ollama — no API key needed',
-    icon: <IconServer className="h-8 w-8" />,
+    icon: <Server className="h-8 w-8" />,
     requiresKey: false,
   },
   {
     id: 'custom',
     name: 'Custom Provider',
     description: 'Any OpenAI-compatible API endpoint',
-    icon: <IconSettings className="h-8 w-8" />,
+    icon: <Settings className="h-8 w-8" />,
     requiresKey: true,
   },
 ];
@@ -300,7 +300,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
   const renderStep0 = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
-        <IconSparkles className="h-12 w-12 text-primary mx-auto mb-3" />
+        <Sparkles className="h-12 w-12 text-primary mx-auto mb-3" />
         <h2 className="text-xl font-bold">Choose your AI Provider</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Select the LLM provider to power smart features
@@ -310,23 +310,23 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
       {/* Auto-detect */}
       <Button variant="outline" className="w-full mb-2" onClick={handleAutoDetect} disabled={autoDetecting}>
         {autoDetecting ? (
-          <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Detecting…</>
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Detecting…</>
         ) : (
-          <><IconSearch className="mr-2 h-4 w-4" />Auto-detect local AI</>
+          <><Search className="mr-2 h-4 w-4" />Auto-detect local AI</>
         )}
       </Button>
 
       {autoDetectResult && (
         <div className="rounded-lg border p-3 mb-2 text-sm space-y-2">
           <div className="font-medium flex items-center gap-1.5">
-            <IconDeviceDesktop className="h-4 w-4" />
+            <Monitor className="h-4 w-4" />
             Detected:
           </div>
           <div className="flex items-center gap-2 ml-5">
             {autoDetectResult.ollama.available ? (
-              <IconCheck className="h-4 w-4 text-green-500" />
+              <Check className="h-4 w-4 text-green-500" />
             ) : (
-              <IconAlertCircle className="h-4 w-4 text-amber-500" />
+              <CircleAlert className="h-4 w-4 text-amber-500" />
             )}
             <span>
               Ollama: {autoDetectResult.ollama.available ? (
@@ -365,7 +365,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
               </div>
               <div className="text-xs text-muted-foreground">{p.description}</div>
             </div>
-            {selectedProvider === p.id && <IconCheck className="h-5 w-5 text-primary" />}
+            {selectedProvider === p.id && <Check className="h-5 w-5 text-primary" />}
           </button>
         ))}
       </div>
@@ -392,7 +392,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
           {copilotConnected ? (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4">
               <div className="flex items-center gap-2 text-green-700 font-medium">
-                <IconCheck className="h-5 w-5" />
+                <Check className="h-5 w-5" />
                 GitHub Copilot Connected
               </div>
               <p className="text-sm text-green-600 mt-1">
@@ -418,17 +418,17 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
                     navigator.clipboard.writeText(copilotUserCode);
                     toast.success('Code copied!');
                   }}>
-                    <IconCopy className="h-4 w-4" />
+                    <Copy className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               <Button className="w-full" onClick={() => window.open(copilotVerifyUrl, '_blank')}>
-                <IconExternalLink className="mr-2 h-4 w-4" />
+                <ExternalLink className="mr-2 h-4 w-4" />
                 Open GitHub to authorize
               </Button>
               {copilotPolling && (
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <IconLoader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Waiting for authorization…
                 </div>
               )}
@@ -436,20 +436,20 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
           ) : (
             <div className="space-y-4">
               <div className="rounded-lg border p-4 text-center">
-                <IconBrandGithub className="h-12 w-12 mx-auto mb-3 text-foreground" />
+                <Github className="h-12 w-12 mx-auto mb-3 text-foreground" />
                 <h3 className="font-semibold mb-1">Login with GitHub</h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   Authenticate with GitHub to use Copilot's AI models. Requires an active Copilot subscription.
                 </p>
                 <Button onClick={handleStartCopilotFlow} className="w-full">
-                  <IconBrandGithub className="mr-2 h-4 w-4" />
+                  <Github className="mr-2 h-4 w-4" />
                   Start GitHub Login
                 </Button>
               </div>
               {copilotError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3">
                   <div className="flex items-center gap-2 text-red-700 text-sm">
-                    <IconAlertCircle className="h-4 w-4" />
+                    <CircleAlert className="h-4 w-4" />
                     {copilotError}
                   </div>
                 </div>
@@ -480,11 +480,11 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
           <div className="rounded-lg border p-4">
             <div className="flex items-center gap-3">
               {ollamaDetecting ? (
-                <IconLoader2 className="h-5 w-5 animate-spin text-primary" />
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
               ) : ollamaDetected ? (
-                <IconCheck className="h-5 w-5 text-green-500" />
+                <Check className="h-5 w-5 text-green-500" />
               ) : (
-                <IconAlertCircle className="h-5 w-5 text-amber-500" />
+                <CircleAlert className="h-5 w-5 text-amber-500" />
               )}
               <div>
                 <div className="font-medium text-sm">
@@ -613,11 +613,11 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
             variant={testResult === 'success' ? 'outline' : 'default'}
           >
             {testResult === 'testing' ? (
-              <><IconLoader2 className="mr-2 h-4 w-4 animate-spin" />Testing…</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Testing…</>
             ) : testResult === 'success' ? (
-              <><IconCheck className="mr-2 h-4 w-4 text-green-500" />Test Again</>
+              <><Check className="mr-2 h-4 w-4 text-green-500" />Test Again</>
             ) : (
-              <><IconPlugConnected className="mr-2 h-4 w-4" />Test Connection</>
+              <><Plug className="mr-2 h-4 w-4" />Test Connection</>
             )}
           </Button>
           {testMessage && (
@@ -653,7 +653,7 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <IconRobot className="h-5 w-5 text-primary" />
+            <Bot className="h-5 w-5 text-primary" />
             AI Setup
             <Badge variant="outline" className="text-xs ml-auto">Step {step + 1}/3</Badge>
           </DialogTitle>
@@ -674,20 +674,20 @@ export function LlmSetupWizard({ open, onClose, onConfigSaved }: LlmSetupWizardP
         <div className="flex items-center justify-between pt-2">
           {step > 0 ? (
             <Button variant="ghost" onClick={() => setStep(step - 1)}>
-              <IconChevronLeft className="mr-1 h-4 w-4" />Back
+              <ChevronLeft className="mr-1 h-4 w-4" />Back
             </Button>
           ) : <div />}
 
           {step < 2 ? (
             <Button onClick={() => setStep(step + 1)}>
-              Next<IconChevronRight className="ml-1 h-4 w-4" />
+              Next<ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
             <Button onClick={handleFinish} disabled={saving} className="bg-primary hover:bg-primary/90">
               {saving ? (
-                <><IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
+                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Saving…</>
               ) : (
-                <><IconSparkles className="mr-1.5 h-4 w-4" />Start using AI</>
+                <><Sparkles className="mr-1.5 h-4 w-4" />Start using AI</>
               )}
             </Button>
           )}

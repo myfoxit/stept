@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { IconLink } from '@tabler/icons-react';
+import { Link } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DocumentLinkInlineProps {
@@ -22,7 +22,7 @@ export function DocumentLinkInline({
       disabled
       className={cn(className)}
     >
-      <IconLink className="h-4 w-4 mr-2" />
+      <Link className="h-4 w-4 mr-2" />
       <span className="hidden sm:inline">Link Document</span>
     </Button>
   );

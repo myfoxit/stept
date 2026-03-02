@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import {
-  IconDots,
-  type Icon,
-} from '@tabler/icons-react';
+  MoreHorizontal,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -25,7 +25,7 @@ export function NavDocuments({
   items: {
     name: string;
     url: string;
-    icon: Icon;
+    icon: LucideIcon;
   }[];
   projectId: string;
   userRole: string;
@@ -48,7 +48,7 @@ export function NavDocuments({
         ))}
         <SidebarMenuItem>
           <SidebarMenuButton className="text-sidebar-foreground/70">
-            <IconDots className="text-sidebar-foreground/70" />
+            <MoreHorizontal className="text-sidebar-foreground/70" />
             <span>More</span>
           </SidebarMenuButton>
         </SidebarMenuItem>

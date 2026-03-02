@@ -1,30 +1,30 @@
 import React from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  IconFileDescription,
-  IconFolder,
-  IconTimeline,
-  IconLayoutDashboard,
-  IconSortAscending,
-  IconSortDescending,
-  IconClock,
-  IconPlayerPlay,
-  IconCalendarEvent,
-  IconAbc,
-  IconPuzzle,
-  IconListDetails,
-  IconBrowser,
-  IconComponents,
-  IconDeviceFloppy,
-  IconClipboardList,
-  IconSettings,
-  IconRobot,
-  IconNote,
-  IconLink,
-  IconEyeOff,
-  IconLock,
-} from '@tabler/icons-react';
-import * as TablerIcons from '@tabler/icons-react';
+  FileText,
+  Folder,
+  Activity,
+  LayoutDashboard,
+  ArrowUpAZ,
+  ArrowDownAZ,
+  Clock,
+  Play,
+  CalendarDays,
+  CaseSensitive,
+  Puzzle,
+  ListTree,
+  AppWindow,
+  Component,
+  Save,
+  ClipboardList,
+  Settings,
+  Bot,
+  StickyNote,
+  Link,
+  EyeOff,
+  Lock,
+  icons,
+} from 'lucide-react';
 
 import { useProject } from '@/providers/project-provider';
 import { Button } from '@/components/ui/button';
@@ -58,15 +58,15 @@ function hashString(input: string) {
 
 // Pool of icon + color combos (tailwind classes)
 const ICON_POOL = [
-  { Comp: IconPuzzle },
-  { Comp: IconListDetails },
-  { Comp: IconBrowser },
-  { Comp: IconComponents },
-  { Comp: IconDeviceFloppy },
-  { Comp: IconClipboardList },
-  { Comp: IconSettings },
-  { Comp: IconRobot },
-  { Comp: IconNote },
+  { Comp: Puzzle },
+  { Comp: ListTree },
+  { Comp: AppWindow },
+  { Comp: Component },
+  { Comp: Save },
+  { Comp: ClipboardList },
+  { Comp: Settings },
+  { Comp: Bot },
+  { Comp: StickyNote },
 ];
 
 // REPLACE color palette + helpers
@@ -113,13 +113,11 @@ function DocumentCard({
     // NEW: Check for stored icon on workflows
     if (isWorkflow && doc.icon_type && doc.icon_value) {
       if (doc.icon_type === 'tabler') {
-        const iconName = doc.icon_value.startsWith('Icon') 
-          ? doc.icon_value 
-          : `Icon${doc.icon_value.charAt(0).toUpperCase()}${doc.icon_value.slice(1)}`;
-        const TablerIcon = (TablerIcons as any)[iconName];
-        if (TablerIcon) {
+        const lucideName = doc.icon_value.replace(/^Icon/, '');
+        const LucideIcon = icons[lucideName as keyof typeof icons];
+        if (LucideIcon) {
           const color = doc.icon_color || iconColor;
-          return <TablerIcon className={`size-6 ${color}`} />;
+          return <LucideIcon className={`size-6 ${color}`} />;
         }
       } else if (doc.icon_type === 'favicon' && doc.icon_value) {
         return (
@@ -137,13 +135,13 @@ function DocumentCard({
     }
 
     if (isWorkflow || docType === 'workflow') {
-      return <IconPlayerPlay className={`size-6 ${iconColor}`} />;
+      return <Play className={`size-6 ${iconColor}`} />;
     }
     switch (docType) {
       case 'folder':
-        return <IconFolder className={`size-6 ${iconColor}`} />;
+        return <Folder className={`size-6 ${iconColor}`} />;
       case 'application':
-        return <IconLayoutDashboard className={`size-6 ${iconColor}`} />;
+        return <LayoutDashboard className={`size-6 ${iconColor}`} />;
       default:
         return getDeterministicIcon(doc.id || doc.name || '', iconColor);
     }
@@ -183,9 +181,9 @@ function DocumentCard({
               {displayName}
             </h3>
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
-              <IconLink className="size-4 text-muted-foreground" />
-              <IconEyeOff className="size-4 text-muted-foreground" />
-              <IconLock className="size-4 text-muted-foreground" />
+              <Link className="size-4 text-muted-foreground" />
+              <EyeOff className="size-4 text-muted-foreground" />
+              <Lock className="size-4 text-muted-foreground" />
             </div>
           </div>
           <div className="flex flex-wrap gap-1">
@@ -199,7 +197,7 @@ function DocumentCard({
             )}
           </div>
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-            <IconClock className="size-3" />
+            <Clock className="size-3" />
             <span>{formatDistanceToNow(new Date(doc.updated_at || doc.created_at), { addSuffix: true })}</span>
           </div>
         </div>
@@ -298,8 +296,8 @@ export function DocumentGalleryPage() {
   const getSortIcon = (field: SortBy) => {
     if (sortBy !== field) return null;
     return sortOrder === 'asc' ? 
-      <IconSortAscending className="size-4" /> : 
-      <IconSortDescending className="size-4" />;
+      <ArrowUpAZ className="size-4" /> : 
+      <ArrowDownAZ className="size-4" />;
   };
 
   if (!selectedProjectId) {
@@ -331,7 +329,7 @@ export function DocumentGalleryPage() {
             onClick={() => handleSortChange('updated_at')}
             className="gap-1"
           >
-            <IconClock className="size-4" />
+            <Clock className="size-4" />
             {getSortIcon('updated_at')}
           </Button>
           <Button
@@ -340,7 +338,7 @@ export function DocumentGalleryPage() {
             onClick={() => handleSortChange('created_at')}
             className="gap-1"
           >
-            <IconCalendarEvent className="size-4" />
+            <CalendarDays className="size-4" />
             {getSortIcon('created_at')}
           </Button>
           <Button
@@ -349,7 +347,7 @@ export function DocumentGalleryPage() {
             onClick={() => handleSortChange('name')}
             className="gap-1"
           >
-            <IconAbc className="size-4" />
+            <CaseSensitive className="size-4" />
             {getSortIcon('name')}
           </Button>
         </div>

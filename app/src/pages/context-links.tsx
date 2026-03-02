@@ -1,24 +1,24 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SettingsLayout } from '@/components/settings-layout';
 import {
-  IconLink,
-  IconPlus,
-  IconTrash,
-  IconWorld,
-  IconApps,
-  IconFileText,
-  IconListDetails,
-  IconFilter,
-  IconRegex,
-  IconEdit,
-  IconChevronDown,
-  IconChevronUp,
-  IconCode,
-  IconSearch,
-  IconDeviceDesktop,
-  IconBrowser,
-  IconWindowMaximize,
-} from '@tabler/icons-react';
+  Link,
+  Plus,
+  Trash2,
+  Globe,
+  LayoutGrid,
+  FileText,
+  ListTree,
+  Filter,
+  Regex,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  Code,
+  Search,
+  Monitor,
+  AppWindow,
+  Maximize2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -56,60 +56,60 @@ import { listDocuments } from '@/api/documents';
 
 const MATCH_TYPE_META: Record<
   MatchType,
-  { label: string; icon: typeof IconWorld; category: 'url' | 'app' | 'window'; placeholder: string; description: string }
+  { label: string; icon: typeof Globe; category: 'url' | 'app' | 'window'; placeholder: string; description: string }
 > = {
   url_exact: {
     label: 'Exact URL',
-    icon: IconWorld,
+    icon: Globe,
     category: 'url',
     placeholder: 'https://app.example.com/dashboard',
     description: 'Matches when the URL is exactly this value (requires Chrome extension)',
   },
   url_pattern: {
     label: 'URL Pattern',
-    icon: IconWorld,
+    icon: Globe,
     category: 'url',
     placeholder: '*.salesforce.com/*/Account*',
     description: 'Glob/wildcard pattern on the full URL (requires Chrome extension)',
   },
   url_regex: {
     label: 'URL Regex',
-    icon: IconRegex,
+    icon: Regex,
     category: 'url',
     placeholder: 'https://.*\\.example\\.com/dashboard/\\d+',
     description: 'Regular expression matched against the full URL (requires Chrome extension)',
   },
   app_name: {
     label: 'App Name',
-    icon: IconApps,
+    icon: LayoutGrid,
     category: 'app',
     placeholder: 'Excel',
     description: 'Case-insensitive partial match — "Excel" matches "Microsoft Excel"',
   },
   app_exact: {
     label: 'App (Exact)',
-    icon: IconDeviceDesktop,
+    icon: Monitor,
     category: 'app',
     placeholder: 'Microsoft Excel',
     description: 'Exact match on the application name',
   },
   app_regex: {
     label: 'App Regex',
-    icon: IconRegex,
+    icon: Regex,
     category: 'app',
     placeholder: '(Code|IntelliJ|Xcode)',
     description: 'Regular expression matched against the app name',
   },
   window_title: {
     label: 'Window Title',
-    icon: IconWindowMaximize,
+    icon: Maximize2,
     category: 'window',
     placeholder: 'Customer Portal',
     description: 'Case-insensitive substring match on the window title',
   },
   window_regex: {
     label: 'Window Regex',
-    icon: IconRegex,
+    icon: Regex,
     category: 'window',
     placeholder: 'PR #\\d+ -',
     description: 'Regular expression matched against the window title',
@@ -389,7 +389,7 @@ export function ContextLinksPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <IconFilter className="h-4 w-4 text-muted-foreground" />
+            <Filter className="h-4 w-4 text-muted-foreground" />
             <div className="flex gap-1">
               {FILTER_CATEGORIES.map((cat) => (
                 <Badge
@@ -408,7 +408,7 @@ export function ContextLinksPage() {
             </span>
           </div>
           <Button onClick={openCreate} className="gap-1">
-            <IconPlus className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
             Add Rule
           </Button>
         </div>
@@ -418,7 +418,7 @@ export function ContextLinksPage() {
           <div className="py-12 text-center text-muted-foreground">Loading...</div>
         ) : filteredGroups.length === 0 ? (
           <div className="py-12 text-center">
-            <IconLink className="mx-auto h-12 w-12 text-muted-foreground/30" />
+            <Link className="mx-auto h-12 w-12 text-muted-foreground/30" />
             <p className="mt-3 text-muted-foreground">
               {totalCount === 0
                 ? 'No context rules yet. Add one to get started.'
@@ -503,7 +503,7 @@ export function ContextLinksPage() {
                   onClick={() => setAdvancedMode(!advancedMode)}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <IconCode className="h-3 w-3" />
+                  <Code className="h-3 w-3" />
                   {advancedMode ? 'Simple Mode' : 'Advanced Mode'}
                 </button>
               </div>
@@ -543,7 +543,7 @@ export function ContextLinksPage() {
                 {isAppType && matchType === 'app_name' ? (
                   <div className="space-y-2">
                     <div className="relative">
-                      <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Search apps or type custom name..."
                         className="pl-8"
@@ -565,7 +565,7 @@ export function ContextLinksPage() {
                               setAppSearch('');
                             }}
                           >
-                            <IconApps className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <LayoutGrid className="h-4 w-4 shrink-0 text-muted-foreground" />
                             <div className="min-w-0 flex-1">
                               <div className="font-medium">{app.name}</div>
                               {app.aliases.length > 0 && (
@@ -603,7 +603,7 @@ export function ContextLinksPage() {
                   </Select>
                   <div className="flex-1">
                     <div className="relative">
-                      <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder={loadingResources ? 'Loading...' : `Search ${resourceType}s...`}
                         className="pl-8"
@@ -627,9 +627,9 @@ export function ContextLinksPage() {
                             }}
                           >
                             {r.type === 'workflow' ? (
-                              <IconListDetails className="h-3.5 w-3.5 text-muted-foreground" />
+                              <ListTree className="h-3.5 w-3.5 text-muted-foreground" />
                             ) : (
-                              <IconFileText className="h-3.5 w-3.5 text-muted-foreground" />
+                              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                             )}
                             <span className="truncate">{r.name}</span>
                           </button>
@@ -774,9 +774,9 @@ function RuleCard({
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm">
             <span className="font-semibold text-muted-foreground">THEN</span>
             {link.resource_type === 'workflow' ? (
-              <IconListDetails className="h-3.5 w-3.5 text-muted-foreground" />
+              <ListTree className="h-3.5 w-3.5 text-muted-foreground" />
             ) : (
-              <IconFileText className="h-3.5 w-3.5 text-muted-foreground" />
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
             )}
             <span className="text-sm">{resourceName || link.resource_id}</span>
           </div>
@@ -793,10 +793,10 @@ function RuleCard({
         </div>
         <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
-            <IconEdit className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={onDelete}>
-            <IconTrash className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </CardContent>

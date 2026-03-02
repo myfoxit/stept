@@ -18,16 +18,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  IconCopy,
-  IconCheck,
-  IconTrash,
-  IconLink,
-  IconUsers,
-  IconLoader2,
-  IconUserPlus,
-  IconWorld,
-  IconLock,
-} from '@tabler/icons-react';
+  Copy,
+  Check,
+  Trash2,
+  Link,
+  Users,
+  Loader2,
+  UserPlus,
+  Globe,
+  Lock,
+} from 'lucide-react';
 import { useShare } from '@/hooks/use-share';
 
 interface ShareDialogProps {
@@ -119,14 +119,14 @@ export function ShareDialog({
     <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <IconUsers className="h-5 w-5" />
+          <Users className="h-5 w-5" />
           Share {resourceName ? `"${resourceName}"` : resourceType}
         </DialogTitle>
       </DialogHeader>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <IconLoader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <div className="space-y-6 pt-2">
@@ -134,14 +134,14 @@ export function ShareDialog({
           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
             {isPrivate ? (
               <>
-                <IconLock className="h-4 w-4 text-amber-500" />
+                <Lock className="h-4 w-4 text-amber-500" />
                 <span className="text-sm">
                   <span className="font-medium">Private</span> — only you can see this
                 </span>
               </>
             ) : (
               <>
-                <IconUsers className="h-4 w-4 text-blue-500" />
+                <Users className="h-4 w-4 text-blue-500" />
                 <span className="text-sm">
                   <span className="font-medium">Team</span> — visible to all project members
                 </span>
@@ -154,9 +154,9 @@ export function ShareDialog({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {settings?.is_public ? (
-                  <IconWorld className="h-4 w-4 text-green-600" />
+                  <Globe className="h-4 w-4 text-green-600" />
                 ) : (
-                  <IconLock className="h-4 w-4 text-muted-foreground" />
+                  <Lock className="h-4 w-4 text-muted-foreground" />
                 )}
                 <Label htmlFor="public-toggle" className="text-sm font-medium cursor-pointer">
                   Anyone with the link
@@ -186,9 +186,9 @@ export function ShareDialog({
                   disabled={!settings?.is_public}
                 >
                   {copied ? (
-                    <IconCheck className="h-4 w-4 text-green-500" />
+                    <Check className="h-4 w-4 text-green-500" />
                   ) : (
-                    <IconCopy className="h-4 w-4" />
+                    <Copy className="h-4 w-4" />
                   )}
                 </Button>
               </div>
@@ -201,7 +201,7 @@ export function ShareDialog({
           {/* Invite people */}
           <div className="space-y-3">
             <Label className="text-sm font-medium flex items-center gap-2">
-              <IconUserPlus className="h-4 w-4" />
+              <UserPlus className="h-4 w-4" />
               Add people
             </Label>
             <div className="flex gap-2">
@@ -231,7 +231,7 @@ export function ShareDialog({
                 size="sm"
               >
                 {isInviting ? (
-                  <IconLoader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   'Add'
                 )}
@@ -286,7 +286,7 @@ export function ShareDialog({
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={() => remove(user.id)}
                     >
-                      <IconTrash className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>

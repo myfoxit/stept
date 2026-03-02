@@ -1,12 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  IconFileDescription,
-  IconPlayerPlay,
-  IconShare,
-  IconEye,
-  IconPencil,
-} from '@tabler/icons-react';
+  FileText,
+  Play,
+  Share2,
+  Eye,
+  Pencil,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 import { useSharedWithMe } from '@/hooks/use-share';
@@ -32,9 +32,9 @@ function SharedItemCard({
       <div className="flex w-full items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted border border-muted-foreground/10">
           {isWorkflow ? (
-            <IconPlayerPlay className="size-6 text-blue-600" />
+            <Play className="size-6 text-blue-600" />
           ) : (
-            <IconFileDescription className="size-6 text-violet-600" />
+            <FileText className="size-6 text-violet-600" />
           )}
         </div>
         <div className="flex-1 space-y-2 min-w-0">
@@ -45,9 +45,9 @@ function SharedItemCard({
               className="shrink-0 text-[10px] px-1.5 py-0"
             >
               {item.permission === 'edit' ? (
-                <IconPencil className="size-3 mr-0.5 inline" />
+                <Pencil className="size-3 mr-0.5 inline" />
               ) : (
-                <IconEye className="size-3 mr-0.5 inline" />
+                <Eye className="size-3 mr-0.5 inline" />
               )}
               {item.permission}
             </Badge>
@@ -102,7 +102,7 @@ export function SharedWithMePage() {
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <IconShare className="size-12 text-muted-foreground/40 mb-4" />
+            <Share2 className="size-12 text-muted-foreground/40 mb-4" />
             <h2 className="text-lg font-medium text-muted-foreground">
               Nothing shared with you yet
             </h2>

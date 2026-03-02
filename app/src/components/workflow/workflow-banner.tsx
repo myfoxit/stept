@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { IconInfoCircle, IconPencil } from '@tabler/icons-react';
+import { Info, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '../ui/sidebar';
 
@@ -19,7 +19,7 @@ export function WorkflowBanner({ isEditMode, onToggleEdit, onShare, isPrivate }:
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-primary">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">
-            <IconInfoCircle className="h-3 w-3" />
+            <Info className="h-3 w-3" />
           </span>
           <span className="hidden sm:inline">
             This Workflow is only visible to you. Make any changes, then share it.

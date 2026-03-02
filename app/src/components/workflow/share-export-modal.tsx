@@ -18,19 +18,19 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  IconCopy,
-  IconCheck,
-  IconTrash,
-  IconFileTypePdf,
-  IconFileTypeHtml,
-  IconMarkdown,
-  IconFileTypeDoc,
-  IconLoader2,
-  IconWorld,
-  IconLock,
-  IconUserPlus,
-  IconUsers,
-} from '@tabler/icons-react';
+  Copy,
+  Check,
+  Trash2,
+  FileType,
+  FileCode,
+  FileDown,
+  FileOutput,
+  Loader2,
+  Globe,
+  Lock,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { exportWorkflow, type ExportFormat } from '@/api/workflows';
 import { useShare } from '@/hooks/use-share';
 
@@ -119,25 +119,25 @@ export function ShareExportModal({
     {
       format: 'pdf' as ExportFormat,
       label: 'Export to PDF',
-      icon: IconFileTypePdf,
+      icon: FileType,
       description: null,
     },
     {
       format: 'html' as ExportFormat,
       label: 'Export to HTML',
-      icon: IconFileTypeHtml,
+      icon: FileCode,
       description: 'Works well with Microsoft Word, Google Docs and other apps.',
     },
     {
       format: 'markdown' as ExportFormat,
       label: 'Export to Markdown',
-      icon: IconMarkdown,
+      icon: FileDown,
       description: 'Works well with Notion, GitHub and other apps.',
     },
     {
       format: 'docx' as ExportFormat,
       label: 'Export to Microsoft Word',
-      icon: IconFileTypeDoc,
+      icon: FileOutput,
       description: null,
     },
   ];
@@ -165,7 +165,7 @@ export function ShareExportModal({
           <TabsContent value="share" className="mt-4 space-y-4">
             {shareLoading ? (
               <div className="flex items-center justify-center py-6">
-                <IconLoader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <>
@@ -173,14 +173,14 @@ export function ShareExportModal({
                 <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
                   {isPrivate ? (
                     <>
-                      <IconLock className="h-4 w-4 text-amber-500" />
+                      <Lock className="h-4 w-4 text-amber-500" />
                       <span className="text-sm">
                         <span className="font-medium">Private</span> — only you can see this
                       </span>
                     </>
                   ) : (
                     <>
-                      <IconUsers className="h-4 w-4 text-blue-500" />
+                      <Users className="h-4 w-4 text-blue-500" />
                       <span className="text-sm">
                         <span className="font-medium">Team</span> — visible to all project members
                       </span>
@@ -193,9 +193,9 @@ export function ShareExportModal({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {settings?.is_public ? (
-                        <IconWorld className="h-4 w-4 text-green-600" />
+                        <Globe className="h-4 w-4 text-green-600" />
                       ) : (
-                        <IconLock className="h-4 w-4 text-muted-foreground" />
+                        <Lock className="h-4 w-4 text-muted-foreground" />
                       )}
                       <Label htmlFor="wf-public-toggle" className="text-sm font-medium cursor-pointer">
                         Anyone with the link
@@ -219,9 +219,9 @@ export function ShareExportModal({
                       />
                       <Button variant="outline" size="icon" onClick={() => handleCopy(publicUrl)}>
                         {copied ? (
-                          <IconCheck className="h-4 w-4 text-green-500" />
+                          <Check className="h-4 w-4 text-green-500" />
                         ) : (
-                          <IconCopy className="h-4 w-4" />
+                          <Copy className="h-4 w-4" />
                         )}
                       </Button>
                     </div>
@@ -233,7 +233,7 @@ export function ShareExportModal({
                 {/* Invite people */}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium flex items-center gap-2">
-                    <IconUserPlus className="h-4 w-4" />
+                    <UserPlus className="h-4 w-4" />
                     Add people
                   </Label>
                   <div className="flex gap-2">
@@ -255,7 +255,7 @@ export function ShareExportModal({
                       </SelectContent>
                     </Select>
                     <Button onClick={handleInvite} disabled={!email.trim() || isInviting} size="sm">
-                      {isInviting ? <IconLoader2 className="h-4 w-4 animate-spin" /> : 'Add'}
+                      {isInviting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
                     </Button>
                   </div>
                   {inviteError && <p className="text-xs text-destructive">{inviteError}</p>}
@@ -286,7 +286,7 @@ export function ShareExportModal({
                             </SelectContent>
                           </Select>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => remove(user.id)}>
-                            <IconTrash className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
@@ -318,7 +318,7 @@ export function ShareExportModal({
                 <div className="flex gap-2">
                   <Input value={embedCode} readOnly className="flex-1 font-mono text-xs" />
                   <Button variant="outline" size="icon" onClick={() => handleCopy(embedCode)}>
-                    {copied ? <IconCheck className="h-4 w-4 text-green-500" /> : <IconCopy className="h-4 w-4" />}
+                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               </>
@@ -356,7 +356,7 @@ export function ShareExportModal({
                   disabled={exportingFormat !== null}
                 >
                   {exportingFormat === option.format ? (
-                    <IconLoader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     'Export'
                   )}

@@ -1,15 +1,15 @@
 import * as React from 'react';
 import {
-  IconPencil,
-  IconZoomIn,
-  IconZoomOut,
-  IconDotsVertical,
-  IconCopy,
-  IconLink,
-  IconPhoto,
-  IconDownload,
-  IconTrash,
-} from '@tabler/icons-react';
+  Pencil,
+  ZoomIn,
+  ZoomOut,
+  MoreVertical,
+  Copy,
+  Link,
+  ImageIcon,
+  Download,
+  Trash2,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -137,7 +137,7 @@ export function WorkflowStep({
                   type="button"
                   className="invisible flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition group-hover:visible hover:bg-slate-100"
                 >
-                  <IconDotsVertical className="h-4 w-4" />
+                  <MoreVertical className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -145,30 +145,30 @@ export function WorkflowStep({
                   Step actions
                 </DropdownMenuLabel>
                 <DropdownMenuItem onClick={onDuplicate}>
-                  <IconCopy className="mr-2 h-4 w-4" />
+                  <Copy className="mr-2 h-4 w-4" />
                   <span>Duplicate Step</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onCopyLink}>
-                  <IconLink className="mr-2 h-4 w-4" />
+                  <Link className="mr-2 h-4 w-4" />
                   <span>Copy Link to Step</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onUpdateGuideLink}>
-                  <IconLink className="mr-2 h-4 w-4 italic" />
+                  <Link className="mr-2 h-4 w-4 italic" />
                   <span>Update <span className="italic">Guide Me</span> Link</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem onClick={onReplaceImage}>
-                  <IconPhoto className="mr-2 h-4 w-4" />
+                  <ImageIcon className="mr-2 h-4 w-4" />
                   <span>Replace Image</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onDownloadImage?.(false)}>
-                  <IconDownload className="mr-2 h-4 w-4" />
+                  <Download className="mr-2 h-4 w-4" />
                   <span>Download Image</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onDownloadImage?.(true)}>
-                  <IconDownload className="mr-2 h-4 w-4" />
+                  <Download className="mr-2 h-4 w-4" />
                   <span>Download Full Image</span>
                 </DropdownMenuItem>
 
@@ -178,7 +178,7 @@ export function WorkflowStep({
                   onClick={onDelete}
                   className="text-red-600 focus:text-red-600"
                 >
-                  <IconTrash className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                   <span>Delete Step</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -257,7 +257,7 @@ export function WorkflowStep({
                   type="button"
                   className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white shadow-md hover:bg-slate-50"
                 >
-                  <IconPencil className="h-4 w-4 text-slate-600" />
+                  <Pencil className="h-4 w-4 text-slate-600" />
                 </button>
               )}
               {!isEditMode && <div />}
@@ -268,7 +268,7 @@ export function WorkflowStep({
                   disabled={zoomState.zoomLevel <= 0}
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white disabled:opacity-40"
                 >
-                  <IconZoomOut className="h-4 w-4 text-slate-600" />
+                  <ZoomOut className="h-4 w-4 text-slate-600" />
                 </button>
                 <button
                   type="button"
@@ -276,7 +276,7 @@ export function WorkflowStep({
                   disabled={zoomState.zoomLevel >= zoomLevels.length - 1}
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white disabled:opacity-40"
                 >
-                  <IconZoomIn className="h-4 w-4 text-slate-600" />
+                  <ZoomIn className="h-4 w-4 text-slate-600" />
                 </button>
               </div>
             </div>

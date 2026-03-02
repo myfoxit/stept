@@ -1,12 +1,12 @@
 import * as React from 'react';
 import {
-  IconPlus,
-  IconBulb,
-  IconAlertCircle,
-  IconCamera,
-  IconHeading,
-  IconVideo,
-} from '@tabler/icons-react';
+  Plus,
+  Lightbulb,
+  CircleAlert,
+  Camera,
+  Heading,
+  Video,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +30,7 @@ export function InsertStepMenu({ index, onInsert, stepNumber }: InsertStepMenuPr
             type="button"
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg leading-none text-slate-500 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50"
           >
-            <IconPlus className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center" className="w-48">
@@ -41,23 +41,23 @@ export function InsertStepMenu({ index, onInsert, stepNumber }: InsertStepMenuPr
             Add Step
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onInsert(index, 'tip')}>
-            <IconBulb className="h-4 w-4 text-purple-500 mr-2" />
+            <Lightbulb className="h-4 w-4 text-purple-500 mr-2" />
             Add Tip
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onInsert(index, 'alert')}>
-            <IconAlertCircle className="h-4 w-4 text-orange-500 mr-2" />
+            <CircleAlert className="h-4 w-4 text-orange-500 mr-2" />
             Add Alert
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onInsert(index, 'capture')}>
-            <IconCamera className="h-4 w-4 text-blue-500 mr-2" />
+            <Camera className="h-4 w-4 text-blue-500 mr-2" />
             Add Capture
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onInsert(index, 'header')}>
-            <IconHeading className="h-4 w-4 text-gray-600 mr-2" />
+            <Heading className="h-4 w-4 text-gray-600 mr-2" />
             Add Header
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onInsert(index, 'gif')}>
-            <IconVideo className="h-4 w-4 text-green-500 mr-2" />
+            <Video className="h-4 w-4 text-green-500 mr-2" />
             Add GIF
           </DropdownMenuItem>
         </DropdownMenuContent>

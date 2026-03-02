@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { SettingsLayout } from '@/components/settings-layout';
 import {
-  IconUpload,
-  IconTrash,
-  IconRefresh,
-  IconFileText,
-  IconDatabase,
-} from '@tabler/icons-react';
+  Upload,
+  Trash2,
+  RefreshCw,
+  FileText,
+  Database,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
@@ -93,7 +93,7 @@ export function KnowledgeBasePage() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadMutation.isPending}
             >
-              <IconUpload className="h-4 w-4 mr-2" />
+              <Upload className="h-4 w-4 mr-2" />
               {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
             </Button>
         </div>
@@ -107,7 +107,7 @@ export function KnowledgeBasePage() {
               <p className="text-muted-foreground">Loading…</p>
             ) : !sources?.length ? (
               <div className="text-center py-12 text-muted-foreground">
-                <IconFileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
                 <p>No knowledge sources yet. Upload a file to get started.</p>
               </div>
             ) : (
@@ -139,7 +139,7 @@ export function KnowledgeBasePage() {
                           onClick={() => handleReindex(s.id)}
                           disabled={reindexMutation.isPending}
                         >
-                          <IconRefresh className="h-4 w-4" />
+                          <RefreshCw className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -147,7 +147,7 @@ export function KnowledgeBasePage() {
                           onClick={() => handleDelete(s.id)}
                           disabled={deleteMutation.isPending}
                         >
-                          <IconTrash className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
                     </TableRow>

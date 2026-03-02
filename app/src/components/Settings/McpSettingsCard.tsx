@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
-  IconKey,
-  IconPlus,
-  IconTrash,
-  IconCopy,
-  IconCheck,
-  IconRobot,
-} from '@tabler/icons-react';
+  KeyRound,
+  Plus,
+  Trash2,
+  Copy,
+  Check,
+  Bot,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -121,11 +121,11 @@ export function McpSettingsCard({ projectId }: McpSettingsCardProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <IconRobot className="h-5 w-5" />
+              <Bot className="h-5 w-5" />
               <CardTitle>MCP API Keys</CardTitle>
             </div>
             <Button size="sm" onClick={() => { setCreateOpen(true); setCreatedKey(null); setNewKeyName(''); }}>
-              <IconPlus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4" />
               Create Key
             </Button>
           </div>
@@ -160,7 +160,7 @@ export function McpSettingsCard({ projectId }: McpSettingsCardProps) {
                     <TableCell>{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" onClick={() => handleRevoke(k.id)}>
-                        <IconTrash className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -175,7 +175,7 @@ export function McpSettingsCard({ projectId }: McpSettingsCardProps) {
             <div className="flex items-center gap-2">
               <code className="rounded bg-muted px-2 py-1 text-xs flex-1">{mcpEndpoint}</code>
               <Button variant="outline" size="sm" onClick={() => copyKey(mcpEndpoint)}>
-                <IconCopy className="h-3 w-3" />
+                <Copy className="h-3 w-3" />
               </Button>
             </div>
           </div>
@@ -217,7 +217,7 @@ export function McpSettingsCard({ projectId }: McpSettingsCardProps) {
                 <div className="flex items-center gap-2">
                   <Input value={createdKey} readOnly className="font-mono text-xs" />
                   <Button size="sm" onClick={() => copyKey(createdKey)}>
-                    {keyCopied ? <IconCheck className="h-4 w-4" /> : <IconCopy className="h-4 w-4" />}
+                    {keyCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -226,7 +226,7 @@ export function McpSettingsCard({ projectId }: McpSettingsCardProps) {
                 <Label>Claude Desktop Config</Label>
                 <pre className="rounded bg-muted p-3 text-xs overflow-x-auto whitespace-pre-wrap">{claudeConfig}</pre>
                 <Button variant="outline" size="sm" onClick={() => copyKey(claudeConfig)}>
-                  <IconCopy className="mr-2 h-3 w-3" /> Copy Config
+                  <Copy className="mr-2 h-3 w-3" /> Copy Config
                 </Button>
               </div>
             </div>
