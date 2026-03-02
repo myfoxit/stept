@@ -985,7 +985,7 @@ namespace Ondoki.Native
 
             // Shut down background element detection thread
             _hooksRunning = false;
-            _clickSignal.Set();
+            _eventSignal.Set();
             _eventThread.Join(2000);
 
             Win32.UnhookWindowsHookEx(mouseHook);
