@@ -68,6 +68,7 @@ interface NativeElementInfo {
   help: string;
   identifier?: string;
   automationId?: string;
+  nameFromParent?: string;
 }
 
 interface ElementConfidence {
@@ -1046,9 +1047,9 @@ export class RecordingService extends EventEmitter {
     let source = 'none';
 
     if (element.title) {
-      score = 0.9;
+      score = element.nameFromParent === 'true' ? 0.4 : 0.9;
       bestLabel = element.title;
-      source = 'title';
+      source = element.nameFromParent === 'true' ? 'title-from-parent' : 'title';
     } else if (element.description) {
       score = 0.8;
       bestLabel = element.description;

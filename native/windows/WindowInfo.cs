@@ -250,7 +250,7 @@ namespace Ondoki.Native
             );
 
         public static string Element(string role, string title, string value, string description, string className,
-            string roleDescription = "", string placeholder = "", string help = "", string automationId = "") =>
+            string roleDescription = "", string placeholder = "", string help = "", string automationId = "", bool nameFromParent = false) =>
             Obj(
                 ("role", Str(role)),
                 ("title", Str(title)),
@@ -260,7 +260,8 @@ namespace Ondoki.Native
                 ("roleDescription", Str(roleDescription)),
                 ("placeholder", Str(placeholder)),
                 ("help", Str(help)),
-                ("automationId", Str(automationId))
+                ("automationId", Str(automationId)),
+                ("nameFromParent", nameFromParent ? "true" : "false")
             );
     }
 
@@ -407,6 +408,7 @@ namespace Ondoki.Native
                 catch { }
 
                 // If name is empty, walk up parents (max 8) to find one with a name
+                bool nameFromParent = false;
                 if (string.IsNullOrEmpty(name))
                 {
                     var walker = TreeWalker.ControlViewWalker;
@@ -419,6 +421,7 @@ namespace Ondoki.Native
                         if (!string.IsNullOrEmpty(parentName))
                         {
                             name = parentName;
+                            nameFromParent = true;
                             break;
                         }
                     }
@@ -433,7 +436,8 @@ namespace Ondoki.Native
                     controlType,
                     "",
                     helpText,
-                    automationId
+                    automationId,
+                    nameFromParent
                 );
             }
             catch
