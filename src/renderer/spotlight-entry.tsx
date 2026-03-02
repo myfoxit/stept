@@ -111,7 +111,7 @@ const SpotlightApp: React.FC = () => {
         projects: status.projects ?? [],
       });
       if (status.isAuthenticated && status.projects?.[0]?.id) {
-        setSelectedProjectId((prev) => prev || status.projects[0].id);
+        setSelectedProjectId(status.projects[0].id);
         api.contextStart?.(status.projects[0].id);
       }
     });
