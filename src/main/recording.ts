@@ -672,6 +672,7 @@ export class RecordingService extends EventEmitter {
     }
 
     // Extract element info
+    console.log(`[DIAG] element data:`, JSON.stringify(event.element));
     const elementName = this.formatElementName(event.element);
     const elementRole = event.element?.role || '';
     const elementDescription = event.element?.description || event.element?.title || event.element?.help || '';
