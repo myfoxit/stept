@@ -733,7 +733,7 @@ namespace Ondoki.Native
 
         // ---- Background element detection (avoids UIA deadlock in hook callback) ----
 
-        struct ClickQueueItem
+        class ClickQueueItem
         {
             public POINT pt;
             public int button;
@@ -743,6 +743,8 @@ namespace Ondoki.Native
             public double scale;
             public long ts;
             public IntPtr rootHwnd;
+            public ManualResetEventSlim done = new ManualResetEventSlim(false);
+            public int written;  // 0=not yet, 1=claimed by a writer
         }
 
         static readonly ConcurrentQueue<ClickQueueItem> _clickQueue = new ConcurrentQueue<ClickQueueItem>();
@@ -757,6 +759,13 @@ namespace Ondoki.Native
                 _clickSignal.WaitOne(200);
                 while (_clickQueue.TryDequeue(out ClickQueueItem item))
                 {
+                    // Atomically claim the right to write this click
+                    if (Interlocked.CompareExchange(ref item.written, 1, 0) != 0)
+                    {
+                        // Hook already wrote it (timeout path)
+                        continue;
+                    }
+
                     string elementJson;
                     try
                     {
@@ -782,6 +791,7 @@ namespace Ondoki.Native
                         ("timestamp", Json.Num(item.ts)),
                         ("screenshotPath", screenshotJson)
                     ));
+                    item.done.Set();  // Signal that this click has been written
                 }
             }
         }
@@ -836,7 +846,7 @@ namespace Ondoki.Native
 
                     // Enqueue for background element detection (UIA uses COM cross-process
                     // calls that DEADLOCK when called from within WH_MOUSE_LL)
-                    _clickQueue.Enqueue(new ClickQueueItem
+                    var clickItem = new ClickQueueItem
                     {
                         pt = pt,
                         button = button,
@@ -846,8 +856,35 @@ namespace Ondoki.Native
                         scale = scale,
                         ts = ts,
                         rootHwnd = rootHwnd
-                    });
+                    };
+                    _clickQueue.Enqueue(clickItem);
                     _clickSignal.Set();
+
+                    // Wait for the background thread to write this click event.
+                    // This preserves ordering with keyboard/scroll events.
+                    // 150ms timeout: if UIA is slow, we still preserve order because
+                    // the background thread will see done is already set and skip.
+                    if (!clickItem.done.Wait(150))
+                    {
+                        // Timeout — background thread hasn't finished UIA yet.
+                        // Atomically claim the write so background thread skips this item.
+                        if (Interlocked.CompareExchange(ref clickItem.written, 1, 0) != 0)
+                            goto skipWrite; // Background thread beat us — it already wrote it
+                        string screenshotJson2 = screenshotPath != null ? Json.Str(screenshotPath) : "null";
+                        WriteEvent(Json.Obj(
+                            ("type", Json.Str("click")),
+                            ("x", Json.Num(pt.X)),
+                            ("y", Json.Num(pt.Y)),
+                            ("button", Json.Num(button)),
+                            ("window", windowJson),
+                            ("element", Json.Null),
+                            ("scale", Json.Num(scale)),
+                            ("monitorBounds", monBoundsJson),
+                            ("timestamp", Json.Num(ts)),
+                            ("screenshotPath", screenshotJson2)
+                        ));
+                    }
+                    skipWrite:;
                 }
                 else if (msg == Win32.WM_MOUSEWHEEL)
                 {
