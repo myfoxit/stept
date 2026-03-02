@@ -51,6 +51,7 @@ export class ContextWatcherService extends EventEmitter {
       // Windows — try packaged path first, then dev paths
       const candidates = [
         path.join(process.resourcesPath, 'native', 'windows', 'window-info.exe'),
+        path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish', 'window-info.exe'),
         path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'window-info.exe'),
         path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.exe'),
       ];

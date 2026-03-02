@@ -140,6 +140,7 @@ export class ScreenshotService {
     } else if (platform === 'win32') {
       const candidates = [
         path.join(app?.isPackaged ? path.dirname(app.getPath('exe')) : '', '..', 'Resources', 'native', 'windows', 'window-info.exe'),
+        path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish', 'window-info.exe'),
         path.join(__dirname, '..', '..', 'native', 'windows', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'window-info.exe'),
         path.join(__dirname, '..', '..', 'native', 'windows', 'window-info.exe'),
       ];
