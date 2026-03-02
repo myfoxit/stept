@@ -24,6 +24,7 @@ export interface RecordedStep {
   screenshotRelativeMousePosition: { x: number; y: number };
   screenshotSize: { width: number; height: number };
   textTyped?: string; scrollDelta?: number; elementName?: string;
+  generatedTitle?: string; generatedDescription?: string;
 }
 
 export interface AuthStatus { isAuthenticated: boolean; user?: UserInfo; projects?: Project[]; }
@@ -74,6 +75,7 @@ export interface ElectronAPI {
 
   // Event listeners
   onStepRecorded: (callback: (step: RecordedStep) => void) => () => void;
+  onStepAnnotated: (callback: (step: RecordedStep) => void) => () => void;
   onRecordingStateChanged: (callback: (state: RecordingState) => void) => () => void;
   onAuthStatusChanged: (callback: (status: AuthStatus) => void) => () => void;
   onUploadStarted: (callback: () => void) => () => void;
@@ -158,6 +160,11 @@ const electronAPI: ElectronAPI = {
     const handler = (_e: IpcRendererEvent, step: RecordedStep) => callback(step);
     ipcRenderer.on('step-recorded', handler);
     return () => ipcRenderer.removeListener('step-recorded', handler);
+  },
+  onStepAnnotated: (callback) => {
+    const handler = (_e: IpcRendererEvent, step: RecordedStep) => callback(step);
+    ipcRenderer.on('step-annotated', handler);
+    return () => ipcRenderer.removeListener('step-annotated', handler);
   },
   onRecordingStateChanged: (callback) => {
     const handler = (_e: IpcRendererEvent, state: RecordingState) => callback(state);

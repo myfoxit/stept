@@ -6,6 +6,7 @@ import { ScreenshotService } from './screenshot';
 import { ChatService } from './chat';
 import { CloudUploadService } from './cloud-upload';
 import { ContextWatcherService } from './context-watcher';
+import { SmartAnnotationService } from './smart-annotation';
 
 export function setupIpcHandlers(
   authService: AuthService,
@@ -16,6 +17,7 @@ export function setupIpcHandlers(
   const chatService = new ChatService(() => authService.getAccessToken(), settingsManager);
   const cloudUploadService = new CloudUploadService(() => authService.getAccessToken(), settingsManager);
   const contextWatcher = new ContextWatcherService();
+  const smartAnnotation = new SmartAnnotationService(chatService);
 
   // Track recorded steps for auto-upload
   let currentRecordingSteps: any[] = [];
@@ -49,9 +51,36 @@ export function setupIpcHandlers(
         currentUserId = status?.user?.id || '';
       } catch {}
 
+      // Reset annotation service for new recording
+      smartAnnotation.clearQueue();
+      smartAnnotation.removeAllListeners('step-annotated');
+
+      // Listen for annotation results — update stored step and notify renderer
+      smartAnnotation.on('step-annotated', (annotatedStep) => {
+        const idx = currentRecordingSteps.findIndex(
+          (s) => s.stepNumber === annotatedStep.stepNumber
+        );
+        if (idx !== -1) {
+          currentRecordingSteps[idx] = {
+            ...currentRecordingSteps[idx],
+            generatedTitle: annotatedStep.generatedTitle,
+            generatedDescription: annotatedStep.generatedDescription,
+          };
+        }
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('step-annotated', annotatedStep);
+        }
+      });
+
       recordingService.on('step-recorded', (step) => {
         currentRecordingSteps.push(step);
         event.sender.send('step-recorded', step);
+
+        // Enqueue for AI annotation if available (async, non-blocking)
+        const aiAvailable = settingsManager.isLlmConfigured() || !!authService.getAccessToken();
+        if (aiAvailable) {
+          smartAnnotation.enqueueStep(step);
+        }
       });
 
       recordingService.on('state-changed', (state) => {

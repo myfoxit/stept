@@ -155,6 +155,9 @@ const SpotlightApp: React.FC = () => {
     const unsubStep = api.onStepRecorded?.((step: any) => {
       setRec((prev) => ({ ...prev, stepCount: prev.stepCount + 1 }));
     });
+    const unsubAnnotated = api.onStepAnnotated?.((step: any) => {
+      console.log('[annotation] Step annotated:', step.stepNumber, step.generatedTitle);
+    });
     const unsubState = api.onRecordingStateChanged?.((state: any) => {
       setRec(state);
     });
@@ -194,6 +197,7 @@ const SpotlightApp: React.FC = () => {
       unsubCtx?.();
       unsubNoCtx?.();
       unsubStep?.();
+      unsubAnnotated?.();
       unsubState?.();
       unsubUpStart?.();
       unsubUpDone?.();

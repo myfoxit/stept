@@ -185,6 +185,8 @@ export class CloudUploadService extends EventEmitter {
       screenshotSize: s.screenshotSize,
       textTyped: s.textTyped,
       scrollDelta: s.scrollDelta,
+      generatedTitle: s.generatedTitle,
+      generatedDescription: s.generatedDescription,
     }));
 
     const response = await fetch(`${baseUrl}/session/${sessionId}/metadata`, {

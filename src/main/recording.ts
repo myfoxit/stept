@@ -112,6 +112,8 @@ export interface RecordedStep {
   elementRole?: string;
   elementDescription?: string;
   ownerApp?: string;
+  generatedTitle?: string;
+  generatedDescription?: string;
 }
 
 export interface RecordingState {

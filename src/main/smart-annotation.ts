@@ -77,7 +77,12 @@ export class SmartAnnotationService extends EventEmitter {
       while (this.annotationQueue.length > 0) {
         const step = this.annotationQueue.shift();
         if (step) {
-          await this.processStepAnnotation(step);
+          try {
+            const annotated = await this.processStepAnnotation(step);
+            this.emit('step-annotated', annotated);
+          } catch (error) {
+            console.error('Annotation queue item failed:', error);
+          }
           this.pendingCount = Math.max(0, this.pendingCount - 1);
         }
       }
