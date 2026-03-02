@@ -738,8 +738,7 @@ export class RecordingService extends EventEmitter {
     const buttonType = buttonTypes[event.button] || 'Left';
     const clickLabel = clickCount >= 3 ? 'Triple Click' : clickCount === 2 ? 'Double Click' : `${buttonType} Click`;
 
-    // Simple description — LLM will construct the real one from metadata
-    const description = `${clickLabel} here`;
+    const description = this.buildClickDescription(clickLabel, elementName, elementRole, elementDescription, windowTitle);
 
     const step: RecordedStep = {
       stepNumber: this.stepCount,
@@ -796,7 +795,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Scroll',
         windowTitle,
-        description: `Scrolled ${this.scrollAccumulator > 0 ? 'down' : 'up'} in ${windowTitle}`,
+        description: `Scroll ${this.scrollAccumulator > 0 ? 'down' : 'up'} in ${this.shortenWindowTitle(windowTitle)}`,
         scrollDelta: this.scrollAccumulator,
         globalMousePosition: pt,
         relativeMousePosition: { x: 0, y: 0 },
@@ -879,7 +878,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Keyboard Shortcut',
         windowTitle,
-        description: `Pressed ${combo} in ${windowTitle}`,
+        description: `Press ${combo}`,
         textTyped: combo,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
@@ -919,7 +918,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Key Press',
         windowTitle,
-        description: `Pressed ${namedKey} in ${windowTitle}`,
+        description: `Press ${namedKey}`,
         textTyped: namedKey,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
@@ -958,7 +957,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Type',
         windowTitle,
-        description: `Typed: "${this.currentText}" in ${windowTitle}`,
+        description: this.buildTypeDescription(this.currentText, windowTitle),
         textTyped: this.currentText,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
@@ -990,6 +989,86 @@ export class RecordingService extends EventEmitter {
     if (element.value && element.value.length < 50) return element.value;
     if (element.role) return element.role.replace(/^AX/, '');
     return '';
+  }
+
+  /** Strip AX prefix and convert to human-readable lowercase: AXButton -> button */
+  private humanReadableRole(role: string): string {
+    return role.replace(/^AX/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  }
+
+  /** Shorten window title by stripping common browser suffixes */
+  private shortenWindowTitle(title: string): string {
+    const browserSuffixes = [
+      ' - Google Chrome', ' - Chrome', ' - Firefox', ' - Safari',
+      ' - Microsoft Edge', ' - Arc', ' - Brave', ' — Mozilla Firefox',
+      ' – Google Chrome',
+    ];
+    let shortened = title;
+    for (const suffix of browserSuffixes) {
+      if (shortened.endsWith(suffix)) {
+        shortened = shortened.slice(0, -suffix.length);
+        break;
+      }
+    }
+    return shortened || title;
+  }
+
+  private static readonly ACTIONABLE_ROLES = new Set([
+    'AXButton', 'AXLink', 'AXMenuItem', 'AXTab', 'AXPopUpButton',
+    'AXCheckBox', 'AXRadioButton', 'AXMenuBarItem', 'AXImage',
+  ]);
+
+  private static readonly FIELD_ROLES = new Set([
+    'AXTextField', 'AXTextArea', 'AXComboBox', 'AXSearchField', 'AXSecureTextField',
+  ]);
+
+  /** Build a rich type description, truncating long text */
+  private buildTypeDescription(text: string, windowTitle: string): string {
+    const displayText = text.length > 40 ? text.slice(0, 40) + '...' : text;
+    const shortTitle = this.shortenWindowTitle(windowTitle);
+    return `Type "${displayText}" in ${shortTitle}`;
+  }
+
+  /** Build a rich click description using accessibility data with smart fallbacks */
+  private buildClickDescription(
+    clickLabel: string,
+    elementName: string,
+    elementRole: string,
+    elementDescription: string,
+    windowTitle: string,
+  ): string {
+    const verb = clickLabel === 'Double Click' ? 'Double-click' :
+                 clickLabel === 'Triple Click' ? 'Triple-click' :
+                 clickLabel === 'Right Click' ? 'Right-click' : 'Click';
+
+    // 1. Named actionable element (button, link, menu item, tab, etc.)
+    if (elementName && RecordingService.ACTIONABLE_ROLES.has(elementRole)) {
+      return `${verb} "${elementName}"`;
+    }
+
+    // 2. Named field element (text field, combo box, etc.)
+    if (elementName && RecordingService.FIELD_ROLES.has(elementRole)) {
+      return `${verb} on ${elementName} field`;
+    }
+
+    // 3. Has a name but unknown role — still useful
+    if (elementName) {
+      return `${verb} "${elementName}"`;
+    }
+
+    // 4. Has description but no name
+    if (elementDescription) {
+      return `${verb} "${elementDescription}"`;
+    }
+
+    // 5. Has role but no name/description
+    if (elementRole) {
+      return `${verb} on ${this.humanReadableRole(elementRole)}`;
+    }
+
+    // 6. Fallback: use shortened window title
+    const shortTitle = this.shortenWindowTitle(windowTitle);
+    return `${verb} in ${shortTitle}`;
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {
