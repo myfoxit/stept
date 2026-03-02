@@ -448,8 +448,15 @@ namespace Ondoki.Native
 
         static string GetElementJson(int x, int y, IntPtr rootHwnd)
         {
-            // Try UIA first — richer data
-            string uiaResult = GetElementViaUIA(x, y);
+            // Try UIA first — richer data, with 200ms timeout to avoid blocking the event queue
+            string uiaResult = null;
+            try
+            {
+                var uiaTask = System.Threading.Tasks.Task.Run(() => GetElementViaUIA(x, y));
+                if (uiaTask.Wait(200))
+                    uiaResult = uiaTask.Result;
+            }
+            catch { }
             if (uiaResult != null) return uiaResult;
 
             // Fall back to MSAA
@@ -983,10 +990,33 @@ namespace Ondoki.Native
                 Win32.DispatchMessage(ref msg);
             }
 
-            // Shut down background element detection thread
+            // Shut down background event processing thread
             _hooksRunning = false;
             _eventSignal.Set();
-            _eventThread.Join(2000);
+            _eventThread.Join(3000);
+            
+            // Drain any remaining events (write clicks without element data for speed)
+            while (_eventQueue.TryDequeue(out HookEvent remaining))
+            {
+                if (remaining is RawJsonEvent rawRemaining)
+                    WriteEvent(rawRemaining.json);
+                else if (remaining is ClickHookEvent clickRemaining)
+                {
+                    string ssJson = clickRemaining.screenshotPath != null ? Json.Str(clickRemaining.screenshotPath) : "null";
+                    WriteEvent(Json.Obj(
+                        ("type", Json.Str("click")),
+                        ("x", Json.Num(clickRemaining.pt.X)),
+                        ("y", Json.Num(clickRemaining.pt.Y)),
+                        ("button", Json.Num(clickRemaining.button)),
+                        ("window", clickRemaining.windowJson),
+                        ("element", Json.Null),
+                        ("scale", Json.Num(clickRemaining.scale)),
+                        ("monitorBounds", clickRemaining.monBoundsJson),
+                        ("timestamp", Json.Num(clickRemaining.ts)),
+                        ("screenshotPath", ssJson)
+                    ));
+                }
+            }
 
             Win32.UnhookWindowsHookEx(mouseHook);
             Win32.UnhookWindowsHookEx(keyboardHook);
