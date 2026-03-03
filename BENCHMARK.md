@@ -68,9 +68,9 @@ Same workflow every run: platform.openai.com → API keys → Create new secret 
 
 ---
 
-### Mac — `ce54f67` — 2026-03-03 — 13/16
+### Mac — `ce54f67` — 2026-03-03 — 14/16
 
-**Title:** *(not recorded this run)* — **0**
+**Title:** "Create new item in OpenAI API" — **1**
 
 | # | Ondoki | Score | Notes |
 |---|--------|-------|-------|
@@ -81,8 +81,8 @@ Same workflow every run: platform.openai.com → API keys → Create new secret 
 | 5 | Click "Create secret key" | 2 ✅ | |
 | 6 | Click "Copy" | 2 ✅ | |
 | 7 | Click "Done" | 2 ✅ | |
-| Title | *(not recorded)* | 0 | |
-| **Total** | | **13/16** | |
+| Title | "Create new item in OpenAI API" | 1 | "item" too generic vs "secret API key" |
+| **Total** | | **14/16** | |
 
 **Extra steps (outside benchmark):** Click "Cell" x2 (OpenAI grid + desktop icon)
 
