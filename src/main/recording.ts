@@ -714,6 +714,12 @@ export class RecordingService extends EventEmitter {
       } catch {}
     }
     console.log(`[DIAG] element data:`, JSON.stringify(element));
+
+    // For fields with no title, use placeholder as the name
+    if (element && !element.title && !element.description && (element as any).placeholder) {
+      element = { ...element, title: (element as any).placeholder };
+    }
+
     const elementName = this.formatElementName(element, windowTitle);
     const elementRole = element?.role || '';
     const elementDescription = element?.description || element?.title || '';
@@ -761,17 +767,20 @@ export class RecordingService extends EventEmitter {
 
     let screenshotPath: string | undefined;
     try {
-      // Use native pre-click screenshot if available (captured synchronously in event tap)
-      let nativePreCapture = preCapture;
-      if (!nativePreCapture && event.screenshotPath) {
+      // Use native pre-click screenshot FIRST (captured synchronously in event tap — guaranteed pre-click)
+      // Only fall back to Electron preCapture if native screenshot is missing (Windows serve-mode, etc.)
+      let nativePreCapture: Buffer | undefined;
+      if (event.screenshotPath) {
         try {
           const fs = require('fs');
           nativePreCapture = fs.readFileSync(event.screenshotPath);
-          // Clean up temp file
           fs.unlink(event.screenshotPath, () => {});
         } catch (e) {
           console.error('[DIAG] Failed to read native screenshot:', e);
         }
+      }
+      if (!nativePreCapture && preCapture) {
+        nativePreCapture = preCapture;
       }
       
       screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
@@ -888,6 +897,17 @@ export class RecordingService extends EventEmitter {
     // Ignore pure modifier keypresses
     const modifierKeys = isMac ? MAC_MODIFIER_KEYCODES : WIN_MODIFIER_VKS;
     if (modifierKeys.includes(keycode)) return;
+
+    // ORDERING FIX: If a click is pending (debouncing for double-click detection),
+    // flush it NOW before processing this key. Typing after a click means the user
+    // is done clicking — no double-click is coming. This guarantees the click step
+    // always appears before subsequent key/type steps in the recording.
+    if (this.pendingClick) {
+      clearTimeout(this.pendingClick.timeout);
+      const pending = this.pendingClick;
+      this.pendingClick = null;
+      this.processClick(pending.event, pending.count, pending.preCapture);
+    }
 
     const charMap = isMac ? MAC_KEYCODE_MAP : WIN_VK_MAP;
     const namedMap = isMac ? MAC_NAMED_KEY_MAP : WIN_NAMED_KEY_MAP;
@@ -1047,14 +1067,18 @@ export class RecordingService extends EventEmitter {
       if (genericRoles.has(role)) return '';
     }
 
-    const name = element.title || element.description || (element.value && element.value.length < 50 ? element.value : '');
+    let name = element.title || element.description || (element.value && element.value.length < 50 ? element.value : '');
     if (!name) {
       if (element.role) return element.role.replace(/^AX/, '');
       return '';
     }
 
+    // Strip browser suffixes from element names — Chrome tab/link AXTitle embeds
+    // the app name and profile: "Page Title - Google Chrome – Alexander (Alex)"
+    name = this.shortenWindowTitle(name);
+
     // Reject if the element name IS (or closely matches) the window title — it's just the container
-    if (windowTitle && name) {
+    if (windowTitle) {
       const stripped = this.shortenWindowTitle(windowTitle).toLowerCase();
       if (name.toLowerCase() === stripped || name.toLowerCase() === windowTitle.toLowerCase()) return '';
     }
@@ -1087,12 +1111,20 @@ export class RecordingService extends EventEmitter {
   }
 
   private static readonly ACTIONABLE_ROLES = new Set([
+    // macOS AX roles
     'AXButton', 'AXLink', 'AXMenuItem', 'AXTab', 'AXPopUpButton',
     'AXCheckBox', 'AXRadioButton', 'AXMenuBarItem', 'AXImage',
+    'AXCell', 'AXRow',
+    // Windows UIA/MSAA roles
+    'Button', 'Hyperlink', 'Link', 'MenuItem', 'TabItem', 'Tab',
+    'CheckBox', 'RadioButton', 'ListItem', 'Cell',
   ]);
 
   private static readonly FIELD_ROLES = new Set([
+    // macOS AX roles
     'AXTextField', 'AXTextArea', 'AXComboBox', 'AXSearchField', 'AXSecureTextField',
+    // Windows UIA/MSAA roles
+    'Edit', 'ComboBox', 'Text',
   ]);
 
   /** Build a rich type description, truncating long text */
@@ -1121,7 +1153,7 @@ export class RecordingService extends EventEmitter {
 
     // 2. Named field element (text field, combo box, etc.)
     if (elementName && RecordingService.FIELD_ROLES.has(elementRole)) {
-      return `${verb} on ${elementName} field`;
+      return `${verb} on "${elementName}" field`;
     }
 
     // 3. Has a name but unknown role — still useful
