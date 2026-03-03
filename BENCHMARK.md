@@ -37,7 +37,7 @@ For each step, score 0–2:
 | `a34a30c` | 2026-03-02 | -/12 | Path fixed, UIA data flowing but deadlock in hook → ordering broken |
 | `20f1160` | 2026-03-02 | ~4/12 | nameFromParent penalty, some correct, ordering sometimes wrong |
 | `e60609b` | 2026-03-03 | ?/12 | Unified queue (ordering fixed), smart element detection — needs test |
-| `a8ea37f` | 2026-03-03 | ?/12 | PublishTrimmed=false — rebuild and run benchmark |
+| `a8ea37f` | 2026-03-03 | 8/12 | Steps 6-8 perfect. Steps 1,2,4 grab window/page title (nameFromParent). Step 1 includes "Google Chrome" suffix. |
 
 ---
 
