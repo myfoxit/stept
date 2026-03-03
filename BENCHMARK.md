@@ -46,3 +46,28 @@ Same workflow every run: platform.openai.com → API keys → Create new secret 
 
 **Issues:** nameFromParent grabs window title for steps 1–3, type split in two, title not tracked, Chrome suffix not stripped.
 
+---
+
+### Mac — `e60609b` — 2026-03-03 — 13/16
+
+**Title:** "Create new item in OpenAI API"
+
+| # | Ondoki | Score | Notes |
+|---|--------|-------|-------|
+| 1 | Click "API keys - OpenAI API - Google Chrome – Alexander (Alex)" | 1 | Chrome suffix still in element name (tab AXTitle includes app name) |
+| 2 | Click "Create new secret key" | 2 ✅ | |
+| 3 | Click on TextField field | 1 | Role detected, no placeholder/name |
+| 4 | Type "sdsdssd" in API keys - OpenAI API | 2 ✅ | |
+| 5 | Click "Create secret key" | 2 ✅ | |
+| 6 | Click "Copy" | 2 ✅ | |
+| 7 | Click "Done" | 2 ✅ | |
+| Title | "Create new item in OpenAI API" | 1 | "item" not specific enough vs "secret API key" |
+| **Total** | | **13/16** | |
+
+**Improvements over Windows a8ea37f (8/16):** Steps 2–7 all correct. Title now tracked.
+
+**Remaining issues:**
+- Step 1: Tab element AXTitle includes full Chrome window title (" - Google Chrome – Profile") — need to strip browser suffix from element names, not just window titles
+- Step 3: TextField has no accessible name/placeholder exposed — needs AXPlaceholderValue fallback
+- Title: "item" is too generic — smarter title generation needed
+
