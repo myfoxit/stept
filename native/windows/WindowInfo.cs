@@ -11,6 +11,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Windows.Automation;
 
@@ -249,7 +250,7 @@ namespace Ondoki.Native
             );
 
         public static string Element(string role, string title, string value, string description, string className,
-            string roleDescription = "", string placeholder = "", string help = "", string automationId = "") =>
+            string roleDescription = "", string placeholder = "", string help = "", string automationId = "", bool nameFromParent = false) =>
             Obj(
                 ("role", Str(role)),
                 ("title", Str(title)),
@@ -259,7 +260,8 @@ namespace Ondoki.Native
                 ("roleDescription", Str(roleDescription)),
                 ("placeholder", Str(placeholder)),
                 ("help", Str(help)),
-                ("automationId", Str(automationId))
+                ("automationId", Str(automationId)),
+                ("nameFromParent", nameFromParent ? "true" : "false")
             );
     }
 
@@ -406,6 +408,7 @@ namespace Ondoki.Native
                 catch { }
 
                 // If name is empty, walk up parents (max 8) to find one with a name
+                bool nameFromParent = false;
                 if (string.IsNullOrEmpty(name))
                 {
                     var walker = TreeWalker.ControlViewWalker;
@@ -418,6 +421,7 @@ namespace Ondoki.Native
                         if (!string.IsNullOrEmpty(parentName))
                         {
                             name = parentName;
+                            nameFromParent = true;
                             break;
                         }
                     }
@@ -432,7 +436,8 @@ namespace Ondoki.Native
                     controlType,
                     "",
                     helpText,
-                    automationId
+                    automationId,
+                    nameFromParent
                 );
             }
             catch
@@ -726,6 +731,75 @@ namespace Ondoki.Native
             }
         }
 
+        // ---- Background element detection (avoids UIA deadlock in hook callback) ----
+
+        struct ClickQueueItem
+        {
+            public POINT pt;
+            public int button;
+            public string windowJson;
+            public string screenshotPath;
+            public string monBoundsJson;
+            public double scale;
+            public long ts;
+            public IntPtr rootHwnd;
+        }
+
+        // RawJsonItem wraps already-serialized JSON for keys/scrolls so they
+        // share the same queue as clicks and are written in strict FIFO order.
+        struct RawJsonItem
+        {
+            public string json;
+        }
+
+        static readonly ConcurrentQueue<object> _eventQueue = new ConcurrentQueue<object>();
+        static readonly AutoResetEvent _eventSignal = new AutoResetEvent(false);
+        static volatile bool _hooksRunning;
+        static Thread _elementThread;
+
+        static void ElementDetectionWorker()
+        {
+            while (_hooksRunning)
+            {
+                _eventSignal.WaitOne(200);
+                while (_eventQueue.TryDequeue(out object item))
+                {
+                    if (item is RawJsonItem raw)
+                    {
+                        WriteEvent(raw.json);
+                    }
+                    else if (item is ClickQueueItem click)
+                    {
+                        string elementJson;
+                        try
+                        {
+                            elementJson = click.rootHwnd != IntPtr.Zero
+                                ? GetElementJson(click.pt.X, click.pt.Y, click.rootHwnd)
+                                : Json.Null;
+                        }
+                        catch
+                        {
+                            elementJson = Json.Null;
+                        }
+
+                        string screenshotJson = click.screenshotPath != null ? Json.Str(click.screenshotPath) : "null";
+                        WriteEvent(Json.Obj(
+                            ("type", Json.Str("click")),
+                            ("x", Json.Num(click.pt.X)),
+                            ("y", Json.Num(click.pt.Y)),
+                            ("button", Json.Num(click.button)),
+                            ("window", click.windowJson),
+                            ("element", elementJson),
+                            ("scale", Json.Num(click.scale)),
+                            ("monitorBounds", click.monBoundsJson),
+                            ("timestamp", Json.Num(click.ts)),
+                            ("screenshotPath", screenshotJson)
+                        ));
+                    }
+                }
+            }
+        }
+
         static List<string> GetModifiers()
         {
             var mods = new List<string>();
@@ -758,33 +832,36 @@ namespace Ondoki.Native
                 if (msg == Win32.WM_LBUTTONDOWN || msg == Win32.WM_RBUTTONDOWN || msg == Win32.WM_MBUTTONDOWN)
                 {
                     // Capture screenshot FIRST — synchronous BitBlt before anything else
-                    // This runs in the low-level hook, before the click reaches the target app
+                    // BitBlt is GDI and safe to call from the hook callback
                     string screenshotPath = CaptureDisplayAtPoint(pt.X, pt.Y);
 
                     int button = msg == Win32.WM_LBUTTONDOWN ? 1 : msg == Win32.WM_RBUTTONDOWN ? 2 : 3;
-                    string windowJson = BuildWindowJsonAtPoint(pt);
-                    string elementJson = Json.Null; // UIA deadlocks in hook callback — element enrichment happens in TypeScript via serve process
 
-                    // Get physical monitor bounds for accurate multi-monitor positioning
+                    // Collect all NON-UIA data (pure Win32/GDI calls — safe from hook)
+                    var hwnd = Win32.WindowFromPoint(pt);
+                    var rootHwnd = Win32.GetAncestor(hwnd, Win32.GA_ROOT);
+                    string windowJson = rootHwnd != IntPtr.Zero ? BuildWindowJson(rootHwnd) : Json.Null;
+
                     var hMonitor = Win32.MonitorFromPoint(pt, Win32.MONITOR_DEFAULTTONEAREST);
                     var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
                     Win32.GetMonitorInfo(hMonitor, ref monInfo);
                     var mr = monInfo.rcMonitor;
                     string monBoundsJson = Json.Rect(mr.Left, mr.Top, mr.Right - mr.Left, mr.Bottom - mr.Top);
 
-                    string screenshotJson = screenshotPath != null ? Json.Str(screenshotPath) : "null";
-                    WriteEvent(Json.Obj(
-                        ("type", Json.Str("click")),
-                        ("x", Json.Num(pt.X)),
-                        ("y", Json.Num(pt.Y)),
-                        ("button", Json.Num(button)),
-                        ("window", windowJson),
-                        ("element", elementJson),
-                        ("scale", Json.Num(scale)),
-                        ("monitorBounds", monBoundsJson),
-                        ("timestamp", Json.Num(ts)),
-                        ("screenshotPath", screenshotJson)
-                    ));
+                    // Enqueue for background element detection (UIA uses COM cross-process
+                    // calls that DEADLOCK when called from within WH_MOUSE_LL)
+                    _eventQueue.Enqueue(new ClickQueueItem
+                    {
+                        pt = pt,
+                        button = button,
+                        windowJson = windowJson,
+                        screenshotPath = screenshotPath,
+                        monBoundsJson = monBoundsJson,
+                        scale = scale,
+                        ts = ts,
+                        rootHwnd = rootHwnd
+                    });
+                    _eventSignal.Set();
                 }
                 else if (msg == Win32.WM_MOUSEWHEEL)
                 {
@@ -795,7 +872,7 @@ namespace Ondoki.Native
                     // For scroll, get cursor position (hookStruct.pt is screen coords)
                     string windowJson = BuildWindowJsonAtPoint(pt);
 
-                    WriteEvent(Json.Obj(
+                    _eventQueue.Enqueue(new RawJsonItem { json = Json.Obj(
                         ("type", Json.Str("scroll")),
                         ("x", Json.Num(pt.X)),
                         ("y", Json.Num(pt.Y)),
@@ -803,7 +880,8 @@ namespace Ondoki.Native
                         ("deltaY", Json.Num(deltaY)),
                         ("window", windowJson),
                         ("timestamp", Json.Num(ts))
-                    ));
+                    )});
+                    _eventSignal.Set();
                 }
             }
 
@@ -825,14 +903,15 @@ namespace Ondoki.Native
                     var fgHwnd = Win32.GetForegroundWindow();
                     string windowJson = fgHwnd != IntPtr.Zero ? BuildWindowJson(fgHwnd) : Json.Null;
 
-                    WriteEvent(Json.Obj(
+                    _eventQueue.Enqueue(new RawJsonItem { json = Json.Obj(
                         ("type", Json.Str("key")),
                         ("keycode", Json.Num((int)hookStruct.vkCode)),
                         ("scancode", Json.Num((int)hookStruct.scanCode)),
                         ("modifiers", Json.StrArr(mods)),
                         ("window", windowJson),
                         ("timestamp", Json.Num(ts))
-                    ));
+                    )});
+                    _eventSignal.Set();
                 }
             }
 
@@ -860,6 +939,15 @@ namespace Ondoki.Native
                 Console.Error.WriteLine("Failed to install keyboard hook");
                 Environment.Exit(1);
             }
+
+            // Start background thread for UIA element detection
+            _hooksRunning = true;
+            _elementThread = new Thread(ElementDetectionWorker)
+            {
+                IsBackground = true,
+                Name = "UIA-ElementDetection"
+            };
+            _elementThread.Start();
 
             // Send ready message — coords are in physical pixel space (DPI aware)
             WriteEvent(Json.Obj(
@@ -891,6 +979,11 @@ namespace Ondoki.Native
                 Win32.TranslateMessage(ref msg);
                 Win32.DispatchMessage(ref msg);
             }
+
+            // Shut down background element detection thread
+            _hooksRunning = false;
+            _eventSignal.Set();
+            _elementThread.Join(2000);
 
             Win32.UnhookWindowsHookEx(mouseHook);
             Win32.UnhookWindowsHookEx(keyboardHook);

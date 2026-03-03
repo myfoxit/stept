@@ -57,14 +57,6 @@ interface NativeWindowInfo {
   layer: number;
 }
 
-interface NativeElementInfo {
-  role: string;
-  title: string;
-  value: string;
-  description: string;
-  subrole: string;
-}
-
 interface NativeDisplaysEvent {
   type: 'displays';
   displays: Array<{
@@ -74,7 +66,23 @@ interface NativeDisplaysEvent {
   }>;
 }
 
-type NativeEvent = NativeClickEvent | NativeKeyEvent | NativeScrollEvent | NativeReadyEvent | NativeDisplaysEvent;
+interface NativeElementInfo {
+  role: string;
+  title: string;
+  value: string;
+  description: string;
+  subrole: string;
+  domId?: string;        // AXDOMIdentifier (Chrome exposes DOM ids)
+  confidence?: string;   // "high" | "low"
+}
+
+interface NativeElementSupplementEvent {
+  type: 'element';
+  timestamp: number;
+  element: NativeElementInfo | null;
+}
+
+type NativeEvent = NativeClickEvent | NativeKeyEvent | NativeScrollEvent | NativeReadyEvent | NativeDisplaysEvent | NativeElementSupplementEvent;
 
 // ---- Public types ----
 
@@ -200,6 +208,8 @@ export class RecordingService extends EventEmitter {
   private lastClickTime = 0;
   private lastClickPos = { x: 0, y: 0 };
   private ignoredShortcuts: Set<string> = new Set();
+  // Mac: element supplement events arrive async after click, keyed by timestamp
+  private pendingElementSupplements: Map<number, NativeElementInfo | null> = new Map();
 
   // Native hooks process
   private hooksProcess: ChildProcess | null = null;
@@ -403,6 +413,14 @@ export class RecordingService extends EventEmitter {
         if (this.isPaused) return;
         this.handleNativeClick(event as NativeClickEvent);
         break;
+      case 'element': {
+        // Mac async element supplement — store it; _processClickInner will pick it up
+        const supp = event as NativeElementSupplementEvent;
+        this.pendingElementSupplements.set(supp.timestamp, supp.element);
+        // Auto-expire after 5 seconds to prevent memory leak
+        setTimeout(() => this.pendingElementSupplements.delete(supp.timestamp), 5000);
+        break;
+      }
       case 'key':
         this.handleNativeKey(event as NativeKeyEvent);
         break;
@@ -658,9 +676,35 @@ export class RecordingService extends EventEmitter {
       }
     }
 
-    // Query element info from the persistent serve-mode process (runs UIA safely on a normal thread)
-    // Hooks don't send element data — UIA deadlocks in WH_MOUSE_LL hook callbacks.
+    // Query element info — on Mac it arrives as async supplement event keyed by timestamp
+    // On Windows, hooks don't send element data — query serve-mode process (safe thread)
     let element: NativeElementInfo | null = event.element || null;
+
+    // Check if a Mac async element supplement arrived for this click
+    if (event.timestamp && this.pendingElementSupplements.has(event.timestamp)) {
+      const suppElement = this.pendingElementSupplements.get(event.timestamp);
+      this.pendingElementSupplements.delete(event.timestamp);
+      if (suppElement) element = suppElement;
+    } else if (event.timestamp && !element) {
+      // Wait briefly for the supplement to arrive (Mac background queue is ~10-50ms)
+      await new Promise<void>(resolve => {
+        const deadline = Date.now() + 80;
+        const check = () => {
+          if (this.pendingElementSupplements.has(event.timestamp)) {
+            const suppElement = this.pendingElementSupplements.get(event.timestamp);
+            this.pendingElementSupplements.delete(event.timestamp);
+            if (suppElement) element = suppElement;
+            resolve();
+          } else if (Date.now() < deadline) {
+            setTimeout(check, 10);
+          } else {
+            resolve();
+          }
+        };
+        setTimeout(check, 10);
+      });
+    }
+
     if (!element || !element.title) {
       try {
         const pointResult = await this.screenshotService.execNative(['point', String(event.x), String(event.y)]);
@@ -670,7 +714,7 @@ export class RecordingService extends EventEmitter {
       } catch {}
     }
     console.log(`[DIAG] element data:`, JSON.stringify(element));
-    const elementName = this.formatElementName(element);
+    const elementName = this.formatElementName(element, windowTitle);
     const elementRole = element?.role || '';
     const elementDescription = element?.description || element?.title || '';
 
@@ -993,13 +1037,29 @@ export class RecordingService extends EventEmitter {
   // Helpers
   // ------------------------------------------------------------------
 
-  private formatElementName(element: NativeElementInfo | null): string {
+  private formatElementName(element: NativeElementInfo | null, windowTitle?: string): string {
     if (!element) return '';
-    if (element.title) return element.title;
-    if (element.description) return element.description;
-    if (element.value && element.value.length < 50) return element.value;
-    if (element.role) return element.role.replace(/^AX/, '');
-    return '';
+
+    // Reject low-confidence generic elements — they'll fall through to "Click here"
+    if (element.confidence === 'low') {
+      const role = element.role || '';
+      const genericRoles = new Set(['AXGroup', 'AXScrollArea', 'AXWebArea', 'AXWindow', 'AXApplication', '']);
+      if (genericRoles.has(role)) return '';
+    }
+
+    const name = element.title || element.description || (element.value && element.value.length < 50 ? element.value : '');
+    if (!name) {
+      if (element.role) return element.role.replace(/^AX/, '');
+      return '';
+    }
+
+    // Reject if the element name IS (or closely matches) the window title — it's just the container
+    if (windowTitle && name) {
+      const stripped = this.shortenWindowTitle(windowTitle).toLowerCase();
+      if (name.toLowerCase() === stripped || name.toLowerCase() === windowTitle.toLowerCase()) return '';
+    }
+
+    return name;
   }
 
   /** Strip AX prefix and convert to human-readable lowercase: AXButton -> button */
@@ -1021,6 +1081,8 @@ export class RecordingService extends EventEmitter {
         break;
       }
     }
+    // Strip Chrome profile suffix: " – ProfileName" at end (em-dash)
+    shortened = shortened.replace(/ – [^–]+$/, '');
     return shortened || title;
   }
 
