@@ -1093,20 +1093,24 @@ export class RecordingService extends EventEmitter {
 
   /** Shorten window title by stripping common browser suffixes */
   private shortenWindowTitle(title: string): string {
+    let shortened = title;
+
+    // Strip Chrome profile suffix FIRST: " – ProfileName" at end (em-dash)
+    // e.g. "Page - Google Chrome – Alexander (Alex)" → "Page - Google Chrome"
+    shortened = shortened.replace(/ – [^–]+$/, '');
+
+    // Then strip browser app suffix
     const browserSuffixes = [
       ' - Google Chrome', ' - Chrome', ' - Firefox', ' - Safari',
       ' - Microsoft Edge', ' - Arc', ' - Brave', ' — Mozilla Firefox',
       ' – Google Chrome',
     ];
-    let shortened = title;
     for (const suffix of browserSuffixes) {
       if (shortened.endsWith(suffix)) {
         shortened = shortened.slice(0, -suffix.length);
         break;
       }
     }
-    // Strip Chrome profile suffix: " – ProfileName" at end (em-dash)
-    shortened = shortened.replace(/ – [^–]+$/, '');
     return shortened || title;
   }
 
