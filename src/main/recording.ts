@@ -248,6 +248,17 @@ export class RecordingService extends EventEmitter {
     }
 
     try {
+      // Resolve window bounds BEFORE starting — needed for overlay + click filtering + screenshots
+      if (captureArea?.type === 'window' && captureArea.windowHandle && !captureArea.bounds) {
+        const windowInfo = await this.screenshotService.getWindowByHandle(captureArea.windowHandle);
+        if (windowInfo) {
+          captureArea.bounds = windowInfo.bounds;
+          console.log(`[DIAG] Resolved window bounds for handle ${captureArea.windowHandle}:`, windowInfo.bounds);
+        } else {
+          console.warn(`[DIAG] Could not resolve bounds for window handle ${captureArea.windowHandle} — recording full display`);
+        }
+      }
+
       this.captureArea = captureArea;
       this.currentProjectId = projectId;
       this.stepCount = 0;
@@ -1201,6 +1212,17 @@ export class RecordingService extends EventEmitter {
   // ------------------------------------------------------------------
 
   private async showOverlay(): Promise<void> {
+    // For window captures, fetch initial bounds from native binary if missing
+    if (this.captureArea && !this.captureArea.bounds && this.captureArea.type === 'window' && this.captureArea.windowHandle) {
+      try {
+        const windowInfo = await this.screenshotService.getWindowByHandle(this.captureArea.windowHandle);
+        if (windowInfo) {
+          this.captureArea.bounds = windowInfo.bounds;
+        }
+      } catch (e) {
+        console.error('Failed to fetch window bounds for overlay:', e);
+      }
+    }
     if (!this.captureArea?.bounds) return;
 
     try {
