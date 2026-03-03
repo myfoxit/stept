@@ -52,6 +52,14 @@ struct ElementInfo: Codable {
     let roleDescription: String
     let placeholder: String
     let help: String
+    let domId: String
+    let confidence: String  // "high" or "low"
+}
+
+struct ElementSupplement: Codable {
+    let type = "element"
+    let timestamp: Int64
+    let element: ElementInfo?
 }
 
 struct MouseResult: Codable {
@@ -192,10 +200,23 @@ func getWindowAtPoint(_ point: CGPoint) -> WindowResult? {
 
 // Roles that typically carry meaningful text for UI actions
 let actionableRoles: Set<String> = [
-    "AXButton", "AXLink", "AXStaticText", "AXMenuItem", "AXTab",
-    "AXTextField", "AXTextArea", "AXCheckBox", "AXPopUpButton",
-    "AXHeading", "AXRadioButton", "AXMenuBarItem", "AXImage",
-    "AXComboBox", "AXSearchField", "AXSecureTextField",
+    "AXButton", "AXLink", "AXMenuItem", "AXTab",
+    "AXPopUpButton", "AXCheckBox", "AXRadioButton",
+    "AXMenuBarItem", "AXImage", "AXCell", "AXRow",
+]
+
+let fieldRoles: Set<String> = [
+    "AXTextField", "AXTextArea", "AXComboBox",
+    "AXSearchField", "AXSecureTextField",
+]
+
+let textRoles: Set<String> = [
+    "AXStaticText", "AXHeading",
+]
+
+let genericRoles: Set<String> = [
+    "AXGroup", "AXScrollArea", "AXWebArea", "AXSplitGroup",
+    "AXSplitter", "AXLayoutArea", "AXLayoutItem", "",
 ]
 
 func axAttr(_ el: AXUIElement, _ name: String) -> String {
@@ -280,7 +301,7 @@ func walkUp(_ el: AXUIElement, maxLevels: Int) -> AXUIElement? {
     return nil
 }
 
-func buildElementInfo(_ el: AXUIElement) -> ElementInfo {
+func buildElementInfo(_ el: AXUIElement, confidence: String = "high") -> ElementInfo {
     return ElementInfo(
         role: axAttr(el, kAXRoleAttribute),
         title: axAttr(el, kAXTitleAttribute),
@@ -289,12 +310,43 @@ func buildElementInfo(_ el: AXUIElement) -> ElementInfo {
         subrole: axAttr(el, kAXSubroleAttribute),
         roleDescription: axAttr(el, kAXRoleDescriptionAttribute),
         placeholder: axAttr(el, kAXPlaceholderValueAttribute),
-        help: axAttr(el, kAXHelpAttribute)
+        help: axAttr(el, kAXHelpAttribute),
+        domId: axAttr(el, "AXDOMIdentifier"),
+        confidence: confidence
     )
+}
+
+// Cache of PIDs where we've already enabled enhanced accessibility
+var enhancedAccessibilityPIDs = Set<Int>()
+
+func ensureEnhancedAccessibility(_ app: AXUIElement, pid: Int) {
+    if enhancedAccessibilityPIDs.contains(pid) { return }
+    // Tell the app to expose its full accessibility tree (required for Chrome, Electron, etc.)
+    AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, true as CFTypeRef)
+    enhancedAccessibilityPIDs.insert(pid)
+}
+
+/// Walk up to find nearest actionable ancestor
+func walkUpForActionable(_ el: AXUIElement, maxLevels: Int) -> AXUIElement? {
+    var current = el
+    for _ in 0..<maxLevels {
+        guard let parent = axParent(current) else { return nil }
+        let role = axAttr(parent, kAXRoleAttribute)
+        if role == "AXWindow" || role == "AXApplication" { return nil }
+        if actionableRoles.contains(role) && hasMeaningfulText(parent) {
+            return parent
+        }
+        if fieldRoles.contains(role) {
+            return parent
+        }
+        current = parent
+    }
+    return nil
 }
 
 func getElementAtPoint(_ point: CGPoint, pid: Int) -> ElementInfo? {
     let app = AXUIElementCreateApplication(pid_t(pid))
+    ensureEnhancedAccessibility(app, pid: pid)
 
     var element: AXUIElement?
     let err = AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element)
@@ -302,26 +354,52 @@ func getElementAtPoint(_ point: CGPoint, pid: Int) -> ElementInfo? {
         return nil
     }
 
-    // 1. Drill down into children to find deepest meaningful element
+    let hitRole = axAttr(hitElement, kAXRoleAttribute)
+
+    // 1. Hit element is actionable (button, link, tab, etc.) → use it directly
+    if actionableRoles.contains(hitRole) && hasMeaningfulText(hitElement) {
+        return buildElementInfo(hitElement, confidence: "high")
+    }
+
+    // 2. Hit element is a field (text field, combo box, etc.) → use it directly
+    if fieldRoles.contains(hitRole) {
+        return buildElementInfo(hitElement, confidence: "high")
+    }
+
+    // 3. Hit element is text (static text, heading) → user clicked ON this text, trust it
+    if textRoles.contains(hitRole) {
+        let title = axAttr(hitElement, kAXTitleAttribute)
+        let val = axValue(hitElement)
+        if !title.isEmpty || !val.isEmpty {
+            // But also check: is there an actionable parent very close (1-2 levels)?
+            // e.g. text inside a button — prefer the button
+            if let actionableParent = walkUpForActionable(hitElement, maxLevels: 2) {
+                return buildElementInfo(actionableParent, confidence: "high")
+            }
+            return buildElementInfo(hitElement, confidence: "high")
+        }
+    }
+
+    // 4. Hit element is generic (group, scroll area, etc.) → walk up for actionable ancestor
+    if let actionableAncestor = walkUpForActionable(hitElement, maxLevels: 8) {
+        return buildElementInfo(actionableAncestor, confidence: "high")
+    }
+
+    // 5. Walk up for ANY ancestor with meaningful text (low confidence)
+    if let textAncestor = walkUp(hitElement, maxLevels: 8) {
+        return buildElementInfo(textAncestor, confidence: "low")
+    }
+
+    // 6. Try drilling down from hit element for actionable children
     let deepest = drillDown(hitElement, depth: 0)
-
-    // 2. If the deepest element has meaningful text, use it
-    if hasMeaningfulText(deepest) {
-        return buildElementInfo(deepest)
+    if hasMeaningfulText(deepest) && deepest as AnyObject !== hitElement as AnyObject {
+        let deepRole = axAttr(deepest, kAXRoleAttribute)
+        let conf = (actionableRoles.contains(deepRole) || fieldRoles.contains(deepRole) || textRoles.contains(deepRole)) ? "high" : "low"
+        return buildElementInfo(deepest, confidence: conf)
     }
 
-    // 3. Walk up from deepest to find nearest ancestor with text
-    if let ancestor = walkUp(deepest, maxLevels: 10) {
-        return buildElementInfo(ancestor)
-    }
-
-    // 4. Try walking up from the original hit element too
-    if let ancestor = walkUp(hitElement, maxLevels: 10) {
-        return buildElementInfo(ancestor)
-    }
-
-    // 5. Fallback: return info from the original hit element
-    return buildElementInfo(hitElement)
+    // 7. Fallback: return hit element info (low confidence)
+    return buildElementInfo(hitElement, confidence: "low")
 }
 
 func getDisplayForPoint(_ point: CGPoint) -> DisplayInfo {
@@ -376,10 +454,15 @@ func captureDisplayAtPoint(_ point: CGPoint) -> String? {
     return path
 }
 
+let stdoutLock = NSLock()
+let elementQueue = DispatchQueue(label: "com.ondoki.element-detection")
+
 func writeJSON<T: Encodable>(_ value: T) {
     if let data = try? encoder.encode(value), let json = String(data: data, encoding: .utf8) {
+        stdoutLock.lock()
         print(json)
         fflush(stdout)
+        stdoutLock.unlock()
     }
 }
 
@@ -523,23 +606,32 @@ func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
         let screenshotPath = captureDisplayAtPoint(point)
         
         let window = getWindowAtPoint(point)
-        var element: ElementInfo? = nil
-        if let w = window {
-            element = getElementAtPoint(point, pid: w.ownerPID)
-        }
         let scale = getScaleForPoint(point)
         
+        // Emit click immediately WITHOUT element (keeps event tap fast, prevents ghost screenshots)
         let clickEvent = HookClickEvent(
             x: location.x,
             y: location.y,
             button: button,
             window: window,
-            element: element,
+            element: nil,
             scale: scale,
             timestamp: timestamp,
             screenshotPath: screenshotPath
         )
         writeJSON(clickEvent)
+        
+        // Element detection runs async on background queue — arrives as separate "element" event
+        if let w = window {
+            let clickTimestamp = timestamp
+            let clickPoint = point
+            let clickPid = w.ownerPID
+            elementQueue.async {
+                let element = getElementAtPoint(clickPoint, pid: clickPid)
+                let supplement = ElementSupplement(timestamp: clickTimestamp, element: element)
+                writeJSON(supplement)
+            }
+        }
         
     case .keyDown:
         let keycode = Int(event.getIntegerValueField(.keyboardEventKeycode))
