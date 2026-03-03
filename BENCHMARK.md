@@ -95,3 +95,20 @@ For each step, score 0–2:
 | Steps out of order (type before click) | keys/scrolls bypassing unified queue |
 | Missing steps | tab-change click filtered, or click dropped |
 | "Click '2. März 2026'" | DataItem row (date) detected instead of button |
+
+---
+
+## Raw Ondoki Output Log
+
+### `a8ea37f` — 2026-03-03
+
+```
+1. Click "API keys - OpenAI API - Google Chrome"
+2. Click "API keys - OpenAI API - Google Chrome"
+3. Type "x"
+4. Click "API keys - OpenAI API"
+5. Type "fdf" in "API keys - OpenAI API"
+6. Click "Create secret key"
+7. Click "Copy"
+8. Click "Done"
+```
