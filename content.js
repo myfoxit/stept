@@ -4,6 +4,7 @@ let typingTimer = null;
 let lastClickTime = 0;
 let lastClickTarget = null;
 let pendingClick = null;
+let focusedFieldValue = null; // Track value on focus for blur comparison
 const TYPING_DELAY = 1000;
 const DOUBLE_CLICK_MS = 400;
 const DEBUG = false;
@@ -328,6 +329,8 @@ function startCapturing() {
   // Use pointerdown — fires before click handlers, captures pre-click state
   document.addEventListener('pointerdown', handleClick, { capture: true });
   document.addEventListener('keydown', handleKeydown, true);
+  document.addEventListener('focusin', handleFocusIn, true);
+  document.addEventListener('focusout', handleFocusOut, true);
 }
 
 function stopCapturing() {
@@ -337,6 +340,8 @@ function stopCapturing() {
 
   document.removeEventListener('pointerdown', handleClick, { capture: true });
   document.removeEventListener('keydown', handleKeydown, true);
+  document.removeEventListener('focusin', handleFocusIn, true);
+  document.removeEventListener('focusout', handleFocusOut, true);
 }
 
 function handleClick(event) {
@@ -395,6 +400,62 @@ function handleClick(event) {
       pendingClick = null;
     }, DOUBLE_CLICK_MS);
   }
+}
+
+// ===== INPUT BLUR TRACKING =====
+
+function handleFocusIn(event) {
+  const el = event.target;
+  if (!isInputLike(el)) return;
+  focusedFieldValue = el.value || '';
+}
+
+function handleFocusOut(event) {
+  if (!isRecording) return;
+  const el = event.target;
+  if (!isInputLike(el)) return;
+
+  const currentValue = el.value || '';
+  if (currentValue === focusedFieldValue) {
+    focusedFieldValue = null;
+    return; // Value didn't change
+  }
+
+  // Skip sensitive fields
+  if (el.type === 'password' || (el.autocomplete && /cc-|credit/i.test(el.autocomplete))) {
+    focusedFieldValue = null;
+    return;
+  }
+
+  flushTypedText(); // Flush any pending typed text first
+
+  const elementInfo = gatherElementInfo(el);
+  const fieldLabel = getBestLabel(elementInfo) || el.id || 'field';
+  const displayValue = currentValue.length > 60 ? currentValue.substring(0, 57) + '...' : currentValue;
+  const description = `Type "${displayValue}" in the "${cleanLabel(fieldLabel)}" field`;
+
+  chrome.runtime.sendMessage({
+    type: 'TYPE_EVENT',
+    data: {
+      actionType: 'Type',
+      pageTitle: document.title,
+      description: description,
+      textTyped: currentValue,
+      url: window.location.href,
+      windowSize: { width: window.outerWidth, height: window.outerHeight },
+      viewportSize: { width: window.innerWidth, height: window.innerHeight },
+      elementInfo: elementInfo,
+    },
+  }).catch(() => {});
+
+  focusedFieldValue = null;
+}
+
+function isInputLike(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' ||
+    (el.isContentEditable && tag !== 'body');
 }
 
 function sendClickStep(stepData) {
