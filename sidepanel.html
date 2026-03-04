@@ -157,27 +157,6 @@
           <button id="spModeDock" class="sp-mode-btn" data-mode="dock">Dock</button>
         </div>
 
-        <!-- PII Redaction -->
-        <label class="sp-settings-label" style="margin-top: 8px;">Privacy Redaction</label>
-        <div class="settings-toggle-group">
-          <label class="settings-toggle-row">
-            <span>Form fields (password, email, etc.)</span>
-            <label class="toggle-switch"><input type="checkbox" id="redactFormFields" checked><span class="toggle-slider"></span></label>
-          </label>
-          <label class="settings-toggle-row">
-            <span>Email addresses in text</span>
-            <label class="toggle-switch"><input type="checkbox" id="redactEmails" checked><span class="toggle-slider"></span></label>
-          </label>
-          <label class="settings-toggle-row">
-            <span>Names</span>
-            <label class="toggle-switch"><input type="checkbox" id="redactNames"><span class="toggle-slider"></span></label>
-          </label>
-          <label class="settings-toggle-row">
-            <span>Numbers</span>
-            <label class="toggle-switch"><input type="checkbox" id="redactNumbers"><span class="toggle-slider"></span></label>
-          </label>
-        </div>
-
         <!-- Auto-upload -->
         <label class="sp-settings-label" style="margin-top: 8px;">Recording</label>
         <div class="settings-toggle-group">
@@ -251,10 +230,11 @@
             <rect x="14" y="4" width="4" height="16"/>
           </svg>
         </button>
-        <button id="redactionToggleBtn" class="footer-icon-btn redaction-active" title="PII Redaction: ON">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button id="redactionToggleBtn" class="footer-icon-btn smart-blur-btn" title="Smart Blur">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
+          <span class="smart-blur-label">Smart Blur</span>
         </button>
         <button id="deleteAllBtn" class="footer-icon-btn" title="Delete capture">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

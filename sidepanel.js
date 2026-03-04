@@ -60,7 +60,6 @@ settingsBackdrop.addEventListener('click', closeSettings);
 
 async function loadSettingsValues() {
   const settings = await sendMessage({ type: 'GET_SETTINGS' });
-  const redaction = await sendMessage({ type: 'GET_REDACTION_SETTINGS' });
 
   if (settings.apiBaseUrl) spApiUrlInput.value = settings.apiBaseUrl;
 
@@ -76,29 +75,7 @@ async function loadSettingsValues() {
 
   // Auto-upload toggle
   document.getElementById('settingsAutoUpload').checked = settings.autoUpload !== false;
-
-  // PII redaction toggles
-  document.getElementById('redactFormFields').checked = redaction.formFields !== false;
-  document.getElementById('redactEmails').checked = redaction.emails !== false;
-  document.getElementById('redactNames').checked = redaction.names === true;
-  document.getElementById('redactNumbers').checked = redaction.numbers === true;
 }
-
-// Save redaction settings on change
-['redactFormFields', 'redactEmails', 'redactNames', 'redactNumbers'].forEach((id) => {
-  document.getElementById(id).addEventListener('change', () => {
-    sendMessage({
-      type: 'SET_REDACTION_SETTINGS',
-      settings: {
-        enabled: true,
-        formFields: document.getElementById('redactFormFields').checked,
-        emails: document.getElementById('redactEmails').checked,
-        names: document.getElementById('redactNames').checked,
-        numbers: document.getElementById('redactNumbers').checked,
-      },
-    });
-  });
-});
 
 // Save auto-upload setting on change
 document.getElementById('settingsAutoUpload').addEventListener('change', (e) => {
@@ -379,30 +356,20 @@ pauseBtn.addEventListener('click', async () => {
   await refreshState();
 });
 
-// Redaction toggle in recording footer
+// Smart Blur toggle in recording footer
 const redactionToggleBtn = document.getElementById('redactionToggleBtn');
-let redactionEnabled = true;
-
-(async () => {
-  const redaction = await sendMessage({ type: 'GET_REDACTION_SETTINGS' });
-  redactionEnabled = redaction.enabled !== false;
-  updateRedactionToggle();
-})();
-
-function updateRedactionToggle() {
-  redactionToggleBtn.classList.toggle('redaction-active', redactionEnabled);
-  redactionToggleBtn.title = `PII Redaction: ${redactionEnabled ? 'ON' : 'OFF'}`;
-}
+let smartBlurOpen = false;
 
 redactionToggleBtn.addEventListener('click', async () => {
-  redactionEnabled = !redactionEnabled;
-  updateRedactionToggle();
-  const current = await sendMessage({ type: 'GET_REDACTION_SETTINGS' });
-  await sendMessage({
-    type: 'SET_REDACTION_SETTINGS',
-    settings: { ...current, enabled: redactionEnabled },
-  });
+  const result = await sendMessage({ type: 'TOGGLE_SMART_BLUR' });
+  smartBlurOpen = result?.isOpen || false;
+  updateSmartBlurButton();
 });
+
+function updateSmartBlurButton() {
+  redactionToggleBtn.classList.toggle('redaction-active', smartBlurOpen);
+  redactionToggleBtn.title = smartBlurOpen ? 'Smart Blur: ON' : 'Smart Blur';
+}
 
 deleteAllBtn.addEventListener('click', async () => {
   if (confirm('Delete this entire capture?')) {
@@ -680,6 +647,8 @@ chrome.runtime.onMessage.addListener((message) => {
   } else if (message.type === 'MAX_STEPS_REACHED') {
     showToast(`Maximum steps reached (${message.limit}). Stop recording to save.`, 6000);
   } else if (message.type === 'RECORDING_STATE_CHANGED') {
+    smartBlurOpen = false;
+    updateSmartBlurButton();
     refreshState();
   } else if (message.type === 'CONTEXT_MATCHES_UPDATED') {
     renderContextMatches(message.matches || []);
