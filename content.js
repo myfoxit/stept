@@ -194,10 +194,19 @@ if (window.__ondokiContentLoaded) {
     shadow.getElementById('dockComplete').addEventListener('click', async (e) => {
       e.stopPropagation();
       await sendMsg({ type: 'STOP_RECORDING' });
-      // Upload automatically
-      await sendMsg({ type: 'UPLOAD' });
-      await sendMsg({ type: 'CLEAR_STEPS' });
-      removeDock();
+      // Upload automatically — only clear on success
+      const result = await sendMsg({ type: 'UPLOAD' });
+      if (result.success) {
+        await sendMsg({ type: 'CLEAR_STEPS' });
+        removeDock();
+      } else {
+        // Show error feedback — flash the complete button red
+        const btn = shadow.getElementById('dockComplete');
+        if (btn) {
+          btn.style.background = '#dc2626';
+          setTimeout(() => { btn.style.background = ''; }, 2000);
+        }
+      }
     });
 
     document.documentElement.appendChild(dockElement);
@@ -280,7 +289,23 @@ if (window.__ondokiContentLoaded) {
         sendResponse({ success: true });
         break;
       case 'PAUSE_RECORDING':
-        isRecording = false;
+        stopCapturing();
+        // Update dock UI
+        if (dockElement) {
+          dockIsPaused = true;
+          const shadow = dockElement.shadowRoot;
+          if (shadow) updateDockPauseUI(shadow);
+        }
+        sendResponse({ success: true });
+        break;
+      case 'RESUME_RECORDING':
+        startCapturing();
+        // Update dock UI
+        if (dockElement) {
+          dockIsPaused = false;
+          const shadow = dockElement.shadowRoot;
+          if (shadow) updateDockPauseUI(shadow);
+        }
         sendResponse({ success: true });
         break;
       case 'SHOW_DOCK':

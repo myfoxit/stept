@@ -60,6 +60,7 @@ chrome.storage.local.get(
     'userProjects',
     'selectedProjectId',
     'isRecording',
+    'isPaused',
     'recordingStartTime',
     'stepCounter',
     'persistedSteps',
@@ -70,10 +71,16 @@ chrome.storage.local.get(
     }
     if (result.isRecording) {
       state.isRecording = true;
+      state.isPaused = result.isPaused || false;
       state.recordingStartTime = result.recordingStartTime || Date.now();
       state.stepCounter = result.stepCounter || 0;
-      chrome.action.setBadgeText({ text: 'REC' });
-      chrome.action.setBadgeBackgroundColor({ color: '#3ab08a' });
+      if (state.isPaused) {
+        chrome.action.setBadgeText({ text: 'II' });
+        chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
+      } else {
+        chrome.action.setBadgeText({ text: 'REC' });
+        chrome.action.setBadgeBackgroundColor({ color: '#3ab08a' });
+      }
     }
 
     // Restore persisted steps (survives SW restarts)
@@ -135,6 +142,28 @@ chrome.storage.local.get(
 
     // Apply display mode on startup
     await applyDisplayMode();
+
+    // Re-inject content scripts into tabs that were being recorded (SW restart recovery)
+    if (state.isRecording) {
+      chrome.tabs.query({}, async (tabs) => {
+        for (const tab of tabs) {
+          if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+            const injected = await ensureContentScript(tab.id);
+            if (injected) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: state.isPaused ? 'PAUSE_RECORDING' : 'START_RECORDING',
+              }).catch(() => {});
+
+              // Restore dock if in dock mode
+              const { displayMode } = await chrome.storage.local.get(['displayMode']);
+              if ((displayMode || 'sidepanel') === 'dock') {
+                chrome.tabs.sendMessage(tab.id, { type: 'SHOW_DOCK' }).catch(() => {});
+              }
+            }
+          }
+        }
+      });
+    }
   },
 );
 
@@ -167,6 +196,7 @@ async function persistAuth() {
 async function persistRecordingState() {
   await chrome.storage.local.set({
     isRecording: state.isRecording,
+    isPaused: state.isPaused,
     recordingStartTime: state.recordingStartTime,
     stepCounter: state.stepCounter,
     selectedProjectId: state.selectedProjectId,
@@ -582,8 +612,18 @@ function stopRecording() {
 
 function pauseRecording() {
   state.isPaused = true;
+  persistRecordingState();
   chrome.action.setBadgeText({ text: 'II' });
   chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
+
+  // Broadcast pause to all content scripts to stop capturing
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+        chrome.tabs.sendMessage(tab.id, { type: 'PAUSE_RECORDING' }).catch(() => {});
+      }
+    });
+  });
 }
 
 function resumeRecording() {
