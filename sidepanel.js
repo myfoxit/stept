@@ -90,6 +90,10 @@ async function refreshState() {
       });
       spStartBtn.disabled = !state.selectedProjectId;
     }
+
+    // Load context matches for current tab
+    loadContextMatches();
+
     return;
   }
 
@@ -520,8 +524,63 @@ function renderSearchResults(data, apiBaseUrl) {
   searchResults.classList.remove('hidden');
 }
 
-// We need accessToken available for search — add to GET_STATE response
-// (already available via state.accessToken in background.js GET_STATE)
+// ===== CONTEXT LINKS =====
+const contextPanel = document.getElementById('contextPanel');
+const contextList = document.getElementById('contextList');
+const contextEmpty = document.getElementById('contextEmpty');
+const contextLinkBtn = document.getElementById('contextLinkBtn');
+
+async function loadContextMatches() {
+  const result = await sendMessage({ type: 'GET_CONTEXT_MATCHES' });
+  renderContextMatches(result.matches || []);
+}
+
+function renderContextMatches(matches) {
+  if (!matches || matches.length === 0) {
+    contextList.innerHTML = '';
+    contextEmpty.classList.remove('hidden');
+    contextLinkBtn.classList.remove('hidden');
+    return;
+  }
+
+  contextEmpty.classList.add('hidden');
+  contextLinkBtn.classList.remove('hidden');
+
+  contextList.innerHTML = matches.map((m) => {
+    const icon = m.resource_type === 'workflow' ? '\uD83D\uDCCB' : '\uD83D\uDCC4';
+    return `
+      <div class="context-item" data-resource-type="${m.resource_type}" data-resource-id="${m.resource_id}">
+        <span class="context-item-icon">${icon}</span>
+        <div class="context-item-info">
+          <span class="context-item-name">${escapeHtml(m.resource_name || 'Untitled')}</span>
+        </div>
+        <span class="context-item-badge">${escapeHtml(m.match_type || 'match')}</span>
+      </div>
+    `;
+  }).join('');
+
+  contextList.querySelectorAll('.context-item').forEach((item) => {
+    item.addEventListener('click', async () => {
+      const settings = await sendMessage({ type: 'GET_SETTINGS' });
+      const webAppUrl = settings.apiBaseUrl.replace('/api/v1', '');
+      const type = item.dataset.resourceType === 'workflow' ? 'workflows' : 'documents';
+      chrome.tabs.create({ url: `${webAppUrl}/${type}/${item.dataset.resourceId}` });
+    });
+  });
+}
+
+contextLinkBtn.addEventListener('click', async () => {
+  const settings = await sendMessage({ type: 'GET_SETTINGS' });
+  const webAppUrl = settings.apiBaseUrl.replace('/api/v1', '');
+  // Get current tab URL
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tabUrl = tabs[0]?.url || '';
+    chrome.tabs.create({ url: `${webAppUrl}/context-links/new?url=${encodeURIComponent(tabUrl)}` });
+  });
+});
+
+// Load context matches when setup panel is shown
+// (called from refreshState when not recording)
 
 // MISS-C002: Show a temporary error toast in the side panel
 function showToast(text, duration = 4000) {
@@ -547,6 +606,8 @@ chrome.runtime.onMessage.addListener((message) => {
     showToast(`Maximum steps reached (${message.limit}). Stop recording to save.`, 6000);
   } else if (message.type === 'RECORDING_STATE_CHANGED') {
     refreshState();
+  } else if (message.type === 'CONTEXT_MATCHES_UPDATED') {
+    renderContextMatches(message.matches || []);
   }
 });
 

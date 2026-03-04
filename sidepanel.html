@@ -102,6 +102,28 @@
           <div class="search-results hidden" id="searchResults"></div>
         </div>
 
+        <!-- Context links panel -->
+        <div class="context-panel" id="contextPanel">
+          <div class="context-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3AB08A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            <span>Related Content</span>
+          </div>
+          <div class="context-list" id="contextList"></div>
+          <div class="context-empty hidden" id="contextEmpty">
+            <span>No related content for this page</span>
+          </div>
+          <button class="context-link-btn hidden" id="contextLinkBtn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Link this page
+          </button>
+        </div>
+
         <!-- Empty state for workflow list -->
         <div class="workflow-empty-state" id="workflowEmptyState">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#D6D3D1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -199,6 +221,7 @@
   </div>
 
   <script src="search.js"></script>
+  <script src="context.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

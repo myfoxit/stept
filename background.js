@@ -1,4 +1,5 @@
 importScripts('storage.js');
+importScripts('context.js');
 
 // Build configuration — change mode to 'cloud' for Chrome Web Store build
 const BUILD_CONFIG = {
@@ -42,6 +43,10 @@ let state = {
   codeVerifier: null,
   authState: null,
 };
+
+// Context link matches for the current tab
+let contextMatches = [];
+let lastContextUrl = null;
 
 // Track whether initial auth restore is done
 let authReady = false;
@@ -1063,6 +1068,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
         break;
 
+      case 'GET_CONTEXT_MATCHES':
+        sendResponse({ matches: contextMatches });
+        break;
+
+      case 'CHECK_CONTEXT_LINKS':
+        await checkContextLinks(message.url);
+        sendResponse({ matches: contextMatches });
+        break;
+
       case 'SET_DISPLAY_MODE':
         await chrome.storage.local.set({ displayMode: message.displayMode });
         await applyDisplayMode();
@@ -1151,8 +1165,50 @@ async function trackPageChange(tabId, reason) {
   }
 }
 
+// Context link matching — query API for matched resources on current tab URL
+async function checkContextLinks(tabUrl) {
+  if (!state.isAuthenticated || !state.accessToken || !tabUrl) return;
+  if (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) return;
+  if (tabUrl === lastContextUrl) return;
+  lastContextUrl = tabUrl;
+
+  try {
+    const API_BASE_URL = await getApiBaseUrl();
+    const result = await fetchContextMatches(
+      API_BASE_URL, state.accessToken, tabUrl, state.selectedProjectId,
+    );
+    contextMatches = result.matches || [];
+
+    // Set badge count (only when not recording)
+    if (!state.isRecording) {
+      if (contextMatches.length > 0) {
+        chrome.action.setBadgeText({ text: String(contextMatches.length) });
+        chrome.action.setBadgeBackgroundColor({ color: '#2563eb' });
+      } else {
+        chrome.action.setBadgeText({ text: '' });
+      }
+    }
+
+    // Notify sidepanel
+    chrome.runtime.sendMessage({
+      type: 'CONTEXT_MATCHES_UPDATED',
+      matches: contextMatches,
+      url: tabUrl,
+    }).catch(() => {});
+  } catch (e) {
+    debugLog('Context link check failed:', e);
+    contextMatches = [];
+  }
+}
+
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   trackPageChange(activeInfo.tabId, 'tab-switch');
+
+  // Check context links for active tab
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    checkContextLinks(tab.url);
+  } catch (e) {}
 
   // Show dock on switched-to tab in dock mode
   if (state.isRecording) {
@@ -1197,6 +1253,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 chrome.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId !== 0) return;
   trackPageChange(details.tabId, 'navigation');
+  checkContextLinks(details.url);
 });
 
 // Listen for tab updates to inject content script into newly loaded pages
