@@ -1,3 +1,5 @@
+importScripts('storage.js');
+
 // Build configuration — change mode to 'cloud' for Chrome Web Store build
 const BUILD_CONFIG = {
   mode: 'self-hosted', // 'self-hosted' or 'cloud'
@@ -78,7 +80,25 @@ chrome.storage.local.get(
     if (result.persistedSteps && Array.isArray(result.persistedSteps)) {
       state.steps = result.persistedSteps;
       state.stepCounter = Math.max(state.stepCounter, state.steps.length);
+
+      // Restore screenshots from IndexedDB
+      try {
+        const screenshots = await self.screenshotDB.getAllScreenshots();
+        for (const step of state.steps) {
+          if (step.screenshotDataUrl && step.screenshotDataUrl.startsWith('idb:')) {
+            const stepId = step.screenshotDataUrl.replace('idb:', '');
+            if (screenshots[stepId]) {
+              step.screenshotDataUrl = screenshots[stepId];
+            }
+          }
+        }
+      } catch (e) {
+        debugLog('Failed to restore screenshots from IDB:', e);
+      }
     }
+
+    // Migrate any old screenshots from chrome.storage to IndexedDB
+    await self.screenshotDB.migrateFromChromeStorage().catch(() => {});
 
     if (result.refreshToken) {
       state.refreshToken = result.refreshToken;
@@ -154,25 +174,38 @@ async function persistRecordingState() {
 }
 
 // Helper to persist steps to storage (survives SW termination)
+// Screenshots are stored in IndexedDB — only metadata goes to chrome.storage
 async function persistSteps() {
   try {
-    await chrome.storage.local.set({ persistedSteps: state.steps });
+    // Save screenshots to IndexedDB, keep only references in chrome.storage
+    for (const step of state.steps) {
+      if (step.screenshotDataUrl && !step.screenshotDataUrl.startsWith('idb:')) {
+        const stepId = `step_${step.stepNumber}`;
+        await self.screenshotDB.saveScreenshot(stepId, step.screenshotDataUrl).catch(() => {});
+      }
+    }
+
+    const lightweight = state.steps.map((s) => ({
+      ...s,
+      screenshotDataUrl: s.screenshotDataUrl
+        ? (s.screenshotDataUrl.startsWith('idb:') ? s.screenshotDataUrl : `idb:step_${s.stepNumber}`)
+        : null,
+    }));
+    await chrome.storage.local.set({ persistedSteps: lightweight });
   } catch (e) {
-    // Quota exceeded — persist steps without screenshots as fallback
-    debugLog('Steps persistence failed, retrying without screenshots:', e);
+    debugLog('Steps persistence failed:', e);
     const lightweight = state.steps.map((s) => ({
       ...s,
       screenshotDataUrl: null,
     }));
-    await chrome.storage.local
-      .set({ persistedSteps: lightweight })
-      .catch(() => {});
+    await chrome.storage.local.set({ persistedSteps: lightweight }).catch(() => {});
   }
 }
 
 // Helper to clear persisted steps from storage
 async function clearPersistedSteps() {
   await chrome.storage.local.remove('persistedSteps');
+  await self.screenshotDB.clearAllScreenshots().catch(() => {});
 }
 
 // PKCE helpers
@@ -740,6 +773,9 @@ async function addStep(stepData) {
 }
 
 function deleteStep(stepNumber) {
+  // Remove screenshot from IndexedDB
+  self.screenshotDB.deleteScreenshot(`step_${stepNumber}`).catch(() => {});
+
   state.steps = state.steps.filter((s) => s.stepNumber !== stepNumber);
   state.steps.forEach((step, index) => {
     step.stepNumber = index + 1;
