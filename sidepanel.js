@@ -379,6 +379,31 @@ pauseBtn.addEventListener('click', async () => {
   await refreshState();
 });
 
+// Redaction toggle in recording footer
+const redactionToggleBtn = document.getElementById('redactionToggleBtn');
+let redactionEnabled = true;
+
+(async () => {
+  const redaction = await sendMessage({ type: 'GET_REDACTION_SETTINGS' });
+  redactionEnabled = redaction.enabled !== false;
+  updateRedactionToggle();
+})();
+
+function updateRedactionToggle() {
+  redactionToggleBtn.classList.toggle('redaction-active', redactionEnabled);
+  redactionToggleBtn.title = `PII Redaction: ${redactionEnabled ? 'ON' : 'OFF'}`;
+}
+
+redactionToggleBtn.addEventListener('click', async () => {
+  redactionEnabled = !redactionEnabled;
+  updateRedactionToggle();
+  const current = await sendMessage({ type: 'GET_REDACTION_SETTINGS' });
+  await sendMessage({
+    type: 'SET_REDACTION_SETTINGS',
+    settings: { ...current, enabled: redactionEnabled },
+  });
+});
+
 deleteAllBtn.addEventListener('click', async () => {
   if (confirm('Delete this entire capture?')) {
     await sendMessage({ type: 'STOP_RECORDING' });

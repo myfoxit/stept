@@ -700,6 +700,17 @@ body {
   border-color: #D6D3D1;
 }
 
+.footer-icon-btn.redaction-active {
+  color: #3AB08A;
+  border-color: #3AB08A;
+  background: rgba(58, 176, 138, 0.06);
+}
+
+.footer-icon-btn.redaction-active:hover {
+  background: rgba(58, 176, 138, 0.12);
+  color: #33a07d;
+}
+
 .complete-bar-btn {
   flex: 1;
   display: inline-flex;
