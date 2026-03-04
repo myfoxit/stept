@@ -9,7 +9,9 @@ const spStartBtn = document.getElementById('spStartBtn');
 const spLogoutBtn = document.getElementById('spLogoutBtn');
 const headerProjectSelector = document.getElementById('headerProjectSelector');
 const settingsToggleBtn = document.getElementById('settingsToggleBtn');
-const settingsAccordion = document.getElementById('settingsAccordion');
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsBackdrop = document.getElementById('settingsBackdrop');
+const settingsCloseBtn = document.getElementById('settingsCloseBtn');
 
 const stepsList = document.getElementById('stepsList');
 const emptyState = document.getElementById('emptyState');
@@ -40,11 +42,67 @@ const newCaptureBtn = document.getElementById('newCaptureBtn');
 let recordingInterval = null;
 let steps = [];
 
-// Settings gear toggles the settings accordion in setup panel
-settingsToggleBtn.addEventListener('click', () => {
-  if (settingsAccordion && spSetupPanel && !spSetupPanel.classList.contains('hidden')) {
-    settingsAccordion.open = !settingsAccordion.open;
+// Settings slide-in panel
+function openSettings() {
+  settingsPanel.classList.add('open');
+  settingsBackdrop.classList.add('open');
+  loadSettingsValues();
+}
+
+function closeSettings() {
+  settingsPanel.classList.remove('open');
+  settingsBackdrop.classList.remove('open');
+}
+
+settingsToggleBtn.addEventListener('click', openSettings);
+settingsCloseBtn.addEventListener('click', closeSettings);
+settingsBackdrop.addEventListener('click', closeSettings);
+
+async function loadSettingsValues() {
+  const settings = await sendMessage({ type: 'GET_SETTINGS' });
+  const redaction = await sendMessage({ type: 'GET_REDACTION_SETTINGS' });
+
+  if (settings.apiBaseUrl) spApiUrlInput.value = settings.apiBaseUrl;
+
+  // Hide API URL section in cloud mode
+  const apiSection = document.getElementById('apiUrlSection');
+  if (apiSection && settings.buildMode === 'cloud') {
+    apiSection.style.display = 'none';
   }
+
+  const mode = settings.displayMode || 'sidepanel';
+  spModeSidePanelBtn.classList.toggle('active', mode === 'sidepanel');
+  spModeDockBtn.classList.toggle('active', mode === 'dock');
+
+  // Auto-upload toggle
+  document.getElementById('settingsAutoUpload').checked = settings.autoUpload !== false;
+
+  // PII redaction toggles
+  document.getElementById('redactFormFields').checked = redaction.formFields !== false;
+  document.getElementById('redactEmails').checked = redaction.emails !== false;
+  document.getElementById('redactNames').checked = redaction.names === true;
+  document.getElementById('redactNumbers').checked = redaction.numbers === true;
+}
+
+// Save redaction settings on change
+['redactFormFields', 'redactEmails', 'redactNames', 'redactNumbers'].forEach((id) => {
+  document.getElementById(id).addEventListener('change', () => {
+    sendMessage({
+      type: 'SET_REDACTION_SETTINGS',
+      settings: {
+        enabled: true,
+        formFields: document.getElementById('redactFormFields').checked,
+        emails: document.getElementById('redactEmails').checked,
+        names: document.getElementById('redactNames').checked,
+        numbers: document.getElementById('redactNumbers').checked,
+      },
+    });
+  });
+});
+
+// Save auto-upload setting on change
+document.getElementById('settingsAutoUpload').addEventListener('change', (e) => {
+  sendMessage({ type: 'SET_SETTINGS', autoUpload: e.target.checked });
 });
 
 // Initialize
@@ -416,14 +474,6 @@ const spModeSidePanelBtn = document.getElementById('spModeSidePanel');
 const spModeDockBtn = document.getElementById('spModeDock');
 const spApiUrlInput = document.getElementById('spApiUrlInput');
 const spSaveSettingsBtn = document.getElementById('spSaveSettingsBtn');
-
-// Load settings
-sendMessage({ type: 'GET_SETTINGS' }).then((settings) => {
-  if (settings.apiBaseUrl) spApiUrlInput.value = settings.apiBaseUrl;
-  const mode = settings.displayMode || 'sidepanel';
-  spModeSidePanelBtn.classList.toggle('active', mode === 'sidepanel');
-  spModeDockBtn.classList.toggle('active', mode === 'dock');
-});
 
 spModeSidePanelBtn.addEventListener('click', async () => {
   spModeSidePanelBtn.classList.add('active');

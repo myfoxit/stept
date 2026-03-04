@@ -328,42 +328,125 @@ body {
   border-color: #FCA5A5;
 }
 
-/* === Settings === */
-.sp-settings-details {
-  width: 100%;
-  margin-top: auto;
+/* === Settings Slide-in Panel === */
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  z-index: 999;
 }
 
-.sp-settings-toggle {
-  cursor: pointer;
-  font-size: 13px;
-  color: #78716C;
-  font-weight: 500;
-  padding: 8px 0;
+.settings-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  background: #FFFFFF;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.settings-panel.open {
+  transform: translateX(0);
+}
+
+.settings-panel-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  list-style: none;
-  transition: color 0.15s;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #E7E5E4;
+  flex-shrink: 0;
 }
 
-.sp-settings-toggle::-webkit-details-marker {
-  display: none;
-}
-
-.sp-settings-toggle:hover {
+.settings-panel-title {
+  font-size: 15px;
+  font-weight: 700;
   color: #1C1917;
 }
 
-.sp-settings-content {
-  margin-top: 12px;
+.settings-panel-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #78716C;
+  transition: all 0.15s;
+}
+
+.settings-panel-close:hover {
+  background: #FAFAF9;
+  color: #1C1917;
+}
+
+.settings-panel-body {
+  flex: 1;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
+  overflow-y: auto;
+}
+
+.settings-toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
   background: #FAFAF9;
   border-radius: 10px;
   border: 1px solid #E7E5E4;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1C1917;
+  cursor: pointer;
+}
+
+.settings-toggle-row + .settings-toggle-row {
+  border-top: 1px solid #F5F5F4;
+}
+
+.settings-toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #3AB08A;
+  cursor: pointer;
+}
+
+.settings-about {
+  margin-top: auto;
+  padding-top: 16px;
+  text-align: center;
+}
+
+.settings-about-version {
+  font-size: 12px;
+  color: #A8A29E;
 }
 
 .sp-settings-label {
