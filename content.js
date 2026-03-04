@@ -352,17 +352,7 @@ function handleClick(event) {
   const rect = target.getBoundingClientRect();
   const now = Date.now();
 
-  const elementInfo = {
-    tagName: target.tagName.toLowerCase(),
-    id: target.id || null,
-    className: typeof target.className === 'string' ? target.className : null,
-    text: getElementText(target),
-    href: target.href || null,
-    type: target.type || null,
-    name: target.name || null,
-    placeholder: target.placeholder || null,
-    ariaLabel: target.getAttribute('aria-label') || null,
-  };
+  const elementInfo = gatherElementInfo(target);
 
   const relativeX = event.clientX - rect.left;
   const relativeY = event.clientY - rect.top;
@@ -413,6 +403,36 @@ function sendClickStep(stepData) {
     .catch((err) => {
       debugLog('Failed to send click event', err);
     });
+
+  // Track SELECT change: listen for change event to capture selected option
+  const target = stepData.elementInfo?.tagName === 'select'
+    ? document.querySelector(`select[name="${stepData.elementInfo.name}"]`) || document.activeElement
+    : null;
+  if (target && target.tagName === 'SELECT') {
+    const onSelectChange = () => {
+      target.removeEventListener('change', onSelectChange);
+      const selectedOption = target.options[target.selectedIndex];
+      if (selectedOption) {
+        const label = getBestLabel(stepData.elementInfo) || 'dropdown';
+        const desc = `Select "${selectedOption.text}" from the "${cleanLabel(label)}" dropdown`;
+        chrome.runtime.sendMessage({
+          type: 'TYPE_EVENT',
+          data: {
+            actionType: 'Select',
+            pageTitle: document.title,
+            description: desc,
+            url: window.location.href,
+            windowSize: { width: window.outerWidth, height: window.outerHeight },
+            viewportSize: { width: window.innerWidth, height: window.innerHeight },
+            elementInfo: stepData.elementInfo,
+          },
+        }).catch(() => {});
+      }
+    };
+    target.addEventListener('change', onSelectChange, { once: true });
+    // Auto-cleanup after 5 seconds if no change
+    setTimeout(() => target.removeEventListener('change', onSelectChange), 5000);
+  }
 }
 
 function handleKeydown(event) {
@@ -481,23 +501,13 @@ function flushTypedText() {
   if (typedText.length === 0) return;
 
   const activeElement = document.activeElement;
-  const elementInfo = activeElement
-    ? {
-        tagName: activeElement.tagName.toLowerCase(),
-        id: activeElement.id || null,
-        className:
-          typeof activeElement.className === 'string'
-            ? activeElement.className
-            : null,
-        type: activeElement.type || null,
-        name: activeElement.name || null,
-        placeholder: activeElement.placeholder || null,
-      }
-    : null;
+  const elementInfo = activeElement ? gatherElementInfo(activeElement) : null;
 
-  const fieldName = elementInfo?.placeholder || elementInfo?.name || elementInfo?.id || '';
+  const fieldName = elementInfo
+    ? (getBestLabel(elementInfo) || elementInfo.id || '')
+    : '';
   const description = fieldName
-    ? `Type "${typedText}" into "${fieldName}"`
+    ? `Type "${typedText}" into the "${cleanLabel(fieldName)}" field`
     : `Type "${typedText}"`;
 
   const stepData = {
@@ -520,28 +530,148 @@ function flushTypedText() {
   typedText = '';
 }
 
+// ===== ELEMENT IDENTIFICATION =====
+
+function gatherElementInfo(target) {
+  const tag = target.tagName.toLowerCase();
+  return {
+    tagName: tag,
+    id: target.id || null,
+    className: typeof target.className === 'string' ? target.className : null,
+    text: getElementText(target),
+    href: target.href || null,
+    type: target.type || null,
+    name: target.name || null,
+    placeholder: target.placeholder || null,
+    ariaLabel: target.getAttribute('aria-label') || null,
+    role: target.getAttribute('role') || null,
+    title: target.getAttribute('title') || null,
+    alt: target.getAttribute('alt') || null,
+    associatedLabel: getAssociatedLabel(target),
+    parentText: getParentText(target),
+    testId: target.getAttribute('data-testid') || target.getAttribute('data-test') || target.getAttribute('data-cy') || null,
+    elementRect: {
+      x: target.getBoundingClientRect().left,
+      y: target.getBoundingClientRect().top,
+      width: target.getBoundingClientRect().width,
+      height: target.getBoundingClientRect().height,
+    },
+  };
+}
+
+function getAssociatedLabel(el) {
+  // 1. <label for="elementId">
+  if (el.id) {
+    const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+    if (label) return cleanLabel(label.textContent);
+  }
+  // 2. Parent <label>
+  const parentLabel = el.closest('label');
+  if (parentLabel) {
+    // Get label text excluding the input's own text
+    const clone = parentLabel.cloneNode(true);
+    clone.querySelectorAll('input, select, textarea').forEach(c => c.remove());
+    const text = clone.textContent.trim();
+    if (text) return cleanLabel(text);
+  }
+  // 3. aria-labelledby
+  const labelledBy = el.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const parts = labelledBy.split(/\s+/).map(id => {
+      const ref = document.getElementById(id);
+      return ref ? ref.textContent.trim() : '';
+    }).filter(Boolean);
+    if (parts.length) return cleanLabel(parts.join(' '));
+  }
+  return null;
+}
+
+function getParentText(el) {
+  const parent = el.parentElement;
+  if (!parent) return null;
+  const text = (parent.innerText || parent.textContent || '').trim();
+  if (text.length > 0 && text.length <= 100) return text;
+  return null;
+}
+
 function getElementText(element) {
   const text = element.innerText || element.textContent || '';
   return text.trim().substring(0, 100);
 }
 
+function cleanLabel(text) {
+  return text.trim().replace(/\s+/g, ' ').substring(0, 60);
+}
+
+// Get the best label for an element using Scribe's priority chain
+function getBestLabel(info) {
+  return info.ariaLabel
+    || info.associatedLabel
+    || info.placeholder
+    || info.title
+    || info.alt
+    || info.name
+    || info.parentText
+    || null;
+}
+
 function generateClickDescription(elementInfo, x, y, prefix) {
-  if (elementInfo.tagName === 'button' || elementInfo.type === 'submit') {
-    const label = elementInfo.text || elementInfo.ariaLabel || 'button';
-    return `${prefix} "${label}"`;
-  } else if (elementInfo.tagName === 'a') {
-    const label = elementInfo.text || 'link';
-    return `${prefix} "${label}"`;
-  } else if (elementInfo.tagName === 'input') {
-    const inputType = elementInfo.type || 'text';
-    const label = elementInfo.placeholder || elementInfo.name || inputType + ' field';
-    return `${prefix} "${label}"`;
-  } else if (elementInfo.tagName === 'select') {
-    const label = elementInfo.name || elementInfo.ariaLabel || 'dropdown';
-    return `${prefix} "${label}"`;
-  } else if (elementInfo.text && elementInfo.text.length > 0) {
-    return `${prefix} "${elementInfo.text.substring(0, 50)}"`;
-  } else {
-    return `${prefix} on ${elementInfo.tagName} element`;
+  const tag = elementInfo.tagName;
+  const bestLabel = getBestLabel(elementInfo);
+
+  // Buttons
+  if (tag === 'button' || elementInfo.type === 'submit' || elementInfo.role === 'button') {
+    const label = elementInfo.ariaLabel || elementInfo.text || bestLabel || 'button';
+    return `${prefix} the "${cleanLabel(label)}" button`;
   }
+
+  // Links
+  if (tag === 'a') {
+    const label = elementInfo.text || elementInfo.ariaLabel || bestLabel || 'link';
+    return `${prefix} the "${cleanLabel(label)}" link`;
+  }
+
+  // Checkboxes
+  if (elementInfo.type === 'checkbox') {
+    const label = bestLabel || elementInfo.text || '';
+    return label ? `${prefix} the "${cleanLabel(label)}" checkbox` : `${prefix} checkbox`;
+  }
+
+  // Radio buttons
+  if (elementInfo.type === 'radio') {
+    const label = bestLabel || elementInfo.text || '';
+    return label ? `Select the "${cleanLabel(label)}" option` : `${prefix} radio option`;
+  }
+
+  // Select/dropdown
+  if (tag === 'select') {
+    const label = bestLabel || 'dropdown';
+    return `${prefix} the "${cleanLabel(label)}" dropdown`;
+  }
+
+  // Input/textarea
+  if (tag === 'input' || tag === 'textarea') {
+    const label = bestLabel || elementInfo.type + ' field';
+    return `${prefix} the "${cleanLabel(label)}" field`;
+  }
+
+  // Tabs / menu items
+  if (elementInfo.role === 'tab' || elementInfo.role === 'menuitem') {
+    const label = elementInfo.text || elementInfo.ariaLabel || '';
+    return label ? `${prefix} the "${cleanLabel(label)}" tab` : `${prefix} tab`;
+  }
+
+  // Images
+  if (tag === 'img') {
+    const label = elementInfo.alt || elementInfo.title || 'image';
+    return `${prefix} the "${cleanLabel(label)}" image`;
+  }
+
+  // Elements with meaningful short text
+  if (elementInfo.text && elementInfo.text.length > 0 && elementInfo.text.length <= 60) {
+    return `${prefix} "${cleanLabel(elementInfo.text)}"`;
+  }
+
+  // Fallback
+  return `${prefix} on the page`;
 }
