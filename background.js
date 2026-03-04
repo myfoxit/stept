@@ -652,7 +652,7 @@ function resumeRecording() {
   });
 }
 
-async function captureScreenshot() {
+async function captureScreenshotRaw() {
   return new Promise((resolve) => {
     chrome.tabs.captureVisibleTab(
       null,
@@ -670,6 +670,27 @@ async function captureScreenshot() {
       },
     );
   });
+}
+
+// Capture screenshot with PII redaction applied/removed around the capture
+async function captureScreenshot() {
+  const activeTab = await new Promise(r =>
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => r(tabs[0])),
+  );
+  if (activeTab?.id) {
+    await chrome.tabs.sendMessage(activeTab.id, { type: 'HIDE_DOCK_TEMP' }).catch(() => {});
+    await chrome.tabs.sendMessage(activeTab.id, { type: 'APPLY_REDACTION' }).catch(() => {});
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  const screenshot = await captureScreenshotRaw();
+
+  if (activeTab?.id) {
+    await chrome.tabs.sendMessage(activeTab.id, { type: 'REMOVE_REDACTION' }).catch(() => {});
+    await chrome.tabs.sendMessage(activeTab.id, { type: 'SHOW_DOCK_TEMP' }).catch(() => {});
+  }
+
+  return screenshot;
 }
 
 // Draw a coral click marker on the screenshot at the given position
@@ -752,20 +773,7 @@ async function addStep(stepData) {
 
   if (isClickAction) {
     try {
-      // Hide dock overlay before screenshot so it's not captured
-      const activeTab = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, tabs => r(tabs[0])));
-      if (activeTab?.id) {
-        await chrome.tabs.sendMessage(activeTab.id, { type: 'HIDE_DOCK_TEMP' }).catch(() => {});
-        // Apply PII redaction before screenshot
-        await chrome.tabs.sendMessage(activeTab.id, { type: 'APPLY_REDACTION' }).catch(() => {});
-        await new Promise(r => setTimeout(r, 50));
-      }
       screenshot = await captureScreenshot();
-      // Remove redaction and restore dock
-      if (activeTab?.id) {
-        await chrome.tabs.sendMessage(activeTab.id, { type: 'REMOVE_REDACTION' }).catch(() => {});
-        await chrome.tabs.sendMessage(activeTab.id, { type: 'SHOW_DOCK_TEMP' }).catch(() => {});
-      }
     } catch (e) {
       debugLog('Screenshot capture threw:', e);
       screenshot = null;

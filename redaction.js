@@ -25,7 +25,7 @@
     enabled: true,
     formFields: true,
     emails: true,
-    names: false,
+    names: true,
     numbers: false,
   };
 
@@ -63,6 +63,38 @@
   // Email pattern for text nodes
   const EMAIL_REGEX = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
 
+  // Number pattern: sequences of 4+ digits (credit cards, SSNs, phone numbers, etc.)
+  const NUMBER_REGEX = /\d{4,}/;
+
+  // ~200 most common US first names (census-based) for name redaction
+  const COMMON_NAMES = new Set([
+    'james','mary','robert','patricia','john','jennifer','michael','linda',
+    'david','elizabeth','william','barbara','richard','susan','joseph','jessica',
+    'thomas','sarah','charles','karen','christopher','lisa','daniel','nancy',
+    'matthew','betty','anthony','margaret','mark','sandra','donald','ashley',
+    'steven','kimberly','paul','emily','andrew','donna','joshua','michelle',
+    'kenneth','dorothy','kevin','carol','brian','amanda','george','melissa',
+    'timothy','deborah','ronald','stephanie','edward','rebecca','jason','sharon',
+    'jeffrey','laura','ryan','cynthia','jacob','kathleen','gary','amy',
+    'nicholas','angela','eric','shirley','jonathan','anna','stephen','brenda',
+    'larry','pamela','justin','emma','scott','nicole','brandon','helen',
+    'benjamin','samantha','samuel','katherine','raymond','christine','gregory','debra',
+    'frank','rachel','alexander','carolyn','patrick','janet','jack','catherine',
+    'dennis','maria','jerry','heather','tyler','diane','aaron','ruth',
+    'jose','julie','adam','olivia','nathan','joyce','henry','virginia',
+    'peter','victoria','zachary','kelly','douglas','lauren','harold','christina',
+    'carl','joan','arthur','evelyn','gerald','judith','roger','megan',
+    'keith','andrea','jeremy','cheryl','terry','hannah','lawrence','jacqueline',
+    'sean','martha','christian','gloria','austin','teresa','jesse','ann',
+    'willie','sara','billy','madison','bruce','frances','albert','kathryn',
+    'jordan','janice','dylan','jean','ralph','abigail','gabriel','alice',
+    'joe','judy','eugene','sophia','wayne','grace','ethan','denise',
+    'russell','amber','elijah','doris','alan','marilyn','philip','danielle',
+    'roy','beverly','vincent','isabella','bobby','theresa','johnny','diana',
+    'logan','natalie','noah','brittany','liam','charlotte','mason','marie',
+    'aiden','kayla','jackson','alexis','lucas','sophia',
+  ]);
+
   /**
    * Apply redaction to all sensitive elements in the DOM.
    * Returns a count of redacted elements.
@@ -85,8 +117,26 @@
       });
     }
 
-    // Blur text containers with email patterns
-    if (redactionSettings.emails) {
+    // Helper to blur a text node's parent element
+    function blurParent(textNode) {
+      const parent = textNode.parentElement;
+      if (!parent || parent.getAttribute(REDACTION_ATTR)) return false;
+      originalValues.set(parent, {
+        filter: parent.style.filter,
+        webkitFilter: parent.style.webkitFilter,
+      });
+      parent.style.filter = 'blur(4px)';
+      parent.style.webkitFilter = 'blur(4px)';
+      parent.setAttribute(REDACTION_ATTR, 'blur');
+      return true;
+    }
+
+    // Walk text nodes once and check for emails, names, and numbers
+    const checkEmails = redactionSettings.emails;
+    const checkNames = redactionSettings.names;
+    const checkNumbers = redactionSettings.numbers;
+
+    if (checkEmails || checkNames || checkNumbers) {
       const walker = document.createTreeWalker(
         document.body,
         NodeFilter.SHOW_TEXT,
@@ -95,26 +145,40 @@
             if (!node.textContent || node.textContent.trim().length === 0) return NodeFilter.FILTER_REJECT;
             if (node.parentElement?.closest(`[${REDACTION_ATTR}]`)) return NodeFilter.FILTER_REJECT;
             if (node.parentElement?.closest('[data-ondoki-exclude]')) return NodeFilter.FILTER_REJECT;
-            if (EMAIL_REGEX.test(node.textContent)) return NodeFilter.FILTER_ACCEPT;
-            return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
           },
         },
       );
 
-      const emailNodes = [];
-      while (walker.nextNode()) emailNodes.push(walker.currentNode);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
 
-      emailNodes.forEach((textNode) => {
-        const parent = textNode.parentElement;
-        if (!parent || parent.getAttribute(REDACTION_ATTR)) return;
-        originalValues.set(parent, {
-          filter: parent.style.filter,
-          webkitFilter: parent.style.webkitFilter,
-        });
-        parent.style.filter = 'blur(4px)';
-        parent.style.webkitFilter = 'blur(4px)';
-        parent.setAttribute(REDACTION_ATTR, 'blur');
-        count++;
+      textNodes.forEach((textNode) => {
+        if (textNode.parentElement?.getAttribute(REDACTION_ATTR)) return;
+        const text = textNode.textContent;
+
+        // Check emails
+        if (checkEmails && EMAIL_REGEX.test(text)) {
+          if (blurParent(textNode)) count++;
+          return;
+        }
+
+        // Check names — split by whitespace, match against common names
+        if (checkNames) {
+          const words = text.split(/\s+/);
+          for (const word of words) {
+            const clean = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+            if (clean.length >= 2 && COMMON_NAMES.has(clean)) {
+              if (blurParent(textNode)) count++;
+              return;
+            }
+          }
+        }
+
+        // Check numbers — 4+ digit sequences
+        if (checkNumbers && NUMBER_REGEX.test(text)) {
+          if (blurParent(textNode)) count++;
+        }
       });
     }
 
