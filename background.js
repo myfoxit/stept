@@ -608,6 +608,13 @@ function stopRecording() {
         chrome.tabs
           .sendMessage(tab.id, { type: 'HIDE_DOCK' })
           .catch(() => {});
+        // Close Smart Blur popup and remove persistent redaction
+        chrome.tabs
+          .sendMessage(tab.id, { type: 'CLOSE_SMART_BLUR' })
+          .catch(() => {});
+        chrome.tabs
+          .sendMessage(tab.id, { type: 'REMOVE_REDACTION' })
+          .catch(() => {});
       }
     });
   });
@@ -672,21 +679,20 @@ async function captureScreenshotRaw() {
   });
 }
 
-// Capture screenshot with PII redaction applied/removed around the capture
+// Capture screenshot — redaction is now persistent on the page (Smart Blur),
+// so we only need to hide the dock overlay temporarily.
 async function captureScreenshot() {
   const activeTab = await new Promise(r =>
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => r(tabs[0])),
   );
   if (activeTab?.id) {
     await chrome.tabs.sendMessage(activeTab.id, { type: 'HIDE_DOCK_TEMP' }).catch(() => {});
-    await chrome.tabs.sendMessage(activeTab.id, { type: 'APPLY_REDACTION' }).catch(() => {});
     await new Promise(r => setTimeout(r, 50));
   }
 
   const screenshot = await captureScreenshotRaw();
 
   if (activeTab?.id) {
-    await chrome.tabs.sendMessage(activeTab.id, { type: 'REMOVE_REDACTION' }).catch(() => {});
     await chrome.tabs.sendMessage(activeTab.id, { type: 'SHOW_DOCK_TEMP' }).catch(() => {});
   }
 
@@ -1113,6 +1119,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
         sendResponse({ success: true });
         break;
+
+      case 'TOGGLE_SMART_BLUR':
+        // Route to active tab's content script
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+          if (tabs[0]?.id) {
+            await ensureContentScript(tabs[0].id);
+            const result = await chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_SMART_BLUR' }).catch(() => ({}));
+            sendResponse({ success: true, isOpen: result?.isOpen });
+          } else {
+            sendResponse({ success: false });
+          }
+        });
+        return; // keep channel open for async response
 
       default:
         sendResponse({ error: 'Unknown message type' });
