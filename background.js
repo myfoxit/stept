@@ -942,6 +942,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           selectedProjectId: state.selectedProjectId,
           stepCount: state.steps.length,
           recordingStartTime: state.recordingStartTime,
+          accessToken: state.accessToken,
         });
         break;
 

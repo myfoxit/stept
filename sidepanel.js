@@ -442,6 +442,87 @@ spSaveSettingsBtn.addEventListener('click', async () => {
   }
 });
 
+// ===== SEARCH =====
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+const searchSpinner = document.getElementById('searchSpinner');
+let searchDebounceTimer = null;
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounceTimer);
+  const query = searchInput.value.trim();
+  if (query.length === 0) {
+    searchResults.classList.add('hidden');
+    searchSpinner.classList.add('hidden');
+    document.getElementById('workflowEmptyState').style.display = '';
+    return;
+  }
+  searchSpinner.classList.remove('hidden');
+  searchDebounceTimer = setTimeout(() => performSearch(query), 300);
+});
+
+async function performSearch(query) {
+  try {
+    const settings = await sendMessage({ type: 'GET_SETTINGS' });
+    const state = await sendMessage({ type: 'GET_STATE' });
+    if (!state.isAuthenticated) return;
+
+    const results = await searchRecordings(
+      settings.apiBaseUrl,
+      state.accessToken || '',
+      query,
+      state.selectedProjectId,
+    );
+
+    searchSpinner.classList.add('hidden');
+    renderSearchResults(results, settings.apiBaseUrl);
+  } catch (e) {
+    searchSpinner.classList.add('hidden');
+    searchResults.innerHTML = '<div class="search-no-results">Search failed</div>';
+    searchResults.classList.remove('hidden');
+  }
+}
+
+function renderSearchResults(data, apiBaseUrl) {
+  const results = data.results || [];
+  document.getElementById('workflowEmptyState').style.display = results.length > 0 ? 'none' : '';
+
+  if (results.length === 0) {
+    searchResults.innerHTML = '<div class="search-no-results">No results found</div>';
+    searchResults.classList.remove('hidden');
+    return;
+  }
+
+  const webAppUrl = apiBaseUrl.replace('/api/v1', '');
+  searchResults.innerHTML = results.map((r) => {
+    const title = escapeHtml(r.generated_title || r.name || 'Untitled');
+    const snippet = r.snippet || '';
+    const date = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
+    const steps = r.step_count ? `${r.step_count} steps` : '';
+    return `
+      <div class="search-result-item" data-url="${webAppUrl}/workflows/${r.id}">
+        <span class="search-result-title">${title}</span>
+        <span class="search-result-snippet">${snippet}</span>
+        <span class="search-result-meta">
+          <span>${date}</span>
+          <span>${steps}</span>
+        </span>
+      </div>
+    `;
+  }).join('');
+
+  searchResults.querySelectorAll('.search-result-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      chrome.tabs.create({ url: item.dataset.url });
+    });
+  });
+
+  searchResults.classList.remove('hidden');
+}
+
+// We need accessToken available for search — add to GET_STATE response
+// (already available via state.accessToken in background.js GET_STATE)
+
 // MISS-C002: Show a temporary error toast in the side panel
 function showToast(text, duration = 4000) {
   const existing = document.querySelector('.toast-error');
