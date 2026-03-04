@@ -768,18 +768,7 @@ body {
   color: #33a07d;
 }
 
-/* Smart Blur button */
-.smart-blur-btn {
-  width: auto;
-  padding: 0 10px;
-  gap: 4px;
-}
-
-.smart-blur-label {
-  font-size: 11px;
-  font-weight: 600;
-  font-family: inherit;
-}
+/* Smart Blur active state */
 
 .complete-bar-btn {
   flex: 1;

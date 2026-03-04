@@ -1299,6 +1299,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         })
         .catch(() => {});
 
+      // Re-apply active redaction on the new page
+      chrome.tabs.sendMessage(tabId, { type: 'APPLY_REDACTION' }).catch(() => {});
+
       // Show dock on newly loaded tabs in dock mode
       const { displayMode } = await chrome.storage.local.get(['displayMode']);
       if ((displayMode || 'sidepanel') === 'dock') {

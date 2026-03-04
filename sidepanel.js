@@ -369,6 +369,8 @@ redactionToggleBtn.addEventListener('click', async () => {
 function updateSmartBlurButton() {
   redactionToggleBtn.classList.toggle('redaction-active', smartBlurOpen);
   redactionToggleBtn.title = smartBlurOpen ? 'Smart Blur: ON' : 'Smart Blur';
+  document.getElementById('blurIconOff').style.display = smartBlurOpen ? 'none' : '';
+  document.getElementById('blurIconOn').style.display = smartBlurOpen ? '' : 'none';
 }
 
 deleteAllBtn.addEventListener('click', async () => {
