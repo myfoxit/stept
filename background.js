@@ -456,7 +456,7 @@ async function ensureContentScript(tabId) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ['content.js'],
+      files: ['redaction.js', 'content.js'],
     });
     // Small delay for script to initialize
     await new Promise((r) => setTimeout(r, 50));
@@ -678,11 +678,14 @@ async function addStep(stepData) {
       const activeTab = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, tabs => r(tabs[0])));
       if (activeTab?.id) {
         await chrome.tabs.sendMessage(activeTab.id, { type: 'HIDE_DOCK_TEMP' }).catch(() => {});
+        // Apply PII redaction before screenshot
+        await chrome.tabs.sendMessage(activeTab.id, { type: 'APPLY_REDACTION' }).catch(() => {});
         await new Promise(r => setTimeout(r, 50));
       }
       screenshot = await captureScreenshot();
-      // Restore dock
+      // Remove redaction and restore dock
       if (activeTab?.id) {
+        await chrome.tabs.sendMessage(activeTab.id, { type: 'REMOVE_REDACTION' }).catch(() => {});
         await chrome.tabs.sendMessage(activeTab.id, { type: 'SHOW_DOCK_TEMP' }).catch(() => {});
       }
     } catch (e) {
@@ -960,6 +963,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             chrome.action.setTitle({ title: '' });
           }
         }
+        if (message.autoUpload !== undefined) {
+          await chrome.storage.local.set({ autoUpload: message.autoUpload });
+        }
+        sendResponse({ success: true });
+        break;
+
+      case 'GET_REDACTION_SETTINGS': {
+        const stored = await chrome.storage.local.get(['redactionSettings']);
+        sendResponse(stored.redactionSettings || {
+          enabled: true,
+          formFields: true,
+          emails: true,
+          names: false,
+          numbers: false,
+        });
+        break;
+      }
+
+      case 'SET_REDACTION_SETTINGS':
+        await chrome.storage.local.set({ redactionSettings: message.settings });
         sendResponse({ success: true });
         break;
 
