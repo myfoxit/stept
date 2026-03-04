@@ -325,9 +325,8 @@ function startCapturing() {
   isRecording = true;
   debugLog('Started capturing events');
 
-  // Use mousedown instead of click to capture all button types including right-click
-  document.addEventListener('mousedown', handleClick, true);
-  document.addEventListener('contextmenu', preventDoubleCapture, true);
+  // Use pointerdown — fires before click handlers, captures pre-click state
+  document.addEventListener('pointerdown', handleClick, { capture: true });
   document.addEventListener('keydown', handleKeydown, true);
 }
 
@@ -336,18 +335,16 @@ function stopCapturing() {
   flushTypedText();
   debugLog('Stopped capturing events');
 
-  document.removeEventListener('mousedown', handleClick, true);
-  document.removeEventListener('contextmenu', preventDoubleCapture, true);
+  document.removeEventListener('pointerdown', handleClick, { capture: true });
   document.removeEventListener('keydown', handleKeydown, true);
-}
-
-// Prevent contextmenu from creating a duplicate step (mousedown already captured it)
-function preventDoubleCapture(event) {
-  // Do nothing — just here so we don't need a separate contextmenu handler
 }
 
 function handleClick(event) {
   if (!isRecording) return;
+
+  // Only handle primary pointer (ignore multi-touch) and left/right clicks
+  if (!event.isPrimary) return;
+  if (event.button !== 0 && event.button !== 2) return;
 
   flushTypedText();
 
