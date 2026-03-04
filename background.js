@@ -1,4 +1,13 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:8000/api/v1';
+// Build configuration — change mode to 'cloud' for Chrome Web Store build
+const BUILD_CONFIG = {
+  mode: 'self-hosted', // 'self-hosted' or 'cloud'
+  cloudApiUrl: 'https://app.ondoki.io/api/v1',
+  defaultApiUrl: 'http://localhost:8000/api/v1',
+};
+
+const DEFAULT_API_BASE_URL = BUILD_CONFIG.mode === 'cloud'
+  ? BUILD_CONFIG.cloudApiUrl
+  : BUILD_CONFIG.defaultApiUrl;
 const MAX_STEPS = 100;
 const DEBUG = false;
 
@@ -87,16 +96,18 @@ chrome.storage.local.get(
       }
     }
 
-    // BUG-C001: First-run check — prompt user to configure API URL if not set
-    const apiCheck = await new Promise((r) =>
-      chrome.storage.local.get(['apiBaseUrl'], r),
-    );
-    if (!apiCheck.apiBaseUrl) {
-      chrome.action.setBadgeText({ text: '!' });
-      chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
-      chrome.action.setTitle({
-        title: 'Ondoki — Please configure your API URL in settings',
-      });
+    // BUG-C001: First-run check — prompt user to configure API URL if not set (self-hosted only)
+    if (BUILD_CONFIG.mode === 'self-hosted') {
+      const apiCheck = await new Promise((r) =>
+        chrome.storage.local.get(['apiBaseUrl'], r),
+      );
+      if (!apiCheck.apiBaseUrl) {
+        chrome.action.setBadgeText({ text: '!' });
+        chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
+        chrome.action.setTitle({
+          title: 'Ondoki — Please configure your API URL in settings',
+        });
+      }
     }
 
     authReady = true;
@@ -930,10 +941,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
 
       case 'GET_SETTINGS':
-        chrome.storage.local.get(['apiBaseUrl', 'displayMode'], (result) => {
+        chrome.storage.local.get(['apiBaseUrl', 'displayMode', 'autoUpload'], (result) => {
           sendResponse({
             apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL,
             displayMode: result.displayMode || 'sidepanel',
+            autoUpload: result.autoUpload !== false,
+            buildMode: BUILD_CONFIG.mode,
           });
         });
         return; // keep channel open
