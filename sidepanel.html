@@ -158,40 +158,42 @@
         </div>
 
         <!-- PII Redaction -->
-        <label class="sp-settings-label" style="margin-top: 12px;">Privacy Redaction</label>
+        <label class="sp-settings-label" style="margin-top: 8px;">Privacy Redaction</label>
         <div class="settings-toggle-group">
           <label class="settings-toggle-row">
             <span>Form fields (password, email, etc.)</span>
-            <input type="checkbox" id="redactFormFields" checked>
+            <label class="toggle-switch"><input type="checkbox" id="redactFormFields" checked><span class="toggle-slider"></span></label>
           </label>
           <label class="settings-toggle-row">
             <span>Email addresses in text</span>
-            <input type="checkbox" id="redactEmails" checked>
+            <label class="toggle-switch"><input type="checkbox" id="redactEmails" checked><span class="toggle-slider"></span></label>
           </label>
           <label class="settings-toggle-row">
             <span>Names</span>
-            <input type="checkbox" id="redactNames">
+            <label class="toggle-switch"><input type="checkbox" id="redactNames"><span class="toggle-slider"></span></label>
           </label>
           <label class="settings-toggle-row">
             <span>Numbers</span>
-            <input type="checkbox" id="redactNumbers">
+            <label class="toggle-switch"><input type="checkbox" id="redactNumbers"><span class="toggle-slider"></span></label>
           </label>
         </div>
 
         <!-- Auto-upload -->
-        <label class="sp-settings-label" style="margin-top: 12px;">Recording</label>
+        <label class="sp-settings-label" style="margin-top: 8px;">Recording</label>
         <div class="settings-toggle-group">
           <label class="settings-toggle-row">
             <span>Auto-upload on complete</span>
-            <input type="checkbox" id="settingsAutoUpload" checked>
+            <label class="toggle-switch"><input type="checkbox" id="settingsAutoUpload" checked><span class="toggle-slider"></span></label>
           </label>
         </div>
 
         <!-- API URL (hidden in cloud mode) -->
         <div id="apiUrlSection">
-          <label class="sp-settings-label" style="margin-top: 12px;" for="spApiUrlInput">API URL</label>
-          <input id="spApiUrlInput" class="sp-settings-input" type="url" placeholder="https://app.ondoki.com/api/v1">
-          <button id="spSaveSettingsBtn" class="btn btn-outline btn-sm" style="margin-top: 6px;">Save</button>
+          <label class="sp-settings-label" style="margin-top: 8px;" for="spApiUrlInput">API URL</label>
+          <div class="api-url-row">
+            <input id="spApiUrlInput" class="sp-settings-input" type="text" placeholder="https://app.ondoki.com/api/v1">
+            <button id="spSaveSettingsBtn" class="btn btn-outline btn-sm">Save</button>
+          </div>
         </div>
 
         <!-- About -->
