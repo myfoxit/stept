@@ -282,6 +282,7 @@ async def get_folder_tree(
             "is_workflow": False,
             "is_private": doc.is_private,
             "owner_id": doc.owner_id,
+            "source_file_mime": doc.source_file_mime,
             "children": [],
         })
     

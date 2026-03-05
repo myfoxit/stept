@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ContextLinkPanel } from "@/components/ContextLinks/ContextLinkPanel";
 import { CommentButton } from "@/components/Comments/CommentButton";
+import { FileViewer } from "@/components/FileViewer";
 import { CommentPanel } from "@/components/Comments/CommentPanel";
 import { useFolderTree } from "@/hooks/api/folders";
 import { useAuth } from "@/providers/auth-provider";
@@ -220,6 +221,13 @@ export default function EditorPage() {
           />
         )}
       </SiteHeader>
+      {doc?.source_file_mime && (
+        <FileViewer
+          docId={docId!}
+          mime={doc.source_file_mime}
+          fileName={doc.source_file_name}
+        />
+      )}
       {isLockedByOther && (
         <div className="mx-auto max-w-4xl px-4 pt-4">
           <Alert

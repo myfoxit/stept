@@ -13,6 +13,7 @@ export interface FolderTreeRead {
   is_workflow: boolean;
   is_private: boolean;
   owner_id: string | null;
+  source_file_mime: string | null;
   children: FolderTreeRead[];
 }
 

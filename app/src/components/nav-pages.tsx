@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, ClipboardCheck, Copy, File, FileText, Files, Folder, FolderOpen, FolderPlus, Globe, Inbox, LayoutGrid, Lock, Monitor, MoreHorizontal, Move, Pencil, Play, Plus, Share2, Trash2, Upload } from 'lucide-react';
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -33,6 +34,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { apiClient } from "@/lib/apiClient";
 import { useProject } from "@/providers/project-provider";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
@@ -77,8 +80,9 @@ interface DocumentNode {
   is_expanded: boolean;
   is_folder: boolean;
   is_workflow: boolean;
-  is_private: boolean; // NEW
-  owner_id?: string | null; // NEW
+  is_private: boolean;
+  owner_id?: string | null;
+  source_file_mime?: string | null;
   children: DocumentNode[];
 }
 
@@ -485,11 +489,13 @@ function NavPageItem({
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    stroke-width="1.5"
+                    strokeWidth="1.5"
                   >
                     <circle cx="12" cy="12" r="3" />
                     <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
                   </svg>
+                ) : doc.source_file_mime ? (
+                  <FileTypeIcon mime={doc.source_file_mime} className="size-3.5 flex-shrink-0" />
                 ) : (
                   <File
                     className="size-3.5 flex-shrink-0 opacity-50"
@@ -871,6 +877,7 @@ export function NavPages({ userRole }: { userRole: string }) {
   const { selectedProjectId } = useProject();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // NEW: Fetch shared and private trees separately
   const { data: sharedTree = [], isLoading: sharedLoading } = useFolderTree(
@@ -923,9 +930,11 @@ export function NavPages({ userRole }: { userRole: string }) {
       const resp = await apiClient.post("/documents/upload-file", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      await queryClient.invalidateQueries({ queryKey: ["folderTree"] });
       navigate(`/editor/${resp.data.id}`);
-    } catch {
-      alert("Upload failed");
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      toast.error(detail || "Upload failed. Please try a different file.");
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }

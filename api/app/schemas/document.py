@@ -43,8 +43,10 @@ class DocumentRead(DocumentBase):
     position: int = 0
     linked_table_id: Optional[str] = None
     linked_row_id: Optional[int] = None
-    is_private: bool = False  # NEW
-    owner_id: Optional[str] = None  # NEW
+    is_private: bool = False
+    owner_id: Optional[str] = None
+    source_file_mime: Optional[str] = None
+    source_file_name: Optional[str] = None
     version: int = 1
     created_at: datetime
     updated_at: datetime

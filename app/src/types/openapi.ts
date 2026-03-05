@@ -74,6 +74,8 @@ export interface DocumentRead {
   position?: number;
   is_private?: boolean;
   owner_id?: string | null;
+  source_file_mime?: string | null;
+  source_file_name?: string | null;
   version?: number;
   created_at?: string;
   updated_at?: string;

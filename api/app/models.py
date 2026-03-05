@@ -190,6 +190,7 @@ class Document(Base):
     folder_id = Column(String(16), ForeignKey("folders.id", ondelete="SET NULL"), nullable=True, index=True)
     source_file_path = Column(String, nullable=True)
     source_file_mime = Column(String, nullable=True)
+    source_file_name = Column(String, nullable=True)
     # NEW: ordering within a folder (or root if folder_id is NULL)
     position   = Column(Integer, nullable=False, default=0, index=True)
     

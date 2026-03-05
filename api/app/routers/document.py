@@ -197,6 +197,8 @@ async def api_get_document(
         "position": doc.position,
         "is_private": doc.is_private,
         "owner_id": doc.owner_id,
+        "source_file_mime": doc.source_file_mime,
+        "source_file_name": doc.source_file_name,
         "version": doc.version if hasattr(doc, 'version') else 1,
         "created_at": doc.created_at,
         "updated_at": doc.updated_at,
@@ -1115,6 +1117,30 @@ async def export_document_docx(
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
 
 
+@router.get("/{doc_id}/file")
+async def download_document_file(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download the original uploaded file for a document."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    await _check_doc_access(db, doc, current_user)
+    if not doc.source_file_path:
+        raise HTTPException(404, "no source file for this document")
+    import os
+    from fastapi.responses import FileResponse
+    if not os.path.isfile(doc.source_file_path):
+        raise HTTPException(404, "source file missing from storage")
+    return FileResponse(
+        doc.source_file_path,
+        media_type=doc.source_file_mime or "application/octet-stream",
+        filename=doc.source_file_name or os.path.basename(doc.source_file_path),
+    )
+
+
 @router.post("/upload-file")
 async def upload_document_file(
     file: UploadFile = File(...),
@@ -1184,6 +1210,7 @@ async def upload_document_file(
         is_private=is_private,
         source_file_path=file_path,
         source_file_mime=mime,
+        source_file_name=file.filename,
         owner_id=current_user.id,
     )
     db.add(doc)

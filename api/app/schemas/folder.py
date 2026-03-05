@@ -49,8 +49,9 @@ class FolderTreeRead(BaseModel):
     is_expanded: bool
     is_folder: bool = True
     is_workflow: bool = False
-    is_private: bool = False  # NEW
-    owner_id: Optional[str] = None  # NEW
+    is_private: bool = False
+    owner_id: Optional[str] = None
+    source_file_mime: Optional[str] = None
     children: List[Any] = []
 
     class Config:
