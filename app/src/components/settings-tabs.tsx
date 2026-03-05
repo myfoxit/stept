@@ -11,8 +11,6 @@ const tabs: { label: string; path: string; external?: boolean }[] = [
   { label: 'Context Links', path: '/context-links' },
   { label: 'Analytics', path: '/analytics' },
   { label: 'Knowledge Base', path: '/knowledge' },
-  { label: 'Knowledge Graph', path: '/knowledge-graph' },
-  { label: 'Video → Guide', path: '/video-import' },
   { label: 'Audit Log', path: '/audit' },
   { label: 'Documentation', path: 'https://docs.ondoki.app', external: true },
 ];

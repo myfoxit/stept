@@ -586,6 +586,24 @@ class ContextLink(Base):
 
     # User-added context
     note = Column(Text, nullable=True)
+
+    # ── Scoring fields ────────────────────────────────────────────────────
+    # source: who created this link.
+    #   "user" = explicitly added by a human (base_weight default 1000)
+    #   "auto" = derived automatically from recording URL / document URL (base_weight default 100)
+    #   Auto links are always ranked below user links unless click signals override.
+    source = Column(String(10), nullable=False, server_default="user")
+
+    # weight: base score used by BaseWeightScorer.
+    #   User-defined:  1000.0  (set at creation; editable)
+    #   Auto-added:     100.0  (fixed; not user-editable)
+    weight = Column(Float, nullable=False, server_default="1000.0")
+
+    # click_count: incremented each time the user clicks this link in context.
+    # Used by ClickCountScorer to boost frequently-chosen resources.
+    click_count = Column(Integer, nullable=False, server_default="0", default=0)
+
+    # priority kept for backward-compat with AND/OR group logic (not scoring)
     priority = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime, server_default=func.now())
@@ -597,6 +615,10 @@ class ContextLink(Base):
 
     __table_args__ = (
         Index('idx_context_links_match', 'project_id', 'match_type', 'match_value'),
+        # Dedup constraint: one link per (project, match, resource) tuple.
+        # The application enforces this before INSERT; the DB is the safety net.
+        UniqueConstraint('project_id', 'match_type', 'match_value', 'resource_id',
+                         name='uq_context_link_dedup'),
     )
 
 

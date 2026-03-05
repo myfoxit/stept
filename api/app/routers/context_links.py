@@ -1,6 +1,21 @@
 """
-Context Links router — CRUD + match endpoint for the Chrome extension.
-v2: compound AND/OR rules, regex match types, known-apps endpoint.
+Context Links router.
+
+Match types (unchanged — keep the full power on the document/workflow surface):
+  url_exact, url_pattern (glob/contains), url_regex
+  app_name (contains + alias resolution), app_exact, app_regex
+  window_title (contains), window_regex
+
+Group logic (unchanged):
+  Links sharing a group_id form an AND group (all must match).
+  Across groups: OR — any matching group surfaces its resources.
+
+New in v3:
+  - source: "user" | "auto"  — user links always outrank auto links by default
+  - weight: base score for the scoring service (user=1000, auto=100)
+  - click_count: incremented on explicit user click; boosts score over time
+  - Auto-create endpoint with duplicate detection: reuses existing entries
+  - Scoring-based match response (replaces flat priority ordering)
 """
 from __future__ import annotations
 
@@ -17,11 +32,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session as get_db
 from app.models import ContextLink, User, ProcessRecordingSession, Document
 from app.security import get_current_user
+from app.services.context_scoring import ScoringContext, compute_final_score
 
 router = APIRouter()
 
+# ── Weight constants ──────────────────────────────────────────────────────────
 
-# ── Known Apps ───────────────────────────────────────────────────────────
+USER_WEIGHT: float = 1000.0   # Weight assigned to user-created links
+AUTO_WEIGHT: float = 100.0    # Weight assigned to auto-created links
+
+
+# ── Known Apps ────────────────────────────────────────────────────────────────
 
 KNOWN_APPS = [
     {"name": "Visual Studio Code", "aliases": ["VSCode", "Code", "VS Code"], "bundle_id": "com.microsoft.VSCode"},
@@ -57,7 +78,6 @@ KNOWN_APPS = [
     {"name": "Spotify", "aliases": ["Spotify"], "bundle_id": "com.spotify.client"},
 ]
 
-# Build a lookup: lowercase alias/name → canonical app name
 _APP_ALIAS_MAP: dict[str, str] = {}
 for _app in KNOWN_APPS:
     _APP_ALIAS_MAP[_app["name"].lower()] = _app["name"]
@@ -66,21 +86,21 @@ for _app in KNOWN_APPS:
 
 
 def _resolve_app_name(value: str) -> str:
-    """Resolve an alias to a canonical app name (case-insensitive)."""
     return _APP_ALIAS_MAP.get(value.lower(), value)
 
 
-# ── Schemas ──────────────────────────────────────────────────────────────
+# ── Schemas ───────────────────────────────────────────────────────────────────
 
 class ContextLinkCreate(BaseModel):
     project_id: str
-    match_type: str  # url_exact, url_pattern, url_regex, app_name, app_exact, app_regex, window_title, window_regex
+    match_type: str
     match_value: str
-    resource_type: str  # workflow, document
+    resource_type: str
     resource_id: str
     note: Optional[str] = None
     priority: int = 0
     group_id: Optional[str] = None
+    # source/weight are set server-side; user can't override auto links to user weight
 
 
 class ContextLinkUpdate(BaseModel):
@@ -91,6 +111,7 @@ class ContextLinkUpdate(BaseModel):
     note: Optional[str] = None
     priority: Optional[int] = None
     group_id: Optional[str] = None
+    weight: Optional[float] = None   # allow users to tune their own link weights
 
 
 class ContextLinkOut(BaseModel):
@@ -103,6 +124,9 @@ class ContextLinkOut(BaseModel):
     note: Optional[str] = None
     priority: int = 0
     group_id: Optional[str] = None
+    source: str = "user"
+    weight: float = USER_WEIGHT
+    click_count: int = 0
 
     class Config:
         from_attributes = True
@@ -119,9 +143,26 @@ class ContextMatchOut(BaseModel):
     note: Optional[str] = None
     priority: int = 0
     group_id: Optional[str] = None
+    source: str = "user"
+    weight: float = USER_WEIGHT
+    click_count: int = 0
+    final_score: float = 0.0  # computed score for this request — for debugging
 
 
-# ── Match helpers ────────────────────────────────────────────────────────
+class AutoCreateRequest(BaseModel):
+    """
+    Create a context link automatically from a recorded workflow or document URL.
+    Derives a url_pattern from the provided URL and reuses any existing entry
+    for the same (project, pattern, resource) tuple instead of creating a duplicate.
+    """
+    project_id: str
+    resource_type: str          # "workflow" | "document"
+    resource_id: str
+    url: str                    # Full URL — hostname_base pattern is derived from this
+    note: Optional[str] = None
+
+
+# ── Match helpers ─────────────────────────────────────────────────────────────
 
 def _link_matches(link: ContextLink, url: str | None, app_name: str | None,
                   window_title: str | None, hostname: str | None,
@@ -136,7 +177,6 @@ def _link_matches(link: ContextLink, url: str | None, app_name: str | None,
     if mt == "url_pattern":
         if not url:
             return False
-        # Auto-wrap with wildcards if no glob chars present (enables "contains" behavior)
         pattern = mv if any(c in mv for c in '*?[') else f"*{mv}*"
         return fnmatch.fnmatch(url.lower(), pattern.lower())
 
@@ -149,15 +189,12 @@ def _link_matches(link: ContextLink, url: str | None, app_name: str | None,
             return False
 
     if mt == "app_name":
-        # Case-insensitive CONTAINS + alias resolution
         if not app_name:
             return False
         canonical = _resolve_app_name(mv)
         app_lower = app_name.lower()
-        # Check: does the match value (or its canonical form) appear in the app name?
         if mv.lower() in app_lower or canonical.lower() in app_lower:
             return True
-        # Also check reverse: does the app name appear in the canonical?
         if app_lower in canonical.lower():
             return True
         return False
@@ -187,7 +224,22 @@ def _link_matches(link: ContextLink, url: str | None, app_name: str | None,
     return False
 
 
-# ── Endpoints ────────────────────────────────────────────────────────────
+def _derive_url_pattern(url: str) -> str:
+    """
+    Derive a glob pattern from a URL suitable for auto-linking.
+    e.g. https://app.salesforce.com/lightning/r/... → *.salesforce.com*
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+        parts = hostname.rsplit(".", 2)
+        hostname_base = ".".join(parts[-2:]) if len(parts) >= 2 else hostname
+        return f"*.{hostname_base}*"
+    except Exception:
+        return url
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/context-links/known-apps")
 async def list_known_apps():
@@ -201,6 +253,18 @@ async def create_context_link(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Create a user-defined context link. Always assigned source='user' and weight=1000."""
+    # Dedup check: if same (project, match_type, match_value, resource) exists, return it
+    existing = await _find_duplicate(db, body.project_id, body.match_type, body.match_value, body.resource_id)
+    if existing:
+        # Upgrade source to "user" if it was auto, since user is now claiming it
+        if existing.source == "auto":
+            existing.source = "user"
+            existing.weight = USER_WEIGHT
+            await db.commit()
+            await db.refresh(existing)
+        return existing
+
     link = ContextLink(
         project_id=body.project_id,
         created_by=current_user.id,
@@ -211,8 +275,69 @@ async def create_context_link(
         note=body.note,
         priority=body.priority,
         group_id=body.group_id,
+        source="user",
+        weight=USER_WEIGHT,
     )
     db.add(link)
+    await db.commit()
+    await db.refresh(link)
+    return link
+
+
+@router.post("/context-links/auto", response_model=ContextLinkOut)
+async def auto_create_context_link(
+    body: AutoCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Auto-create a context link from a workflow/document URL.
+    Derives a url_pattern (e.g. *.salesforce.com*) and deduplicates:
+    if an entry for (project, pattern, resource) already exists it is returned
+    as-is rather than creating a new row.  Auto links always use weight=100
+    unless a user has already claimed the same pattern (weight stays at 1000).
+    """
+    pattern = _derive_url_pattern(body.url)
+
+    existing = await _find_duplicate(db, body.project_id, "url_pattern", pattern, body.resource_id)
+    if existing:
+        # Don't downgrade a user link to auto
+        return existing
+
+    link = ContextLink(
+        project_id=body.project_id,
+        created_by=current_user.id,
+        match_type="url_pattern",
+        match_value=pattern,
+        resource_type=body.resource_type,
+        resource_id=body.resource_id,
+        note=body.note,
+        source="auto",
+        weight=AUTO_WEIGHT,
+    )
+    db.add(link)
+    await db.commit()
+    await db.refresh(link)
+    return link
+
+
+@router.post("/context-links/{link_id}/click", response_model=ContextLinkOut)
+async def record_context_click(
+    link_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Record that the user clicked/opened a context-surfaced resource.
+    Increments click_count on the link, which feeds ClickCountScorer.
+    Call this whenever the user explicitly navigates to a resource via a
+    context suggestion (not on passive display).
+    """
+    result = await db.execute(select(ContextLink).where(ContextLink.id == link_id))
+    link = result.scalar_one_or_none()
+    if not link:
+        raise HTTPException(status_code=404, detail="Context link not found")
+    link.click_count = (link.click_count or 0) + 1
     await db.commit()
     await db.refresh(link)
     return link
@@ -239,7 +364,7 @@ async def list_context_links(
         q = q.where(ContextLink.resource_type == resource_type)
     if resource_id:
         q = q.where(ContextLink.resource_id == resource_id)
-    q = q.order_by(ContextLink.priority.desc())
+    q = q.order_by(ContextLink.weight.desc(), ContextLink.click_count.desc())
     result = await db.execute(q)
     return result.scalars().all()
 
@@ -255,13 +380,18 @@ async def match_context_links(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Match context links against a URL, app name, and/or window title.
+    """
+    Match context links against a URL, app name, and/or window title.
 
-    Grouping logic:
-    - Links with the same group_id form an AND group (all must match)
-    - Links with null group_id are each their own group
-    - Across groups: any group matching triggers (OR)
-    - The highest-priority matching group's resources are returned
+    Grouping (AND/OR) logic is unchanged:
+      - Links in the same group_id: ALL must match (AND).
+      - Across groups: ANY matching group surfaces its resources (OR).
+
+    Ranking is now score-based (see context_scoring.py):
+      - User-defined links (weight=1000) always outrank auto links (weight=100)
+        unless the auto link has accumulated significant click_count signal.
+      - Results are sorted by final_score descending.
+      - final_score is included in the response for debugging.
     """
     from app.models import project_members
 
@@ -276,7 +406,7 @@ async def match_context_links(
         parts = hostname.rsplit(".", 2)
         hostname_base = ".".join(parts[-2:]) if len(parts) >= 2 else hostname
 
-    # Fetch all candidate links
+    # Fetch all candidate links for this project/user
     if project_id:
         q = select(ContextLink).where(ContextLink.project_id == project_id)
     else:
@@ -288,7 +418,7 @@ async def match_context_links(
     result = await db.execute(q)
     links: list[ContextLink] = list(result.scalars().all())
 
-    # Group links by group_id (null group_id → each link is its own group)
+    # ── AND/OR group evaluation (unchanged logic) ─────────────────────────
     groups: dict[str, list[ContextLink]] = {}
     solo_counter = 0
     for link in links:
@@ -298,33 +428,63 @@ async def match_context_links(
             groups[f"__solo_{solo_counter}"] = [link]
             solo_counter += 1
 
-    # Evaluate each group: AND within group, OR across groups
-    matched_groups: list[tuple[int, list[ContextLink]]] = []  # (max_priority, links)
-    for group_key, group_links in groups.items():
+    matched_links: list[ContextLink] = []
+    seen_resources: set[tuple[str, str]] = set()
+
+    # Collect all matching links (dedup by resource)
+    for group_links in groups.values():
         all_match = all(
             _link_matches(link, url, app_name, window_title, hostname, hostname_base)
             for link in group_links
         )
         if all_match:
-            max_priority = max(link.priority for link in group_links)
-            matched_groups.append((max_priority, group_links))
+            for link in group_links:
+                resource_key = (link.resource_type, link.resource_id)
+                if resource_key not in seen_resources:
+                    seen_resources.add(resource_key)
+                    matched_links.append(link)
 
-    # Sort by highest priority group first
-    matched_groups.sort(key=lambda g: g[0], reverse=True)
+    # ── Score each matched link ───────────────────────────────────────────
+    # Enrich ScoringContext with available signals.
+    # resource_total_views: fetch view_count from the resource row.
+    # user_has_viewed: not yet tracked per-user — stub as False.
+    # user_onboarding_complete: stub as False until onboarding tracking lands.
 
-    # Flatten matched links, dedup by resource
-    seen_resources: set[tuple[str, str]] = set()
-    matched: list[ContextLink] = []
-    for _, group_links in matched_groups:
-        for link in sorted(group_links, key=lambda l: l.priority, reverse=True):
-            resource_key = (link.resource_type, link.resource_id)
-            if resource_key not in seen_resources:
-                seen_resources.add(resource_key)
-                matched.append(link)
+    async def _get_resource_views(link: ContextLink) -> int:
+        try:
+            if link.resource_type == "workflow":
+                r = await db.execute(
+                    select(ProcessRecordingSession.view_count).where(
+                        ProcessRecordingSession.id == link.resource_id
+                    )
+                )
+                return r.scalar_one_or_none() or 0
+            # Documents don't have view_count yet — return 0
+            return 0
+        except Exception:
+            return 0
 
-    # Resolve resource names
+    scored: list[tuple[float, ContextLink]] = []
+    for link in matched_links:
+        resource_views = await _get_resource_views(link)
+        ctx = ScoringContext(
+            base_weight=link.weight if link.weight is not None else (
+                USER_WEIGHT if (link.source or "user") == "user" else AUTO_WEIGHT
+            ),
+            source=link.source or "user",
+            context_click_count=link.click_count or 0,
+            resource_total_views=resource_views,
+            user_has_viewed=False,          # TODO: per-user view tracking
+            user_onboarding_complete=False, # TODO: onboarding status
+        )
+        final_score = compute_final_score(ctx)
+        scored.append((final_score, link))
+
+    scored.sort(key=lambda t: t[0], reverse=True)
+
+    # ── Resolve resource names & build response ───────────────────────────
     out: list[dict] = []
-    for link in matched:
+    for final_score, link in scored:
         resource_name = ""
         resource_summary = None
         if link.resource_type == "workflow":
@@ -353,8 +513,12 @@ async def match_context_links(
                 resource_name=resource_name,
                 resource_summary=resource_summary,
                 note=link.note,
-                priority=link.priority,
+                priority=link.priority or 0,
                 group_id=link.group_id,
+                source=link.source or "user",
+                weight=link.weight if link.weight is not None else USER_WEIGHT,
+                click_count=link.click_count or 0,
+                final_score=final_score,
             ).model_dump()
         )
 
@@ -392,3 +556,27 @@ async def delete_context_link(
     await db.delete(link)
     await db.commit()
     return {"ok": True}
+
+
+# ── Internal helpers ──────────────────────────────────────────────────────────
+
+async def _find_duplicate(
+    db: AsyncSession,
+    project_id: str,
+    match_type: str,
+    match_value: str,
+    resource_id: str,
+) -> ContextLink | None:
+    """
+    Check for an existing (project, match_type, match_value, resource_id) entry.
+    Used by both create endpoints to prevent duplicate rows.
+    """
+    result = await db.execute(
+        select(ContextLink).where(
+            ContextLink.project_id == project_id,
+            ContextLink.match_type == match_type,
+            ContextLink.match_value == match_value,
+            ContextLink.resource_id == resource_id,
+        )
+    )
+    return result.scalar_one_or_none()

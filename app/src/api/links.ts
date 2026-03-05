@@ -26,17 +26,7 @@ export interface CreateLinkPayload {
   link_type?: string;
 }
 
-export interface KnowledgeGraph {
-  nodes: Array<{ id: string; type: string; resource_id: string }>;
-  edges: Array<{
-    id: string;
-    source: string;
-    target: string;
-    link_type: string | null;
-    confidence: number | null;
-    auto_detected: boolean;
-  }>;
-}
+
 
 /** List links for a project */
 export const listLinks = (projectId: string, resourceType?: string, resourceId?: string) =>
@@ -75,10 +65,4 @@ export const detectLinks = (
     params: { project_id: projectId, resource_type: resourceType, resource_id: resourceId, threshold },
   });
 
-/** Get the full knowledge graph */
-export const getKnowledgeGraph = (projectId: string) =>
-  request<KnowledgeGraph>({
-    method: 'GET',
-    url: '/links/graph',
-    params: { project_id: projectId },
-  });
+

@@ -30,8 +30,6 @@ import { TeamPage } from "@/pages/team";
 import { KnowledgeBasePage } from "@/pages/knowledge-base";
 import { AuditLogPage } from "@/pages/audit-log";
 import { AnalyticsDashboardPage } from "@/pages/analytics-dashboard";
-import { KnowledgeGraphPage } from "@/pages/knowledge-graph";
-import VideoImportPage from "@/pages/video-import";
 import TrashPage from "@/pages/trash";
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -106,14 +104,6 @@ createRoot(document.getElementById("root")!).render(
                       <Route
                         path="/analytics"
                         element={<AnalyticsDashboardPage />}
-                      />
-                      <Route
-                        path="/knowledge-graph"
-                        element={<KnowledgeGraphPage />}
-                      />
-                      <Route
-                        path="/video-import"
-                        element={<VideoImportPage />}
                       />
                       <Route path="/trash" element={<TrashPage />} />
                     </Route>
