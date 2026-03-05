@@ -1,13 +1,13 @@
 """Add soft delete (deleted_at) to documents and process_recording_sessions
 
-Revision ID: 020
-Revises: 019
+Revision ID: 018
+Revises: 017
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "020"
-down_revision = "019"
+revision = "018"
+down_revision = "017"
 branch_labels = None
 depends_on = None
 

@@ -1,7 +1,7 @@
 """context link scoring: add source, weight, click_count + dedup constraint
 
-Revision ID: 030
-Revises: 029
+Revision ID: 026
+Revises: 025
 Create Date: 2026-03-05
 
 Changes
@@ -17,8 +17,8 @@ Changes
 from alembic import op
 import sqlalchemy as sa
 
-revision = "030"
-down_revision = "029"
+revision = "026"
+down_revision = "025"
 branch_labels = None
 depends_on = None
 

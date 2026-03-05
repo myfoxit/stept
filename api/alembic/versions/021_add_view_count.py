@@ -1,13 +1,13 @@
 """Add view_count and last_viewed_at to process_recording_sessions
 
-Revision ID: 025
-Revises: 024
+Revision ID: 021
+Revises: 020
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "025"
-down_revision = "024"
+revision = "021"
+down_revision = "020"
 branch_labels = None
 depends_on = None
 

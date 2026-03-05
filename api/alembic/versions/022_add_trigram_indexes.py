@@ -1,12 +1,12 @@
 """Enable pg_trgm and add trigram GIN indexes
 
-Revision ID: 026
-Revises: 025
+Revision ID: 022
+Revises: 021
 """
 from alembic import op
 
-revision = "026"
-down_revision = "025"
+revision = "022"
+down_revision = "021"
 branch_labels = None
 depends_on = None
 

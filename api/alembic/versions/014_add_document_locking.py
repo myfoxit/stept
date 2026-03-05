@@ -13,7 +13,6 @@ depends_on = None
 
 
 def upgrade():
-    # locked_by and locked_at already added in migration 013
     pass
 
 

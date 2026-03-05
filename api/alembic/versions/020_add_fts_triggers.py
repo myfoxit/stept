@@ -1,13 +1,13 @@
 """Add FTS triggers for workflows and steps, search_tsv on steps
 
-Revision ID: 024
-Revises: 023
+Revision ID: 020
+Revises: 019
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "024"
-down_revision = "023"
+revision = "020"
+down_revision = "019"
 branch_labels = None
 depends_on = None
 

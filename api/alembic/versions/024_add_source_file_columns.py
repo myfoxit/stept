@@ -1,13 +1,13 @@
 """Add source_file columns to documents
 
-Revision ID: 028
-Revises: 027
+Revision ID: 024
+Revises: 023
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "028"
-down_revision = "027"
+revision = "024"
+down_revision = "023"
 branch_labels = None
 depends_on = None
 

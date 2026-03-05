@@ -1,14 +1,14 @@
 """Widen project.name from String(16) to String(255)
 
-Revision ID: 022
-Revises: 021
+Revision ID: 019
+Revises: 018
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "022"
-down_revision = "021"
+revision = "019"
+down_revision = "018"
 branch_labels = None
 depends_on = None
 
