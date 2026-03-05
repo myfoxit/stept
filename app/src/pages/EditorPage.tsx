@@ -254,6 +254,7 @@ export default function EditorPage() {
           </Alert>
         </div>
       )}
+      <div className={doc?.source_file_mime ? 'hidden' : undefined}>
       <OndokiEditor
         docId={docId as string}
         readOnly={isReadOnly}
@@ -296,6 +297,7 @@ export default function EditorPage() {
           </>
         )}
       />
+      </div>
 
       {selectedProjectId && docId && user && (
         <CommentPanel
