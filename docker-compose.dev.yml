@@ -8,7 +8,6 @@ services:
     volumes:
       - ./api:/app
       - recordings-storage:/app/storage/recordings
-      - video-uploads:/data/uploads/videos
     environment:
       ENVIRONMENT: local
       GOTENBERG_URL: http://gotenberg:3000
@@ -17,28 +16,10 @@ services:
       ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-exX5o2vhMgT48Eho4ShGcD-vx_iKKZQMBGgOfw7dhRM=}
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      ONDOKI_UPLOAD_DIR: /data/uploads/videos
     ports:
       - "8000:8000"
     depends_on:
       - gotenberg
-
-  media-worker:
-    build:
-      context: .
-      dockerfile: video-worker/Dockerfile
-    command: celery -A app.tasks worker --loglevel=info --queues=celery,media --concurrency=1
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-      ONDOKI_UPLOAD_DIR: /data/uploads/videos
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      WHISPER_MODEL: ${WHISPER_MODEL:-base}
-    volumes:
-      - ./api:/app
-      - video-uploads:/data/uploads/videos
 
   frontend:
     build:
@@ -68,4 +49,3 @@ services:
 
 volumes:
   recordings-storage:
-  video-uploads:

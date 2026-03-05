@@ -98,20 +98,13 @@ class ContextLinkCreate(BaseModel):
     resource_type: str
     resource_id: str
     note: Optional[str] = None
-    priority: int = 0
-    group_id: Optional[str] = None
-    # source/weight are set server-side; user can't override auto links to user weight
 
 
 class ContextLinkUpdate(BaseModel):
     match_type: Optional[str] = None
     match_value: Optional[str] = None
-    resource_type: Optional[str] = None
-    resource_id: Optional[str] = None
     note: Optional[str] = None
-    priority: Optional[int] = None
-    group_id: Optional[str] = None
-    weight: Optional[float] = None   # allow users to tune their own link weights
+    weight: Optional[float] = None
 
 
 class ContextLinkOut(BaseModel):
@@ -122,8 +115,6 @@ class ContextLinkOut(BaseModel):
     resource_type: str
     resource_id: str
     note: Optional[str] = None
-    priority: int = 0
-    group_id: Optional[str] = None
     source: str = "user"
     weight: float = USER_WEIGHT
     click_count: int = 0
@@ -141,12 +132,10 @@ class ContextMatchOut(BaseModel):
     resource_name: str
     resource_summary: Optional[str] = None
     note: Optional[str] = None
-    priority: int = 0
-    group_id: Optional[str] = None
     source: str = "user"
     weight: float = USER_WEIGHT
     click_count: int = 0
-    final_score: float = 0.0  # computed score for this request — for debugging
+    final_score: float = 0.0
 
 
 class AutoCreateRequest(BaseModel):
@@ -273,8 +262,6 @@ async def create_context_link(
         resource_type=body.resource_type,
         resource_id=body.resource_id,
         note=body.note,
-        priority=body.priority,
-        group_id=body.group_id,
         source="user",
         weight=USER_WEIGHT,
     )
@@ -418,31 +405,16 @@ async def match_context_links(
     result = await db.execute(q)
     links: list[ContextLink] = list(result.scalars().all())
 
-    # ── AND/OR group evaluation (unchanged logic) ─────────────────────────
-    groups: dict[str, list[ContextLink]] = {}
-    solo_counter = 0
-    for link in links:
-        if link.group_id:
-            groups.setdefault(link.group_id, []).append(link)
-        else:
-            groups[f"__solo_{solo_counter}"] = [link]
-            solo_counter += 1
-
-    matched_links: list[ContextLink] = []
+    # Each link is evaluated independently (OR across all matchers).
+    # Multiple matchers for the same resource are fine — the best-scoring one wins.
     seen_resources: set[tuple[str, str]] = set()
-
-    # Collect all matching links (dedup by resource)
-    for group_links in groups.values():
-        all_match = all(
-            _link_matches(link, url, app_name, window_title, hostname, hostname_base)
-            for link in group_links
-        )
-        if all_match:
-            for link in group_links:
-                resource_key = (link.resource_type, link.resource_id)
-                if resource_key not in seen_resources:
-                    seen_resources.add(resource_key)
-                    matched_links.append(link)
+    matched_links: list[ContextLink] = []
+    for link in links:
+        if _link_matches(link, url, app_name, window_title, hostname, hostname_base):
+            resource_key = (link.resource_type, link.resource_id)
+            if resource_key not in seen_resources:
+                seen_resources.add(resource_key)
+                matched_links.append(link)
 
     # ── Score each matched link ───────────────────────────────────────────
     # Enrich ScoringContext with available signals.
@@ -513,8 +485,6 @@ async def match_context_links(
                 resource_name=resource_name,
                 resource_summary=resource_summary,
                 note=link.note,
-                priority=link.priority or 0,
-                group_id=link.group_id,
                 source=link.source or "user",
                 weight=link.weight if link.weight is not None else USER_WEIGHT,
                 click_count=link.click_count or 0,

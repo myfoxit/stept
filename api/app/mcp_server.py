@@ -432,43 +432,4 @@ async def workflow_resource(workflow_id: str) -> str:
     return result.get("guide_markdown", "") or ""
 
 
-@mcp.tool()
-async def get_related_knowledge(resource_id: str, resource_type: str = "document", ctx=None) -> list[dict]:
-    """Get knowledge related to a document or workflow, following the knowledge graph."""
-    auth_project_id = await _auth_project_id(ctx or {})
-    if not auth_project_id:
-        return [{"error": "Authentication required. Provide a valid API key."}]
 
-    session, gen = await _db()
-    try:
-        from app.models import KnowledgeLink
-        from sqlalchemy import select, and_, or_
-
-        stmt = select(KnowledgeLink).where(
-            or_(
-                and_(KnowledgeLink.source_type == resource_type, KnowledgeLink.source_id == resource_id),
-                and_(KnowledgeLink.target_type == resource_type, KnowledgeLink.target_id == resource_id),
-            )
-        )
-        links = (await session.execute(stmt)).scalars().all()
-
-        results = []
-        for link in links:
-            # Return the "other" side of the link
-            if link.source_id == resource_id and link.source_type == resource_type:
-                results.append({
-                    "resource_type": link.target_type,
-                    "resource_id": link.target_id,
-                    "link_type": link.link_type.value if link.link_type else None,
-                    "confidence": link.confidence,
-                })
-            else:
-                results.append({
-                    "resource_type": link.source_type,
-                    "resource_id": link.source_id,
-                    "link_type": link.link_type.value if link.link_type else None,
-                    "confidence": link.confidence,
-                })
-        return results
-    finally:
-        await _close_db(session, gen)

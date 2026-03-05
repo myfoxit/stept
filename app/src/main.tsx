@@ -25,7 +25,7 @@ import { SpotlightProvider } from "@/components/spotlight/SpotlightProvider";
 import { PublicWorkflowPage } from "@/pages/public-workflow";
 import { PublicDocumentPage } from "@/pages/public-document";
 import { SharedWithMePage } from "@/pages/shared-with-me";
-import { ContextLinksPage } from "@/pages/context-links";
+
 import { TeamPage } from "@/pages/team";
 import { KnowledgeBasePage } from "@/pages/knowledge-base";
 import { AuditLogPage } from "@/pages/audit-log";
@@ -91,10 +91,6 @@ createRoot(document.getElementById("root")!).render(
                         element={<DocumentGalleryPage />}
                       />
                       <Route path="/shared" element={<SharedWithMePage />} />
-                      <Route
-                        path="/context-links"
-                        element={<ContextLinksPage />}
-                      />
                       <Route path="/team" element={<TeamPage />} />
                       <Route
                         path="/knowledge"

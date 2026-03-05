@@ -301,15 +301,6 @@ class ProcessRecordingSession(Base):
     is_processed = Column(Boolean, nullable=False, default=False)
     guide_markdown = Column(Text, nullable=True)
     
-    # Video import fields
-    source_type = Column(String(20), default="desktop")  # desktop, cli, video
-    video_filename = Column(String, nullable=True)
-    video_size_bytes = Column(BigInteger, nullable=True)
-    video_duration_seconds = Column(Float, nullable=True)
-    processing_progress = Column(Integer, default=0)  # 0-100
-    processing_stage = Column(String, nullable=True)  # uploading, extracting_audio, transcribing, extracting_frames, analyzing, generating, done, failed
-    processing_error = Column(String, nullable=True)
-    
     search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
 
     # Ranking signals
@@ -326,31 +317,6 @@ class ProcessRecordingSession(Base):
     project = relationship("Project", backref="recording_sessions")
     folder = relationship("Folder", backref="recording_sessions")
     owner = relationship("User", foreign_keys=[owner_id], backref="private_workflows")
-
-class MediaProcessingJob(Base):
-    __tablename__ = "media_processing_jobs"
-
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    session_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
-    job_type = Column(String(32), nullable=False, default="video_import")
-    status = Column(String(16), nullable=False, default="queued", index=True)  # queued, running, succeeded, failed
-    progress = Column(Integer, nullable=False, default=0)
-    stage = Column(String(64), nullable=True)
-    error = Column(String, nullable=True)
-    task_id = Column(String(64), nullable=True, unique=True, index=True)
-    attempts = Column(Integer, nullable=False, default=0)
-    max_attempts = Column(Integer, nullable=False, default=3)
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    session = relationship("ProcessRecordingSession", backref=backref("media_jobs", cascade="all, delete-orphan"))
-
-    __table_args__ = (
-        UniqueConstraint('session_id', 'job_type', name='_media_job_session_type_unique'),
-    )
-
 
 class ProcessRecordingStep(Base):
     __tablename__ = "process_recording_steps"
@@ -577,9 +543,6 @@ class ContextLink(Base):
     match_type = Column(String(20), nullable=False)  # 'url_pattern', 'url_exact', 'url_regex', 'app_name', 'app_exact', 'app_regex', 'window_title', 'window_regex'
     match_value = Column(String(500), nullable=False)
 
-    # AND grouping — links sharing a group_id must ALL match
-    group_id = Column(String(16), nullable=True, index=True)
-
     # What to surface
     resource_type = Column(String(20), nullable=False)  # 'workflow', 'document'
     resource_id = Column(String(16), nullable=False)
@@ -615,8 +578,6 @@ class ContextLink(Base):
 
     __table_args__ = (
         Index('idx_context_links_match', 'project_id', 'match_type', 'match_value'),
-        # Dedup constraint: one link per (project, match, resource) tuple.
-        # The application enforces this before INSERT; the DB is the safety net.
         UniqueConstraint('project_id', 'match_type', 'match_value', 'resource_id',
                          name='uq_context_link_dedup'),
     )
@@ -702,31 +663,4 @@ class AuditLog(Base):
     user = relationship("User", backref="audit_logs")
 
 
-class LinkType(enum.Enum):
-    RELATED = "related"
-    DEPENDS_ON = "depends_on"
-    SUPERSEDES = "supersedes"
-    PART_OF = "part_of"
 
-class KnowledgeLink(Base):
-    __tablename__ = "knowledge_links"
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    source_type = Column(String(30), nullable=False)
-    source_id = Column(String(16), nullable=False)
-    target_type = Column(String(30), nullable=False)
-    target_id = Column(String(16), nullable=False)
-    link_type = Column(SQLEnum(LinkType, name="link_type_enum", values_callable=enum_values, native_enum=False), nullable=False)
-    confidence = Column(Float, nullable=True)
-    auto_detected = Column(Boolean, nullable=False, default=False)
-    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    created_at = Column(DateTime, server_default=func.now())
-
-    project = relationship("Project", backref="knowledge_links")
-    creator = relationship("User", backref="knowledge_links")
-
-    __table_args__ = (
-        UniqueConstraint('source_type', 'source_id', 'target_type', 'target_id', 'link_type', name='_knowledge_link_unique'),
-        Index('idx_kl_source', 'source_type', 'source_id'),
-        Index('idx_kl_target', 'target_type', 'target_id'),
-    )
