@@ -1,8 +1,10 @@
 # app/api/document.py
-from fastapi import APIRouter, Depends, HTTPException, Response, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, Query, Request, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
+import os
+import asyncio
 from app.database import get_session as get_db
 from app.schemas.document import (
     DocumentRead, 
@@ -1104,3 +1106,106 @@ async def export_document_docx(
             "Content-Disposition": f'attachment; filename="{filename}"',
         }
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# FILE UPLOAD ENDPOINT
+# ──────────────────────────────────────────────────────────────────────────────
+
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
+
+
+@router.post("/upload-file")
+async def upload_document_file(
+    file: UploadFile = File(...),
+    project_id: str = Form(...),
+    folder_id: Optional[str] = Form(None),
+    is_private: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a file and create a Document + KnowledgeSource from its extracted text."""
+    from app.services.ingest.extract import extract_text, ALLOWED_MIME_TYPES
+    from app.services.indexer import index_knowledge_source_background
+    from app.models import Document as DocumentModel, KnowledgeSource, SourceType
+    from app.utils import gen_suffix
+
+    # Check permission
+    await check_project_permission(db, current_user.id, project_id, ProjectRole.EDITOR)
+
+    # Validate mime type
+    mime = file.content_type or ""
+    if mime not in ALLOWED_MIME_TYPES:
+        raise HTTPException(400, f"Unsupported file type: {mime}")
+
+    # Read file content
+    content = await file.read()
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(400, "File exceeds 50MB limit")
+
+    # Normalize folder_id
+    if folder_id in (None, "", "null", "undefined"):
+        folder_id = None
+
+    # Generate doc id and store file
+    doc_id = gen_suffix()
+    file_dir = os.path.join(UPLOAD_DIR, "file-docs", project_id, doc_id)
+    os.makedirs(file_dir, exist_ok=True)
+    file_path = os.path.join(file_dir, file.filename)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # Extract text
+    extracted_text = await extract_text(file_path, mime)
+
+    # Convert to TipTap JSON
+    paragraphs = []
+    for chunk in extracted_text.split("\n\n"):
+        chunk = chunk.strip()
+        if chunk:
+            paragraphs.append({
+                "type": "paragraph",
+                "content": [{"type": "text", "text": chunk}],
+            })
+    if not paragraphs:
+        paragraphs.append({"type": "paragraph", "content": [{"type": "text", "text": "(empty)"}]})
+    tiptap_json = {"type": "doc", "content": paragraphs}
+
+    # Derive name from filename (without extension)
+    name = os.path.splitext(file.filename)[0]
+
+    # Create Document
+    doc = DocumentModel(
+        id=doc_id,
+        name=name,
+        content=tiptap_json,
+        project_id=project_id,
+        folder_id=folder_id,
+        is_private=is_private,
+        source_file_path=file_path,
+        source_file_mime=mime,
+        owner_id=current_user.id,
+    )
+    db.add(doc)
+
+    # Create KnowledgeSource
+    source = KnowledgeSource(
+        project_id=project_id,
+        source_type=SourceType.UPLOAD,
+        name=file.filename,
+        raw_content=extracted_text,
+        processed_content=extracted_text,
+        file_path=file_path,
+        file_size=len(content),
+        mime_type=mime,
+        created_by=current_user.id,
+    )
+    db.add(source)
+    await db.commit()
+    await db.refresh(doc)
+    await db.refresh(source)
+
+    # Index in background
+    asyncio.create_task(index_knowledge_source_background(source.id))
+
+    return {"id": doc.id, "name": doc.name}

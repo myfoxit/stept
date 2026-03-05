@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ClipboardCheck, Copy, File, FileText, Files, Folder, FolderOpen, FolderPlus, Globe, Inbox, LayoutGrid, Lock, Monitor, MoreHorizontal, Move, Pencil, Play, Plus, Share2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardCheck, Copy, File, FileText, Files, Folder, FolderOpen, FolderPlus, Globe, Inbox, LayoutGrid, Lock, Monitor, MoreHorizontal, Move, Pencil, Play, Plus, Share2, Trash2, Upload } from 'lucide-react';
 import * as React from "react";
 import {
   SidebarGroup,
@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/apiClient";
 import { useProject } from "@/providers/project-provider";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
@@ -87,12 +88,14 @@ function NavPageItem({
   level = 0,
   onDragEnd,
   isPrivateSection, // NEW: Track which section we're in
+  onUploadFile,
 }: {
   doc: DocumentNode;
   userRole: string;
   level?: number;
   onDragEnd?: () => void;
   isPrivateSection?: boolean; // NEW
+  onUploadFile?: (folderId: string, isPrivate: boolean) => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -585,6 +588,10 @@ function NavPageItem({
                       <FileText className="mr-2 size-4" />
                       New Page
                     </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onUploadFile?.(doc.id, doc.is_private)}>
+                      <Upload className="mr-2 size-4" />
+                      Upload File
+                    </DropdownMenuItem>
                   </>
                 )}
 
@@ -639,6 +646,7 @@ function NavPageItem({
                 level={level + 1}
                 onDragEnd={onDragEnd}
                 isPrivateSection={isPrivateSection} // NEW: Pass down
+                onUploadFile={onUploadFile}
               />
             ))}
           </div>
@@ -880,6 +888,10 @@ export function NavPages({ userRole }: { userRole: string }) {
   const moveDoc = useMoveDocument();
   const moveWorkflow = useMoveWorkflow();
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadTargetFolder, setUploadTargetFolder] = React.useState<string | null>(null);
+  const [uploadIsPrivate, setUploadIsPrivate] = React.useState(false);
+
   const [dragCounter, setDragCounter] = React.useState(0);
   const [isDraggingOverShared, setIsDraggingOverShared] = React.useState(false);
   const [isDraggingOverPrivate, setIsDraggingOverPrivate] =
@@ -897,6 +909,26 @@ export function NavPages({ userRole }: { userRole: string }) {
 
   const handleDragEnd = () => {
     setDragCounter((c) => c + 1);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedProjectId) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("project_id", selectedProjectId);
+    if (uploadTargetFolder) formData.append("folder_id", uploadTargetFolder);
+    formData.append("is_private", String(uploadIsPrivate));
+    try {
+      const resp = await apiClient.post("/documents/upload-file", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      navigate(`/editor/${resp.data.id}`);
+    } catch {
+      alert("Upload failed");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   // NEW: Handler for dropping into shared section
@@ -1002,6 +1034,13 @@ export function NavPages({ userRole }: { userRole: string }) {
 
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt,.md,.html,.htm,.jpg,.jpeg,.png,.gif,.webp"
+        onChange={handleFileUpload}
+      />
       {/* Gallery View Links */}
       <SidebarGroup className="py-2">
         <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1]">
@@ -1113,6 +1152,11 @@ export function NavPages({ userRole }: { userRole: string }) {
                 userRole={userRole}
                 onDragEnd={handleDragEnd}
                 isPrivateSection={false}
+                onUploadFile={(folderId, isPrivate) => {
+                  setUploadTargetFolder(folderId);
+                  setUploadIsPrivate(isPrivate);
+                  fileInputRef.current?.click();
+                }}
               />
             ))}
 
@@ -1165,6 +1209,16 @@ export function NavPages({ userRole }: { userRole: string }) {
                       <FileText className="mr-2 size-4" />
                       New Page
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setUploadTargetFolder(null);
+                        setUploadIsPrivate(false);
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      <Upload className="mr-2 size-4" />
+                      Upload File
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -1181,6 +1235,11 @@ export function NavPages({ userRole }: { userRole: string }) {
                     userRole={userRole}
                     onDragEnd={handleDragEnd}
                     isPrivateSection={false}
+                    onUploadFile={(folderId, isPrivate) => {
+                      setUploadTargetFolder(folderId);
+                      setUploadIsPrivate(isPrivate);
+                      fileInputRef.current?.click();
+                    }}
                   />
                 ))}
             </div>
@@ -1244,6 +1303,11 @@ export function NavPages({ userRole }: { userRole: string }) {
                   userRole={userRole}
                   onDragEnd={handleDragEnd}
                   isPrivateSection={true}
+                  onUploadFile={(folderId, isPrivate) => {
+                    setUploadTargetFolder(folderId);
+                    setUploadIsPrivate(isPrivate);
+                    fileInputRef.current?.click();
+                  }}
                 />
               ))}
 
@@ -1300,6 +1364,16 @@ export function NavPages({ userRole }: { userRole: string }) {
                         <FileText className="mr-2 size-4" />
                         New Page
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setUploadTargetFolder(null);
+                          setUploadIsPrivate(true);
+                          fileInputRef.current?.click();
+                        }}
+                      >
+                        <Upload className="mr-2 size-4" />
+                        Upload File
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
@@ -1316,6 +1390,11 @@ export function NavPages({ userRole }: { userRole: string }) {
                       userRole={userRole}
                       onDragEnd={handleDragEnd}
                       isPrivateSection={true}
+                      onUploadFile={(folderId, isPrivate) => {
+                        setUploadTargetFolder(folderId);
+                        setUploadIsPrivate(isPrivate);
+                        fileInputRef.current?.click();
+                      }}
                     />
                   ))}
               </div>
