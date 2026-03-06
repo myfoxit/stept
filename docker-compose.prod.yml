@@ -97,6 +97,18 @@ services:
       SR_SMTP_USER: ${SR_SMTP_USER:-}
       SR_SMTP_PASS: ${SR_SMTP_PASS:-}
       SR_FROM_EMAIL: ${SR_FROM_EMAIL:-noreply@ondoki.com}
+      # Storage
+      STORAGE_BACKEND: "${STORAGE_BACKEND:-local}"
+      LOCAL_STORAGE_PATH: "${LOCAL_STORAGE_PATH:-/app/storage/recordings}"
+      UPLOAD_DIR: "${UPLOAD_DIR:-/app/uploads}"
+      S3_BUCKET: "${S3_BUCKET:-}"
+      S3_REGION: "${S3_REGION:-}"
+      S3_ENDPOINT_URL: "${S3_ENDPOINT_URL:-}"
+      S3_PREFIX: "${S3_PREFIX:-uploads}"
+      S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-}"
+      S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
     volumes:
       - file-storage:/app/storage
       - uploads:/app/uploads
@@ -128,6 +140,15 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       WHISPER_MODEL: ${WHISPER_MODEL:-base}
       ONDOKI_UPLOAD_DIR: /app/storage/videos
+      STORAGE_BACKEND: "${STORAGE_BACKEND:-local}"
+      S3_BUCKET: "${S3_BUCKET:-}"
+      S3_REGION: "${S3_REGION:-}"
+      S3_ENDPOINT_URL: "${S3_ENDPOINT_URL:-}"
+      S3_PREFIX: "${S3_PREFIX:-uploads}"
+      S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-}"
+      S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
     volumes:
       - file-storage:/app/storage
     networks:
