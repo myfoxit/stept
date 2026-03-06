@@ -146,6 +146,7 @@ class S3StorageBackend(StorageBackend):
         self.endpoint_url = endpoint_url
         try:
             import boto3  # type: ignore
+            from botocore.config import Config as BotoConfig
 
             kwargs: dict[str, Any] = {}
             if region:
@@ -155,6 +156,12 @@ class S3StorageBackend(StorageBackend):
             if access_key_id and secret_access_key:
                 kwargs["aws_access_key_id"] = access_key_id
                 kwargs["aws_secret_access_key"] = secret_access_key
+            # Use s3v4 signatures and virtual-hosted addressing for proper
+            # presigned URL generation across all regions.
+            kwargs["config"] = BotoConfig(
+                signature_version="s3v4",
+                s3={"addressing_style": "virtual"},
+            )
             self._client = boto3.client("s3", **kwargs)
         except Exception:
             self._client = None
