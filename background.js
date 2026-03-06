@@ -908,7 +908,19 @@ async function uploadCapture() {
 
     for (const step of state.steps) {
       if (step.screenshotDataUrl) {
-        const blob = await dataUrlToBlob(step.screenshotDataUrl);
+        // Resolve IDB references to actual data URLs
+        let dataUrl = step.screenshotDataUrl;
+        if (dataUrl.startsWith('idb:')) {
+          const stepId = dataUrl.replace('idb:', '');
+          const fromIdb = await self.screenshotDB.getScreenshot(stepId).catch(() => null);
+          if (!fromIdb) {
+            debugLog(`Skipping step ${step.stepNumber}: screenshot not found in IDB`);
+            continue;
+          }
+          dataUrl = fromIdb;
+        }
+
+        const blob = await dataUrlToBlob(dataUrl);
         const formData = new FormData();
         formData.append('file', blob, `step_${step.stepNumber}.jpg`);
         formData.append('stepNumber', step.stepNumber.toString());

@@ -21,7 +21,7 @@ async function searchRecordings(apiUrl, accessToken, query, projectId, limit = 1
     params.append('project_id', projectId);
   }
 
-  const response = await fetch(`${apiUrl}/search?${params}`, {
+  const response = await fetch(`${apiUrl}/search/search?${params}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
