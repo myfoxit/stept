@@ -324,15 +324,15 @@ async function performUpload() {
   progressFill.style.width = '100%';
 
   if (result.success) {
-    uploadTitle.textContent = 'Upload Complete!';
-    uploadMessage.textContent = 'Your capture has been saved to the cloud';
-    uploadStatus.textContent = '\u2713 Successfully uploaded';
-    uploadStatus.classList.add('upload-success');
-    uploadActions.classList.add('hidden');
-    uploadDoneActions.classList.remove('hidden');
-
     await sendMessage({ type: 'CLEAR_STEPS' });
     steps = [];
+
+    // Redirect to the new workflow
+    const settings = await sendMessage({ type: 'GET_SETTINGS' });
+    const webAppUrl = (settings.apiBaseUrl || '').replace('/api/v1', '');
+    if (result.sessionId && webAppUrl) {
+      chrome.tabs.create({ url: `${webAppUrl}/workflows/${result.sessionId}` });
+    }
   } else {
     uploadTitle.textContent = 'Upload Failed';
     uploadMessage.textContent = 'There was a problem uploading your capture';

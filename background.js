@@ -946,7 +946,7 @@ async function uploadCapture() {
       },
     );
 
-    return { success: true };
+    return { success: true, sessionId };
   } catch (error) {
     return { success: false, error: error.message };
   }
