@@ -7,6 +7,131 @@ import { ChatService } from './chat';
 import { CloudUploadService } from './cloud-upload';
 import { ContextWatcherService } from './context-watcher';
 import { SmartAnnotationService } from './smart-annotation';
+import * as path from 'path';
+
+// --- Input validation helpers ---
+
+function assertString(value: unknown, name: string): asserts value is string {
+  if (typeof value !== 'string') throw new Error(`${name} must be a string`);
+}
+
+function assertOptionalString(value: unknown, name: string): asserts value is string | undefined {
+  if (value !== undefined && value !== null && typeof value !== 'string')
+    throw new Error(`${name} must be a string`);
+}
+
+function assertBoolean(value: unknown, name: string): asserts value is boolean {
+  if (typeof value !== 'boolean') throw new Error(`${name} must be a boolean`);
+}
+
+function assertNumber(value: unknown, name: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${name} must be a finite number`);
+}
+
+function assertObject(value: unknown, name: string): asserts value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new Error(`${name} must be a non-null object`);
+}
+
+function assertArray(value: unknown, name: string): asserts value is unknown[] {
+  if (!Array.isArray(value)) throw new Error(`${name} must be an array`);
+}
+
+/** Validate a CaptureArea object from the renderer */
+function validateCaptureArea(area: unknown): void {
+  assertObject(area, 'captureArea');
+  const a = area as Record<string, unknown>;
+  if (!['all-displays', 'single-display', 'window'].includes(a.type as string))
+    throw new Error('captureArea.type must be all-displays, single-display, or window');
+  if (a.displayId !== undefined) assertString(a.displayId, 'captureArea.displayId');
+  if (a.displayName !== undefined) assertString(a.displayName, 'captureArea.displayName');
+  if (a.windowHandle !== undefined) assertNumber(a.windowHandle, 'captureArea.windowHandle');
+  if (a.windowTitle !== undefined) assertString(a.windowTitle, 'captureArea.windowTitle');
+  if (a.bounds !== undefined) validateBounds(a.bounds);
+}
+
+/** Validate a Rectangle/bounds object */
+function validateBounds(bounds: unknown): void {
+  assertObject(bounds, 'bounds');
+  const b = bounds as Record<string, unknown>;
+  assertNumber(b.x, 'bounds.x');
+  assertNumber(b.y, 'bounds.y');
+  assertNumber(b.width, 'bounds.width');
+  assertNumber(b.height, 'bounds.height');
+  if (b.width <= 0 || b.height <= 0) throw new Error('bounds width/height must be positive');
+  if (b.width > 20000 || b.height > 20000) throw new Error('bounds dimensions exceed maximum');
+}
+
+/** Validate settings keys – only allow known setting fields */
+const ALLOWED_SETTINGS_KEYS = new Set([
+  'cloudEndpoint', 'chatApiUrl', 'apiKey',
+  'llmProvider', 'llmApiKey', 'llmModel', 'llmBaseUrl',
+  'autoAnnotateSteps', 'autoGenerateGuide', 'frontendUrl',
+  'spotlightShortcut', 'recordingShortcut', 'minimizeOnRecord',
+]);
+
+function validateSettingsUpdate(settings: unknown): void {
+  assertObject(settings, 'settings');
+  const s = settings as Record<string, unknown>;
+  for (const key of Object.keys(s)) {
+    if (!ALLOWED_SETTINGS_KEYS.has(key))
+      throw new Error(`Unknown settings key: ${key}`);
+  }
+  // Type-check individual fields if present
+  if (s.cloudEndpoint !== undefined) assertString(s.cloudEndpoint, 'cloudEndpoint');
+  if (s.chatApiUrl !== undefined) assertString(s.chatApiUrl, 'chatApiUrl');
+  if (s.apiKey !== undefined) assertString(s.apiKey, 'apiKey');
+  if (s.llmProvider !== undefined) assertString(s.llmProvider, 'llmProvider');
+  if (s.llmApiKey !== undefined) assertString(s.llmApiKey, 'llmApiKey');
+  if (s.llmModel !== undefined) assertString(s.llmModel, 'llmModel');
+  if (s.llmBaseUrl !== undefined) assertString(s.llmBaseUrl, 'llmBaseUrl');
+  if (s.autoAnnotateSteps !== undefined) assertBoolean(s.autoAnnotateSteps, 'autoAnnotateSteps');
+  if (s.autoGenerateGuide !== undefined) assertBoolean(s.autoGenerateGuide, 'autoGenerateGuide');
+  if (s.frontendUrl !== undefined) assertString(s.frontendUrl, 'frontendUrl');
+  if (s.spotlightShortcut !== undefined) assertString(s.spotlightShortcut, 'spotlightShortcut');
+  if (s.recordingShortcut !== undefined) assertString(s.recordingShortcut, 'recordingShortcut');
+  if (s.minimizeOnRecord !== undefined) assertBoolean(s.minimizeOnRecord, 'minimizeOnRecord');
+}
+
+/** Validate a chat message array */
+function validateChatMessages(messages: unknown): void {
+  assertArray(messages, 'messages');
+  if ((messages as unknown[]).length === 0) throw new Error('messages must not be empty');
+  if ((messages as unknown[]).length > 200) throw new Error('messages exceeds maximum length');
+  for (const msg of messages as unknown[]) {
+    assertObject(msg, 'message');
+    const m = msg as Record<string, unknown>;
+    if (!['system', 'user', 'assistant'].includes(m.role as string))
+      throw new Error('message.role must be system, user, or assistant');
+    assertString(m.content, 'message.content');
+    if ((m.content as string).length > 100_000)
+      throw new Error('message.content exceeds maximum length');
+  }
+}
+
+/** Validate URL for openExternal — allow only https and mailto */
+function validateExternalUrl(url: unknown): void {
+  assertString(url, 'url');
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error('Invalid URL'); }
+  const allowed = ['https:', 'mailto:'];
+  if (!allowed.includes(parsed.protocol))
+    throw new Error(`Protocol ${parsed.protocol} is not allowed. Only https: and mailto: are permitted.`);
+}
+
+/** Validate that a path does not contain traversal sequences */
+function validateNoPathTraversal(filePath: unknown, name: string): void {
+  assertString(filePath, name);
+  const normalized = path.normalize(filePath);
+  if (normalized.includes('..')) throw new Error(`${name} must not contain path traversal`);
+}
+
+/** Validate a UUID-like string (alphanumeric + hyphens, reasonable length) */
+function validateId(value: unknown, name: string): void {
+  assertString(value, name);
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value))
+    throw new Error(`${name} must be alphanumeric (with hyphens/underscores), max 128 chars`);
+}
 
 export function setupIpcHandlers(
   authService: AuthService,
@@ -32,6 +157,9 @@ export function setupIpcHandlers(
   // Recording IPC handlers
   ipcMain.handle('recording:start', async (event, captureArea, projectId) => {
     try {
+      validateCaptureArea(captureArea);
+      assertOptionalString(projectId, 'projectId');
+
       recordingService.removeAllListeners('step-recorded');
       recordingService.removeAllListeners('state-changed');
 
@@ -174,7 +302,9 @@ export function setupIpcHandlers(
 
   // Screenshot IPC handlers
   ipcMain.handle('screenshot:take', async (event, bounds) => {
-    try { return await screenshotService.takeScreenshot(bounds); }
+    try {
+      if (bounds !== undefined && bounds !== null) validateBounds(bounds);
+      return await screenshotService.takeScreenshot(bounds); }
     catch (error) { throw new Error(`Failed to take screenshot: ${error instanceof Error ? error.message : String(error)}`); }
   });
 
@@ -196,6 +326,7 @@ export function setupIpcHandlers(
 
   ipcMain.handle('auth:handle-callback', async (event, url) => {
     try {
+      assertString(url, 'url');
       const success = await authService.handleCallback(url);
       const status = await authService.getStatus();
       event.sender.send('auth-status-changed', status);
@@ -238,7 +369,9 @@ export function setupIpcHandlers(
   ipcMain.handle('settings:get', () => settingsManager.getSettings());
 
   ipcMain.handle('settings:save', async (event, settings) => {
-    try { await settingsManager.saveSettings(settings); return { success: true }; }
+    try {
+      validateSettingsUpdate(settings);
+      await settingsManager.saveSettings(settings); return { success: true }; }
     catch (error) { throw new Error(`Failed to save settings: ${error instanceof Error ? error.message : String(error)}`); }
   });
 
@@ -248,12 +381,10 @@ export function setupIpcHandlers(
   });
 
   // Chat IPC handlers
-  let manualContextItems: { type: string; content: string; label?: string }[] = [];
-  let clipboardWatchingEnabled = false;
-  let lastClipboardText = '';
-
   ipcMain.handle('chat:send-message', async (event, messages, context) => {
     try {
+      validateChatMessages(messages);
+      assertOptionalString(context, 'context');
       let enrichedContext = context;
       try {
         const activeCtx = await contextWatcher.getActiveContext();
@@ -261,12 +392,6 @@ export function setupIpcHandlers(
         if (context) contextParts.push(context);
         if (activeCtx) {
           contextParts.push(`Active context: ${activeCtx.appName}${activeCtx.windowTitle ? ' — ' + activeCtx.windowTitle : ''}${activeCtx.url ? ' (' + activeCtx.url + ')' : ''}`);
-        }
-        if (manualContextItems.length > 0) {
-          const manualStr = manualContextItems.map(item =>
-            `[${item.type}${item.label ? ': ' + item.label : ''}] ${item.content.slice(0, 500)}`
-          ).join('\n');
-          contextParts.push(`User-provided context:\n${manualStr}`);
         }
         if (contextParts.length > 0) enrichedContext = contextParts.join('\n\n');
       } catch {}
@@ -278,12 +403,17 @@ export function setupIpcHandlers(
 
   // Cloud upload IPC handlers (manual trigger still available)
   ipcMain.handle('cloud:upload', async (event, steps, projectId, userId) => {
-    try { return await cloudUploadService.uploadRecording(steps, userId, projectId); }
+    try {
+      assertArray(steps, 'steps');
+      assertString(projectId, 'projectId');
+      assertString(userId, 'userId');
+      return await cloudUploadService.uploadRecording(steps, userId, projectId); }
     catch (error) { throw new Error(`Failed to upload recording: ${error instanceof Error ? error.message : String(error)}`); }
   });
 
   // Context watcher IPC handlers
-  ipcMain.handle('context:start', async (event, projectId: string) => {
+  ipcMain.handle('context:start', async (event, projectId) => {
+    assertString(projectId, 'projectId');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { error: 'Not authenticated' };
@@ -315,10 +445,15 @@ export function setupIpcHandlers(
     return await contextWatcher.forceMatchCheck();
   });
 
-  ipcMain.handle('context:add-link', async (event, data: {
-    project_id: string; match_type: string; match_value: string;
-    resource_type: string; resource_id: string; note?: string;
-  }) => {
+  ipcMain.handle('context:add-link', async (event, data) => {
+    assertObject(data, 'data');
+    const d = data as Record<string, unknown>;
+    assertString(d.project_id, 'project_id');
+    assertString(d.match_type, 'match_type');
+    assertString(d.match_value, 'match_value');
+    assertString(d.resource_type, 'resource_type');
+    assertString(d.resource_id, 'resource_id');
+    assertOptionalString(d.note, 'note');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { error: 'Not authenticated' };
@@ -332,12 +467,13 @@ export function setupIpcHandlers(
     return await res.json();
   });
 
-  ipcMain.handle('context:list-links', async (event, projectId?: string) => {
+  ipcMain.handle('context:list-links', async (event, projectId) => {
+    assertOptionalString(projectId, 'projectId');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { error: 'Not authenticated' };
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
-    const params = projectId ? `?project_id=${projectId}` : '';
+    const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
     const res = await fetch(`${apiBase}/context-links${params}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
@@ -345,12 +481,13 @@ export function setupIpcHandlers(
     return await res.json();
   });
 
-  ipcMain.handle('context:delete-link', async (event, linkId: string) => {
+  ipcMain.handle('context:delete-link', async (event, linkId) => {
+    validateId(linkId, 'linkId');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { error: 'Not authenticated' };
     const apiBase = (settings.chatApiUrl || settings.cloudEndpoint).replace(/\/+$/, '');
-    const res = await fetch(`${apiBase}/context-links/${linkId}`, {
+    const res = await fetch(`${apiBase}/context-links/${encodeURIComponent(linkId)}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` },
     });
@@ -363,42 +500,15 @@ export function setupIpcHandlers(
     return { success: true };
   });
 
-  ipcMain.handle('context:add-manual', async (_event, item: { type: string; content: string; label?: string }) => {
-    manualContextItems.push(item);
-    return { success: true, items: manualContextItems };
-  });
-
-  ipcMain.handle('context:remove-manual', async (_event, index: number) => {
-    if (index >= 0 && index < manualContextItems.length) manualContextItems.splice(index, 1);
-    return { success: true, items: manualContextItems };
-  });
-
-  ipcMain.handle('context:get-manual', async () => manualContextItems);
-
-  ipcMain.handle('context:get-clipboard', async () => {
-    const { clipboard } = require('electron');
-    return clipboard.readText();
-  });
-
-  ipcMain.handle('context:set-clipboard-watching', async (_event, enabled: boolean) => {
-    clipboardWatchingEnabled = enabled;
-    if (enabled) { const { clipboard } = require('electron'); lastClipboardText = clipboard.readText(); }
-    return { success: true };
-  });
-
-  ipcMain.handle('context:take-screenshot', async () => {
-    try {
-      const screenshot = require('screenshot-desktop');
-      const imgBuffer = await screenshot();
-      return imgBuffer.toString('base64');
-    } catch (err) {
-      console.error('Failed to take context screenshot:', err);
-      return null;
-    }
-  });
+  // Removed unexposed IPC channels: context:add-manual, context:remove-manual,
+  // context:get-manual, context:get-clipboard, context:set-clipboard-watching,
+  // context:take-screenshot — these were not exposed via preload and expanded
+  // the attack surface unnecessarily.
 
   // Spotlight IPC
-  ipcMain.handle('spotlight:search', async (event, query: string, projectId: string) => {
+  ipcMain.handle('spotlight:search', async (event, query, projectId) => {
+    assertString(query, 'query');
+    assertString(projectId, 'projectId');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { results: [] };
@@ -414,7 +524,9 @@ export function setupIpcHandlers(
   });
 
   // Keep for backward compat but also route to unified-v2
-  ipcMain.handle('spotlight:semantic-search', async (event, query: string, projectId: string) => {
+  ipcMain.handle('spotlight:semantic-search', async (event, query, projectId) => {
+    assertString(query, 'query');
+    assertString(projectId, 'projectId');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { results: [] };
@@ -428,7 +540,11 @@ export function setupIpcHandlers(
     return await res.json();
   });
 
-  ipcMain.handle('spotlight:preview', async (_event, resourceId: string, resourceType: string) => {
+  ipcMain.handle('spotlight:preview', async (_event, resourceId, resourceType) => {
+    validateId(resourceId, 'resourceId');
+    assertString(resourceType, 'resourceType');
+    if (!['workflow', 'document'].includes(resourceType))
+      throw new Error('resourceType must be workflow or document');
     const settings = settingsManager.getSettings();
     const token = authService.getAccessToken();
     if (!token) return { preview: null };
@@ -443,21 +559,20 @@ export function setupIpcHandlers(
     } catch { return { preview: null }; }
   });
 
-  ipcMain.handle('spotlight:open', async (event, projectId?: string) => {
-    app.emit('spotlight:open', projectId || '');
-    return { ok: true };
-  });
+  // Removed unexposed IPC channel: spotlight:open
 
   // Utility IPC handlers
   ipcMain.handle('utility:open-external', async (event, url) => {
-    try { await shell.openExternal(url); return { success: true }; }
-    catch (error) { throw new Error(`Failed to open external URL: ${error instanceof Error ? error.message : String(error)}`); }
+    try {
+      validateExternalUrl(url);
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (error) {
+      throw new Error(`Failed to open external URL: ${error instanceof Error ? error.message : String(error)}`);
+    }
   });
 
-  ipcMain.handle('utility:show-in-folder', async (event, path) => {
-    try { shell.showItemInFolder(path); return { success: true }; }
-    catch (error) { throw new Error(`Failed to show item in folder: ${error instanceof Error ? error.message : String(error)}`); }
-  });
+  // Removed unexposed IPC channel: utility:show-in-folder (path traversal risk, not used by renderer)
 
   ipcMain.handle('utility:get-version', () => app.getVersion());
   ipcMain.handle('utility:get-platform', () => process.platform);
