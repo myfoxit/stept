@@ -6,8 +6,6 @@ const BUILD_CONFIG = {
   mode: 'self-hosted', // 'self-hosted' or 'cloud'
   cloudApiUrl: 'https://app.ondoki.io/api/v1',
   defaultApiUrl: 'http://localhost:8000/api/v1',
-  cloudFrontendUrl: 'https://app.ondoki.io',
-  defaultFrontendUrl: 'http://localhost',
 };
 
 const DEFAULT_API_BASE_URL = BUILD_CONFIG.mode === 'cloud'
@@ -1054,13 +1052,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
 
       case 'GET_SETTINGS':
-        chrome.storage.local.get(['apiBaseUrl', 'displayMode', 'autoUpload'], (result) => {
-          const frontendUrl = BUILD_CONFIG.mode === 'cloud'
-            ? BUILD_CONFIG.cloudFrontendUrl
-            : BUILD_CONFIG.defaultFrontendUrl;
+        chrome.storage.local.get(['apiBaseUrl', 'frontendUrl', 'displayMode', 'autoUpload'], (result) => {
+          const apiBase = result.apiBaseUrl || DEFAULT_API_BASE_URL;
+          // Derive frontend URL: strip /api/v1 from API base.
+          // For self-hosted with separate frontend port, set frontendUrl in settings.
+          const defaultFrontend = apiBase.replace('/api/v1', '');
           sendResponse({
-            apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL,
-            frontendUrl,
+            apiBaseUrl: apiBase,
+            frontendUrl: result.frontendUrl || defaultFrontend,
             displayMode: result.displayMode || 'sidepanel',
             autoUpload: result.autoUpload !== false,
             buildMode: BUILD_CONFIG.mode,
@@ -1079,6 +1078,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (message.autoUpload !== undefined) {
           await chrome.storage.local.set({ autoUpload: message.autoUpload });
+        }
+        if (message.frontendUrl !== undefined) {
+          await chrome.storage.local.set({ frontendUrl: message.frontendUrl });
         }
         sendResponse({ success: true });
         break;

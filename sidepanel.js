@@ -526,7 +526,7 @@ async function performSearch(query) {
     );
 
     searchSpinner.classList.add('hidden');
-    renderSearchResults(results, settings.apiBaseUrl);
+    renderSearchResults(results, settings.frontendUrl || settings.apiBaseUrl.replace('/api/v1', ''));
   } catch (e) {
     searchSpinner.classList.add('hidden');
     searchResults.innerHTML = '<div class="search-no-results">Search failed</div>';
@@ -534,7 +534,7 @@ async function performSearch(query) {
   }
 }
 
-function renderSearchResults(data, apiBaseUrl) {
+function renderSearchResults(data, frontendUrl) {
   const results = data.results || [];
   document.getElementById('workflowEmptyState').style.display = results.length > 0 ? 'none' : '';
 
@@ -544,7 +544,7 @@ function renderSearchResults(data, apiBaseUrl) {
     return;
   }
 
-  const webAppUrl = apiBaseUrl.replace('/api/v1', '');
+  const webAppUrl = frontendUrl;
   searchResults.innerHTML = results.map((r) => {
     const title = escapeHtml(r.generated_title || r.name || 'Untitled');
     const snippet = r.snippet || '';
@@ -609,7 +609,7 @@ function renderContextMatches(matches) {
   contextList.querySelectorAll('.context-item').forEach((item) => {
     item.addEventListener('click', async () => {
       const settings = await sendMessage({ type: 'GET_SETTINGS' });
-      const webAppUrl = settings.apiBaseUrl.replace('/api/v1', '');
+      const webAppUrl = settings.frontendUrl || settings.apiBaseUrl.replace('/api/v1', '');
       const type = item.dataset.resourceType === 'workflow' ? 'workflows' : 'documents';
       chrome.tabs.create({ url: `${webAppUrl}/${type}/${item.dataset.resourceId}` });
     });
@@ -618,8 +618,7 @@ function renderContextMatches(matches) {
 
 contextLinkBtn.addEventListener('click', async () => {
   const settings = await sendMessage({ type: 'GET_SETTINGS' });
-  const webAppUrl = settings.apiBaseUrl.replace('/api/v1', '');
-  // Get current tab URL
+  const webAppUrl = settings.frontendUrl || settings.apiBaseUrl.replace('/api/v1', '');
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const tabUrl = tabs[0]?.url || '';
     chrome.tabs.create({ url: `${webAppUrl}/context-links/new?url=${encodeURIComponent(tabUrl)}` });
