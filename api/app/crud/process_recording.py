@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.services.storage import (
     StorageBackend,
     get_storage_backend,
+    STORAGE_BACKEND_TYPE,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ async def create_session(
         user_id=user_id,
         client_name=client_name,
         status="uploading",
-        storage_type=(STORAGE_TYPE or "local"),
+        storage_type=(STORAGE_BACKEND_TYPE or "local"),
         storage_path=storage_path,
         project_id=project_id,
         folder_id=folder_id,
