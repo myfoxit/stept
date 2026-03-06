@@ -329,7 +329,7 @@ async function performUpload() {
 
     // Redirect to the new workflow
     const settings = await sendMessage({ type: 'GET_SETTINGS' });
-    const webAppUrl = (settings.apiBaseUrl || '').replace('/api/v1', '');
+    const webAppUrl = settings.frontendUrl || (settings.apiBaseUrl || '').replace('/api/v1', '');
     if (result.sessionId && webAppUrl) {
       chrome.tabs.create({ url: `${webAppUrl}/workflows/${result.sessionId}` });
     }
@@ -385,6 +385,9 @@ completeBtn.addEventListener('click', async () => {
   await sendMessage({ type: 'STOP_RECORDING' });
   // Auto-upload immediately
   showUploadPanel();
+  uploadActions.classList.add('hidden');
+  uploadTitle.textContent = 'Uploading...';
+  uploadMessage.textContent = 'Please wait while we upload your capture';
   await performUpload();
 });
 

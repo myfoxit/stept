@@ -6,6 +6,8 @@ const BUILD_CONFIG = {
   mode: 'self-hosted', // 'self-hosted' or 'cloud'
   cloudApiUrl: 'https://app.ondoki.io/api/v1',
   defaultApiUrl: 'http://localhost:8000/api/v1',
+  cloudFrontendUrl: 'https://app.ondoki.io',
+  defaultFrontendUrl: 'http://localhost',
 };
 
 const DEFAULT_API_BASE_URL = BUILD_CONFIG.mode === 'cloud'
@@ -1053,8 +1055,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'GET_SETTINGS':
         chrome.storage.local.get(['apiBaseUrl', 'displayMode', 'autoUpload'], (result) => {
+          const frontendUrl = BUILD_CONFIG.mode === 'cloud'
+            ? BUILD_CONFIG.cloudFrontendUrl
+            : BUILD_CONFIG.defaultFrontendUrl;
           sendResponse({
             apiBaseUrl: result.apiBaseUrl || DEFAULT_API_BASE_URL,
+            frontendUrl,
             displayMode: result.displayMode || 'sidepanel',
             autoUpload: result.autoUpload !== false,
             buildMode: BUILD_CONFIG.mode,
