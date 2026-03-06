@@ -357,7 +357,8 @@ class OndokiApp {
       return { ok: true };
     });
 
-    ipcMain.handle('spotlight:resize', (_event, height: number) => {
+    ipcMain.handle('spotlight:resize', (_event, height) => {
+      if (typeof height !== 'number' || !Number.isFinite(height)) throw new Error('height must be a finite number');
       if (this.spotlightWindow && !this.spotlightWindow.isDestroyed()) {
         const bounds = this.spotlightWindow.getBounds();
         this.spotlightWindow.setBounds({
@@ -462,7 +463,13 @@ class OndokiApp {
       }
     });
 
-    ipcMain.handle('picker:select', (_event, captureArea: any) => {
+    ipcMain.handle('picker:select', (_event, captureArea) => {
+      if (captureArea != null) {
+        if (typeof captureArea !== 'object' || Array.isArray(captureArea))
+          throw new Error('captureArea must be an object');
+        if (!['all-displays', 'single-display', 'window'].includes(captureArea.type))
+          throw new Error('captureArea.type must be all-displays, single-display, or window');
+      }
       if (this.pickerResolve) {
         this.pickerResolve(captureArea);
         this.pickerResolve = null;
@@ -474,7 +481,8 @@ class OndokiApp {
       return { ok: true };
     });
 
-    ipcMain.handle('recording:set-starting', (_event, starting: boolean) => {
+    ipcMain.handle('recording:set-starting', (_event, starting) => {
+      if (typeof starting !== 'boolean') throw new Error('starting must be a boolean');
       this.isStartingRecording = starting;
       return { ok: true };
     });
