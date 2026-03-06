@@ -207,7 +207,7 @@ class OndokiApp {
       focusable: false,
       resizable: false,
       hasShadow: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true },
+      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
     });
 
     this.countdownWindow.setIgnoreMouseEvents(true);
@@ -316,6 +316,7 @@ class OndokiApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
         preload: PRELOAD_PATH,
       },
     });
@@ -401,6 +402,7 @@ class OndokiApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
         preload: PRELOAD_PATH,
       },
     });
@@ -551,6 +553,7 @@ class OndokiApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
         preload: PRELOAD_PATH,
       },
     });
