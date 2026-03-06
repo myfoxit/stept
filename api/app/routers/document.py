@@ -30,8 +30,11 @@ from app.models import User, ProjectRole
 from app.services.search_indexer import update_document_search
 from app.services.audit import log_audit
 from app.models import AuditAction
+from app.services.storage import get_storage_backend
 
 router = APIRouter()
+
+_file_backend = get_storage_backend(prefix_override="file-docs")
 
 
 async def _check_doc_access(db, doc, current_user, required_role=ProjectRole.VIEWER):
@@ -1114,9 +1117,6 @@ async def export_document_docx(
 # FILE UPLOAD ENDPOINT
 # ──────────────────────────────────────────────────────────────────────────────
 
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
-
-
 @router.get("/{doc_id}/file")
 async def download_document_file(
     doc_id: str,
@@ -1124,21 +1124,29 @@ async def download_document_file(
     current_user: User = Depends(get_current_user),
 ):
     """Download the original uploaded file for a document."""
+    from fastapi.responses import FileResponse, RedirectResponse
+
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "document not found")
     await _check_doc_access(db, doc, current_user)
     if not doc.source_file_path:
         raise HTTPException(404, "no source file for this document")
-    import os
-    from fastapi.responses import FileResponse
-    if not os.path.isfile(doc.source_file_path):
-        raise HTTPException(404, "source file missing from storage")
-    return FileResponse(
-        doc.source_file_path,
-        media_type=doc.source_file_mime or "application/octet-stream",
-        filename=doc.source_file_name or os.path.basename(doc.source_file_path),
-    )
+
+    # Local file exists on disk
+    if os.path.isfile(doc.source_file_path):
+        return FileResponse(
+            doc.source_file_path,
+            media_type=doc.source_file_mime or "application/octet-stream",
+            filename=doc.source_file_name or os.path.basename(doc.source_file_path),
+        )
+
+    # Cloud backend — generate presigned URL
+    download_url = await _file_backend.get_download_url("", doc.source_file_path)
+    if download_url:
+        return RedirectResponse(download_url)
+
+    raise HTTPException(404, "source file missing from storage")
 
 
 @router.post("/upload-file")
@@ -1173,16 +1181,31 @@ async def upload_document_file(
     if folder_id in (None, "", "null", "undefined"):
         folder_id = None
 
-    # Generate doc id and store file
+    # Generate doc id and store file via storage backend
     doc_id = gen_suffix()
-    file_dir = os.path.join(UPLOAD_DIR, "file-docs", project_id, doc_id)
-    os.makedirs(file_dir, exist_ok=True)
-    file_path = os.path.join(file_dir, file.filename)
-    with open(file_path, "wb") as f:
-        f.write(content)
+    session_path = await _file_backend.ensure_session_path(f"{project_id}/{doc_id}")
+    stored_key = await _file_backend.save_file(session_path, file.filename, content, mime)
 
-    # Extract text
-    extracted_text = await extract_text(file_path, mime)
+    # Determine file_path for DB and extraction
+    local_path = await _file_backend.resolve_local_path(session_path, stored_key)
+    if local_path and os.path.isfile(local_path):
+        file_path = local_path
+    else:
+        # Cloud backend: use stored key as DB path, temp file for extraction
+        file_path = stored_key
+
+    # Extract text — need a local file for extraction
+    if os.path.isfile(file_path):
+        extracted_text = await extract_text(file_path, mime)
+    else:
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1])
+        tmp.write(content)
+        tmp.close()
+        try:
+            extracted_text = await extract_text(tmp.name, mime)
+        finally:
+            os.unlink(tmp.name)
 
     # Convert to TipTap JSON
     paragraphs = []

@@ -7,10 +7,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import shutil
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,11 +23,10 @@ from app.services.indexer import (
     delete_knowledge_source_embeddings,
     index_knowledge_source,
 )
+from app.services.storage import get_storage_backend
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
 
 ALLOWED_MIME_TYPES = {
     "application/pdf",
@@ -39,6 +38,8 @@ ALLOWED_MIME_TYPES = {
 }
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+
+_backend = get_storage_backend(prefix_override="knowledge")
 
 
 @router.post("/upload")
@@ -65,19 +66,40 @@ async def upload_knowledge_file(
     from app.utils import gen_suffix
     source_id = gen_suffix()
 
-    # Store file
-    store_dir = os.path.join(UPLOAD_DIR, "knowledge", project_id, source_id)
-    os.makedirs(store_dir, exist_ok=True)
-    file_path = os.path.join(store_dir, file.filename or "upload")
-    with open(file_path, "wb") as f:
-        f.write(content)
+    # Store file via storage backend
+    session_path = await _backend.ensure_session_path(f"{project_id}/{source_id}")
+    stored_key = await _backend.save_file(session_path, file.filename or "upload", content, mime)
+
+    # For text extraction we need a local path.
+    # On local backend the file is already on disk; on cloud backends we use the
+    # in-memory content directly via a temp file.
+    local_path = await _backend.resolve_local_path(session_path, stored_key)
+    if local_path and os.path.isfile(local_path):
+        extract_path = local_path
+    else:
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename or "")[1])
+        tmp.write(content)
+        tmp.close()
+        extract_path = tmp.name
 
     # Extract text
     try:
-        raw_text = await extract_text(file_path, mime)
+        raw_text = await extract_text(extract_path, mime)
     except Exception as exc:
         logger.error("Text extraction failed for %s: %s", file.filename, exc)
         raw_text = ""
+    finally:
+        # Clean up temp file if we created one
+        if extract_path != local_path and os.path.exists(extract_path):
+            os.unlink(extract_path)
+
+    # Build the file_path to store in DB:
+    # For local: the absolute local path; for cloud: the stored key
+    if local_path and os.path.isfile(local_path):
+        db_file_path = local_path
+    else:
+        db_file_path = stored_key
 
     # Create record
     source = KnowledgeSource(
@@ -87,7 +109,7 @@ async def upload_knowledge_file(
         name=file.filename or "Untitled",
         raw_content=raw_text,
         processed_content=raw_text,
-        file_path=file_path,
+        file_path=db_file_path,
         file_size=len(content),
         mime_type=mime,
         created_by=current_user.id,
@@ -184,10 +206,15 @@ async def delete_knowledge_source(
     # Delete embeddings
     await delete_knowledge_source_embeddings(source_id, db)
 
-    # Delete stored file
-    if source.file_path and os.path.exists(source.file_path):
-        store_dir = os.path.dirname(source.file_path)
-        shutil.rmtree(store_dir, ignore_errors=True)
+    # Delete stored file(s) via backend
+    if source.file_path:
+        # For local backend: the file_path is an absolute path — delete its parent dir
+        if os.path.exists(source.file_path):
+            store_dir = os.path.dirname(source.file_path)
+            await _backend.delete_prefix(store_dir)
+        else:
+            # Cloud backend: file_path is a stored key
+            await _backend.delete_file(source.file_path)
 
     await db.delete(source)
     await db.commit()
@@ -209,13 +236,30 @@ async def reindex_knowledge_source(
     await check_project_permission(db, current_user.id, source.project_id, ProjectRole.EDITOR)
 
     # Re-extract if file exists
-    if source.file_path and os.path.exists(source.file_path):
+    if source.file_path:
+        extract_path = None
         try:
-            raw_text = await extract_text(source.file_path, source.mime_type or "text/plain")
-            source.raw_content = raw_text
-            source.processed_content = raw_text
+            if os.path.exists(source.file_path):
+                # Local file
+                extract_path = source.file_path
+            else:
+                # Cloud backend — download via presigned URL to temp file
+                import tempfile, urllib.request
+                url = await _backend.get_download_url("", source.file_path)
+                if url:
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(source.file_path)[1])
+                    urllib.request.urlretrieve(url, tmp.name)
+                    extract_path = tmp.name
+
+            if extract_path:
+                raw_text = await extract_text(extract_path, source.mime_type or "text/plain")
+                source.raw_content = raw_text
+                source.processed_content = raw_text
         except Exception as exc:
             logger.error("Re-extraction failed for %s: %s", source_id, exc)
+        finally:
+            if extract_path and extract_path != source.file_path and os.path.exists(extract_path):
+                os.unlink(extract_path)
 
     # Delete old embeddings and re-index
     await delete_knowledge_source_embeddings(source_id, db)

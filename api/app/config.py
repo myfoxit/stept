@@ -17,8 +17,25 @@ class Settings(BaseSettings):
     sr_smtp_port: int = int(os.getenv("sr_smtp_port", "1025"))
     
     # Storage Configuration
-    storage_type: str = os.getenv("storage_type", "local")
-    local_storage_path: str = os.getenv("local_storage_path", "./storage/recordings")
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", os.getenv("STORAGE_TYPE", os.getenv("storage_type", "local")))
+    LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", os.getenv("local_storage_path", "./storage/recordings"))
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
+
+    # S3-compatible storage
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "")
+    S3_REGION: str = os.getenv("S3_REGION", "")
+    S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "")
+    S3_PREFIX: str = os.getenv("S3_PREFIX", "uploads")
+    S3_ACCESS_KEY_ID: str = os.getenv("S3_ACCESS_KEY_ID", "")
+    S3_SECRET_ACCESS_KEY: str = os.getenv("S3_SECRET_ACCESS_KEY", "")
+
+    # GCS storage
+    STORAGE_GCS_BUCKET: str = os.getenv("STORAGE_GCS_BUCKET", "")
+    STORAGE_GCS_CREDENTIALS_FILE: str = os.getenv("STORAGE_GCS_CREDENTIALS_FILE", "")
+
+    # Azure Blob storage
+    STORAGE_AZURE_CONTAINER: str = os.getenv("STORAGE_AZURE_CONTAINER", "")
+    STORAGE_AZURE_CONNECTION_STRING: str = os.getenv("STORAGE_AZURE_CONNECTION_STRING", "")
     
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "http://localhost:5173,ondoki://").split(",")
