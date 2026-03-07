@@ -176,6 +176,11 @@ async def upload_image(
         # Read file content with size limit
         file_content = await file.read()
         if len(file_content) > MAX_IMAGE_SIZE:
+            # Reset session status so it doesn't stay stuck in 'uploading'
+            session_obj = await db.get(ProcessRecordingSession, session_id)
+            if session_obj and session_obj.status == "uploading":
+                session_obj.status = "error"
+                await db.commit()
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 f"File too large. Maximum size: {MAX_IMAGE_SIZE // (1024*1024)}MB"
