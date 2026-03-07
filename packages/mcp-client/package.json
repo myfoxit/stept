@@ -1,0 +1,23 @@
+{
+  "name": "@ondoki/mcp",
+  "version": "0.1.0",
+  "description": "Ondoki MCP server for AI agents — access your pages, workflows, and context from any IDE",
+  "bin": {
+    "ondoki-mcp": "./bin/ondoki-mcp.mjs"
+  },
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["mcp", "ondoki", "ai", "copilot", "claude", "documentation", "workflows"],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/myfoxit/ondoki-web",
+    "directory": "packages/mcp-client"
+  }
+}
