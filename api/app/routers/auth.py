@@ -639,6 +639,54 @@ async def token(
     else:
         raise HTTPException(status_code=400, detail="Unsupported grant type")
 
+
+# ── Dedicated refresh endpoint (used by frontend) ───────────────────────
+class RefreshRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
+@router.post("/refresh")
+async def refresh_access_token(
+    body: RefreshRequest = None,
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Refresh an access token using a refresh token from body or cookie."""
+    token = None
+    if body and body.refresh_token:
+        token = body.refresh_token
+    elif request:
+        token = request.cookies.get("refresh_token")
+    
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing refresh token")
+    
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    refresh_obj = await db.scalar(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked == False
+        )
+    )
+    
+    if not refresh_obj:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    
+    if refresh_obj.expires_at and dt.datetime.utcnow() > refresh_obj.expires_at:
+        refresh_obj.revoked = True
+        await db.commit()
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    
+    refresh_obj.last_used_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    await db.commit()
+    
+    access_token = _create_access_token(refresh_obj.user_id)
+    return {
+        "access_token": access_token,
+        "token_type": "Bearer",
+        "expires_in": 3600,
+    }
+
+
 @router.websocket("/ws/notifications")
 async def websocket_notifications(
     websocket: WebSocket,
