@@ -212,11 +212,10 @@ async def upload_image(
         )
     except Exception as e:
         import traceback
-        traceback.print_exc()  # Log the full error for debugging
-        return FileUploadResponse(
-            success=False,
-            step_number=stepNumber,
-            message=str(e)
+        traceback.print_exc()
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Upload failed unexpectedly: {str(e)}"
         )
 
 @router.post("/session/{session_id}/finalize", status_code=status.HTTP_200_OK)
