@@ -423,6 +423,7 @@ class RefreshToken(Base):
     client_name = Column(String, nullable=True, default="desktop")
     created_at = Column(DateTime, server_default=func.now())
     last_used_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    expires_at = Column(DateTime, nullable=True)  # NULL = legacy tokens; new tokens get 30-day expiry
     revoked = Column(Boolean, default=False, nullable=False)
     
     user = relationship("User", backref="refresh_tokens")
