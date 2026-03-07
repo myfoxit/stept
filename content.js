@@ -498,7 +498,7 @@ if (window.__ondokiContentLoaded) {
           const settings = await sendMsg({ type: 'GET_SETTINGS' });
           const webAppUrl = settings.frontendUrl || (settings.apiBaseUrl || '').replace('/api/v1', '');
           if (webAppUrl) {
-            window.open(`${webAppUrl}/workflows/${result.sessionId}`, '_blank');
+            window.open(`${webAppUrl}/workflow/${result.sessionId}`, '_blank');
           }
         }
       } else {

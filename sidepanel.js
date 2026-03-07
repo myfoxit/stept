@@ -335,7 +335,7 @@ async function performUpload() {
     const settings = await sendMessage({ type: 'GET_SETTINGS' });
     const webAppUrl = settings.frontendUrl || (settings.apiBaseUrl || '').replace('/api/v1', '');
     if (result.sessionId && webAppUrl) {
-      chrome.tabs.create({ url: `${webAppUrl}/workflows/${result.sessionId}` });
+      chrome.tabs.create({ url: `${webAppUrl}/workflow/${result.sessionId}` });
     }
   } else {
     uploadTitle.textContent = 'Upload Failed';
@@ -569,7 +569,7 @@ function renderSearchResults(data, frontendUrl) {
     const date = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
     const steps = r.step_count ? `${r.step_count} steps` : '';
     return `
-      <div class="search-result-item" data-url="${webAppUrl}/workflows/${r.id}">
+      <div class="search-result-item" data-url="${webAppUrl}/workflow/${r.id}">
         <span class="search-result-title">${title}</span>
         <span class="search-result-snippet">${snippet}</span>
         <span class="search-result-meta">
