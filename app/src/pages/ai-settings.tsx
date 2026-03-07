@@ -29,7 +29,14 @@ export function AiSettingsPage() {
   const [aiTesting, setAiTesting] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  const aiEnabled = (selectedProject as any)?.ai_enabled !== false;
+  const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean | null>(null);
+  const aiEnabledFromServer = selectedProject?.ai_enabled !== false;
+  const aiEnabled = aiEnabledLocal ?? aiEnabledFromServer;
+
+  // Sync local state when server data changes (e.g. page load, project switch)
+  useEffect(() => {
+    setAiEnabledLocal(null);
+  }, [selectedProject?.id]);
 
   const refreshAiConfig = () => {
     fetchChatConfig().then(setAiConfig).catch(() => {});
@@ -79,10 +86,12 @@ export function AiSettingsPage() {
               checked={aiEnabled}
               onCheckedChange={async (checked) => {
                 if (!projectId || projectId === 'null') return;
+                setAiEnabledLocal(checked);
                 try {
                   await updateProject.mutateAsync({ projectId, ai_enabled: checked });
                   toast.success(checked ? 'AI features enabled' : 'AI features disabled');
                 } catch {
+                  setAiEnabledLocal(!checked); // revert on failure
                   toast.error('Failed to update setting');
                 }
               }}

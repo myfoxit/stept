@@ -7,6 +7,7 @@ export interface Project {
   id: string;
   name: string;
   created_by_name?: string;
+  ai_enabled?: boolean;
 }
 
 export type ProjectRole = 'owner' | 'admin' | 'editor' | 'viewer' | null;
