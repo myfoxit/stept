@@ -100,7 +100,7 @@ services:
   # enhanced name/org detection:
   #   docker compose --profile privacy --profile presidio up -d
   sendcloak:
-    image: ghcr.io/myfoxit/dataveil:latest
+    image: ghcr.io/myfoxit/sendcloak:latest
     container_name: ondoki-sendcloak
     profiles: ["privacy"]
     command: ["api", "--port", "9090", "--bind", "0.0.0.0"]

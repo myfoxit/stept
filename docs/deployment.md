@@ -136,7 +136,7 @@ If SMTP is not configured, the app works normally — email verification and pas
 
 ## SendCloak / PII Protection (Optional)
 
-[SendCloak](https://github.com/myfoxit/dataveil) automatically detects and replaces personal data before it reaches any LLM API.
+[SendCloak](https://github.com/myfoxit/sendcloak) automatically detects and replaces personal data before it reaches any LLM API.
 
 ### Enable SendCloak
 

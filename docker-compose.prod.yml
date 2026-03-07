@@ -166,7 +166,7 @@ services:
   # ── SendCloak — PII obfuscation (optional) ──────────────────────────
   # Enable: docker compose --profile privacy -f docker-compose.prod.yml up -d
   sendcloak:
-    image: ghcr.io/myfoxit/dataveil:latest
+    image: ghcr.io/myfoxit/sendcloak:latest
     container_name: ondoki-sendcloak
     profiles: ["privacy"]
     command: ["api", "--port", "9090", "--bind", "0.0.0.0"]
