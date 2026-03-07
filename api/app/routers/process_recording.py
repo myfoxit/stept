@@ -1230,7 +1230,7 @@ async def update_workflow_invite(
 # AI PROCESSING ENDPOINTS
 # ──────────────────────────────────────────────────────────────────────────────
 
-@router.post("/workflow/{session_id}/process", response_model=ProcessingStatus)
+@router.post("/workflow/{session_id}/process")
 async def process_recording_with_ai(
     session_id: str,
     db: AsyncSession = Depends(get_db),
