@@ -83,6 +83,14 @@ async def upload_metadata(
     if not session:
         raise ValueError(f"Session {session_id} not found")
 
+    # Check project's AI setting
+    ai_enabled = True
+    if session.project_id:
+        from app.models import Project
+        project = await db.get(Project, session.project_id)
+        if project and not project.ai_enabled:
+            ai_enabled = False
+
     # Delete existing steps if any (for re-upload scenarios)
     from sqlalchemy import delete
     await db.execute(
@@ -122,9 +130,9 @@ async def upload_metadata(
             url=meta.url,
             owner_app=meta.owner_app,
             element_info=meta.element_info,
-            generated_title=meta.generated_title,      # AI titles from desktop
-            generated_description=meta.generated_description,  # AI descriptions from desktop
-            is_annotated=bool(meta.generated_title),   # Mark as annotated if title exists
+            generated_title=meta.generated_title if ai_enabled else None,
+            generated_description=meta.generated_description if ai_enabled else None,
+            is_annotated=bool(meta.generated_title) if ai_enabled else False,
         )
         db.add(step)
     
@@ -132,13 +140,13 @@ async def upload_metadata(
     session.total_steps = len(metadata)
     session.updated_at = datetime.utcnow()
 
-    # Auto-set session name/title from AI-generated step titles
-    ai_titled_steps = [m for m in metadata if m.generated_title]
-    if ai_titled_steps and (not session.generated_title):
-        # Use first step's generated title as session title
-        session.generated_title = ai_titled_steps[0].generated_title
-    if session.name == "Untitled Workflow" and session.generated_title:
-        session.name = session.generated_title
+    # Auto-set session name/title from AI-generated step titles (only if AI enabled)
+    if ai_enabled:
+        ai_titled_steps = [m for m in metadata if m.generated_title]
+        if ai_titled_steps and (not session.generated_title):
+            session.generated_title = ai_titled_steps[0].generated_title
+        if session.name == "Untitled Workflow" and session.generated_title:
+            session.name = session.generated_title
 
     # Still persist metadata to storage for backup/export
     metadata_json = []
