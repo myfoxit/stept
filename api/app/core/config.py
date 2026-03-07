@@ -50,7 +50,17 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
-    FIRST_SUPERUSER_PASSWORD: str = "changethis"  # will be warned/overridden in prod
+    FIRST_SUPERUSER_PASSWORD: str = "changethis"
+
+    @model_validator(mode="after")
+    def _validate_secrets(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if self.FIRST_SUPERUSER_PASSWORD == "changethis":
+                raise ValueError(
+                    "FIRST_SUPERUSER_PASSWORD must be changed from default in production! "
+                    "Set the FIRST_SUPERUSER_PASSWORD environment variable."
+                )
+        return self
     # ────────────────────────────────────────────────────────────
 
     BACKEND_CORS_ORIGINS: Annotated[
