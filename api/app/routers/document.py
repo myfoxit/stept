@@ -106,6 +106,7 @@ async def api_get_filtered_documents(
     current_user: User = Depends(get_current_user)
 ):
     """Get filtered documents with sorting"""
+    await check_project_permission(db, current_user.id, project_id)
     return await get_filtered_documents(
         db,
         project_id=project_id,
