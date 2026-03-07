@@ -78,6 +78,15 @@ chrome.storage.local.get(
     'persistedSteps',
   ],
   async (result) => {
+    // Restore PKCE state from session storage (survives SW restart, clears on browser close)
+    try {
+      const pkce = await chrome.storage.session.get(['pkceCodeVerifier', 'pkceAuthState']);
+      if (pkce.pkceCodeVerifier) state.codeVerifier = pkce.pkceCodeVerifier;
+      if (pkce.pkceAuthState) state.authState = pkce.pkceAuthState;
+    } catch (e) {
+      debugLog('Failed to restore PKCE state:', e);
+    }
+
     if (result.selectedProjectId) {
       state.selectedProjectId = result.selectedProjectId;
     }
@@ -337,6 +346,12 @@ async function initiateLogin() {
   const codeChallenge = await generateCodeChallenge(state.codeVerifier);
   state.authState = generateState();
 
+  // Persist PKCE state to survive SW termination
+  await chrome.storage.session.set({
+    pkceCodeVerifier: state.codeVerifier,
+    pkceAuthState: state.authState,
+  });
+
   const redirectUrl = chrome.identity.getRedirectURL('callback');
 
   const authUrl =
@@ -405,6 +420,7 @@ async function handleAuthCallback(callbackUrl) {
 
   state.codeVerifier = null;
   state.authState = null;
+  chrome.storage.session.remove(['pkceCodeVerifier', 'pkceAuthState']).catch(() => {});
 
   await fetchUserInfo();
   await fetchUserProjects();
@@ -438,20 +454,30 @@ async function tryAutoLogin() {
       await persistAuth();
       return true;
     }
-  } catch (error) {
-    debugLog('Auto-login failed:', error);
-  }
 
-  await chrome.storage.local.remove([
-    'refreshToken',
-    'accessToken',
-    'currentUser',
-    'userProjects',
-  ]);
-  state.refreshToken = null;
-  state.accessToken = null;
-  state.isAuthenticated = false;
-  return false;
+    // Auth error (401/403) — token is invalid, clear auth
+    if (response.status === 401 || response.status === 403) {
+      debugLog('Auto-login auth rejected:', response.status);
+      await chrome.storage.local.remove([
+        'refreshToken',
+        'accessToken',
+        'currentUser',
+        'userProjects',
+      ]);
+      state.refreshToken = null;
+      state.accessToken = null;
+      state.isAuthenticated = false;
+      return false;
+    }
+
+    // Other server error (500, etc) — keep tokens, don't logout
+    debugLog('Auto-login server error:', response.status);
+    return false;
+  } catch (error) {
+    // Network error (offline, DNS, timeout) — keep tokens intact
+    debugLog('Auto-login network error:', error.message);
+    return false;
+  }
 }
 
 async function logout() {
