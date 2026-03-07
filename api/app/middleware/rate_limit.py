@@ -51,6 +51,18 @@ def _mem_check(key: str, limit: int, window: int) -> tuple[bool, int]:
 # Redis-backed check
 # ---------------------------------------------------------------------------
 
+_redis_pool = None
+
+def _get_redis():
+    """Lazy-init a shared Redis connection pool."""
+    global _redis_pool
+    if _redis_pool is None:
+        import redis.asyncio as aioredis
+        from app.config import settings
+        redis_url: str = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
+        _redis_pool = aioredis.from_url(redis_url, decode_responses=True)
+    return _redis_pool
+
 async def _redis_check(key: str, limit: int, window: int) -> tuple[bool, int]:
     """
     Sliding-window rate limit via Redis sorted set.
@@ -58,11 +70,7 @@ async def _redis_check(key: str, limit: int, window: int) -> tuple[bool, int]:
     Falls back to in-memory on any Redis error.
     """
     try:
-        import redis.asyncio as aioredis
-        from app.config import settings
-
-        redis_url: str = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
-        r = aioredis.from_url(redis_url, decode_responses=True)
+        r = _get_redis()
 
         now = time.time()
         window_start = now - window
