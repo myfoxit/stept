@@ -126,6 +126,7 @@ async def api_create_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    await check_project_permission(db, current_user.id, payload.project_id, ProjectRole.EDITOR)
     doc = await create_document(
         db, 
         name=payload.name, 
@@ -654,6 +655,10 @@ async def restore_document_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Restore a soft-deleted document"""
+    doc_check = await get_document(db, doc_id)
+    if not doc_check:
+        raise HTTPException(404, "Document not found")
+    await check_project_permission(db, current_user.id, doc_check.project_id, ProjectRole.EDITOR)
     try:
         doc = await restore_document(db, doc_id)
     except ValueError as e:
@@ -668,6 +673,10 @@ async def permanent_delete_document_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Permanently delete a document (no recovery)"""
+    doc_check = await get_document(db, doc_id)
+    if not doc_check:
+        raise HTTPException(404, "Document not found")
+    await check_project_permission(db, current_user.id, doc_check.project_id, ProjectRole.ADMIN)
     try:
         await permanent_delete_document(db, doc_id)
     except ValueError as e:
