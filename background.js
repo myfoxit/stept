@@ -1173,8 +1173,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'GET_SETTINGS':
         chrome.storage.local.get(['apiBaseUrl', 'frontendUrl', 'displayMode', 'autoUpload'], (result) => {
           const apiBase = result.apiBaseUrl || DEFAULT_API_BASE_URL;
-          // Derive frontend URL: strip /api/v1 from API base.
-          // For self-hosted with separate frontend port, set frontendUrl in settings.
           const defaultFrontend = apiBase.replace('/api/v1', '');
           sendResponse({
             apiBaseUrl: apiBase,
@@ -1185,6 +1183,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
         });
         return; // keep channel open
+
+      case 'API_FETCH': {
+        // Authenticated GET request to any API endpoint
+        try {
+          const resp = await authedFetch(message.url, { method: message.method || 'GET' });
+          if (resp.ok) {
+            sendResponse(await resp.json());
+          } else {
+            sendResponse(null);
+          }
+        } catch (e) {
+          debugLog('API_FETCH error:', e.message);
+          sendResponse(null);
+        }
+        break;
+      }
 
       case 'SET_SETTINGS':
         if (message.apiBaseUrl) {

@@ -132,6 +132,7 @@ async function refreshState() {
 
     // Load context matches for current tab
     loadContextMatches();
+    loadRecentWorkflows();
 
     return;
   }
@@ -464,6 +465,7 @@ spLogoutBtn.addEventListener('click', async () => {
 
 spProjectSelector.addEventListener('change', () => {
   spStartBtn.disabled = !spProjectSelector.value;
+  loadRecentWorkflows();
 });
 
 spStartBtn.addEventListener('click', async () => {
@@ -596,7 +598,6 @@ function renderSearchResults(data, frontendUrl) {
 const contextPanel = document.getElementById('contextPanel');
 const contextList = document.getElementById('contextList');
 const contextEmpty = document.getElementById('contextEmpty');
-const contextLinkBtn = document.getElementById('contextLinkBtn');
 
 async function loadContextMatches() {
   const result = await sendMessage({ type: 'GET_CONTEXT_MATCHES' });
@@ -607,12 +608,10 @@ function renderContextMatches(matches) {
   if (!matches || matches.length === 0) {
     contextList.innerHTML = '';
     contextEmpty.classList.remove('hidden');
-    contextLinkBtn.classList.remove('hidden');
     return;
   }
 
   contextEmpty.classList.add('hidden');
-  contextLinkBtn.classList.remove('hidden');
 
   contextList.innerHTML = matches.map((m) => {
     const icon = m.resource_type === 'workflow' ? '\uD83D\uDCCB' : '\uD83D\uDCC4';
@@ -637,17 +636,89 @@ function renderContextMatches(matches) {
   });
 }
 
-contextLinkBtn.addEventListener('click', async () => {
-  const settings = await sendMessage({ type: 'GET_SETTINGS' });
-  const webAppUrl = settings.frontendUrl || settings.apiBaseUrl.replace('/api/v1', '');
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const tabUrl = tabs[0]?.url || '';
-    chrome.tabs.create({ url: `${webAppUrl}/context-links/new?url=${encodeURIComponent(tabUrl)}` });
-  });
-});
-
 // Load context matches when setup panel is shown
 // (called from refreshState when not recording)
+
+// ===== RECENT WORKFLOWS =====
+const recentList = document.getElementById('recentList');
+const recentLoading = document.getElementById('recentLoading');
+
+async function loadRecentWorkflows() {
+  if (!recentList) return;
+
+  const projectId = spProjectSelector.value;
+  if (!projectId) {
+    recentList.innerHTML = '<div class="recent-empty">Select a project to see workflows</div>';
+    return;
+  }
+
+  recentList.innerHTML = '<div class="recent-loading">Loading...</div>';
+
+  try {
+    const apiBaseUrl = await sendMessage({ type: 'GET_SETTINGS' }).then(s => s.apiBaseUrl || 'http://localhost:8000/api/v1');
+    const settings = await sendMessage({ type: 'GET_SETTINGS' });
+    const webAppUrl = settings.frontendUrl || apiBaseUrl.replace('/api/v1', '');
+
+    const result = await sendMessage({
+      type: 'API_FETCH',
+      url: `${apiBaseUrl}/process-recording/workflows/filtered?project_id=${projectId}&limit=10&sort_by=created_at&sort_order=desc`,
+    });
+
+    if (!result || !Array.isArray(result)) {
+      recentList.innerHTML = '<div class="recent-empty">No workflows yet</div>';
+      return;
+    }
+
+    if (result.length === 0) {
+      recentList.innerHTML = '<div class="recent-empty">No workflows yet</div>';
+      return;
+    }
+
+    recentList.innerHTML = result.map((w) => {
+      const title = w.workflow_title || w.title || 'Untitled workflow';
+      const date = w.created_at ? timeAgo(new Date(w.created_at)) : '';
+      const steps = w.step_count || w.steps?.length || 0;
+      const id = w.session_id || w.id;
+      return `
+        <a class="recent-item" href="#" data-url="${webAppUrl}/workflow/${id}">
+          <div class="recent-item-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#78716C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+          </div>
+          <div class="recent-item-info">
+            <div class="recent-item-title">${escapeHtml(title)}</div>
+            <div class="recent-item-meta">${steps} steps · ${date}</div>
+          </div>
+        </a>
+      `;
+    }).join('');
+
+    recentList.querySelectorAll('.recent-item').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        chrome.tabs.create({ url: item.dataset.url });
+      });
+    });
+  } catch (e) {
+    console.error('Failed to load recent workflows:', e);
+    recentList.innerHTML = '<div class="recent-empty">Failed to load workflows</div>';
+  }
+}
+
+function timeAgo(date) {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
 
 // MISS-C002: Show a temporary error toast in the side panel
 function showToast(text, duration = 4000) {
