@@ -1,4 +1,4 @@
-import secrets, datetime as dt
+import secrets, datetime as dt, hashlib
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
@@ -139,16 +139,18 @@ async def request_password_reset(db: AsyncSession, email: str) -> Optional[str]:
     user: Optional[User] = await db.scalar(select(User).where(User.normalized_email == norm))
     if not user:
         return None
-    user.reset_token      = secrets.token_hex(16)
+    raw_token = secrets.token_hex(16)
+    user.reset_token      = hashlib.sha256(raw_token.encode()).hexdigest()
     user.reset_expires_at = utc_now_naive() + dt.timedelta(hours=1)
     await db.flush()
     await db.commit()
-    send_reset_email(user.email, user.reset_token)
-    return user.reset_token
+    send_reset_email(user.email, raw_token)
+    return raw_token
 
 async def reset_password(db: AsyncSession, token: str, new_password: str) -> bool:
     now  = utc_now_naive()
-    stmt = select(User).where(User.reset_token == token, User.reset_expires_at > now)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    stmt = select(User).where(User.reset_token == token_hash, User.reset_expires_at > now)
     user: Optional[User] = await db.scalar(stmt)
     if not user:
         return False
