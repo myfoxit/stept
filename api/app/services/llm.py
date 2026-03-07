@@ -677,8 +677,8 @@ async def list_models() -> list[dict]:
 
 def get_config() -> dict:
     """Return non-sensitive LLM configuration."""
-    from app.services.dataveil import is_dataveil_enabled
     from app.services.auth_providers.copilot import is_authenticated as copilot_authenticated
+    from app.services import sendcloak
 
     provider = _provider()
     configured = bool(_api_key() or provider == "ollama" or (provider == "copilot" and copilot_authenticated()))
@@ -687,6 +687,6 @@ def get_config() -> dict:
         "provider": provider,
         "model": _model(),
         "base_url": _base_url() if provider == "ollama" else None,
-        "dataveil_enabled": is_dataveil_enabled(),
+        "sendcloak_enabled": sendcloak.is_enabled(),
         "configured": configured,
     }

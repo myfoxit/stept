@@ -95,12 +95,16 @@ The production stack includes:
 Enable PII protection with the `privacy` profile:
 
 ```bash
+# SendCloak only (fast, lightweight)
 docker compose -f docker-compose.prod.yml --profile privacy up -d
+
+# SendCloak + Presidio (best detection accuracy)
+docker compose -f docker-compose.prod.yml --profile privacy --profile presidio up -d
 ```
 
 This adds:
-- **SendCloak** — PII obfuscation proxy
-- **Presidio** — Microsoft's NER-based PII detection
+- **SendCloak** — PII obfuscation proxy (detects and replaces personal data before it reaches AI providers)
+- **Presidio** (optional) — Microsoft's NER-based PII detection for enhanced accuracy
 
 ## Volumes
 

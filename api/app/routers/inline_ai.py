@@ -18,7 +18,6 @@ from pydantic import BaseModel
 from app.security import get_current_user
 from app.models import User
 from app.services import llm as llm_service
-from app.services import dataveil as dataveil_service
 from app.services import sendcloak
 
 logger = logging.getLogger(__name__)
@@ -137,14 +136,7 @@ async def inline_ai_completion(
 
     messages = _build_messages(body)
 
-    # Resolve DataVeil proxy
-    try:
-        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        )
+    base_url_override = None
 
     try:
         result = await llm_service.chat_completion(

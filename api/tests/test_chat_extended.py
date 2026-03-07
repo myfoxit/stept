@@ -107,7 +107,6 @@ async def test_chat_completions_with_recording_context(
             return _gen()
 
     with (
-        patch("app.services.dataveil.get_proxied_base_url_with_fallback", new_callable=AsyncMock, return_value=None),
         patch("app.services.llm.chat_completion", side_effect=fake_chat_completion),
         patch("app.services.ai_tools.registry.all_tools", return_value=[]),
     ):
@@ -148,7 +147,6 @@ async def test_chat_completions_non_streaming(
     }
 
     with (
-        patch("app.services.dataveil.get_proxied_base_url_with_fallback", new_callable=AsyncMock, return_value=None),
         patch("app.services.llm.chat_completion", new_callable=AsyncMock, return_value=mock_resp),
         patch("app.services.ai_tools.registry.all_tools", return_value=[]),
     ):
@@ -171,7 +169,6 @@ async def test_chat_completions_llm_error(
 ):
     """When LLM call fails, should return 502."""
     with (
-        patch("app.services.dataveil.get_proxied_base_url_with_fallback", new_callable=AsyncMock, return_value=None),
         patch("app.services.llm.chat_completion", new_callable=AsyncMock, side_effect=Exception("LLM down")),
         patch("app.services.ai_tools.registry.all_tools", return_value=[]),
     ):

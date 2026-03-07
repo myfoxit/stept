@@ -1412,7 +1412,6 @@ async def annotate_single_step(
 ):
     """Re-annotate a single step with AI."""
     from app.services.auto_processor import auto_processor
-    from app.services import dataveil as dataveil_service
     from app.models import ProcessRecordingFile
     from sqlalchemy import and_
 
@@ -1442,10 +1441,8 @@ async def annotate_single_step(
         if file_data:
             image_b64 = b64mod.b64encode(file_data).decode("utf-8")
 
-    base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
-
     try:
-        result = await auto_processor.annotate_step(step, image_b64, base_url_override)
+        result = await auto_processor.annotate_step(step, image_b64)
         if result:
             step.generated_title = result.get("title", "")
             step.generated_description = result.get("description", "")
@@ -1478,16 +1475,13 @@ async def improve_step_endpoint(
 ):
     """Improve a step's description using AI."""
     from app.services.auto_processor import auto_processor
-    from app.services import dataveil as dataveil_service
 
     step = await db.get(ProcessRecordingStep, step_id)
     if not step:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Step not found")
 
-    base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
-
     try:
-        result = await auto_processor.improve_step(step, base_url_override)
+        result = await auto_processor.improve_step(step)
         if result:
             step.generated_title = result.get("title", step.generated_title)
             step.generated_description = result.get("description", step.generated_description)

@@ -33,7 +33,6 @@ from app.models import (
 )
 from app.security import get_current_user
 from app.services import llm as llm_service
-from app.services import dataveil as dataveil_service
 from app.services import sendcloak
 from app.services.ai_tools import registry as tool_registry
 from app.middleware.rate_limit import chat_rate_limiter
@@ -76,8 +75,6 @@ class ChatConfigUpdate(BaseModel):
     model: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
-    dataveil_enabled: Optional[bool] = None
-    dataveil_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -468,14 +465,7 @@ async def chat_completions(
     if tool_system_prompt:
         messages = [{"role": "system", "content": tool_system_prompt}] + messages
 
-    # Resolve DataVeil proxy
-    try:
-        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        )
+    base_url_override = None
 
     # Check if tools are available — use tool-calling flow
     has_tools = len(tool_registry.all_tools()) > 0

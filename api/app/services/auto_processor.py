@@ -20,7 +20,6 @@ from sqlalchemy.orm import selectinload
 
 from app.models import ProcessRecordingSession, ProcessRecordingStep, ProcessRecordingFile
 from app.services import llm as llm_service
-from app.services import dataveil as dataveil_service
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +186,7 @@ class RecordingAutoProcessor:
 
         steps = sorted(session.steps, key=lambda s: s.step_number)
 
-        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+        base_url_override = None
 
         # 1. Annotate each step concurrently
         annotated_count = 0
@@ -365,7 +364,7 @@ class RecordingAutoProcessor:
             "Use proper markdown formatting. Make it helpful and professional."
         )
 
-        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+        base_url_override = None
 
         messages = [
             {"role": "system", "content": "You are an expert technical writer. Write clear, helpful documentation in markdown format."},
@@ -458,7 +457,7 @@ class RecordingAutoProcessor:
             "Use proper markdown formatting. Make it helpful and professional."
         )
 
-        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+        base_url_override = None
 
         messages = [
             {"role": "system", "content": "You are an expert technical writer. Write clear, helpful documentation in markdown format."},

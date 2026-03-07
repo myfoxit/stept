@@ -112,18 +112,21 @@ ondoki supports optional PII obfuscation before data reaches AI providers:
 
 ### SendCloak
 
-[SendCloak](https://github.com/myfoxit/sendcloak) is a proxy that intercepts LLM requests, detects PII using Microsoft Presidio, replaces it with synthetic data, and de-masks the AI response.
+[SendCloak](https://github.com/myfoxit/dataveil) automatically detects and replaces personal data before it reaches any LLM API. Responses are transparently deobfuscated.
 
-Enable it with:
+It works standalone with built-in regex and pattern detection. For enhanced name/organization detection, add Microsoft Presidio.
 
 ```bash
+# Enable SendCloak (standalone)
 SENDCLOAK_ENABLED=true
 docker compose --profile privacy up -d
+
+# Enable SendCloak + Presidio (best accuracy)
+SENDCLOAK_ENABLED=true
+docker compose --profile privacy --profile presidio up -d
 ```
 
-### DataVeil
-
-An alternative privacy proxy that masks sensitive data in AI requests. Configure via `DATAVEIL_ENABLED` and `DATAVEIL_URL` environment variables.
+When enabled, all AI features (chat, inline AI, workflow annotation, guide generation) automatically route through SendCloak. If SendCloak is unreachable, AI features gracefully fall back to direct LLM connections.
 
 ## Circuit Breaker
 

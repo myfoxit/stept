@@ -20,7 +20,7 @@ describe('Chat API', () => {
         provider: 'openai',
         model: 'gpt-4o',
         base_url: null,
-        dataveil_enabled: false,
+        sendcloak_enabled: false,
         configured: true,
       };
       mockApiClient.get.mockResolvedValueOnce({ data: config });

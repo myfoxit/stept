@@ -136,7 +136,7 @@ If SMTP is not configured, the app works normally — email verification and pas
 
 ## SendCloak / PII Protection (Optional)
 
-SendCloak obfuscates personally identifiable information (PII) before sending text to AI providers.
+[SendCloak](https://github.com/myfoxit/dataveil) automatically detects and replaces personal data before it reaches any LLM API.
 
 ### Enable SendCloak
 
@@ -144,21 +144,16 @@ SendCloak obfuscates personally identifiable information (PII) before sending te
 # In .env
 SENDCLOAK_ENABLED=true
 
-# Start with the privacy profile
+# SendCloak only (fast, lightweight)
 docker compose -f docker-compose.prod.yml --profile privacy up -d
+
+# SendCloak + Presidio (best detection accuracy)
+docker compose -f docker-compose.prod.yml --profile privacy --profile presidio up -d
 ```
 
-This starts:
-- **Presidio** — Microsoft's PII detection engine
-- **SendCloak** — Obfuscation proxy that wraps Presidio
+SendCloak works standalone with built-in regex and pattern detection. Adding Microsoft Presidio enhances name/organization detection accuracy.
 
 If SendCloak is not running but `SENDCLOAK_ENABLED=true`, AI features gracefully fall back to sending text without obfuscation (logged as a warning).
-
-### Language Support
-
-Set `PRESIDIO_LANG_PACK` in `.env`:
-- `en` — English only (smaller, faster)
-- `eu` — English + German + French + Spanish + Italian
 
 ## Monitoring
 

@@ -118,10 +118,7 @@ class Settings(BaseSettings):
     SENDCLOAK_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
     SENDCLOAK_URL: str = "http://sendcloak:9090"
 
-    # ── DataVeil privacy proxy ──────────────────────────────────
-    DATAVEIL_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
-    DATAVEIL_URL: Optional[str] = None           # e.g. http://localhost:8080
-    DATAVEIL_FALLBACK: Annotated[bool, BeforeValidator(parse_bool_env)] = True  # fall back to direct if proxy is down
+
 
 # Instantiate once and share across the application
 settings = Settings()  # noqa: E305

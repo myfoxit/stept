@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Desktop Sync** — Upload recordings from the Ondoki Desktop app (.NET/WPF)
 - **Guide Generation** — Auto-generate step-by-step documentation from recordings
 - **LLM Setup Wizard** — 3-step frontend wizard for configuring AI providers
-- **DataVeil Integration** — Optional privacy proxy for LLM requests
+- **SendCloak Integration** — Optional PII obfuscation for LLM requests
 - **Export** — PDF, DOCX, Excel, JSON export of workflows
 
 ### Security

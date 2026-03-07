@@ -29,7 +29,7 @@ description: "System architecture, components, and data flow."
 
      ┌───────────────────────────────────────┐
      │        Optional Services              │
-     │  SendCloak → Presidio (PII)           │
+     │  SendCloak (PII obfuscation)           │
      │  Celery Media Worker (video/audio)    │
      └───────────────────────────────────────┘
 ```
@@ -106,13 +106,13 @@ Async worker process for video import pipeline:
 4. Analyze frames with AI
 5. Generate step-by-step guide
 
-### SendCloak + Presidio (Optional)
+### SendCloak (Optional)
 
 Privacy layer that obfuscates PII before data reaches AI providers:
 
-- **Presidio** — Microsoft's NER-based PII detection engine
-- **SendCloak** — Proxy that intercepts AI requests, masks PII, and de-masks responses
-- Supports English and European languages (en, de, fr, es, it)
+- **SendCloak** — Intercepts AI requests, detects and replaces PII with synthetic data, deobfuscates responses
+- Works standalone with built-in regex/pattern detection
+- Optionally enhanced with **Microsoft Presidio** for NER-based name/org detection
 
 ## Data Flow
 

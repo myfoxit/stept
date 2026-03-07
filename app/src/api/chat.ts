@@ -36,7 +36,7 @@ export interface ChatConfig {
   provider: string;
   model: string;
   base_url: string | null;
-  dataveil_enabled: boolean;
+  sendcloak_enabled: boolean;
   configured: boolean;
 }
 

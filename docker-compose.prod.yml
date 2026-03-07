@@ -163,6 +163,45 @@ services:
     networks:
       - ondoki-network
 
+  # ── SendCloak — PII obfuscation (optional) ──────────────────────────
+  # Enable: docker compose --profile privacy -f docker-compose.prod.yml up -d
+  sendcloak:
+    image: ghcr.io/myfoxit/dataveil:latest
+    container_name: ondoki-sendcloak
+    profiles: ["privacy"]
+    command: ["api", "--port", "9090", "--bind", "0.0.0.0"]
+    environment:
+      SENDCLOAK_STRATEGY: "${SENDCLOAK_STRATEGY:-semantic}"
+      SENDCLOAK_LOG_LEVEL: info
+      SENDCLOAK_PRESIDIO_URL: "http://presidio:3000"
+    depends_on:
+      presidio:
+        condition: service_started
+        required: false
+    networks:
+      - ondoki-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  presidio:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    container_name: ondoki-presidio
+    profiles: ["presidio"]
+    environment:
+      DEFAULT_LANGUAGE: "${PRESIDIO_LANGUAGE:-en}"
+    networks:
+      - ondoki-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   db-data:
   caddy-data:

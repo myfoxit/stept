@@ -42,10 +42,10 @@ async def test_chat_completions_no_config(async_client: AsyncClient, auth_header
     an error (502/503) rather than silently failing.
     """
     with patch(
-        "app.services.dataveil.get_proxied_base_url_with_fallback",
+        "app.services.llm.chat_completion",
         new_callable=AsyncMock,
         side_effect=RuntimeError("No LLM configured"),
-    ):
+    ), patch("app.services.ai_tools.registry.all_tools", return_value=[]):
         resp = await async_client.post(
             "/api/v1/chat/completions",
             json={
@@ -85,7 +85,6 @@ async def test_chat_completions_streaming_sse_format(async_client: AsyncClient, 
         return mock_resp
 
     with (
-        patch("app.services.dataveil.get_proxied_base_url_with_fallback", new_callable=AsyncMock, return_value=None),
         patch("app.services.llm.chat_completion", side_effect=fake_chat_completion),
         patch("app.services.ai_tools.registry.all_tools", return_value=[]),
     ):

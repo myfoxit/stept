@@ -94,8 +94,8 @@ export function AiSettingsPage() {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <ShieldAlert className="h-4 w-4" />
-              <span>DataVeil:</span>
-              {aiConfig?.dataveil_enabled ? (
+              <span>SendCloak:</span>
+              {aiConfig?.sendcloak_enabled ? (
                 <span className="text-green-500 font-medium">Active</span>
               ) : (
                 <span className="text-muted-foreground">Disabled</span>
