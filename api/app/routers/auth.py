@@ -180,6 +180,14 @@ async def login(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="BAD_CREDENTIALS")
     
     user = await user_crud.get_user_by_email(db, body.email)
+
+    # Enforce email verification
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="EMAIL_NOT_VERIFIED",
+        )
+
     resp_payload = UserRead.model_validate(user, from_attributes=True).model_dump()
     resp = JSONResponse(resp_payload)
     _set_session_cookie(resp, session_token, request)
