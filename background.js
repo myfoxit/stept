@@ -1187,6 +1187,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
         break;
 
+      case 'SET_STEP_DESCRIPTION':
+        if (message.stepIndex >= 0 && message.stepIndex < state.steps.length) {
+          state.steps[message.stepIndex].description = message.description;
+          persistSteps();
+        }
+        sendResponse({ success: true });
+        break;
+
+      case 'REORDER_STEPS': {
+        const { fromIndex, toIndex } = message;
+        if (fromIndex >= 0 && fromIndex < state.steps.length && toIndex >= 0 && toIndex < state.steps.length) {
+          const [moved] = state.steps.splice(fromIndex, 1);
+          state.steps.splice(toIndex, 0, moved);
+          // Renumber step_number fields
+          state.steps.forEach((s, i) => { s.step_number = i + 1; });
+          persistSteps();
+        }
+        sendResponse({ steps: state.steps });
+        break;
+      }
+
       case 'OPEN_SIDE_PANEL':
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {

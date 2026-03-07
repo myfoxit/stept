@@ -696,8 +696,46 @@ body {
 .step-top-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 12px 8px;
+}
+
+.step-drag-handle {
+  cursor: grab;
+  color: #D6D3D1;
+  font-size: 14px;
+  line-height: 28px;
+  flex-shrink: 0;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.step-card:hover .step-drag-handle {
+  opacity: 1;
+}
+
+.step-drag-handle:active {
+  cursor: grabbing;
+}
+
+.step-card.dragging {
+  opacity: 0.4;
+}
+
+.step-card.drag-over {
+  border-top: 2px solid #3AB08A;
+}
+
+.step-description {
+  cursor: text;
+}
+
+.step-description.editing {
+  outline: 1px solid #3AB08A;
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: #FAFAF9;
 }
 
 .step-number {

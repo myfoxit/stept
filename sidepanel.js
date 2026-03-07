@@ -191,7 +191,7 @@ function renderSteps() {
   // Add new steps
   steps.forEach((step, index) => {
     if (!existingStepNumbers.has(step.stepNumber)) {
-      const card = createStepCard(step, index === steps.length - 1);
+      const card = createStepCard(step, index === steps.length - 1, index);
       stepsList.appendChild(card);
     }
   });
@@ -200,16 +200,17 @@ function renderSteps() {
   stepsList.scrollTop = stepsList.scrollHeight;
 }
 
-function createStepCard(step, isNew) {
+function createStepCard(step, isNew, stepIndex) {
   const card = document.createElement('div');
   card.className = 'step-card' + (isNew ? ' new' : '');
   card.dataset.stepNumber = step.stepNumber;
 
   card.innerHTML = `
     <div class="step-top-row">
+      <span class="step-drag-handle" draggable="true" title="Drag to reorder">⠿</span>
       <span class="step-number">${step.stepNumber}</span>
       <div class="step-text">
-        <p class="step-description">${escapeHtml(step.description || step.actionType)}</p>
+        <p class="step-description" data-step-index="${stepIndex}" title="Click to edit">${escapeHtml(step.description || step.actionType)}</p>
         ${step.url ? `<p class="step-url">${escapeHtml(step.url)}</p>` : ''}
       </div>
     </div>
@@ -238,6 +239,65 @@ function createStepCard(step, isNew) {
     await sendMessage({ type: 'DELETE_STEP', stepNumber: step.stepNumber });
     card.remove();
     await refreshState();
+  });
+
+  // Inline description editing
+  const descEl = card.querySelector('.step-description');
+  descEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    descEl.contentEditable = 'true';
+    descEl.focus();
+    descEl.classList.add('editing');
+  });
+  descEl.addEventListener('blur', async () => {
+    descEl.contentEditable = 'false';
+    descEl.classList.remove('editing');
+    const newDesc = descEl.textContent.trim();
+    if (newDesc && newDesc !== (step.description || step.actionType)) {
+      await sendMessage({ type: 'SET_STEP_DESCRIPTION', stepIndex, description: newDesc });
+      step.description = newDesc;
+    }
+  });
+  descEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); descEl.blur(); }
+    if (e.key === 'Escape') { descEl.textContent = step.description || step.actionType; descEl.blur(); }
+  });
+
+  // Drag and drop reordering
+  const handle = card.querySelector('.step-drag-handle');
+  handle.addEventListener('dragstart', (e) => {
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', stepIndex.toString());
+  });
+  handle.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    stepsList.querySelectorAll('.step-card').forEach(c => c.classList.remove('drag-over'));
+  });
+  card.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    card.classList.add('drag-over');
+  });
+  card.addEventListener('dragleave', () => {
+    card.classList.remove('drag-over');
+  });
+  card.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    const toIndex = stepIndex;
+    if (fromIndex !== toIndex) {
+      const result = await sendMessage({ type: 'REORDER_STEPS', fromIndex, toIndex });
+      if (result.steps) {
+        steps = result.steps;
+        // Re-render all steps
+        stepsList.querySelectorAll('.step-card').forEach(c => c.remove());
+        steps.forEach((s, i) => {
+          stepsList.appendChild(createStepCard(s, false, i));
+        });
+      }
+    }
   });
 
   // Zoom screenshot on click
