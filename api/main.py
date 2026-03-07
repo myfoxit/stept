@@ -40,13 +40,18 @@ api_router = APIRouter(prefix=settings.API_V1_STR)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestIdMiddleware)
-_cors_origin = os.getenv("CORS_ORIGIN_REGEX", r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$")
+
+# CORS: prefer explicit CORS_ORIGINS (comma-separated) over regex
+_cors_origins_str = os.getenv("CORS_ORIGINS", "")
+_cors_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()] if _cors_origins_str else []
+_cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$") if not _cors_origins else None
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=_cors_origin,
+    allow_origins=_cors_origins or [],
+    allow_origin_regex=_cors_origin_regex,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,  # ← enable cookies
+    allow_credentials=True,
 )
 
 
