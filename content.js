@@ -1068,6 +1068,6 @@ function generateClickDescription(elementInfo, x, y, prefix) {
     return `${prefix} "${cleanLabel(elementInfo.text)}"`;
   }
 
-  // Fallback
-  return `${prefix} on the page`;
+  // Fallback — the screenshot shows exactly where the click happened
+  return `${prefix} here`;
 }
