@@ -493,6 +493,14 @@ if (window.__ondokiContentLoaded) {
       if (result.success) {
         await sendMsg({ type: 'CLEAR_STEPS' });
         removeDock();
+        // Redirect to workflow page
+        if (result.sessionId) {
+          const settings = await sendMsg({ type: 'GET_SETTINGS' });
+          const webAppUrl = settings.frontendUrl || (settings.apiBaseUrl || '').replace('/api/v1', '');
+          if (webAppUrl) {
+            window.open(`${webAppUrl}/workflows/${result.sessionId}`, '_blank');
+          }
+        }
       } else {
         // Show error feedback — flash the complete button red
         const btn = shadow.getElementById('dockComplete');

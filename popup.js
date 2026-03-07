@@ -49,6 +49,10 @@ async function loadSettings() {
   if (settings.apiBaseUrl) {
     apiUrlInput.value = settings.apiBaseUrl;
   }
+  const frontendInput = document.getElementById('frontendUrlInput');
+  if (frontendInput && settings.frontendUrl) {
+    frontendInput.value = settings.frontendUrl;
+  }
   currentDisplayMode = settings.displayMode || 'sidepanel';
   updateModeButtons();
 
@@ -396,6 +400,20 @@ saveSettingsBtn.addEventListener('click', async () => {
     setTimeout(() => { saveSettingsBtn.textContent = 'Save'; }, 1500);
   }
 });
+
+// Frontend URL save handler
+const saveFrontendBtn = document.getElementById('saveFrontendBtn');
+const frontendUrlInput = document.getElementById('frontendUrlInput');
+if (saveFrontendBtn && frontendUrlInput) {
+  saveFrontendBtn.addEventListener('click', async () => {
+    const url = frontendUrlInput.value.trim();
+    if (url) {
+      await sendMessage({ type: 'SET_SETTINGS', frontendUrl: url });
+      saveFrontendBtn.textContent = 'Saved!';
+      setTimeout(() => { saveFrontendBtn.textContent = 'Save'; }, 1500);
+    }
+  });
+}
 
 // Listen for step updates from background
 chrome.runtime.onMessage.addListener((message) => {

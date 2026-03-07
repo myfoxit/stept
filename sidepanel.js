@@ -62,6 +62,10 @@ async function loadSettingsValues() {
   const settings = await sendMessage({ type: 'GET_SETTINGS' });
 
   if (settings.apiBaseUrl) spApiUrlInput.value = settings.apiBaseUrl;
+  if (settings.frontendUrl) {
+    const frontendInput = document.getElementById('spFrontendUrlInput');
+    if (frontendInput) frontendInput.value = settings.frontendUrl;
+  }
 
   // Hide API URL section in cloud mode
   const apiSection = document.getElementById('apiUrlSection');
@@ -492,6 +496,20 @@ spSaveSettingsBtn.addEventListener('click', async () => {
     setTimeout(() => { spSaveSettingsBtn.textContent = 'Save'; }, 1500);
   }
 });
+
+// Frontend URL save handler
+const spSaveFrontendBtn = document.getElementById('spSaveFrontendBtn');
+const spFrontendUrlInput = document.getElementById('spFrontendUrlInput');
+if (spSaveFrontendBtn && spFrontendUrlInput) {
+  spSaveFrontendBtn.addEventListener('click', async () => {
+    const url = spFrontendUrlInput.value.trim();
+    if (url) {
+      await sendMessage({ type: 'SET_SETTINGS', frontendUrl: url });
+      spSaveFrontendBtn.textContent = 'Saved!';
+      setTimeout(() => { spSaveFrontendBtn.textContent = 'Save'; }, 1500);
+    }
+  });
+}
 
 // ===== SEARCH =====
 const searchInput = document.getElementById('searchInput');

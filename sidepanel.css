@@ -208,16 +208,16 @@ body {
 .sp-setup-content {
   display: flex;
   flex-direction: column;
-  padding: 20px 16px 16px;
-  gap: 16px;
+  padding: 16px 16px 16px;
+  gap: 12px;
   flex: 1;
   overflow-y: auto;
 }
 
 .sp-greeting {
-  font-size: 13px;
-  font-weight: 500;
-  color: #78716C;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1C1917;
 }
 
 /* Workflow empty state */
