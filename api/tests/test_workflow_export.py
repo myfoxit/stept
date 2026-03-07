@@ -1,4 +1,4 @@
-"""Tests for workflow export helpers (markdown/html/confluence/notion/image pathing)."""
+"""Tests for workflow export helpers (markdown/html/confluence/notion)."""
 
 from datetime import datetime
 import base64
@@ -6,7 +6,7 @@ import base64
 import pytest
 
 from app.workflow_export import (
-    get_step_image_path,
+    get_step_image_bytes,
     get_step_image_base64,
     generate_markdown,
     generate_html,
@@ -36,48 +36,51 @@ def mixed_steps():
     ]
 
 
-def test_get_step_image_path_relative_found(tmp_path):
+# ── get_step_image_bytes (async, replaces old get_step_image_path) ────────
+
+@pytest.mark.asyncio
+async def test_get_step_image_bytes_local_found(tmp_path):
     storage = tmp_path / "recordings" / "wf"
     storage.mkdir(parents=True)
     f = storage / "step_1.png"
     f.write_bytes(b"img")
-
-    result = get_step_image_path(str(storage), "step_1.png")
-    assert result == str(f)
-
-
-def test_get_step_image_path_absolute_found(tmp_path):
-    f = tmp_path / "absolute.png"
-    f.write_bytes(b"img")
-
-    result = get_step_image_path("/unused", str(f))
-    assert result == str(f)
+    result = await get_step_image_bytes(str(storage), "step_1.png")
+    assert result == b"img"
 
 
+@pytest.mark.asyncio
+async def test_get_step_image_bytes_missing_returns_none(tmp_path):
+    result = await get_step_image_bytes(str(tmp_path), "missing.png")
+    assert result is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("storage_type", ["s3", "cloud", "remote"])
-def test_get_step_image_path_non_local_returns_none(storage_type, tmp_path):
+async def test_get_step_image_bytes_non_local_returns_none(storage_type, tmp_path):
     f = tmp_path / "x.png"
     f.write_bytes(b"img")
-    assert get_step_image_path(str(tmp_path), str(f), storage_type=storage_type) is None
+    result = await get_step_image_bytes(str(tmp_path), str(f), storage_type=storage_type)
+    assert result is None
 
 
-def test_get_step_image_path_missing_returns_none(tmp_path):
-    assert get_step_image_path(str(tmp_path), "missing.png") is None
+# ── get_step_image_base64 (now async) ─────────────────────────────────────
 
-
-def test_get_step_image_base64_returns_encoded_data(tmp_path):
+@pytest.mark.asyncio
+async def test_get_step_image_base64_returns_encoded_data(tmp_path):
     storage = tmp_path / "wf"
     storage.mkdir()
     data = b"\x89PNG\r\n\x1a\nabc"
     (storage / "s.png").write_bytes(data)
-
-    b64 = get_step_image_base64(str(storage), "s.png")
+    b64 = await get_step_image_base64(str(storage), "s.png")
     assert b64 == base64.b64encode(data).decode("utf-8")
 
 
-def test_get_step_image_base64_missing_returns_none(tmp_path):
-    assert get_step_image_base64(str(tmp_path), "none.png") is None
+@pytest.mark.asyncio
+async def test_get_step_image_base64_missing_returns_none(tmp_path):
+    assert await get_step_image_base64(str(tmp_path), "none.png") is None
 
+
+# ── generate_markdown (sync) ─────────────────────────────────────────────
 
 def test_generate_markdown_title_and_metadata(workflow, mixed_steps):
     md = generate_markdown(workflow, mixed_steps, files={})
@@ -132,11 +135,8 @@ def test_generate_markdown_image_placeholder_without_base_url(workflow):
 def test_generate_markdown_image_url_with_base_url(workflow):
     steps = [{"step_number": 7, "description": "With image"}]
     md = generate_markdown(
-        workflow,
-        steps,
-        files={7: "step_7.png"},
-        include_images=True,
-        image_base_url="https://cdn.example.com",
+        workflow, steps, files={7: "step_7.png"},
+        include_images=True, image_base_url="https://cdn.example.com",
     )
     assert "![Step 1](https://cdn.example.com/session/wf-1/image/7)" in md
 
@@ -148,13 +148,25 @@ def test_generate_markdown_counts_visible_step_types(workflow, step_type):
     assert "**Steps:** 1" in md
 
 
-def test_generate_html_has_document_structure(workflow, mixed_steps):
-    html = generate_html(workflow, mixed_steps, files={}, storage_path="/tmp")
+@pytest.mark.parametrize("name", [None, "", "Automation Guide"])
+def test_generate_markdown_title_fallback(name):
+    wf = {"id": "wf-2", "name": name}
+    md = generate_markdown(wf, [], files={})
+    expected = "Untitled Workflow" if not name else "Automation Guide"
+    assert f"# {expected}" in md
+
+
+# ── generate_html (now async) ────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_generate_html_has_document_structure(workflow, mixed_steps):
+    html = await generate_html(workflow, mixed_steps, files={}, storage_path="/tmp")
     assert "<!DOCTYPE html>" in html
     assert "<html lang='en'>" in html
     assert "<h1>Deploy Workflow</h1>" in html
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "step, snippet",
     [
@@ -163,40 +175,41 @@ def test_generate_html_has_document_structure(workflow, mixed_steps):
         ({"step_number": 1, "step_type": "alert", "content": "Warn"}, "<div class='alert'>⚠️ <strong>Alert:</strong> Warn</div>"),
     ],
 )
-def test_generate_html_special_nodes(workflow, step, snippet):
-    html = generate_html(workflow, [step], files={}, storage_path="/tmp")
+async def test_generate_html_special_nodes(workflow, step, snippet):
+    html = await generate_html(workflow, [step], files={}, storage_path="/tmp")
     assert snippet in html
 
 
-def test_generate_html_for_pdf_includes_print_css(workflow):
-    html = generate_html(workflow, [{"step_number": 1, "description": "x"}], files={}, storage_path="/tmp", for_pdf=True)
+@pytest.mark.asyncio
+async def test_generate_html_for_pdf_includes_print_css(workflow):
+    html = await generate_html(workflow, [{"step_number": 1, "description": "x"}], files={}, storage_path="/tmp", for_pdf=True)
     assert "@media print" in html
     assert "page-break-inside: avoid" in html
 
 
-def test_generate_html_uses_image_base_url_when_not_embedded(workflow):
-    html = generate_html(
+@pytest.mark.asyncio
+async def test_generate_html_uses_image_base_url_when_not_embedded(workflow):
+    html = await generate_html(
         workflow,
         [{"step_number": 2, "description": "Image"}],
-        files={2: "step2.png"},
-        storage_path="/tmp",
-        embed_images=False,
-        image_base_url="https://assets.example.com",
+        files={2: "step2.png"}, storage_path="/tmp",
+        embed_images=False, image_base_url="https://assets.example.com",
     )
     assert "https://assets.example.com/session/wf-1/image/2" in html
 
 
-def test_generate_html_shows_no_image_placeholder_when_embed_fails(workflow):
-    html = generate_html(
+@pytest.mark.asyncio
+async def test_generate_html_shows_no_image_placeholder_when_embed_fails(workflow):
+    html = await generate_html(
         workflow,
         [{"step_number": 2, "description": "Image"}],
-        files={2: "missing.png"},
-        storage_path="/no/such/dir",
+        files={2: "missing.png"}, storage_path="/no/such/dir",
         embed_images=True,
     )
     assert "[Image not available: missing.png]" in html
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "step, snippet",
     [
@@ -204,10 +217,12 @@ def test_generate_html_shows_no_image_placeholder_when_embed_fails(workflow):
         ({"step_number": 1, "description": "Key", "key_pressed": "Tab"}, "Key pressed: <code>Tab</code>"),
     ],
 )
-def test_generate_html_details(workflow, step, snippet):
-    html = generate_html(workflow, [step], files={}, storage_path="/tmp")
+async def test_generate_html_details(workflow, step, snippet):
+    html = await generate_html(workflow, [step], files={}, storage_path="/tmp")
     assert snippet in html
 
+
+# ── generate_confluence_storage (sync) ───────────────────────────────────
 
 def test_generate_confluence_storage_core_elements(workflow, mixed_steps):
     c = generate_confluence_storage(workflow, mixed_steps, files={})
@@ -231,18 +246,15 @@ def test_generate_confluence_special_nodes(workflow, step, snippet):
 
 def test_generate_confluence_image_url(workflow):
     c = generate_confluence_storage(
-        workflow,
-        [{"step_number": 3, "description": "Image"}],
-        files={3: "x.png"},
-        image_base_url="https://img.example.com",
+        workflow, [{"step_number": 3, "description": "Image"}],
+        files={3: "x.png"}, image_base_url="https://img.example.com",
     )
     assert 'ri:value="https://img.example.com/session/wf-1/image/3"' in c
 
 
 def test_generate_confluence_attachment_when_no_base_url(workflow):
     c = generate_confluence_storage(
-        workflow,
-        [{"step_number": 3, "description": "Image"}],
+        workflow, [{"step_number": 3, "description": "Image"}],
         files={3: "nested/x.png"},
     )
     assert 'ri:attachment ri:filename="x.png"' in c
@@ -259,6 +271,8 @@ def test_generate_confluence_details(workflow, step, snippet):
     c = generate_confluence_storage(workflow, [step], files={})
     assert snippet in c
 
+
+# ── generate_notion_markdown (sync) ──────────────────────────────────────
 
 def test_generate_notion_markdown_core(workflow, mixed_steps):
     md = generate_notion_markdown(workflow, mixed_steps, files={})
@@ -283,21 +297,12 @@ def test_generate_notion_details_block_for_visible_steps(workflow):
     md = generate_notion_markdown(
         workflow,
         [{"step_number": 9, "description": "Deploy", "text_typed": "kubectl apply", "key_pressed": "Enter"}],
-        files={9: "step9.png"},
-        image_base_url="https://cdn.example.com",
+        files={9: "step9.png"}, image_base_url="https://cdn.example.com",
     )
     assert "<details><summary><strong>Step 1:</strong> Deploy</summary>" in md
     assert "![Step 1](https://cdn.example.com/session/wf-1/image/9)" in md
     assert "**Text entered:** `kubectl apply`" in md
     assert "**Key pressed:** `Enter`" in md
-
-
-@pytest.mark.parametrize("name", [None, "", "Automation Guide"])
-def test_generate_markdown_title_fallback(name):
-    wf = {"id": "wf-2", "name": name}
-    md = generate_markdown(wf, [], files={})
-    expected = "Untitled Workflow" if not name else "Automation Guide"
-    assert f"# {expected}" in md
 
 
 @pytest.mark.parametrize("name", [None, "", "Workflow X"])
