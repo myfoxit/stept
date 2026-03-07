@@ -21,6 +21,7 @@ import { ImageUploadModal } from '@/components/workflow/image-upload-modal';
 import { ShareExportModal } from '@/components/workflow/share-export-modal';
 import { GuidePanel } from '@/components/workflow/guide-panel';
 import { SmartStepOverlay } from '@/components/workflow/smart-step-card';
+import { AIToolbar } from '@/components/workflow/ai-toolbar';
 import {
   formatDuration,
   getMostUsedSite,
@@ -345,8 +346,27 @@ export function WorkflowView() {
 
   // AI state
   const [guideOpen, setGuideOpen] = React.useState(false);
+  const [isAIProcessing, setIsAIProcessing] = React.useState(false);
+  const [aiProgress, setAiProgress] = React.useState<{ current: number; total: number } | null>(null);
 
   const isProcessed = typedWorkflow ? Boolean((typedWorkflow as any).is_processed) : false;
+  const aiSummary = typedWorkflow as any;
+
+  const handleProcessWithAI = React.useCallback(async () => {
+    if (!workflowId || isAIProcessing) return;
+    setIsAIProcessing(true);
+    setAiProgress({ current: 0, total: steps?.length || 1 });
+    try {
+      const result = await processRecording(workflowId);
+      setAiProgress({ current: result.steps_annotated, total: result.total_steps });
+      refreshWorkflow();
+    } catch (e) {
+      console.error('AI processing failed:', e);
+    } finally {
+      setIsAIProcessing(false);
+      setAiProgress(null);
+    }
+  }, [workflowId, isAIProcessing, steps?.length, refreshWorkflow]);
 
   const handleGenerateGuide = React.useCallback(() => {
     setGuideOpen(true);
@@ -661,6 +681,17 @@ export function WorkflowView() {
           {selectedProjectId && workflowId && (
             <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
           )}
+
+          <AIToolbar
+            isProcessing={isAIProcessing}
+            isProcessed={isProcessed}
+            processingProgress={aiProgress}
+            onProcessAll={handleProcessWithAI}
+            onGenerateGuide={handleGenerateGuide}
+            difficulty={aiSummary?.difficulty}
+            estimatedTime={aiSummary?.estimated_time}
+            tags={aiSummary?.tags}
+          />
 
           {isEditMode ? (
             <InsertStepMenu index={0} onInsert={handleInsertStep} stepNumber={1} />

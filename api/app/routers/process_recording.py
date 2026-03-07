@@ -28,8 +28,28 @@ from app.crud.process_recording import (
 )
 from app.security import get_current_user, ProjectPermissionChecker, check_project_permission
 from fastapi import Body  # NEW: accept JSON body in update endpoint
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _safe_light_process(recording_id: str) -> None:
+    """Run light AI processing in the background with its own DB session.
+
+    Safe to fire-and-forget — catches all exceptions and logs them.
+    """
+    try:
+        from app.database import AsyncSessionLocal
+        from app.services.auto_processor import auto_processor
+
+        async with AsyncSessionLocal() as db:
+            result = await auto_processor.light_process_recording(recording_id, db)
+            if result.get("title"):
+                logger.info("Auto-titled recording %s: %s", recording_id, result["title"])
+    except Exception:
+        logger.exception("Light auto-processing failed for recording %s", recording_id)
 
 @router.get("/workflows/filtered")
 async def get_filtered_workflows_endpoint(
@@ -186,6 +206,14 @@ async def finalize_upload_session(
             import asyncio
             from app.services.indexer import index_workflow_background
             asyncio.create_task(index_workflow_background(session_id))
+        
+        # Auto-generate smart title + summary for all clients (lightweight, no vision)
+        if session and not session.is_processed:
+            import asyncio
+            from app.services.auto_processor import auto_processor
+            asyncio.create_task(
+                _safe_light_process(session_id)
+            )
         
         return {"status": "success", "message": "Session finalized"}
     except ValueError as e:

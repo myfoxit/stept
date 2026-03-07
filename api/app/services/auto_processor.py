@@ -520,6 +520,96 @@ class RecordingAutoProcessor:
 
         return await _llm_json_call(messages, base_url_override)
 
+    async def light_process_recording(self, recording_id: str, db: AsyncSession) -> dict:
+        """Lightweight auto-processing: generate smart title + summary from metadata only.
+
+        No vision, no per-step annotation, no guide.  One cheap text-only LLM call
+        using step descriptions + element_info + URLs.  Designed to run automatically
+        on finalize without noticeable cost.
+        """
+        stmt = (
+            select(ProcessRecordingSession)
+            .where(ProcessRecordingSession.id == recording_id)
+            .options(selectinload(ProcessRecordingSession.steps))
+        )
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        if not session:
+            raise ValueError(f"Recording {recording_id} not found")
+
+        steps = sorted(session.steps, key=lambda s: s.step_number)
+        if not steps:
+            return {"recording_id": recording_id, "skipped": True}
+
+        # Build rich context from all available metadata
+        steps_text = []
+        for step in steps:
+            parts = [f"{step.step_number}. [{step.action_type or 'Action'}]"]
+            if step.description:
+                parts.append(step.description)
+            if step.owner_app:
+                parts.append(f"(app: {step.owner_app})")
+            if step.url:
+                parts.append(f"(url: {step.url})")
+            # Extract the most useful element_info fields
+            ei = step.element_info
+            if ei and isinstance(ei, dict):
+                role = ei.get("role") or ei.get("tagName")
+                label = (ei.get("ariaLabel") or ei.get("title") or
+                         ei.get("associatedLabel") or ei.get("text"))
+                dom_id = ei.get("domId") or ei.get("id") or ei.get("testId")
+                if role:
+                    parts.append(f"[{role}]")
+                if label and label not in (step.description or ""):
+                    parts.append(f'"{label}"')
+                if dom_id:
+                    parts.append(f"#{dom_id}")
+            if step.text_typed:
+                parts.append(f'(typed: "{step.text_typed}")')
+            steps_text.append(" ".join(parts))
+
+        prompt = (
+            "You are a workflow documentation assistant. Given these steps from a recorded process, "
+            "generate a JSON object with:\n"
+            '- "title": a clear, descriptive workflow title (e.g. "Create an API Key in OpenAI Dashboard"). '
+            "Do NOT use generic titles like 'Workflow' or 'Untitled'. Base it on what the user actually did.\n"
+            '- "summary": a 2-3 sentence overview of what this workflow accomplishes\n'
+            '- "tags": a list of 3-8 searchable keywords/tags\n'
+            '- "estimated_time": estimated time to complete (e.g. "1-2 minutes")\n'
+            '- "difficulty": one of: easy, medium, advanced\n\n'
+            f"Steps:\n" + "\n".join(steps_text) + "\n\n"
+            "Return ONLY valid JSON, no extra text."
+        )
+
+        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+
+        messages = [
+            {"role": "system", "content": "You are a precise workflow documentation assistant. Always respond with valid JSON only."},
+            {"role": "user", "content": prompt},
+        ]
+
+        summary_data = await _llm_json_call(messages, base_url_override)
+        if summary_data:
+            if summary_data.get("title"):
+                session.generated_title = summary_data["title"]
+                # Also update the display name if it's still the generic default
+                if (not session.name or
+                    session.name.startswith("Untitled") or
+                    session.name.startswith("Workflow:")):
+                    session.name = summary_data["title"]
+            session.summary = summary_data.get("summary", "")
+            session.tags = summary_data.get("tags", [])
+            session.estimated_time = summary_data.get("estimated_time", "")
+            session.difficulty = summary_data.get("difficulty", "")
+
+        await db.commit()
+
+        return {
+            "recording_id": recording_id,
+            "title": summary_data.get("title", ""),
+            "has_summary": bool(summary_data),
+        }
+
 
 # Singleton instance
 auto_processor = RecordingAutoProcessor()
