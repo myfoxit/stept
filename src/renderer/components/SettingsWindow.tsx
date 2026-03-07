@@ -198,12 +198,9 @@ const SettingsWindow: React.FC = () => {
             <label className="settings-label" style={{ margin: 0 }}>
               Auto-improve step titles with AI
             </label>
-            <Toggle
-              value={settings.autoAnnotateSteps}
-              onChange={() =>
-                update('autoAnnotateSteps', !settings.autoAnnotateSteps)
-              }
-            />
+            <span className="settings-hint" style={{ fontSize: '0.8em', color: '#888' }}>
+              Controlled in project settings on the web
+            </span>
           </div>
         </div>
       </div>

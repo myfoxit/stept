@@ -227,8 +227,30 @@ export function setupIpcHandlers(
         // Batch-annotate the full workflow (10s timeout) — runs in parallel with drain
         let workflowTitle: string | undefined;
         const aiAvailable = settingsManager.isLlmConfigured() || !!authService.getAccessToken();
-        const autoAnnotate = settingsManager.getSettings().autoAnnotateSteps !== false;
-        if (aiAvailable && autoAnnotate) {
+
+        // Check project's ai_enabled setting (single source of truth)
+        let projectAiEnabled = true;
+        if (currentProjectId && authService.getAccessToken()) {
+          try {
+            const settings = settingsManager.getSettings();
+            const apiBase = (settings.chatApiUrl || settings.cloudEndpoint || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+            const projListRes = await fetch(`${apiBase}/projects/${currentUserId}`, {
+              headers: { 'Authorization': `Bearer ${authService.getAccessToken()}` },
+            });
+            if (projListRes.ok) {
+              const projects = await projListRes.json();
+              const proj = projects.find((p: any) => p.id === currentProjectId);
+              if (proj && proj.ai_enabled === false) {
+                projectAiEnabled = false;
+                console.log('[AI] Project AI disabled, skipping SmartAnnotation');
+              }
+            }
+          } catch (e) {
+            console.warn('[AI] Failed to check project ai_enabled, defaulting to enabled:', e);
+          }
+        }
+
+        if (aiAvailable && projectAiEnabled) {
           try {
             const annotationPromise = smartAnnotation.annotateWorkflow(currentRecordingSteps);
             const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000));
