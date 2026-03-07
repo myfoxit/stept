@@ -227,7 +227,8 @@ export function setupIpcHandlers(
         // Batch-annotate the full workflow (10s timeout) — runs in parallel with drain
         let workflowTitle: string | undefined;
         const aiAvailable = settingsManager.isLlmConfigured() || !!authService.getAccessToken();
-        if (aiAvailable) {
+        const autoAnnotate = settingsManager.getSettings().autoAnnotateSteps !== false;
+        if (aiAvailable && autoAnnotate) {
           try {
             const annotationPromise = smartAnnotation.annotateWorkflow(currentRecordingSteps);
             const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000));
