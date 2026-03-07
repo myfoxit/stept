@@ -1489,3 +1489,24 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     }
   }
 });
+
+// Keyboard shortcuts
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'toggle-recording') {
+    if (state.isRecording) {
+      stopRecording();
+    } else if (state.selectedProjectId) {
+      startRecording(state.selectedProjectId);
+    } else {
+      debugLog('Cannot start recording — no project selected');
+    }
+  } else if (command === 'pause-recording') {
+    if (state.isRecording) {
+      if (state.isPaused) {
+        resumeRecording();
+      } else {
+        pauseRecording();
+      }
+    }
+  }
+});
