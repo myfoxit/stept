@@ -42,10 +42,18 @@ async def upload_image(
     if content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(400, f"Unsupported file type: {content_type}. Allowed: {', '.join(ALLOWED_MIME_TYPES)}")
 
-    # Read and validate size
-    content = await file.read()
-    if len(content) > MAX_IMAGE_SIZE:
-        raise HTTPException(400, f"File too large. Maximum size: {MAX_IMAGE_SIZE // (1024*1024)}MB")
+    # Read in chunks to limit memory usage
+    chunks = []
+    total_size = 0
+    while True:
+        chunk = await file.read(8192)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_IMAGE_SIZE:
+            raise HTTPException(400, f"File too large. Maximum size: {MAX_IMAGE_SIZE // (1024*1024)}MB")
+        chunks.append(chunk)
+    content = b"".join(chunks)
 
     # Generate unique filename
     ext = os.path.splitext(file.filename or "image.png")[1] or ".png"
