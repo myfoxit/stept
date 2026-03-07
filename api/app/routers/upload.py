@@ -63,8 +63,9 @@ async def upload_image(
 @router.get("/image/{filename}")
 async def get_image(
     filename: str,
+    current_user: User = Depends(get_current_user),
 ):
-    """Serve an uploaded image."""
+    """Serve an uploaded image (requires auth)."""
     # Reject path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(400, "Invalid filename")
