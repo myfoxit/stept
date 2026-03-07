@@ -35,6 +35,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _verify_session_access(db: AsyncSession, session_id: str, user_id: str) -> ProcessRecordingSession:
+    """Load a session and verify the user has project access. Raises 404/403."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    if session.project_id:
+        await check_project_permission(db, user_id, session.project_id)
+    return session
+
+
 async def _safe_light_process(recording_id: str) -> None:
     """Run light AI processing in the background with its own DB session.
 
@@ -63,6 +73,8 @@ async def get_filtered_workflows_endpoint(
     current_user: User = Depends(get_current_user)
 ):
     """Get filtered workflows with sorting for a project"""
+    from app.security import check_project_permission
+    await check_project_permission(db, current_user.id, project_id)
     try:
         workflows = await get_filtered_workflows(
             db,
@@ -129,6 +141,7 @@ async def upload_session_metadata(
     current_user: User = Depends(get_current_user),
 ):
     """Upload metadata for all steps in a session"""
+    await _verify_session_access(db, session_id, current_user.id)
     try:
         await upload_metadata(db, session_id, metadata)
         return {"status": "success", "steps_uploaded": len(metadata)}
@@ -147,6 +160,7 @@ async def upload_image(
     current_user: User = Depends(get_current_user),
 ):
     """Upload a single image for a step"""
+    await _verify_session_access(db, session_id, current_user.id)
     try:
         # Read file content
         file_content = await file.read()
@@ -309,6 +323,7 @@ async def get_session_status_endpoint(
 ):
     """Get status of an upload session (augmented with icon fields and title)"""
     try:
+        await _verify_session_access(db, session_id, current_user.id)
         status_data = await get_session_status(db, session_id)
         # Convert to dict whether it's a Pydantic model or already a dict
         base = status_data.dict() if hasattr(status_data, "dict") else dict(status_data)
@@ -366,6 +381,7 @@ async def get_image(
     current_user: User = Depends(get_current_user),
 ):
     """Retrieve an uploaded image (local file or redirect to signed URL)"""
+    await _verify_session_access(db, session_id, current_user.id)
     access = await get_file_access(db, session_id, step_number, expires_in=3600)
     if not access:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
