@@ -118,7 +118,10 @@ async def upload_metadata(
             screenshot_size=meta.screenshot_size,
             screenshot_relative_position=meta.screenshot_relative_position,
             step_type=meta.step_type or "screenshot",  # NEW: default screenshot
-            content=meta.content,                      # NEW
+            content=meta.content,
+            url=meta.url,
+            owner_app=meta.owner_app,
+            element_info=meta.element_info,
             generated_title=meta.generated_title,      # AI titles from desktop
             generated_description=meta.generated_description,  # AI descriptions from desktop
             is_annotated=bool(meta.generated_title),   # Mark as annotated if title exists
@@ -157,6 +160,9 @@ async def upload_metadata(
             "scroll_delta": meta.scroll_delta,
             "screenshot_size": meta.screenshot_size,
             "screenshot_relative_position": meta.screenshot_relative_position,
+            "url": meta.url,
+            "owner_app": meta.owner_app,
+            "element_info": meta.element_info,
         })
 
     backend = get_storage_backend(session.storage_type)
@@ -584,9 +590,12 @@ async def get_session_status(
             "scroll_delta": step.scroll_delta,
             "screenshot_size": step.screenshot_size,
             "screenshot_relative_position": step.screenshot_relative_position,
-            "step_type": step.step_type or "screenshot",   # NEW
-            "content": step.content,                      # NEW
-            "file_uploaded": step.step_number in file_steps,  # NEW
+            "step_type": step.step_type or "screenshot",
+            "content": step.content,
+            "url": step.url,
+            "owner_app": step.owner_app,
+            "element_info": step.element_info,
+            "file_uploaded": step.step_number in file_steps,
             # AI annotation fields
             "step_id": step.id,
             "generated_title": step.generated_title,

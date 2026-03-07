@@ -17,6 +17,9 @@ interface PublicStep {
   key_pressed: string | null;
   generated_title: string | null;
   generated_description: string | null;
+  screenshot_relative_position: { x: number; y: number } | null;
+  screenshot_size: { width: number; height: number } | null;
+  window_size: { width: number; height: number } | null;
 }
 
 interface PublicWorkflow {
@@ -151,15 +154,43 @@ export function PublicWorkflowPage() {
                   </div>
                   <h3 className="font-medium">{step.description || step.window_title || `Step ${visibleIndex}`}</h3>
                 </div>
-                {hasImage && (
-                  <div className="p-4">
-                    <img
-                      src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
-                      alt={`Step ${visibleIndex}`}
-                      className="w-full rounded-lg border"
-                    />
-                  </div>
-                )}
+                {hasImage && (() => {
+                  const screenshotRel = step.screenshot_relative_position;
+                  const screenshotSize = step.screenshot_size ?? step.window_size;
+                  let circlePos: { x: number; y: number } | null = null;
+                  if (screenshotRel && screenshotSize) {
+                    circlePos = {
+                      x: (screenshotRel.x / screenshotSize.width) * 100,
+                      y: (screenshotRel.y / screenshotSize.height) * 100,
+                    };
+                  }
+                  return (
+                    <div className="p-4">
+                      <div className="relative">
+                        <img
+                          src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
+                          alt={`Step ${visibleIndex}`}
+                          className="w-full rounded-lg border"
+                        />
+                        {circlePos && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${circlePos.x}%`,
+                              top: `${circlePos.y}%`,
+                              transform: 'translate(-50%, -50%)',
+                            }}
+                          >
+                            <div className="absolute -inset-4 rounded-full bg-violet-500/20 animate-pulse" />
+                            <div className="relative h-8 w-8 rounded-full border-2 border-violet-600 bg-violet-500/30">
+                              <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {(step.text_typed || step.key_pressed) && (
                   <div className="px-4 pb-4 space-y-1 text-sm text-muted-foreground">
                     {step.text_typed && <div>Text entered: <code className="bg-muted px-1 rounded">{step.text_typed}</code></div>}

@@ -54,6 +54,11 @@ class StepMetadata(BaseModel):
     step_type: Optional[str] = Field(None, alias="stepType")
     content: Optional[str] = None
     file_uploaded: Optional[bool] = Field(None, alias="fileUploaded")
+    # Rich context — flexible JSON for evolving element data from any client
+    url: Optional[str] = None
+    owner_app: Optional[str] = Field(None, alias="ownerApp")
+    element_info: Optional[dict] = Field(None, alias="elementInfo")
+    
     # AI-generated fields from desktop app
     generated_title: Optional[str] = Field(None, alias="generatedTitle")
     generated_description: Optional[str] = Field(None, alias="generatedDescription")

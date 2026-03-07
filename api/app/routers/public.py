@@ -44,6 +44,9 @@ def _serialize_workflow(session, permission: str = "view"):
             "key_pressed": step.key_pressed,
             "generated_title": step.generated_title,
             "generated_description": step.generated_description,
+            "screenshot_relative_position": step.screenshot_relative_position,
+            "screenshot_size": step.screenshot_size,
+            "window_size": step.window_size,
         }
         steps_data.append(step_dict)
 

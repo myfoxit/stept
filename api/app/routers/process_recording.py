@@ -674,6 +674,9 @@ async def export_workflow_markdown(
             "window_title": step.window_title,
             "text_typed": step.text_typed,
             "key_pressed": step.key_pressed,
+            "url": step.url,
+            "owner_app": step.owner_app,
+            "element_info": step.element_info,
         }
         for step in session.steps
     ]

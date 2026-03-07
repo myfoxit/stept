@@ -15,12 +15,16 @@ interface ProcessStep {
   action_type: string;
   window_title: string;
   description: string;
-  global_position?: [number, number];
-  relative_position?: [number, number];
-  window_size?: [number, number];
+  global_position?: { x: number; y: number } | [number, number];
+  relative_position?: { x: number; y: number } | [number, number];
+  window_size?: { width: number; height: number } | [number, number];
+  screenshot_relative_position?: { x: number; y: number };
+  screenshot_size?: { width: number; height: number };
   key_pressed?: string;
   text_typed?: string;
   scroll_delta?: [number, number];
+  generated_title?: string;
+  generated_description?: string;
 }
 
 interface ProcessRecordingData {
@@ -86,7 +90,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
     setImageLoadErrors(prev => new Set(prev).add(stepNumber));
   };
 
-  const renderStepImage = (stepNumber: number) => {
+  const renderStepImage = (stepNumber: number, step?: ProcessStep) => {
     const hasError = imageLoadErrors.has(stepNumber);
     
     if (hasError) {
@@ -103,14 +107,49 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
     // Use the URL directly - no need to fetch via apiClient
     const imageUrl = getWorkflowImage(sessionId, stepNumber);
 
+    // Calculate click indicator position
+    // Prefer screenshot_relative_position + screenshot_size (cropped screenshot coords),
+    // fall back to relative_position + window_size (full window coords)
+    let circlePos: { x: number; y: number } | null = null;
+    if (step) {
+      const pos = step.screenshot_relative_position ?? step.relative_position;
+      const size = step.screenshot_size ?? step.window_size;
+      if (pos && size) {
+        const px = typeof pos === 'object' && 'x' in pos ? pos.x : Array.isArray(pos) ? pos[0] : null;
+        const py = typeof pos === 'object' && 'y' in pos ? pos.y : Array.isArray(pos) ? pos[1] : null;
+        const sw = typeof size === 'object' && 'width' in size ? size.width : Array.isArray(size) ? size[0] : null;
+        const sh = typeof size === 'object' && 'height' in size ? size.height : Array.isArray(size) ? size[1] : null;
+        if (px != null && py != null && sw && sh) {
+          circlePos = { x: (px / sw) * 100, y: (py / sh) * 100 };
+        }
+      }
+    }
+
     return (
-      <img
-        src={imageUrl}
-        alt={`Step ${stepNumber}`}
-        className="w-full rounded-lg border border-gray-200 shadow-sm"
-        loading="lazy"
-        onError={() => handleImageError(stepNumber)}
-      />
+      <div className="relative">
+        <img
+          src={imageUrl}
+          alt={`Step ${stepNumber}`}
+          className="w-full rounded-lg border border-gray-200 shadow-sm"
+          loading="lazy"
+          onError={() => handleImageError(stepNumber)}
+        />
+        {circlePos && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: `${circlePos.x}%`,
+              top: `${circlePos.y}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div className="absolute -inset-4 rounded-full bg-blue-500/20 animate-pulse" />
+            <div className="relative h-8 w-8 rounded-full border-2 border-blue-600 bg-blue-500/30">
+              <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600" />
+            </div>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -198,7 +237,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
                     </div>
                   </div>
 
-                  {renderStepImage(step.step_number)}
+                  {renderStepImage(step.step_number, step)}
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     {step.global_position && Array.isArray(step.global_position) && (
@@ -276,7 +315,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
                   </div>
                 </div>
 
-                {renderStepImage(step.step_number)}
+                {renderStepImage(step.step_number, step)}
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {step.global_position && Array.isArray(step.global_position) && (

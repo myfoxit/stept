@@ -67,11 +67,17 @@ async def execute(
         has_typing = False
         has_clicks = False
 
+        urls = set()
+        apps = set()
         for step in steps:
             stype = step.action_type or step.step_type or "unknown"
             step_types[stype] = step_types.get(stype, 0) + 1
             if step.window_title:
                 windows.add(step.window_title)
+            if step.url:
+                urls.add(step.url)
+            if step.owner_app:
+                apps.add(step.owner_app)
             if step.text_typed:
                 has_typing = True
             if step.action_type and "click" in step.action_type.lower():
@@ -95,7 +101,8 @@ async def execute(
             "name": workflow.name or workflow.generated_title or "Untitled Workflow",
             "total_steps": len(steps),
             "step_breakdown": step_types,
-            "applications_used": sorted(windows),
+            "applications_used": sorted(apps) if apps else sorted(windows),
+            "urls_visited": sorted(urls),
             "has_data_entry": has_typing,
             "has_clicks": has_clicks,
             "potential_duplicates": duplicate_count,

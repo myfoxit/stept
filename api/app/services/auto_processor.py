@@ -47,14 +47,22 @@ async def _read_image_base64(file_path: str, storage_path: str, storage_type: st
 
 
 def _build_step_context(step: ProcessRecordingStep) -> str:
-    """Build a textual description of step metadata."""
+    """Build a textual description of step metadata.
+    
+    Includes rich element data from the client when available —
+    this is far more useful for AI than the pre-baked description string.
+    """
     parts = [f"Step {step.step_number}"]
     if step.step_type:
         parts.append(f"Type: {step.step_type}")
     if step.action_type:
         parts.append(f"Action: {step.action_type}")
+    if step.owner_app:
+        parts.append(f"Application: {step.owner_app}")
     if step.window_title:
         parts.append(f"Window: {step.window_title}")
+    if step.url:
+        parts.append(f"URL: {step.url}")
     if step.description:
         parts.append(f"Description: {step.description}")
     if step.text_typed:
@@ -63,6 +71,34 @@ def _build_step_context(step: ProcessRecordingStep) -> str:
         parts.append(f"Key pressed: {step.key_pressed}")
     if step.content:
         parts.append(f"Content: {step.content}")
+    
+    # Include rich element data when available (from Chrome plugin or desktop native)
+    ei = step.element_info
+    if ei and isinstance(ei, dict):
+        # Prefer the most semantically useful fields; skip noisy ones
+        for key, label in [
+            ("ariaLabel", "ARIA label"),
+            ("role", "Element role"),
+            ("tagName", "HTML tag"),
+            ("associatedLabel", "Field label"),
+            ("placeholder", "Placeholder"),
+            ("title", "Element title"),
+            ("text", "Element text"),
+            ("alt", "Alt text"),
+            ("testId", "Test ID"),
+            ("id", "DOM ID"),
+            ("href", "Link URL"),
+            ("name", "Name attr"),
+            ("type", "Input type"),
+            # Desktop native fields
+            ("description", "AX description"),
+            ("subrole", "AX subrole"),
+            ("domId", "DOM ID"),
+        ]:
+            val = ei.get(key)
+            if val and isinstance(val, str) and len(val) < 200:
+                parts.append(f"{label}: {val}")
+
     return " | ".join(parts)
 
 
@@ -301,8 +337,12 @@ class RecordingAutoProcessor:
                 parts.append(f"  Category: {category}")
             if ui:
                 parts.append(f"  UI Element: {ui}")
+            if step.owner_app:
+                parts.append(f"  Application: {step.owner_app}")
             if window:
                 parts.append(f"  Window: {window}")
+            if step.url:
+                parts.append(f"  URL: {step.url}")
             if step.text_typed:
                 parts.append(f"  Text entered: {step.text_typed}")
             steps_text.append("\n".join(parts))
@@ -392,8 +432,12 @@ class RecordingAutoProcessor:
                 parts.append(f"  Category: {step.step_category}")
             if step.ui_element:
                 parts.append(f"  UI Element: {step.ui_element}")
+            if step.owner_app:
+                parts.append(f"  Application: {step.owner_app}")
             if step.window_title:
                 parts.append(f"  Window: {step.window_title}")
+            if step.url:
+                parts.append(f"  URL: {step.url}")
             steps_text.append("\n".join(parts))
 
         workflow_title = session.generated_title or session.name or "Untitled Workflow"

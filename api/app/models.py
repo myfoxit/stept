@@ -345,6 +345,16 @@ class ProcessRecordingStep(Base):
     text_typed = Column(Text, nullable=True)
     scroll_delta = Column(Integer, nullable=True)
     
+    # Rich context — flexible JSON blobs for evolving client data
+    url = Column(String, nullable=True)          # Page URL (web workflows)
+    owner_app = Column(String, nullable=True)    # Application name (e.g. "Google Chrome")
+    element_info = Column(JSON, nullable=True)   # Raw element data from any client
+    # Desktop: {role, title, value, description, subrole, domId, confidence}
+    # Chrome:  {tagName, id, className, text, href, type, name, placeholder,
+    #           ariaLabel, role, title, alt, associatedLabel, parentText,
+    #           testId, elementRect}
+    # Future clients can add arbitrary keys — schema is intentionally open
+    
     # AI annotation fields
     generated_title = Column(String, nullable=True)
     generated_description = Column(Text, nullable=True)
