@@ -120,6 +120,8 @@ export interface RecordedStep {
   elementRole?: string;
   elementDescription?: string;
   ownerApp?: string;
+  /** Raw native element data — flexible JSON, uploaded as-is for backend AI */
+  nativeElement?: Record<string, any>;
   generatedTitle?: string;
   generatedDescription?: string;
 }
@@ -836,6 +838,15 @@ export class RecordingService extends EventEmitter {
       elementRole: elementRole || undefined,
       elementDescription: elementDescription || undefined,
       ownerApp: ownerApp || undefined,
+      nativeElement: element ? {
+        role: element.role || undefined,
+        title: element.title || undefined,
+        value: (element.value && element.value.length < 200) ? element.value : undefined,
+        description: element.description || undefined,
+        subrole: element.subrole || undefined,
+        domId: element.domId || undefined,
+        confidence: element.confidence || undefined,
+      } : undefined,
     };
 
     this.emit('step-recorded', step);

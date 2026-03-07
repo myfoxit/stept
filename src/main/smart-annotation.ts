@@ -46,6 +46,8 @@ export class SmartAnnotationService extends EventEmitter {
       if (s.description) parts.push(`- ${s.description}`);
       if (s.textTyped) parts.push(`(typed: "${s.textTyped}")`);
       if (s.elementName) parts.push(`[element: ${s.elementName}]`);
+      if (s.elementRole) parts.push(`[role: ${s.elementRole}]`);
+      if (s.nativeElement?.domId) parts.push(`[domId: ${s.nativeElement.domId}]`);
       if (s.ownerApp) parts.push(`(app: ${s.ownerApp})`);
       return parts.join(' ');
     });

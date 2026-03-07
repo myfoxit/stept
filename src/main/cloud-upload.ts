@@ -194,6 +194,15 @@ export class CloudUploadService extends EventEmitter {
       scrollDelta: s.scrollDelta,
       generatedTitle: s.generatedTitle,
       generatedDescription: s.generatedDescription,
+      // Rich context — flexible JSON, backend stores as-is
+      ownerApp: s.ownerApp || undefined,
+      elementInfo: s.nativeElement || (
+        (s.elementName || s.elementRole || s.elementDescription) ? {
+          role: s.elementRole || undefined,
+          title: s.elementName || undefined,
+          description: s.elementDescription || undefined,
+        } : undefined
+      ),
     }));
 
     const response = await fetch(`${baseUrl}/session/${sessionId}/metadata`, {
