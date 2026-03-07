@@ -4,6 +4,12 @@ import { SettingsManager } from './settings';
 import * as fs from 'fs';
 import * as path from 'path';
 
+let sharp: any;
+try { sharp = require('sharp'); } catch {}
+
+// Max dimension for uploaded screenshots (keeps quality, reduces size dramatically)
+const MAX_UPLOAD_WIDTH = 1920;
+
 export interface UploadResult {
   success: boolean;
   error?: string;
@@ -95,20 +101,23 @@ export class CloudUploadService extends EventEmitter {
     this.emitProgress('Uploading metadata...', 0, 0, 10);
     await this.uploadMetadata(baseUrl, accessToken, sessionId, steps);
 
-    // Step 3: Upload images
+    // Step 3: Upload images (parallel, 3 at a time)
     const stepsWithImages = steps.filter(s => s.screenshotPath && fs.existsSync(s.screenshotPath));
     const totalFiles = stepsWithImages.length;
-    let currentFile = 0;
+    let completedFiles = 0;
+    const CONCURRENCY = 3;
 
-    for (const step of stepsWithImages) {
-      currentFile++;
-      this.emitProgress(
-        `Uploading image ${currentFile}/${totalFiles}...`,
-        currentFile, totalFiles,
-        10 + Math.round((currentFile / totalFiles) * 80)
-      );
-
-      await this.uploadImage(baseUrl, accessToken, sessionId, step.stepNumber, step.screenshotPath);
+    for (let i = 0; i < stepsWithImages.length; i += CONCURRENCY) {
+      const batch = stepsWithImages.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async (step) => {
+        await this.uploadImage(baseUrl, accessToken, sessionId, step.stepNumber, step.screenshotPath);
+        completedFiles++;
+        this.emitProgress(
+          `Uploading image ${completedFiles}/${totalFiles}...`,
+          completedFiles, totalFiles,
+          10 + Math.round((completedFiles / totalFiles) * 80)
+        );
+      }));
     }
 
     // Step 4: Finalize
@@ -224,11 +233,31 @@ export class CloudUploadService extends EventEmitter {
     baseUrl: string, token: string, sessionId: string,
     stepNumber: number, filePath: string
   ): Promise<void> {
-    const fileBuffer = fs.readFileSync(filePath);
-    const blob = new Blob([fileBuffer], { type: 'image/png' });
+    let fileBuffer = fs.readFileSync(filePath);
+    let mimeType = 'image/png';
+    let filename = `step_${stepNumber}.png`;
+
+    // Resize + compress to JPEG if sharp is available (5120px → 1920px saves ~90% size)
+    if (sharp) {
+      try {
+        const metadata = await sharp(fileBuffer).metadata();
+        if (metadata.width && metadata.width > MAX_UPLOAD_WIDTH) {
+          fileBuffer = await sharp(fileBuffer)
+            .resize(MAX_UPLOAD_WIDTH, undefined, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+          mimeType = 'image/jpeg';
+          filename = `step_${stepNumber}.jpg`;
+        }
+      } catch (e) {
+        console.warn(`[Upload] Failed to resize step ${stepNumber}, uploading original:`, (e as Error).message);
+      }
+    }
+
+    const blob = new Blob([fileBuffer], { type: mimeType });
 
     const formData = new FormData();
-    formData.append('file', blob, `step_${stepNumber}.png`);
+    formData.append('file', blob, filename);
     formData.append('stepNumber', String(stepNumber));
 
     const response = await fetch(`${baseUrl}/session/${sessionId}/image`, {

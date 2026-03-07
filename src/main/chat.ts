@@ -54,7 +54,7 @@ export class ChatService extends EventEmitter {
     try {
       const settings = this.settingsManager.getSettings();
       const apiBaseUrl = (settings.chatApiUrl || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
-      const response = await fetch(`${apiBaseUrl}/chat`, {
+      const response = await fetch(`${apiBaseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
