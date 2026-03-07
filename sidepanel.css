@@ -164,6 +164,12 @@ body {
   display: none !important;
 }
 
+/* Setup panel (authenticated) — top-aligned, not centered */
+#spSetupPanel {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
 /* Login content */
 .sp-auth-content {
   display: flex;
