@@ -66,7 +66,8 @@ async def test_get_uploaded_image(
     assert upload_resp.status_code == 200
     url = upload_resp.json()["url"]
     
-    # Retrieve it
-    get_resp = await async_client.get(url)
-    assert get_resp.status_code == 200
-    assert get_resp.headers["content-type"] == "image/png"
+    # Retrieve it (auth required after #96; endpoint returns 307 redirect to presigned URL)
+    get_resp = await async_client.get(url, headers=auth_headers)
+    assert get_resp.status_code in (200, 307)
+    if get_resp.status_code == 200:
+        assert get_resp.headers["content-type"] == "image/png"

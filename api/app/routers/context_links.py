@@ -105,6 +105,7 @@ class ContextLinkUpdate(BaseModel):
     match_value: Optional[str] = None
     note: Optional[str] = None
     weight: Optional[float] = None
+    priority: Optional[int] = None
 
 
 class ContextLinkOut(BaseModel):
@@ -117,6 +118,7 @@ class ContextLinkOut(BaseModel):
     note: Optional[str] = None
     source: str = "user"
     weight: float = USER_WEIGHT
+    priority: int = 0
     click_count: int = 0
 
     class Config:

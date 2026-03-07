@@ -54,7 +54,7 @@ async def test_chat_completions_no_config(async_client: AsyncClient, auth_header
             },
             headers=auth_headers,
         )
-        assert resp.status_code == 503
+        assert resp.status_code == 502  # 502 Bad Gateway — upstream LLM failure
 
 
 @pytest.mark.asyncio

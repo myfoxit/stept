@@ -68,6 +68,8 @@ def _make_mock_step(step_number, action_type="click", window_title="App", descri
     step.text_typed = None
     step.key_pressed = None
     step.content = None
+    step.url = None
+    step.owner_app = None
     return step
 
 
