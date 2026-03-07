@@ -79,21 +79,91 @@ Email is used for account verification and password reset. When `SR_SMTP_HOST` i
 
 ## Storage
 
+Ondoki supports four storage backends. All file operations (workflow screenshots, uploads, exports) go through a unified abstraction — switch backends with a single env var.
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `storage_type` | — | `local` | Storage backend: `local` or `s3` |
-| `local_storage_path` | — | `./storage/recordings` | Path for local file storage |
+| `STORAGE_BACKEND` | — | `local` | Storage backend: `local`, `s3`, `gcs`, or `azure` |
+| `LOCAL_STORAGE_PATH` | — | `./storage/recordings` | Path for local file storage |
 | `UPLOAD_DIR` | — | `./uploads` | Directory for general file uploads |
 
-### S3 Storage (when `storage_type=s3`)
+### S3-Compatible Storage (AWS S3, Cloudflare R2, MinIO, DigitalOcean Spaces, Backblaze B2, Wasabi, Hetzner)
+
+Set `STORAGE_BACKEND=s3` and configure:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `S3_BUCKET` | — | — | S3 bucket name |
-| `S3_REGION` | — | — | AWS region |
-| `S3_ENDPOINT` | — | — | S3 endpoint URL |
-| `S3_ACCESS_KEY` | — | — | AWS access key |
-| `S3_SECRET_KEY` | — | — | AWS secret key |
+| `S3_BUCKET` | Yes | — | Bucket name |
+| `S3_REGION` | — | — | AWS region (e.g., `eu-central-1`) |
+| `S3_ENDPOINT_URL` | — | — | Custom endpoint for non-AWS providers (see examples below) |
+| `S3_ACCESS_KEY_ID` | Yes | — | Access key |
+| `S3_SECRET_ACCESS_KEY` | Yes | — | Secret key |
+| `S3_PREFIX` | — | `uploads` | Key prefix for all stored objects |
+| `S3_FORCE_PATH_STYLE` | — | `false` | Set to `true` for MinIO, LocalStack, and some R2 setups |
+
+<Tip>
+**S3_FORCE_PATH_STYLE** controls URL addressing:
+- `false` (default) → `bucket.s3.amazonaws.com/key` (virtual-hosted, used by AWS)
+- `true` → `s3.amazonaws.com/bucket/key` (path-style, required for most self-hosted S3)
+</Tip>
+
+**Provider examples:**
+
+```bash
+# AWS S3
+S3_ENDPOINT_URL=             # leave empty for AWS
+S3_FORCE_PATH_STYLE=false
+
+# Cloudflare R2
+S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
+S3_FORCE_PATH_STYLE=false
+
+# MinIO (self-hosted)
+S3_ENDPOINT_URL=http://minio:9000
+S3_FORCE_PATH_STYLE=true
+
+# DigitalOcean Spaces
+S3_ENDPOINT_URL=https://<region>.digitaloceanspaces.com
+S3_FORCE_PATH_STYLE=false
+
+# Backblaze B2
+S3_ENDPOINT_URL=https://s3.<region>.backblazeb2.com
+S3_FORCE_PATH_STYLE=false
+
+# Wasabi
+S3_ENDPOINT_URL=https://s3.<region>.wasabisys.com
+S3_FORCE_PATH_STYLE=false
+
+# Hetzner Object Storage
+S3_ENDPOINT_URL=https://fsn1.your-objectstorage.com
+S3_FORCE_PATH_STYLE=false
+```
+
+### Google Cloud Storage
+
+Set `STORAGE_BACKEND=gcs` and configure:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `STORAGE_GCS_BUCKET` | Yes | — | GCS bucket name |
+| `STORAGE_GCS_CREDENTIALS_FILE` | — | — | Path to service account JSON key file. If empty, uses Application Default Credentials (ADC) |
+
+<Note>
+When running on GCP (GKE, Cloud Run, Compute Engine), you can omit `STORAGE_GCS_CREDENTIALS_FILE` and use Workload Identity or the default service account instead.
+</Note>
+
+### Azure Blob Storage
+
+Set `STORAGE_BACKEND=azure` and configure:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `STORAGE_AZURE_CONTAINER` | Yes | — | Blob container name |
+| `STORAGE_AZURE_CONNECTION_STRING` | Yes | — | Azure Storage connection string |
+
+<Note>
+Find your connection string in the Azure Portal under **Storage Account → Access keys**.
+</Note>
 
 ## AI / LLM
 
