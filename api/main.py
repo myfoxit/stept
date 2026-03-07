@@ -41,6 +41,24 @@ api_router = APIRouter(prefix=settings.API_V1_STR)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestIdMiddleware)
 
+# Security headers middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = os.getenv("X_FRAME_OPTIONS", "DENY")
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if os.getenv("ENVIRONMENT", "local") == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        csp = os.getenv("CSP_POLICY", "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'")
+        response.headers["Content-Security-Policy"] = csp
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS: prefer explicit CORS_ORIGINS (comma-separated) over regex
 _cors_origins_str = os.getenv("CORS_ORIGINS", "")
 _cors_origins = [o.strip() for o in _cors_origins_str.split(",") if o.strip()] if _cors_origins_str else []
