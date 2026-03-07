@@ -48,6 +48,13 @@ let state = {
 let contextMatches = [];
 let lastContextUrl = null;
 
+// Streaming upload state — images upload in background during recording
+let streamingSessionId = null;
+let streamingUploaded = new Set(); // stepNumbers already uploaded
+let streamingQueue = []; // { stepNumber, dataUrl } pending upload
+let streamingDraining = false;
+const STREAMING_CONCURRENCY = 2;
+
 // Track whether initial auth restore is done
 let authReady = false;
 let authReadyPromise;
@@ -547,6 +554,10 @@ function startRecording(projectId) {
   chrome.storage.local.set({ selectedProjectId: projectId });
   persistRecordingState();
   clearPersistedSteps();
+  resetStreamingState();
+
+  // Start streaming upload session in background (non-blocking)
+  beginStreamingSession();
 
   // Inject content script into ALL open http/https tabs
   chrome.tabs.query({}, async (tabs) => {
@@ -817,6 +828,11 @@ async function addStep(stepData) {
 
   persistSteps();
 
+  // Stream-upload screenshot in background
+  if (screenshot) {
+    enqueueStreamingUpload(step.stepNumber, step.screenshotDataUrl || screenshot);
+  }
+
   chrome.runtime
     .sendMessage({ type: 'STEP_ADDED', step: step })
     .catch(() => {});
@@ -843,22 +859,20 @@ function deleteStep(stepNumber) {
   persistSteps();
 }
 
-// Cloud upload
-async function uploadCapture() {
-  if (!state.accessToken || state.steps.length === 0) {
-    return { success: false, error: 'No steps to upload or not authenticated' };
-  }
+// ------------------------------------------------------------------
+// Streaming upload — upload images in background during recording
+// ------------------------------------------------------------------
 
-  const API_BASE_URL = await getApiBaseUrl();
+async function beginStreamingSession() {
+  if (!state.accessToken || !state.selectedProjectId) return;
 
   try {
-    const sessionResponse = await authedFetch(
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await authedFetch(
       `${API_BASE_URL}/process-recording/session/create`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timestamp: new Date().toISOString(),
           client: 'OndokiChromeExtension',
@@ -868,13 +882,120 @@ async function uploadCapture() {
       },
     );
 
-    if (!sessionResponse.ok) {
-      throw new Error('Failed to create upload session');
+    if (response.ok) {
+      const data = await response.json();
+      streamingSessionId = data.session_id || data.sessionId;
+      debugLog('Streaming session created:', streamingSessionId);
+    }
+  } catch (e) {
+    debugLog('Failed to create streaming session (will batch on upload):', e.message);
+    streamingSessionId = null;
+  }
+}
+
+function enqueueStreamingUpload(stepNumber, dataUrl) {
+  if (!streamingSessionId || !dataUrl) return;
+  streamingQueue.push({ stepNumber, dataUrl });
+  drainStreamingQueue();
+}
+
+async function drainStreamingQueue() {
+  if (streamingDraining || !streamingSessionId) return;
+  streamingDraining = true;
+
+  const API_BASE_URL = await getApiBaseUrl();
+
+  while (streamingQueue.length > 0) {
+    const batch = streamingQueue.splice(0, STREAMING_CONCURRENCY);
+    await Promise.all(batch.map(async ({ stepNumber, dataUrl }) => {
+      try {
+        // Resolve IDB references
+        let resolvedUrl = dataUrl;
+        if (resolvedUrl.startsWith('idb:')) {
+          const stepId = resolvedUrl.replace('idb:', '');
+          resolvedUrl = await self.screenshotDB.getScreenshot(stepId).catch(() => null);
+          if (!resolvedUrl) return;
+        }
+
+        const blob = await dataUrlToBlob(resolvedUrl);
+        const formData = new FormData();
+        formData.append('file', blob, `step_${stepNumber}.jpg`);
+        formData.append('stepNumber', stepNumber.toString());
+
+        const response = await authedFetch(
+          `${API_BASE_URL}/process-recording/session/${streamingSessionId}/image`,
+          { method: 'POST', body: formData },
+        );
+
+        if (response.ok) {
+          streamingUploaded.add(stepNumber);
+          debugLog(`Streamed step ${stepNumber} (${streamingUploaded.size} done)`);
+          // Notify UI of progress
+          chrome.runtime.sendMessage({
+            type: 'UPLOAD_PROGRESS',
+            uploaded: streamingUploaded.size,
+            total: state.steps.length,
+          }).catch(() => {});
+        }
+      } catch (e) {
+        debugLog(`Stream upload failed for step ${stepNumber}:`, e.message);
+        // Will be caught by batch upload on finalize
+      }
+    }));
+  }
+
+  streamingDraining = false;
+}
+
+function resetStreamingState() {
+  streamingSessionId = null;
+  streamingUploaded = new Set();
+  streamingQueue = [];
+  streamingDraining = false;
+}
+
+// Cloud upload
+async function uploadCapture() {
+  if (!state.accessToken || state.steps.length === 0) {
+    return { success: false, error: 'No steps to upload or not authenticated' };
+  }
+
+  const API_BASE_URL = await getApiBaseUrl();
+
+  try {
+    // Wait for any in-flight streaming uploads to finish
+    let drainAttempts = 0;
+    while (streamingDraining && drainAttempts < 50) {
+      await new Promise((r) => setTimeout(r, 100));
+      drainAttempts++;
     }
 
-    const data = await sessionResponse.json();
-    const sessionId = data.session_id || data.sessionId;
+    // Use existing streaming session or create a new one
+    let sessionId = streamingSessionId;
+    if (!sessionId) {
+      const sessionResponse = await authedFetch(
+        `${API_BASE_URL}/process-recording/session/create`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp: new Date().toISOString(),
+            client: 'OndokiChromeExtension',
+            user_id: state.currentUser?.id,
+            project_id: state.selectedProjectId,
+          }),
+        },
+      );
 
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to create upload session');
+      }
+
+      const data = await sessionResponse.json();
+      sessionId = data.session_id || data.sessionId;
+    }
+
+    // Upload metadata
     const metadata = state.steps.map((s) => ({
       stepNumber: s.stepNumber,
       timestamp: s.timestamp,
@@ -895,9 +1016,7 @@ async function uploadCapture() {
       `${API_BASE_URL}/process-recording/session/${sessionId}/metadata`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(metadata),
       },
     );
@@ -906,48 +1025,47 @@ async function uploadCapture() {
       throw new Error('Failed to upload metadata');
     }
 
+    // Upload any images that weren't streamed yet
     for (const step of state.steps) {
-      if (step.screenshotDataUrl) {
-        // Resolve IDB references to actual data URLs
-        let dataUrl = step.screenshotDataUrl;
-        if (dataUrl.startsWith('idb:')) {
-          const stepId = dataUrl.replace('idb:', '');
-          const fromIdb = await self.screenshotDB.getScreenshot(stepId).catch(() => null);
-          if (!fromIdb) {
-            debugLog(`Skipping step ${step.stepNumber}: screenshot not found in IDB`);
-            continue;
-          }
-          dataUrl = fromIdb;
+      if (streamingUploaded.has(step.stepNumber)) continue; // Already uploaded
+      if (!step.screenshotDataUrl) continue;
+
+      let dataUrl = step.screenshotDataUrl;
+      if (dataUrl.startsWith('idb:')) {
+        const stepId = dataUrl.replace('idb:', '');
+        const fromIdb = await self.screenshotDB.getScreenshot(stepId).catch(() => null);
+        if (!fromIdb) {
+          debugLog(`Skipping step ${step.stepNumber}: screenshot not found in IDB`);
+          continue;
         }
+        dataUrl = fromIdb;
+      }
 
-        const blob = await dataUrlToBlob(dataUrl);
-        const formData = new FormData();
-        formData.append('file', blob, `step_${step.stepNumber}.jpg`);
-        formData.append('stepNumber', step.stepNumber.toString());
+      const blob = await dataUrlToBlob(dataUrl);
+      const formData = new FormData();
+      formData.append('file', blob, `step_${step.stepNumber}.jpg`);
+      formData.append('stepNumber', step.stepNumber.toString());
 
-        const imageResponse = await authedFetch(
-          `${API_BASE_URL}/process-recording/session/${sessionId}/image`,
-          {
-            method: 'POST',
-            body: formData,
-          },
-        );
+      const imageResponse = await authedFetch(
+        `${API_BASE_URL}/process-recording/session/${sessionId}/image`,
+        { method: 'POST', body: formData },
+      );
 
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to upload image for step ${step.stepNumber}`);
-        }
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to upload image for step ${step.stepNumber}`);
       }
     }
 
+    // Finalize
     await authedFetch(
       `${API_BASE_URL}/process-recording/session/${sessionId}/finalize`,
-      {
-        method: 'POST',
-      },
+      { method: 'POST' },
     );
 
+    resetStreamingState();
     return { success: true, sessionId };
   } catch (error) {
+    resetStreamingState();
     return { success: false, error: error.message };
   }
 }
@@ -1034,6 +1152,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         state.steps = [];
         state.stepCounter = 0;
         clearPersistedSteps();
+        resetStreamingState();
         sendResponse({ success: true });
         break;
 
