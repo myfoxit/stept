@@ -89,6 +89,7 @@ async def api_list_documents(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return await get_documents(db, skip=skip, limit=limit)
 
