@@ -8,6 +8,7 @@ import { CloudUploadService } from './cloud-upload';
 import { ContextWatcherService } from './context-watcher';
 import { SmartAnnotationService } from './smart-annotation';
 import * as path from 'path';
+import * as fs from 'fs';
 
 // --- Input validation helpers ---
 
@@ -182,9 +183,25 @@ export function setupIpcHandlers(
       // Reset annotation service for new recording
       smartAnnotation.clearQueue();
 
+      // Start streaming upload session (images upload in background during recording)
+      cloudUploadService.beginSession(currentUserId, currentProjectId).catch((e) => {
+        console.warn('[Upload] Failed to begin streaming session:', e.message);
+      });
+
+      // Forward upload progress to renderer during recording
+      const progressHandler = (progress: any) => {
+        event.sender.send('upload:progress', progress);
+      };
+      cloudUploadService.on('upload-progress', progressHandler);
+
       recordingService.on('step-recorded', (step) => {
         currentRecordingSteps.push(step);
         event.sender.send('step-recorded', step);
+
+        // Stream-upload screenshot in background
+        if (step.screenshotPath && fs.existsSync(step.screenshotPath)) {
+          cloudUploadService.enqueueImage(step.stepNumber, step.screenshotPath);
+        }
       });
 
       recordingService.on('state-changed', (state) => {
@@ -207,7 +224,7 @@ export function setupIpcHandlers(
       if (currentRecordingSteps.length > 0 && currentProjectId) {
         event.sender.send('upload:started');
 
-        // Batch-annotate the full workflow before uploading (10s timeout)
+        // Batch-annotate the full workflow (10s timeout) — runs in parallel with drain
         let workflowTitle: string | undefined;
         const aiAvailable = settingsManager.isLlmConfigured() || !!authService.getAccessToken();
         if (aiAvailable) {
@@ -218,7 +235,6 @@ export function setupIpcHandlers(
 
             if (annotation) {
               workflowTitle = annotation.workflowTitle;
-              // Apply per-step titles to the recorded steps
               for (const stepAnnotation of annotation.steps) {
                 const idx = currentRecordingSteps.findIndex(
                   (s) => s.stepNumber === stepAnnotation.stepNumber
@@ -237,7 +253,8 @@ export function setupIpcHandlers(
         }
 
         try {
-          const result = await cloudUploadService.uploadRecording(
+          // finishUpload waits for in-flight images, then sends metadata + finalizes
+          const result = await cloudUploadService.finishUpload(
             currentRecordingSteps,
             currentUserId,
             currentProjectId,

@@ -63,6 +63,7 @@ const SpotlightApp: React.FC = () => {
     'idle' | 'uploading' | 'success' | 'error'
   >('idle');
   const [uploadError, setUploadError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState<{ currentFile: number; totalFiles: number } | null>(null);
 
   // Context
   const [contextInfo, setContextInfo] = useState<ContextInfo | null>(null);
@@ -175,6 +176,9 @@ const SpotlightApp: React.FC = () => {
       setUploadError(err);
       setTimeout(() => setUploadStatus('idle'), 5000);
     });
+    const unsubUpProgress = api.onUploadProgress?.((progress: any) => {
+      setUploadProgress({ currentFile: progress.currentFile, totalFiles: progress.totalFiles });
+    });
 
     // Get initial context
     api.contextGetActive?.().then((ctx) => {
@@ -202,6 +206,7 @@ const SpotlightApp: React.FC = () => {
       unsubUpStart?.();
       unsubUpDone?.();
       unsubUpErr?.();
+      unsubUpProgress?.();
       unsubToggleRec?.();
     };
   }, []);
@@ -508,6 +513,7 @@ const SpotlightApp: React.FC = () => {
               selectedProjectId={selectedProjectId}
               uploadStatus={uploadStatus}
               uploadError={uploadError}
+              uploadProgress={uploadProgress}
               onStartAll={() => doStartRecording({ type: 'all-displays' })}
               onStartChoose={handleStartRecording}
               onStop={handleStopRecording}

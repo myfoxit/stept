@@ -18,6 +18,7 @@ interface RecordingControlsProps {
   selectedProjectId: string;
   uploadStatus: 'idle' | 'uploading' | 'success' | 'error';
   uploadError: string;
+  uploadProgress?: { currentFile: number; totalFiles: number } | null;
   onStartAll: () => void;
   onStartChoose: () => void;
   onStop: () => void;
@@ -30,6 +31,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   selectedProjectId,
   uploadStatus,
   uploadError,
+  uploadProgress,
   onStartAll,
   onStartChoose,
   onStop,
@@ -103,8 +105,20 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
       <div className={`upload-toast upload-toast--${uploadStatus}`}>
         {uploadStatus === 'uploading' && (
           <>
-            <Upload size={12} className="upload-toast-icon" /> Uploading
-            recording...
+            <Upload size={12} className="upload-toast-icon" />
+            <span>
+              {uploadProgress && uploadProgress.totalFiles > 0
+                ? `Uploading ${uploadProgress.currentFile}/${uploadProgress.totalFiles}`
+                : 'Preparing upload...'}
+            </span>
+            {uploadProgress && uploadProgress.totalFiles > 0 && (
+              <div className="upload-progress-bar">
+                <div
+                  className="upload-progress-fill"
+                  style={{ width: `${Math.round((uploadProgress.currentFile / uploadProgress.totalFiles) * 100)}%` }}
+                />
+              </div>
+            )}
           </>
         )}
         {uploadStatus === 'success' && (

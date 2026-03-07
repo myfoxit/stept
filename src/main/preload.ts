@@ -81,6 +81,7 @@ export interface ElectronAPI {
   onUploadStarted: (callback: () => void) => () => void;
   onUploadComplete: (callback: (result: UploadResult) => void) => () => void;
   onUploadError: (callback: (error: string) => void) => () => void;
+  onUploadProgress: (callback: (progress: { currentFile: number; totalFiles: number; status: string }) => void) => () => void;
 
   // Context watcher
   contextStart: (projectId: string) => Promise<any>;
@@ -190,6 +191,11 @@ const electronAPI: ElectronAPI = {
     const handler = (_e: IpcRendererEvent, error: string) => callback(error);
     ipcRenderer.on('upload:error', handler);
     return () => ipcRenderer.removeListener('upload:error', handler);
+  },
+  onUploadProgress: (callback) => {
+    const handler = (_e: IpcRendererEvent, progress: any) => callback(progress);
+    ipcRenderer.on('upload:progress', handler);
+    return () => ipcRenderer.removeListener('upload:progress', handler);
   },
 
   // Context watcher
