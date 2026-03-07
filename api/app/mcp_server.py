@@ -88,6 +88,7 @@ async def _auth_project_id(ctx) -> str | None:
 @mcp.tool()
 async def list_projects(ctx=None) -> list[dict[str, Any]]:
     """List projects accessible to the API key."""
+    logger.info("🔧 list_projects() called")
     from sqlalchemy import select
     from app.models import Project
 
@@ -110,6 +111,7 @@ async def list_projects(ctx=None) -> list[dict[str, Any]]:
 @mcp.tool()
 async def search_pages(query: str, project_id: str | None = None, limit: int = 20, ctx=None) -> list[dict[str, Any]]:
     """Search pages/documents by query using full-text search with ILIKE fallback."""
+    logger.info("🔧 search_pages(query=%r, limit=%d) called", query, limit)
     from sqlalchemy import select, or_, and_
     from app.models import Document, Folder
 
@@ -202,6 +204,7 @@ async def search_pages(query: str, project_id: str | None = None, limit: int = 2
 @mcp.tool()
 async def get_page(page_id: str, ctx=None) -> dict[str, Any]:
     """Get full page content as Markdown."""
+    logger.info("🔧 get_page(page_id=%r) called", page_id)
     from sqlalchemy import select
     from app.models import Document, Folder
     from app.services.git_sync_service import tiptap_to_markdown
@@ -243,6 +246,7 @@ async def get_page(page_id: str, ctx=None) -> dict[str, Any]:
 @mcp.tool()
 async def search_workflows(query: str, project_id: str | None = None, limit: int = 20, ctx=None) -> list[dict[str, Any]]:
     """Search recorded workflows by query."""
+    logger.info("🔧 search_workflows(query=%r, limit=%d) called", query, limit)
     from sqlalchemy import select, or_, and_
     from sqlalchemy.orm import selectinload
     from app.models import ProcessRecordingSession
@@ -294,6 +298,7 @@ async def search_workflows(query: str, project_id: str | None = None, limit: int
 @mcp.tool()
 async def get_workflow(workflow_id: str, ctx=None) -> dict[str, Any]:
     """Get workflow with all steps."""
+    logger.info("🔧 get_workflow(workflow_id=%r) called", workflow_id)
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from app.models import ProcessRecordingSession
@@ -346,6 +351,7 @@ async def get_context(
     ctx=None,
 ) -> list[dict[str, Any]]:
     """Find relevant docs/workflows based on current context (URL, app name, window title)."""
+    logger.info("🔧 get_context(url=%r, app=%r, window=%r) called", url, app_name, window_title)
     from sqlalchemy import select
     from app.models import ContextLink, ProcessRecordingSession, Document
 
