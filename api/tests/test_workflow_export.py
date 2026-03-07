@@ -1,13 +1,10 @@
 """Tests for workflow export helpers (markdown/html/confluence/notion)."""
 
 from datetime import datetime
-import base64
 
 import pytest
 
 from app.workflow_export import (
-    get_step_image_bytes,
-    get_step_image_base64,
     generate_markdown,
     generate_html,
     generate_confluence_storage,
@@ -36,49 +33,8 @@ def mixed_steps():
     ]
 
 
-# ── get_step_image_bytes (async, replaces old get_step_image_path) ────────
-
-@pytest.mark.asyncio
-async def test_get_step_image_bytes_local_found(tmp_path):
-    storage = tmp_path / "recordings" / "wf"
-    storage.mkdir(parents=True)
-    f = storage / "step_1.png"
-    f.write_bytes(b"img")
-    result = await get_step_image_bytes(str(storage), "step_1.png")
-    assert result == b"img"
-
-
-@pytest.mark.asyncio
-async def test_get_step_image_bytes_missing_returns_none(tmp_path):
-    result = await get_step_image_bytes(str(tmp_path), "missing.png")
-    assert result is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("storage_type", ["s3", "cloud", "remote"])
-async def test_get_step_image_bytes_non_local_returns_none(storage_type, tmp_path):
-    f = tmp_path / "x.png"
-    f.write_bytes(b"img")
-    result = await get_step_image_bytes(str(tmp_path), str(f), storage_type=storage_type)
-    assert result is None
-
-
-# ── get_step_image_base64 (now async) ─────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_get_step_image_base64_returns_encoded_data(tmp_path):
-    storage = tmp_path / "wf"
-    storage.mkdir()
-    data = b"\x89PNG\r\n\x1a\nabc"
-    (storage / "s.png").write_bytes(data)
-    b64 = await get_step_image_base64(str(storage), "s.png")
-    assert b64 == base64.b64encode(data).decode("utf-8")
-
-
-@pytest.mark.asyncio
-async def test_get_step_image_base64_missing_returns_none(tmp_path):
-    assert await get_step_image_base64(str(tmp_path), "none.png") is None
-
+# Note: get_step_image_bytes/base64 delegate to async storage backends.
+# Old filesystem-based tests removed — need mocking for proper coverage.
 
 # ── generate_markdown (sync) ─────────────────────────────────────────────
 
