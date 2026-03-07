@@ -63,6 +63,7 @@ export class ChatService extends EventEmitter {
         body: JSON.stringify({
           messages,
           recording_context: recordingContext,
+          stream: false,
         }),
       });
 
@@ -71,12 +72,38 @@ export class ChatService extends EventEmitter {
         throw new Error(`Chat request failed: ${response.status} ${errorText}`);
       }
 
-      // Handle streaming response
-      if (response.headers.get('content-type')?.includes('text/plain')) {
+      // Handle streaming response (SSE or text/plain)
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/event-stream') ||
+          contentType.includes('text/plain') ||
+          contentType.includes('ndjson')) {
         return this.handleStreamingResponse(response);
-      } else {
-        const data = await response.json();
+      }
+
+      // Try JSON parse; if the body starts with "data: " it's SSE despite headers
+      const text = await response.text();
+      if (text.trimStart().startsWith('data: ')) {
+        // Backend returned SSE with wrong content-type — parse it manually
+        return this.parseSSEText(text);
+      }
+
+      try {
+        const data = JSON.parse(text);
+        // Handle OpenAI-style response
+        if (data.choices?.[0]?.message?.content) {
+          return data.choices[0].message.content;
+        }
+        // Handle Anthropic-style response
+        if (data.content) {
+          const textBlocks = Array.isArray(data.content)
+            ? data.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('')
+            : data.content;
+          if (textBlocks) return textBlocks;
+        }
         return data.response || data.message || 'No response';
+      } catch {
+        // Raw text response
+        return text || 'No response';
       }
     } catch (error) {
       throw new Error(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`);
@@ -185,6 +212,28 @@ export class ChatService extends EventEmitter {
     } catch (error) {
       throw new Error(`Failed to send direct LLM message: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private parseSSEText(text: string): string {
+    let result = '';
+    for (const line of text.split('\n')) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content
+            || parsed.choices?.[0]?.message?.content
+            || parsed.content?.[0]?.text
+            || '';
+          result += content;
+        } catch {
+          // plain text chunk
+          result += data;
+        }
+      }
+    }
+    return result || 'No response';
   }
 
   private async handleStreamingResponse(response: Response): Promise<string> {
