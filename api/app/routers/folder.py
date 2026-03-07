@@ -19,8 +19,8 @@ from app.crud.folder import (
     duplicate_folder,
     delete_folder,
 )
-from app.security import get_current_user
-from app.models import User
+from app.security import get_current_user, check_project_permission
+from app.models import User, ProjectRole
 
 router = APIRouter()
 
@@ -35,6 +35,7 @@ async def api_get_folder_tree(
     current_user: User = Depends(get_current_user)
 ):
     """Get hierarchical folder tree for a project"""
+    await check_project_permission(db, current_user.id, project_id)
     return await get_folder_tree(
         db, 
         project_id=project_id,
@@ -51,6 +52,7 @@ async def api_create_folder(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    await check_project_permission(db, current_user.id, payload.project_id, ProjectRole.EDITOR)
     return await create_folder(
         db, 
         name=payload.name,
@@ -72,6 +74,7 @@ async def api_get_folder(
     folder = await get_folder(db, folder_id)
     if not folder:
         raise HTTPException(404, "Folder not found")
+    await check_project_permission(db, current_user.id, folder.project_id)
     return folder
 
 # Update folder
@@ -82,6 +85,10 @@ async def api_update_folder(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)  # NEW
 ):
+    folder = await get_folder(db, folder_id)
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    await check_project_permission(db, current_user.id, folder.project_id, ProjectRole.EDITOR)
     return await update_folder(
         db,
         folder_id,
@@ -99,6 +106,10 @@ async def api_move_folder(
     current_user: User = Depends(get_current_user)
 ):
     """Move folder to new parent and/or position"""
+    folder = await get_folder(db, folder_id)
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    await check_project_permission(db, current_user.id, folder.project_id, ProjectRole.EDITOR)
     try:
         return await move_folder(
             db,
@@ -135,6 +146,10 @@ async def api_duplicate_folder(
     current_user: User = Depends(get_current_user)
 ):
     """Duplicate a folder and optionally its children"""
+    folder = await get_folder(db, folder_id)
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    await check_project_permission(db, current_user.id, folder.project_id, ProjectRole.EDITOR)
     try:
         return await duplicate_folder(
             db,
@@ -151,6 +166,10 @@ async def api_delete_folder(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    folder = await get_folder(db, folder_id)
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    await check_project_permission(db, current_user.id, folder.project_id, ProjectRole.EDITOR)
     try:
         await delete_folder(db, folder_id)
     except ValueError as e:
