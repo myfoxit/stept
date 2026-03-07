@@ -1,7 +1,9 @@
-import os, smtplib
+import os, smtplib, logging
 from email.mime.text import MIMEText
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR   = Path(__file__).resolve().parent
 TEMPLATES  = BASE_DIR / "templates" / "email"
@@ -31,8 +33,8 @@ def _send(to_addr: str, subject: str, html_body: str) -> None:
                 s.starttls()
                 s.login(SMTP_USER, SMTP_PASS)
             s.send_message(msg)
-    except Exception as exc:               # ← swallow & log any SMTP failure
-        import logging; logging.warning("mail send failed: %s", exc)
+    except Exception as exc:
+        logger.error("Email send failed to=%s subject=%r: %s", to_addr, subject, exc, exc_info=True)
 
 def send_verification_email(email: str, token: str) -> None:
     html = _render("verify.html", verify_token=token)
