@@ -541,14 +541,22 @@ async function performSearch(query) {
     const state = await sendMessage({ type: 'GET_STATE' });
     if (!state.isAuthenticated) return;
 
-    const results = await searchRecordings(
-      settings.apiBaseUrl,
-      state.accessToken || '',
-      query,
-      state.selectedProjectId,
-    );
+    const params = new URLSearchParams({ q: query, limit: '10' });
+    if (state.selectedProjectId) params.append('project_id', state.selectedProjectId);
+
+    const results = await sendMessage({
+      type: 'API_FETCH',
+      url: `${settings.apiBaseUrl}/search/search?${params}`,
+    });
 
     searchSpinner.classList.add('hidden');
+
+    if (!results) {
+      searchResults.innerHTML = '<div class="search-no-results">Search failed</div>';
+      searchResults.classList.remove('hidden');
+      return;
+    }
+
     renderSearchResults(results, settings.frontendUrl || settings.apiBaseUrl.replace('/api/v1', ''));
   } catch (e) {
     searchSpinner.classList.add('hidden');
@@ -559,7 +567,6 @@ async function performSearch(query) {
 
 function renderSearchResults(data, frontendUrl) {
   const results = data.results || [];
-  document.getElementById('workflowEmptyState').style.display = results.length > 0 ? 'none' : '';
 
   if (results.length === 0) {
     searchResults.innerHTML = '<div class="search-no-results">No results found</div>';
@@ -569,18 +576,15 @@ function renderSearchResults(data, frontendUrl) {
 
   const webAppUrl = frontendUrl;
   searchResults.innerHTML = results.map((r) => {
-    const title = escapeHtml(r.generated_title || r.name || 'Untitled');
-    const snippet = r.snippet || '';
+    const title = escapeHtml(r.name || r.generated_title || 'Untitled');
+    const snippet = r.snippet || r.summary || '';
     const date = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
-    const steps = r.step_count ? `${r.step_count} steps` : '';
+    const id = r.recording_id || r.id;
     return `
-      <div class="search-result-item" data-url="${webAppUrl}/workflow/${r.id}">
+      <div class="search-result-item" data-url="${webAppUrl}/workflow/${id}">
         <span class="search-result-title">${title}</span>
-        <span class="search-result-snippet">${snippet}</span>
-        <span class="search-result-meta">
-          <span>${date}</span>
-          <span>${steps}</span>
-        </span>
+        ${snippet ? `<span class="search-result-snippet">${snippet}</span>` : ''}
+        ${date ? `<span class="search-result-meta">${date}</span>` : ''}
       </div>
     `;
   }).join('');
@@ -675,10 +679,10 @@ async function loadRecentWorkflows() {
     }
 
     recentList.innerHTML = result.map((w) => {
-      const title = w.workflow_title || w.title || 'Untitled workflow';
+      const title = w.name || 'Untitled workflow';
       const date = w.created_at ? timeAgo(new Date(w.created_at)) : '';
-      const steps = w.step_count || w.steps?.length || 0;
-      const id = w.session_id || w.id;
+      const steps = w.total_steps || 0;
+      const id = w.id;
       return `
         <a class="recent-item" href="#" data-url="${webAppUrl}/workflow/${id}">
           <div class="recent-item-icon">
