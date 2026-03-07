@@ -54,7 +54,23 @@ export class SmartAnnotationService extends EventEmitter {
 
     return `You are analyzing a screen recording of a user workflow. Given the following steps, generate:
 1. A concise workflow title (max 60 chars) describing what the user accomplished
-2. For each step, a brief action description (max 80 chars) that makes sense in context of the whole workflow
+2. For each step, a contextual action title (max 80 chars) that makes sense in the workflow
+
+CRITICAL RULES:
+- ALWAYS preserve exact quoted UI element names from the description.
+  If the raw step says Click "Create new secret key", your title MUST include "Create new secret key".
+  Users need exact button/link/field labels to follow the guide.
+- Never paraphrase button or link names — keep the original label in quotes.
+- ADD value the raw description lacks: context about WHERE in the app, WHY this matters,
+  or what the RESULT will be.
+- For vague raw descriptions (like "Click here"), use the surrounding steps and window title
+  to describe what was likely clicked.
+- For Type actions, describe WHAT is being entered (e.g., "Enter a name for the API key")
+  rather than showing the literal typed text.
+- Format: {Verb} "{exact element name}" — {brief context}
+
+Good: Click "Create new secret key" to start key generation
+Bad: Start creating a new secret key (lost the button name!)
 
 Steps:
 ${stepLines.join('\n')}
