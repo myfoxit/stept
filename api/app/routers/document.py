@@ -26,7 +26,7 @@ from app.crud.document import (
     get_deleted_documents,
 )
 from app.security import get_current_user, check_project_permission
-from app.models import User, ProjectRole
+from app.models import Document, User, ProjectRole
 from app.services.search_indexer import update_document_search
 from app.services.audit import log_audit
 from app.models import AuditAction
@@ -655,7 +655,7 @@ async def restore_document_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Restore a soft-deleted document"""
-    doc_check = await get_document(db, doc_id)
+    doc_check = await db.get(Document, doc_id)
     if not doc_check:
         raise HTTPException(404, "Document not found")
     await check_project_permission(db, current_user.id, doc_check.project_id, ProjectRole.EDITOR)
@@ -673,7 +673,7 @@ async def permanent_delete_document_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Permanently delete a document (no recovery)"""
-    doc_check = await get_document(db, doc_id)
+    doc_check = await db.get(Document, doc_id)
     if not doc_check:
         raise HTTPException(404, "Document not found")
     await check_project_permission(db, current_user.id, doc_check.project_id, ProjectRole.ADMIN)
