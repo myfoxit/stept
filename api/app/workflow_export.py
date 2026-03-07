@@ -12,45 +12,30 @@ from datetime import datetime
 GOTENBERG_URL = os.getenv("GOTENBERG_URL", "http://gotenberg:3000")
 
 
-def get_step_image_path(storage_path: str, file_path: str, storage_type: str = "local") -> Optional[str]:
-    """Get the full path to an image file for local storage."""
-    if storage_type == "local":
-        if os.path.isabs(file_path):
-            full_path = file_path
-        else:
-            full_path = os.path.join(storage_path, file_path)
-        
-        print(f"[Export] Looking for image at: {full_path}")
-        
-        if os.path.exists(full_path):
-            print(f"[Export] Found image at: {full_path}")
-            return full_path
-        else:
-            print(f"[Export] Image not found at: {full_path}")
-            # Try alternative paths
-            alt_paths = [
-                file_path,
-                os.path.join("/app/storage/recordings", os.path.basename(storage_path), file_path),
-                os.path.join("/app/storage/recordings", os.path.basename(storage_path), os.path.basename(file_path)),
-            ]
-            for alt_path in alt_paths:
-                if os.path.exists(alt_path):
-                    print(f"[Export] Found at alternative path: {alt_path}")
-                    return alt_path
+async def get_step_image_bytes(storage_path: str, file_path: str, storage_type: str = "local") -> Optional[bytes]:
+    """Read step image bytes via the storage backend.
+
+    Works with local filesystem, S3-compatible, GCS, and Azure — whatever
+    the recording session was stored with.
+    """
+    from app.services.storage import get_storage_backend
+
+    backend = get_storage_backend(storage_type)
+    try:
+        data = await backend.read_file(storage_path, file_path)
+        if data:
+            return data
+    except Exception as e:
+        print(f"[Export] Error reading image via backend ({storage_type}): {e}")
     return None
 
 
-def get_step_image_base64(storage_path: str, file_path: str, storage_type: str = "local") -> Optional[str]:
+async def get_step_image_base64(storage_path: str, file_path: str, storage_type: str = "local") -> Optional[str]:
     """Get base64 encoded image for embedding in exports."""
-    full_path = get_step_image_path(storage_path, file_path, storage_type)
-    if full_path:
-        try:
-            with open(full_path, "rb") as f:
-                img_data = f.read()
-                print(f"[Export] Read image, size: {len(img_data)} bytes")
-                return base64.b64encode(img_data).decode("utf-8")
-        except Exception as e:
-            print(f"[Export] Error reading image: {e}")
+    data = await get_step_image_bytes(storage_path, file_path, storage_type)
+    if data:
+        print(f"[Export] Read image, size: {len(data)} bytes")
+        return base64.b64encode(data).decode("utf-8")
     return None
 
 
@@ -127,7 +112,7 @@ def generate_markdown(
     return "\n".join(lines)
 
 
-def generate_html(
+async def generate_html(
     workflow: Dict[str, Any],
     steps: List[Dict[str, Any]],
     files: Dict[int, str],
@@ -221,7 +206,7 @@ def generate_html(
                 print(f"[PDF Export] Step {step_number} has file: {file_path}")
                 
                 if embed_images:
-                    img_b64 = get_step_image_base64(storage_path, file_path, storage_type)
+                    img_b64 = await get_step_image_base64(storage_path, file_path, storage_type)
                     if img_b64:
                         html_parts.append(f"    <img src='data:image/png;base64,{img_b64}' alt='Step {visible_index}'>")
                     else:
@@ -258,7 +243,7 @@ async def generate_pdf_gotenberg(
     """Generate PDF using Gotenberg's HTML-to-PDF conversion."""
     
     # Generate HTML optimized for PDF
-    html_content = generate_html(
+    html_content = await generate_html(
         workflow,
         steps,
         files,
@@ -531,7 +516,7 @@ def generate_notion_markdown(
     return "\n".join(lines)
 
 
-def generate_docx(
+async def generate_docx(
     workflow: Dict[str, Any],
     steps: List[Dict[str, Any]],
     files: Dict[int, str],
@@ -599,15 +584,16 @@ def generate_docx(
                 file_path = files[step_number]
                 print(f"[DOCX Export] Step {step_number} has file: {file_path}")
                 
-                # Use the helper function to resolve the path
-                full_path = get_step_image_path(storage_path, file_path, storage_type)
+                # Read image via storage backend (works with S3, GCS, Azure, local)
+                img_data = await get_step_image_bytes(storage_path, file_path, storage_type)
                 
-                if full_path and os.path.exists(full_path):
+                if img_data:
                     try:
-                        doc.add_picture(full_path, width=Inches(6))
+                        img_stream = io.BytesIO(img_data)
+                        doc.add_picture(img_stream, width=Inches(6))
                         last_paragraph = doc.paragraphs[-1]
                         last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        print(f"[DOCX Export] Added image from: {full_path}")
+                        print(f"[DOCX Export] Added image for step {step_number}, size: {len(img_data)} bytes")
                     except Exception as e:
                         print(f"[DOCX Export] Error adding image: {e}")
                         doc.add_paragraph(f"[Image could not be loaded: {e}]")

@@ -106,12 +106,10 @@ async def get_public_workflow_image(
     _rl=Depends(_public_limiter),
 ):
     """Get an image from a publicly shared workflow (no auth required)."""
-    from fastapi.responses import FileResponse
-    import os
+    from fastapi.responses import FileResponse, RedirectResponse
 
     stmt = (
         select(ProcessRecordingSession)
-        .options(selectinload(ProcessRecordingSession.files))
         .where(ProcessRecordingSession.share_token == share_token)
     )
     result = await db.execute(stmt)
@@ -128,18 +126,23 @@ async def get_public_workflow_image(
         if not allowed:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
 
-    file_record = next((f for f in session.files if f.step_number == step_number), None)
-    if not file_record:
+    # Use the same storage-aware helper as the authenticated endpoint
+    from app.crud.process_recording import get_file_access
+
+    access = await get_file_access(db, session.id, step_number, expires_in=3600)
+    if not access:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
 
-    file_path = file_record.file_path
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(session.storage_path or "", file_path)
+    if access["type"] == "local":
+        import os
+        if not os.path.exists(access["path"]):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Image file not found")
+        return FileResponse(access["path"], media_type="image/png",
+                            headers={"Cache-Control": "public, max-age=3600"})
+    elif access["type"] == "url":
+        return RedirectResponse(url=access["url"], status_code=307)
 
-    if not os.path.exists(file_path):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image file not found")
-
-    return FileResponse(file_path, media_type=file_record.mime_type or "image/png")
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
 
 
 @router.get("/document/{share_token}")
@@ -231,8 +234,7 @@ async def get_embedded_workflow_image(
     _rl=Depends(_public_limiter),
 ):
     """Get an image from a workflow embedded in a public document."""
-    from fastapi.responses import FileResponse
-    import os
+    from fastapi.responses import FileResponse, RedirectResponse
 
     # Verify the document is actually public
     stmt = select(Document).where(Document.share_token == share_token)
@@ -241,10 +243,9 @@ async def get_embedded_workflow_image(
     if not doc or not doc.is_public:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found or not public")
 
-    # Load workflow
+    # Load workflow (no need to eager-load files; get_file_access queries them)
     stmt = (
         select(ProcessRecordingSession)
-        .options(selectinload(ProcessRecordingSession.files))
         .where(ProcessRecordingSession.id == session_id)
     )
     result = await db.execute(stmt)
@@ -256,15 +257,20 @@ async def get_embedded_workflow_image(
     if doc.project_id and session.project_id and doc.project_id != session.project_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
 
-    file_record = next((f for f in session.files if f.step_number == step_number), None)
-    if not file_record:
+    # Use the same storage-aware helper as the authenticated endpoint
+    from app.crud.process_recording import get_file_access
+
+    access = await get_file_access(db, session.id, step_number, expires_in=3600)
+    if not access:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
 
-    file_path = file_record.file_path
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(session.storage_path or "", file_path)
+    if access["type"] == "local":
+        import os
+        if not os.path.exists(access["path"]):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Image file not found")
+        return FileResponse(access["path"], media_type="image/png",
+                            headers={"Cache-Control": "public, max-age=3600"})
+    elif access["type"] == "url":
+        return RedirectResponse(url=access["url"], status_code=307)
 
-    if not os.path.exists(file_path):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image file not found")
-
-    return FileResponse(file_path, media_type=file_record.mime_type or "image/png")
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")

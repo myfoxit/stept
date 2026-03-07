@@ -220,21 +220,20 @@ async def upload_cli_session(
         if not session:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
         
-        # Store the CLI session data as a file
+        # Store the CLI session data via the storage backend
         filename = f"cli-session-{session_id}.json"
-        storage_dir = os.path.join("uploads", "recordings", session_id)
-        os.makedirs(storage_dir, exist_ok=True)
-        filepath = os.path.join(storage_dir, filename)
-        
-        with open(filepath, "wb") as f:
-            f.write(body)
+        from app.services.storage import get_storage_backend
+        backend = get_storage_backend(session.storage_type)
+        stored_path = await backend.save_file(
+            session.storage_path, filename, body, "application/json"
+        )
         
         # Create a file record
         file_record = ProcessRecordingFile(
             session_id=session_id,
             step_number=0,  # 0 = session-level attachment
             filename=filename,
-            filepath=filepath,
+            filepath=stored_path,
             file_size=len(body),
             mime_type="application/json",
         )
@@ -749,7 +748,7 @@ async def export_workflow_html(
     
     files_dict = {f.step_number: f.file_path for f in session.files}
     
-    html = generate_html(
+    html = await generate_html(
         workflow_dict,
         steps_list,
         files_dict,
@@ -956,7 +955,7 @@ async def export_workflow_docx(
     files_dict = {f.step_number: f.file_path for f in session.files}
     
     try:
-        docx_bytes = generate_docx(
+        docx_bytes = await generate_docx(
             workflow_dict,
             steps_list,
             files_dict,
@@ -1413,7 +1412,7 @@ async def annotate_single_step(
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
 
-    # Load screenshot if available
+    # Load screenshot if available (works with any storage backend)
     image_b64 = None
     stmt = select(ProcessRecordingFile).where(
         and_(
@@ -1425,10 +1424,11 @@ async def annotate_single_step(
     file_record = file_result.scalar_one_or_none()
     if file_record and session.storage_path:
         import base64 as b64mod
-        file_abs = os.path.join(session.storage_path, file_record.file_path) if not os.path.isabs(file_record.file_path) else file_record.file_path
-        if os.path.exists(file_abs):
-            with open(file_abs, "rb") as f:
-                image_b64 = b64mod.b64encode(f.read()).decode("utf-8")
+        from app.services.storage import get_storage_backend
+        backend = get_storage_backend(session.storage_type)
+        file_data = await backend.read_file(session.storage_path, file_record.file_path)
+        if file_data:
+            image_b64 = b64mod.b64encode(file_data).decode("utf-8")
 
     base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
 

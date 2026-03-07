@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     S3_PREFIX: str = os.getenv("S3_PREFIX", "uploads")
     S3_ACCESS_KEY_ID: str = os.getenv("S3_ACCESS_KEY_ID", "")
     S3_SECRET_ACCESS_KEY: str = os.getenv("S3_SECRET_ACCESS_KEY", "")
+    S3_FORCE_PATH_STYLE: bool = os.getenv("S3_FORCE_PATH_STYLE", "false").lower() in ("true", "1", "yes")
 
     # GCS storage
     STORAGE_GCS_BUCKET: str = os.getenv("STORAGE_GCS_BUCKET", "")

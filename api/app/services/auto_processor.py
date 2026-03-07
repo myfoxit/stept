@@ -28,18 +28,22 @@ logger = logging.getLogger(__name__)
 _SEMAPHORE = asyncio.Semaphore(5)
 
 
-def _read_image_base64(file_path: str, storage_path: str) -> Optional[str]:
-    """Read a local image and return base64 data URI."""
-    # file_path is the relative filename stored in the DB
-    abs_path = os.path.join(storage_path, file_path) if not os.path.isabs(file_path) else file_path
-    if not os.path.exists(abs_path):
-        return None
+async def _read_image_base64(file_path: str, storage_path: str, storage_type: str = "local") -> Optional[str]:
+    """Read an image via the storage backend and return base64-encoded data.
+
+    Works with local filesystem, S3, GCS, and Azure — whatever the session
+    was recorded with.
+    """
+    from app.services.storage import get_storage_backend
+
+    backend = get_storage_backend(storage_type)
     try:
-        with open(abs_path, "rb") as f:
-            data = f.read()
-        return base64.b64encode(data).decode("utf-8")
+        data = await backend.read_file(storage_path, file_path)
+        if data:
+            return base64.b64encode(data).decode("utf-8")
     except Exception:
-        return None
+        pass
+    return None
 
 
 def _build_step_context(step: ProcessRecordingStep) -> str:
@@ -155,9 +159,10 @@ class RecordingAutoProcessor:
         for step in steps:
             image_b64 = None
             if step.step_number in file_map and session.storage_path:
-                image_b64 = _read_image_base64(
+                image_b64 = await _read_image_base64(
                     file_map[step.step_number].file_path,
                     session.storage_path,
+                    session.storage_type or "local",
                 )
             tasks.append(self._annotate_step(step, image_b64, base_url_override))
 

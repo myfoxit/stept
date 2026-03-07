@@ -32,7 +32,7 @@ STORAGE_BACKEND_TYPE = os.getenv("STORAGE_BACKEND", os.getenv("STORAGE_TYPE", "l
 LOCAL_STORAGE_PATH = os.path.abspath(os.getenv("LOCAL_STORAGE_PATH", "./storage/recordings"))
 UPLOAD_DIR = os.path.abspath(os.getenv("UPLOAD_DIR", "./uploads"))
 
-# S3-compatible
+# S3-compatible (AWS S3, Cloudflare R2, MinIO, DigitalOcean Spaces, Backblaze B2, Wasabi, Hetzner...)
 S3_BUCKET = os.getenv("S3_BUCKET", "")
 S3_PREFIX = os.getenv("S3_PREFIX", "uploads")
 S3_REGION = os.getenv("S3_REGION", None)
@@ -41,6 +41,11 @@ S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", None)
 # Explicit S3 credentials (for MinIO / R2 / non-AWS)
 S3_ACCESS_KEY_ID = os.getenv("S3_ACCESS_KEY_ID", None)
 S3_SECRET_ACCESS_KEY = os.getenv("S3_SECRET_ACCESS_KEY", None)
+
+# Force path-style addressing (required for MinIO, some R2 setups, LocalStack)
+# Virtual-hosted style: bucket.s3.amazonaws.com/key  (default for AWS)
+# Path style:           s3.amazonaws.com/bucket/key  (required for most self-hosted S3)
+S3_FORCE_PATH_STYLE = os.getenv("S3_FORCE_PATH_STYLE", "false").lower() in ("true", "1", "yes")
 
 # GCS
 GCS_BUCKET = os.getenv("STORAGE_GCS_BUCKET", "")
@@ -67,6 +72,10 @@ class StorageBackend:
     async def save_file(self, session_path: str, filename: str, data: bytes, mime_type: str) -> str:
         """Save *data* under *session_path/filename*. Return the stored key/path."""
         raise NotImplementedError
+
+    async def read_file(self, session_path: str, stored_relative_path: str) -> Optional[bytes]:
+        """Read file contents as bytes. Returns None if the file does not exist."""
+        return None
 
     async def delete_file(self, stored_path: str) -> None:
         """Delete a single stored file by its stored key/path."""
@@ -111,6 +120,13 @@ class LocalStorageBackend(StorageBackend):
             await f.write(data)
         return safe_name
 
+    async def read_file(self, session_path: str, stored_relative_path: str) -> Optional[bytes]:
+        local_path = await self.resolve_local_path(session_path, stored_relative_path)
+        if local_path and os.path.exists(local_path):
+            async with aiofiles.open(local_path, "rb") as f:
+                return await f.read()
+        return None
+
     async def delete_file(self, stored_path: str) -> None:
         if os.path.isfile(stored_path):
             os.remove(stored_path)
@@ -139,6 +155,7 @@ class S3StorageBackend(StorageBackend):
         endpoint_url: Optional[str] = None,
         access_key_id: Optional[str] = None,
         secret_access_key: Optional[str] = None,
+        force_path_style: bool = False,
     ):
         self.bucket = bucket
         self.prefix = prefix.strip("/")
@@ -156,11 +173,13 @@ class S3StorageBackend(StorageBackend):
             if access_key_id and secret_access_key:
                 kwargs["aws_access_key_id"] = access_key_id
                 kwargs["aws_secret_access_key"] = secret_access_key
-            # Use s3v4 signatures and virtual-hosted addressing for proper
-            # presigned URL generation across all regions.
+            # Use s3v4 signatures. Path-style addressing is required for
+            # MinIO, LocalStack, and some R2 setups. AWS and most managed
+            # services use virtual-hosted style.
+            addressing_style = "path" if force_path_style else "virtual"
             kwargs["config"] = BotoConfig(
                 signature_version="s3v4",
-                s3={"addressing_style": "virtual"},
+                s3={"addressing_style": addressing_style},
             )
             self._client = boto3.client("s3", **kwargs)
         except Exception:
@@ -195,6 +214,20 @@ class S3StorageBackend(StorageBackend):
             ContentType=mime_type or "application/octet-stream",
         )
         return key
+
+    async def read_file(self, session_path: str, stored_relative_path: str) -> Optional[bytes]:
+        if not self._client:
+            raise RuntimeError("boto3 is required for S3 operations")
+        key = stored_relative_path if stored_relative_path.startswith(self.prefix) else f"{session_path}/{stored_relative_path}"
+        try:
+            response = await asyncio.to_thread(
+                self._client.get_object,
+                Bucket=self.bucket,
+                Key=key,
+            )
+            return await asyncio.to_thread(response["Body"].read)
+        except Exception:
+            return None
 
     async def delete_file(self, stored_path: str) -> None:
         if not self._client:
@@ -268,6 +301,14 @@ class GCSStorageBackend(StorageBackend):
         await asyncio.to_thread(blob.upload_from_string, data, content_type=mime_type or "application/octet-stream")
         return key
 
+    async def read_file(self, session_path: str, stored_relative_path: str) -> Optional[bytes]:
+        key = stored_relative_path if stored_relative_path.startswith(self.prefix) else f"{session_path}/{stored_relative_path}"
+        blob = self._bucket.blob(key)
+        try:
+            return await asyncio.to_thread(blob.download_as_bytes)
+        except Exception:
+            return None
+
     async def delete_file(self, stored_path: str) -> None:
         blob = self._bucket.blob(stored_path)
         try:
@@ -321,6 +362,15 @@ class AzureBlobStorageBackend(StorageBackend):
         blob = self._container.get_blob_client(key)
         await asyncio.to_thread(blob.upload_blob, data, overwrite=True, content_type=mime_type or "application/octet-stream")
         return key
+
+    async def read_file(self, session_path: str, stored_relative_path: str) -> Optional[bytes]:
+        key = stored_relative_path if stored_relative_path.startswith(self.prefix) else f"{session_path}/{stored_relative_path}"
+        blob = self._container.get_blob_client(key)
+        try:
+            downloader = await asyncio.to_thread(blob.download_blob)
+            return await asyncio.to_thread(downloader.readall)
+        except Exception:
+            return None
 
     async def delete_file(self, stored_path: str) -> None:
         blob = self._container.get_blob_client(stored_path)
@@ -392,6 +442,7 @@ def get_storage_backend(
             endpoint_url=S3_ENDPOINT_URL,
             access_key_id=S3_ACCESS_KEY_ID,
             secret_access_key=S3_SECRET_ACCESS_KEY,
+            force_path_style=S3_FORCE_PATH_STYLE,
         )
     elif stype == "gcs":
         backend = GCSStorageBackend(
