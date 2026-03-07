@@ -7,8 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-ondoki}
-    ports:             
-      - "5432:5432"
+    # ports: exposed only in docker-compose.dev.yml for local dev tools
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:

@@ -1,5 +1,10 @@
 # Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 services:
+  db:
+    # Expose DB port for local development tools (pgAdmin, DBeaver, etc.)
+    ports:
+      - "5432:5432"
+
   backend:
     build:
       context: ./api
