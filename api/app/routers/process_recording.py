@@ -161,9 +161,25 @@ async def upload_image(
 ):
     """Upload a single image for a step"""
     await _verify_session_access(db, session_id, current_user.id)
+
+    # Validate MIME type
+    ALLOWED_MIME = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+    MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_MIME:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unsupported file type: {content_type}. Allowed: {', '.join(ALLOWED_MIME)}"
+        )
+
     try:
-        # Read file content
+        # Read file content with size limit
         file_content = await file.read()
+        if len(file_content) > MAX_IMAGE_SIZE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"File too large. Maximum size: {MAX_IMAGE_SIZE // (1024*1024)}MB"
+            )
         
         # Use original filename or generate one
         filename = file.filename or f"step_{stepNumber}.png"
