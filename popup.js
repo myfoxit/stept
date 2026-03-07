@@ -51,6 +51,12 @@ async function loadSettings() {
   }
   currentDisplayMode = settings.displayMode || 'sidepanel';
   updateModeButtons();
+
+  // Hide API URL section in cloud mode
+  const apiSection = document.getElementById('apiUrlSection');
+  if (apiSection && settings.buildMode === 'cloud') {
+    apiSection.style.display = 'none';
+  }
 }
 
 function updateModeButtons() {
@@ -88,11 +94,7 @@ function updateUI(state) {
       }
     } else {
       showIdlePanel();
-      startBtn.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
-        Start Capture`;
+      startBtn.disabled = !state.selectedProjectId;
     }
   } else {
     loginPanel.classList.remove('hidden');

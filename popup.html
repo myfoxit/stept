@@ -57,7 +57,7 @@
     </div>
 
     <!-- Login Panel -->
-    <div id="loginPanel" class="panel">
+    <div id="loginPanel" class="panel" style="align-items: center;">
       <button id="loginBtn" class="btn btn-outline">
         Sign In
       </button>
@@ -71,7 +71,19 @@
       <!-- Greeting -->
       <p id="greeting" class="greeting">Hello!</p>
 
+      <!-- Idle State — Start button first for visibility -->
+      <div id="idlePanel">
+        <button id="startBtn" class="btn btn-primary" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>
+          </svg>
+          Start Capture
+        </button>
+      </div>
+
       <!-- Project Selector -->
+      <label class="select-label">Project</label>
       <select id="projectSelector" class="select">
         <option value="">Select project</option>
       </select>
@@ -97,21 +109,13 @@
               Dock
             </button>
           </div>
-          <label class="settings-label" for="apiUrlInput">API URL</label>
-          <input id="apiUrlInput" class="settings-input" type="url" placeholder="https://app.ondoki.com/api/v1">
-          <button id="saveSettingsBtn" class="btn btn-outline btn-sm">Save</button>
+          <div id="apiUrlSection">
+            <label class="settings-label" for="apiUrlInput">API URL</label>
+            <input id="apiUrlInput" class="settings-input" type="url" placeholder="https://app.ondoki.com/api/v1">
+            <button id="saveSettingsBtn" class="btn btn-outline btn-sm">Save</button>
+          </div>
         </div>
       </details>
-
-      <!-- Idle State -->
-      <div id="idlePanel">
-        <button id="startBtn" class="btn btn-primary" disabled>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-          Start Capture
-        </button>
-      </div>
 
       <!-- Recording State -->
       <div id="recordingPanel" class="hidden">
