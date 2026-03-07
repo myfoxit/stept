@@ -350,6 +350,7 @@ export function WorkflowView() {
   const [aiProgress, setAiProgress] = React.useState<{ current: number; total: number } | null>(null);
 
   const isProcessed = typedWorkflow ? Boolean((typedWorkflow as any).is_processed) : false;
+  const aiEnabled = typedWorkflow ? (typedWorkflow as any).ai_enabled !== false : true;
   const aiSummary = typedWorkflow as any;
 
   const handleProcessWithAI = React.useCallback(async () => {
@@ -682,16 +683,18 @@ export function WorkflowView() {
             <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
           )}
 
-          <AIToolbar
-            isProcessing={isAIProcessing}
-            isProcessed={isProcessed}
-            processingProgress={aiProgress}
-            onProcessAll={handleProcessWithAI}
-            onGenerateGuide={handleGenerateGuide}
-            difficulty={aiSummary?.difficulty}
-            estimatedTime={aiSummary?.estimated_time}
-            tags={aiSummary?.tags}
-          />
+          {aiEnabled && (
+            <AIToolbar
+              isProcessing={isAIProcessing}
+              isProcessed={isProcessed}
+              processingProgress={aiProgress}
+              onProcessAll={handleProcessWithAI}
+              onGenerateGuide={handleGenerateGuide}
+              difficulty={aiSummary?.difficulty}
+              estimatedTime={aiSummary?.estimated_time}
+              tags={aiSummary?.tags}
+            />
+          )}
 
           {isEditMode ? (
             <InsertStepMenu index={0} onInsert={handleInsertStep} stepNumber={1} />

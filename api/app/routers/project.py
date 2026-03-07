@@ -85,7 +85,7 @@ async def api_update_project(
     auth: tuple[User, ProjectRole] = Depends(ProjectPermissionChecker(ProjectRole.ADMIN))
 ):
     """Only admins and owners can update project settings."""
-    return await update_project(db, project_id, p.name)
+    return await update_project(db, project_id, name=p.name, ai_enabled=p.ai_enabled)
 
 # New endpoints for member management
 @router.post("/{project_id}/members", response_model=dict)

@@ -55,11 +55,11 @@ export const useUpdateProject = () => {
   return useMutation<
     ProjectRead,
     ApiError,
-    { projectId: string; name: string }
+    { projectId: string; name?: string; ai_enabled?: boolean }
   >({
-    mutationFn: ({ projectId, name }) => updateProject(projectId, name),
+    mutationFn: ({ projectId, name, ai_enabled }) => updateProject(projectId, name, ai_enabled),
     onSuccess: () =>
-      // Invalidate all project queries to ensure the updated name appears everywhere
+      // Invalidate all project queries to ensure the updated data appears everywhere
       qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'projects' }),
   });
 };

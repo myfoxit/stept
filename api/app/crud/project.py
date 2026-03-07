@@ -62,13 +62,22 @@ async def delete_project(db: AsyncSession, project_id: str) -> None:
     await db.execute(stmt)
     await db.commit()
 
-async def update_project(db: AsyncSession, project_id: str, name: str) -> Project:
-    """
-    Update a project's name by its ID.
-    """
-    stmt = update(Project).where(Project.id == project_id).values(name=name)
-    await db.execute(stmt)
-    await db.commit()
+async def update_project(
+    db: AsyncSession,
+    project_id: str,
+    name: str = None,
+    ai_enabled: bool = None,
+) -> Project:
+    """Update a project's settings."""
+    values = {}
+    if name is not None:
+        values["name"] = name
+    if ai_enabled is not None:
+        values["ai_enabled"] = ai_enabled
+    if values:
+        stmt = update(Project).where(Project.id == project_id).values(**values)
+        await db.execute(stmt)
+        await db.commit()
     
     # Fetch and return the updated project
     stmt = select(Project).where(Project.id == project_id)

@@ -20,11 +20,11 @@ export const deleteProject = (projectId: string) =>
     url: `/projects/${projectId}`,
   });
 
-export const updateProject = (projectId: string, name: string) =>
+export const updateProject = (projectId: string, name?: string, ai_enabled?: boolean) =>
   request<ProjectRead>({
     method: 'PUT',
     url: `/projects/${projectId}`,
-    data: { name },
+    data: { ...(name !== undefined && { name }), ...(ai_enabled !== undefined && { ai_enabled }) },
   });
 
 // Project Members

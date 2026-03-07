@@ -7,13 +7,15 @@ class ProjectCreate(BaseModel):
     user_id: str
 
 class ProjectUpdate(BaseModel):
-    name: str
+    name: Optional[str] = None
+    ai_enabled: Optional[bool] = None
 
 class ProjectRead(BaseModel):
     id: str
     name: str
     user_id: Optional[str] = None  # Keep for backward compatibility
     owner_id: str  # New field for project owner
+    ai_enabled: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     created_by_name: Optional[str] = None  # Creator's display name

@@ -53,6 +53,7 @@ export interface ProjectRead {
   name: string;
   owner_id: string;
   user_id?: string;
+  ai_enabled?: boolean;
   created_at?: string;
   updated_at?: string;
   created_by_name?: string;

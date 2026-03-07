@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Brain,
   Plug,
@@ -6,20 +7,28 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { fetchChatConfig, fetchChatModels, type ChatConfig, type ChatModel } from '@/api/chat';
 import { LlmSetupWizard, LlmStatusBadge } from '@/components/Settings/LlmSetupWizard';
 import { AiUsageCard } from '@/components/Settings/AiUsageCard';
 import { ProviderLogin } from '@/components/Settings/ProviderLogin';
 import { SettingsLayout } from '@/components/settings-layout';
+import { useProject } from '@/providers/project-provider';
+import { useUpdateProject } from '@/hooks/api/projects';
 import { toast } from 'sonner';
 
 export function AiSettingsPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { selectedProject } = useProject();
+  const updateProject = useUpdateProject();
   const [aiConfig, setAiConfig] = useState<ChatConfig | null>(null);
   const [aiModels, setAiModels] = useState<ChatModel[]>([]);
   const [aiTesting, setAiTesting] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  const aiEnabled = (selectedProject as any)?.ai_enabled !== false;
 
   const refreshAiConfig = () => {
     fetchChatConfig().then(setAiConfig).catch(() => {});
@@ -51,6 +60,36 @@ export function AiSettingsPage() {
 
   return (
     <SettingsLayout title="AI Settings" description="Configure your AI provider, models, and usage.">
+      {/* AI Features Toggle */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                AI Features
+              </CardTitle>
+              <CardDescription className="mt-1">
+                When enabled, new recordings are automatically titled and summarized using AI.
+                The "Enhance with AI" button appears on workflow pages for full annotation and guide generation.
+              </CardDescription>
+            </div>
+            <Switch
+              checked={aiEnabled}
+              onCheckedChange={async (checked) => {
+                if (!projectId) return;
+                try {
+                  await updateProject.mutateAsync({ projectId, ai_enabled: checked });
+                  toast.success(checked ? 'AI features enabled' : 'AI features disabled');
+                } catch {
+                  toast.error('Failed to update setting');
+                }
+              }}
+            />
+          </div>
+        </CardHeader>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

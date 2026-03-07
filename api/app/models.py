@@ -152,6 +152,9 @@ class Project(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
+    # AI features toggle — controls auto-processing on finalize + AI toolbar visibility
+    ai_enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+
     # Relationships
     owner = relationship("User", foreign_keys=[owner_id], backref="owned_projects")
     user = relationship("User", foreign_keys=[user_id], backref="projects")  # Keep for backward compatibility
