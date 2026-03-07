@@ -204,7 +204,6 @@ export class RecordingService extends EventEmitter {
   private screenshotService: ScreenshotService;
   private overlayWindow?: BrowserWindow;
   private currentText = '';
-  private lastClickedFieldName?: string;
   private textFlushTimeout?: NodeJS.Timeout;
   private clickProcessing = false;
   private clickQueue: { event: NativeClickEvent; count: number; preCapture?: Buffer }[] = [];
@@ -818,13 +817,6 @@ export class RecordingService extends EventEmitter {
 
     const description = this.buildClickDescription(clickLabel, elementName, elementRole, elementDescription, windowTitle);
 
-    // Track last clicked field name for subsequent Type steps
-    if (elementName && RecordingService.FIELD_ROLES.has(elementRole)) {
-      this.lastClickedFieldName = elementName;
-    } else {
-      this.lastClickedFieldName = undefined;
-    }
-
     const step: RecordedStep = {
       stepNumber: this.stepCount,
       timestamp: new Date(),
@@ -1062,7 +1054,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Type',
         windowTitle,
-        description: this.buildTypeDescription(this.currentText, windowTitle, this.lastClickedFieldName),
+        description: this.buildTypeDescription(this.currentText, windowTitle),
         textTyped: this.currentText,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
@@ -1093,13 +1085,7 @@ export class RecordingService extends EventEmitter {
     // Reject low-confidence generic elements — they'll fall through to "Click here"
     if (element.confidence === 'low') {
       const role = element.role || '';
-      const genericRoles = new Set([
-        'AXGroup', 'AXScrollArea', 'AXWebArea', 'AXWindow', 'AXApplication',
-        'AXLayoutArea', 'AXSplitGroup', 'AXSplitter', 'AXList', 'AXOutline',
-        'AXBrowser', 'AXToolbar', 'AXUnknown', 'AXSheet', 'AXDrawer',
-        'AXTabGroup', 'AXGrowArea', 'AXRulerMarker', 'AXMatte',
-        '',
-      ]);
+      const genericRoles = new Set(['AXGroup', 'AXScrollArea', 'AXWebArea', 'AXWindow', 'AXApplication', '']);
       if (genericRoles.has(role)) return '';
     }
 
@@ -1111,22 +1097,13 @@ export class RecordingService extends EventEmitter {
 
     // Strip browser suffixes from element names — Chrome tab/link AXTitle embeds
     // the app name and profile: "Page Title - Google Chrome – Alexander (Alex)"
-    name = this.stripBrowserCruft(name);
+    name = this.shortenWindowTitle(name);
 
-    // Reject if the element name IS or overlaps with the window title — it's just the container
+    // Reject if the element name IS (or closely matches) the window title — it's just the container
     if (windowTitle) {
-      const shortWin = this.shortenWindowTitle(windowTitle).toLowerCase();
-      const shortName = name.toLowerCase();
-      // Exact match, substring match, or high overlap → container label, not a real element
-      if (shortName === shortWin ||
-          shortName === windowTitle.toLowerCase() ||
-          (shortName.length > 10 && (shortWin.includes(shortName) || shortName.includes(shortWin)))) {
-        return '';
-      }
+      const stripped = this.shortenWindowTitle(windowTitle).toLowerCase();
+      if (name.toLowerCase() === stripped || name.toLowerCase() === windowTitle.toLowerCase()) return '';
     }
-
-    // Reject suspiciously long element names (likely concatenated container text)
-    if (name.length > 80) return '';
 
     return name;
   }
@@ -1134,15 +1111,6 @@ export class RecordingService extends EventEmitter {
   /** Strip AX prefix and convert to human-readable lowercase: AXButton -> button */
   private humanReadableRole(role: string): string {
     return role.replace(/^AX/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
-  }
-
-  /** Strip browser app name + profile from element titles (more aggressive than shortenWindowTitle) */
-  private stripBrowserCruft(name: string): string {
-    // "Page Title - Google Chrome – Alexander (Alex)" → "Page Title"
-    // "Page Title - Firefox" → "Page Title"
-    return name
-      .replace(/\s*[-–—]\s*(Google Chrome|Chrome|Chromium|Firefox|Safari|Microsoft Edge|Edge|Arc|Brave|Opera|Vivaldi|Waterfox)(\s*[-–—]\s*.*)?$/i, '')
-      .trim() || name;
   }
 
   /** Shorten window title by stripping common browser suffixes */
@@ -1185,22 +1153,10 @@ export class RecordingService extends EventEmitter {
     'Edit', 'ComboBox', 'Text',
   ]);
 
-  /** Build a rich type description using field name when available, sanitizing text */
-  private buildTypeDescription(text: string, windowTitle: string, fieldName?: string): string {
-    const shortTitle = this.shortenWindowTitle(windowTitle);
-
-    // Use the field name if we know what field was being typed into
-    if (fieldName) {
-      return `Type in "${fieldName}" field`;
-    }
-
-    // Don't expose raw text if it looks like test/garbage data or is very short
-    const looksLikeGarbage = text.length <= 3 || /^[a-z]+$/i.test(text) || /^(.)\1+$/.test(text);
-    if (looksLikeGarbage) {
-      return `Type text in ${shortTitle}`;
-    }
-
+  /** Build a rich type description, truncating long text */
+  private buildTypeDescription(text: string, windowTitle: string): string {
     const displayText = text.length > 40 ? text.slice(0, 40) + '...' : text;
+    const shortTitle = this.shortenWindowTitle(windowTitle);
     return `Type "${displayText}" in ${shortTitle}`;
   }
 
@@ -1236,13 +1192,14 @@ export class RecordingService extends EventEmitter {
       return `${verb} "${elementDescription}"`;
     }
 
-    // 5. Has a known actionable role but no name — describe the element type
-    if (elementRole && RecordingService.ACTIONABLE_ROLES.has(elementRole)) {
-      return `${verb} ${this.humanReadableRole(elementRole)}`;
+    // 5. Has role but no name/description
+    if (elementRole) {
+      return `${verb} on ${this.humanReadableRole(elementRole)}`;
     }
 
-    // 6. Fallback — the screenshot shows exactly where the click happened
-    return `${verb} here`;
+    // 6. Fallback: use shortened window title
+    const shortTitle = this.shortenWindowTitle(windowTitle);
+    return `${verb} in ${shortTitle}`;
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {
