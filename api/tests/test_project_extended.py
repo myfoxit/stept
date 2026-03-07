@@ -213,8 +213,10 @@ async def test_create_invite_link(
     data = resp.json()
     assert "token" in data
     assert "expires_at" in data
-    # Token should be decodable
-    decoded = json.loads(base64.urlsafe_b64decode(data["token"]))
+    # Token is HMAC-signed: payload.signature
+    parts = data["token"].split(".")
+    assert len(parts) == 2, "Token should be payload.signature"
+    decoded = json.loads(base64.urlsafe_b64decode(parts[0] + "=="))
     assert decoded["project_id"] == test_project["id"]
     assert decoded["role"] == "viewer"
 
