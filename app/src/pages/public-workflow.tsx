@@ -78,7 +78,7 @@ export function PublicWorkflowPage() {
               </p>
               <a
                 href="/"
-                className="inline-flex items-center px-4 py-2 rounded-md bg-violet-600 text-white hover:bg-violet-700 text-sm font-medium"
+                className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium"
               >
                 Go to Ondoki
               </a>
@@ -110,7 +110,7 @@ export function PublicWorkflowPage() {
         {workflow.tags && workflow.tags.length > 0 && (
           <div className="flex gap-2 mb-6 flex-wrap">
             {workflow.tags.map((tag) => (
-              <span key={tag} className="px-2 py-1 rounded-full bg-violet-100 text-violet-700 text-xs dark:bg-violet-900 dark:text-violet-300">
+              <span key={tag} className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs dark:bg-primary/20 dark:text-primary">
                 {tag}
               </span>
             ))}
@@ -149,7 +149,7 @@ export function PublicWorkflowPage() {
             return (
               <div key={step.step_number} className="bg-card rounded-xl border shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b">
-                  <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center text-sm font-semibold">
+                  <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
                     {visibleIndex}
                   </div>
                   <h3 className="font-medium">{step.description || step.window_title || `Step ${visibleIndex}`}</h3>
@@ -181,9 +181,9 @@ export function PublicWorkflowPage() {
                               transform: 'translate(-50%, -50%)',
                             }}
                           >
-                            <div className="absolute -inset-4 rounded-full bg-violet-500/20 animate-pulse" />
-                            <div className="relative h-8 w-8 rounded-full border-2 border-violet-600 bg-violet-500/30">
-                              <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600" />
+                            <div className="absolute -inset-4 rounded-full bg-primary/20 animate-pulse" />
+                            <div className="relative h-8 w-8 rounded-full border-2 border-primary bg-primary/30">
+                              <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
                             </div>
                           </div>
                         )}
@@ -206,7 +206,7 @@ export function PublicWorkflowPage() {
         <div className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>
             Made with{' '}
-            <a href="/" className="text-violet-600 hover:underline font-medium">
+            <a href="/" className="text-primary hover:underline font-medium">
               Ondoki
             </a>
           </p>

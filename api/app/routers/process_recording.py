@@ -745,6 +745,9 @@ async def export_workflow_html(
             "window_title": step.window_title,
             "text_typed": step.text_typed,
             "key_pressed": step.key_pressed,
+            "url": step.url,
+            "owner_app": step.owner_app,
+            "element_info": step.element_info,
         }
         for step in session.steps
     ]
@@ -807,6 +810,9 @@ async def export_workflow_pdf(
             "window_title": step.window_title,
             "text_typed": step.text_typed,
             "key_pressed": step.key_pressed,
+            "url": step.url,
+            "owner_app": step.owner_app,
+            "element_info": step.element_info,
         }
         for step in session.steps
     ]
@@ -877,7 +883,7 @@ async def export_workflow_confluence(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
     
     workflow_dict = {"id": session.id, "name": session.name, "created_at": session.created_at}
-    steps_list = [{"step_number": s.step_number, "step_type": s.step_type, "description": s.description, "content": s.content, "window_title": s.window_title, "text_typed": s.text_typed, "key_pressed": s.key_pressed} for s in session.steps]
+    steps_list = [{"step_number": s.step_number, "step_type": s.step_type, "description": s.description, "content": s.content, "window_title": s.window_title, "text_typed": s.text_typed, "key_pressed": s.key_pressed, "url": s.url, "owner_app": s.owner_app, "element_info": s.element_info} for s in session.steps]
     files_dict = {f.step_number: f.file_path for f in session.files}
     
     confluence = generate_confluence_storage(workflow_dict, steps_list, files_dict, image_base_url="/api/v1/process-recording")
@@ -906,7 +912,7 @@ async def export_workflow_notion(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
     
     workflow_dict = {"id": session.id, "name": session.name, "created_at": session.created_at}
-    steps_list = [{"step_number": s.step_number, "step_type": s.step_type, "description": s.description, "content": s.content, "window_title": s.window_title, "text_typed": s.text_typed, "key_pressed": s.key_pressed} for s in session.steps]
+    steps_list = [{"step_number": s.step_number, "step_type": s.step_type, "description": s.description, "content": s.content, "window_title": s.window_title, "text_typed": s.text_typed, "key_pressed": s.key_pressed, "url": s.url, "owner_app": s.owner_app, "element_info": s.element_info} for s in session.steps]
     files_dict = {f.step_number: f.file_path for f in session.files}
     
     notion_md = generate_notion_markdown(workflow_dict, steps_list, files_dict, image_base_url="/api/v1/process-recording")
@@ -951,6 +957,9 @@ async def export_workflow_docx(
             "window_title": step.window_title,
             "text_typed": step.text_typed,
             "key_pressed": step.key_pressed,
+            "url": step.url,
+            "owner_app": step.owner_app,
+            "element_info": step.element_info,
         }
         for step in session.steps
     ]

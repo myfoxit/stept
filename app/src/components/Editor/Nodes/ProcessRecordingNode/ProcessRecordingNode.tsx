@@ -143,9 +143,9 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
               transform: 'translate(-50%, -50%)',
             }}
           >
-            <div className="absolute -inset-4 rounded-full bg-blue-500/20 animate-pulse" />
-            <div className="relative h-8 w-8 rounded-full border-2 border-blue-600 bg-blue-500/30">
-              <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600" />
+            <div className="absolute -inset-4 rounded-full bg-primary/20 animate-pulse" />
+            <div className="relative h-8 w-8 rounded-full border-2 border-primary bg-primary/30">
+              <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
             </div>
           </div>
         )}
@@ -180,7 +180,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
     <NodeViewWrapper className="process-recording-node">
       <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b">
+        <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 border-b">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-semibold text-lg text-gray-900">Process Recording</h3>
@@ -225,7 +225,7 @@ const ProcessRecordingComponent = ({ node }: { node: any }) => {
               return (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 pb-4 border-b">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 text-sm font-semibold text-primary">
                       {step.step_number}
                     </span>
                     {getActionIcon(step.action_type)}
