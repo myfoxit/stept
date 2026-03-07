@@ -195,8 +195,12 @@ async def api_create_invite_link(
     }
     
     # TODO: send invite email to request.email
-    # For now, return encoded token
-    token = base64.urlsafe_b64encode(json.dumps(invite_data).encode()).decode()
+    # Sign the token with HMAC to prevent forgery
+    payload = base64.urlsafe_b64encode(json.dumps(invite_data).encode()).decode()
+    from app.core.config import settings
+    import hmac as _hmac, hashlib as _hl
+    sig = _hmac.new(settings.SECRET_KEY.encode(), payload.encode(), _hl.sha256).hexdigest()
+    token = f"{payload}.{sig}"
     
     return {
         "token": token,
@@ -224,8 +228,19 @@ async def api_join_project_with_token(
 ):
     """Join a project using an invite token. Only the invited email can join."""
     try:
+        # Verify HMAC signature
+        from app.core.config import settings
+        import hmac as _hmac, hashlib as _hl
+        parts = request.token.rsplit(".", 1)
+        if len(parts) != 2:
+            raise HTTPException(status_code=400, detail="Invalid invite token")
+        payload, sig = parts
+        expected_sig = _hmac.new(settings.SECRET_KEY.encode(), payload.encode(), _hl.sha256).hexdigest()
+        if not _hmac.compare_digest(sig, expected_sig):
+            raise HTTPException(status_code=400, detail="Invalid invite token")
+
         # Decode token
-        invite_data = json.loads(base64.urlsafe_b64decode(request.token.encode()).decode())
+        invite_data = json.loads(base64.urlsafe_b64decode(payload.encode()).decode())
         
         # Check expiration
         expires_at = datetime.fromisoformat(invite_data["expires_at"])
