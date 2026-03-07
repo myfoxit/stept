@@ -337,6 +337,9 @@ async function performUpload() {
     if (result.sessionId && webAppUrl) {
       chrome.tabs.create({ url: `${webAppUrl}/workflow/${result.sessionId}` });
     }
+
+    // Close the side panel
+    window.close();
   } else {
     uploadTitle.textContent = 'Upload Failed';
     uploadMessage.textContent = 'There was a problem uploading your capture';

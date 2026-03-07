@@ -335,10 +335,8 @@ completeBtn.addEventListener('click', async () => {
 
   if (result.success) {
     uploadStatus.textContent = 'Upload complete!';
-    setTimeout(async () => {
-      await sendMessage({ type: 'CLEAR_STEPS' });
-      showIdlePanel();
-    }, 2000);
+    await sendMessage({ type: 'CLEAR_STEPS' });
+    window.close();
   } else {
     uploadStatus.textContent =
       'Upload failed: ' + (result.error || 'Unknown error');
