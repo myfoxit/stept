@@ -34,17 +34,18 @@ def _get_key() -> bytes:
     if raw:
         _ENCRYPTION_KEY = raw.encode()
     else:
+        env = os.environ.get("ENVIRONMENT", "local")
+        if env == "production":
+            raise RuntimeError(
+                "ONDOKI_ENCRYPTION_KEY must be set in production! "
+                "Generate one with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+            )
         _ENCRYPTION_KEY = Fernet.generate_key()
         warnings.warn(
             "ONDOKI_ENCRYPTION_KEY is not set — generated a random key. "
-            "API-key encryption will NOT survive restarts. "
-            "Set the env var in production!",
+            "Encryption will NOT survive restarts.",
             RuntimeWarning,
             stacklevel=2,
-        )
-        logger.warning(
-            "ONDOKI_ENCRYPTION_KEY not configured; using ephemeral key. "
-            "Set this env var for persistent encryption."
         )
     return _ENCRYPTION_KEY
 
