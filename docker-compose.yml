@@ -113,10 +113,6 @@ services:
       - "9090:9090"
     volumes:
       - sendcloak-data:/root/.sendcloak
-    depends_on:
-      presidio:
-        condition: service_started
-        required: false
     networks:
       - ondoki-network
     restart: unless-stopped

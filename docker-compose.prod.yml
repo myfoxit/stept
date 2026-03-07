@@ -174,10 +174,6 @@ services:
       SENDCLOAK_STRATEGY: "${SENDCLOAK_STRATEGY:-semantic}"
       SENDCLOAK_LOG_LEVEL: info
       SENDCLOAK_PRESIDIO_URL: "http://presidio:3000"
-    depends_on:
-      presidio:
-        condition: service_started
-        required: false
     networks:
       - ondoki-network
     restart: unless-stopped
