@@ -51,8 +51,8 @@ async def api_update_text_container(
     current_user: User = Depends(get_current_user),
 ):
     return await upsert_text_container(
+        payload.id,
         db,
-        containerId=payload.id,
         name=payload.name,
         content=payload.content or {},
     )
