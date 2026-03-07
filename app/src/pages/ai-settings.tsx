@@ -20,9 +20,10 @@ import { useUpdateProject } from '@/hooks/api/projects';
 import { toast } from 'sonner';
 
 export function AiSettingsPage() {
-  const { projectId } = useParams<{ projectId: string }>();
-  const { selectedProject } = useProject();
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>();
+  const { selectedProject, selectedProjectId } = useProject();
   const updateProject = useUpdateProject();
+  const projectId = routeProjectId || selectedProjectId;
   const [aiConfig, setAiConfig] = useState<ChatConfig | null>(null);
   const [aiModels, setAiModels] = useState<ChatModel[]>([]);
   const [aiTesting, setAiTesting] = useState(false);
@@ -77,7 +78,7 @@ export function AiSettingsPage() {
             <Switch
               checked={aiEnabled}
               onCheckedChange={async (checked) => {
-                if (!projectId) return;
+                if (!projectId || projectId === 'null') return;
                 try {
                   await updateProject.mutateAsync({ projectId, ai_enabled: checked });
                   toast.success(checked ? 'AI features enabled' : 'AI features disabled');
