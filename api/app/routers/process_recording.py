@@ -346,14 +346,6 @@ async def get_workflow_summary(session_id: str, db: AsyncSession = Depends(get_d
     # Count steps without loading them
     from sqlalchemy import func as sqlfunc
     step_count = await db.scalar(select(sqlfunc.count(ProcessRecordingStep.id)).where(ProcessRecordingStep.session_id == session_id))
-    # Resolve AI enabled flag from project
-    ai_enabled = True
-    if session.project_id:
-        from app.models import Project
-        project = await db.get(Project, session.project_id)
-        if project:
-            ai_enabled = project.ai_enabled
-
     return {
         "id": session.id, "name": session.name, "status": session.status,
         "created_at": session.created_at, "updated_at": session.updated_at,
@@ -363,7 +355,6 @@ async def get_workflow_summary(session_id: str, db: AsyncSession = Depends(get_d
         "total_steps": step_count,
         "guide_markdown": session.guide_markdown,
         "estimated_time": session.estimated_time, "difficulty": session.difficulty,
-        "ai_enabled": ai_enabled,
     }
 
 

@@ -48,6 +48,7 @@ async def get_projects(db: AsyncSession, user_id: str) -> list[dict]:
             "name": project.name,
             "user_id": project.user_id,
             "owner_id": project.owner_id,
+            "ai_enabled": project.ai_enabled,
             "created_at": project.created_at,
             "updated_at": project.updated_at,
             "created_by_name": created_by_name,

@@ -59,7 +59,7 @@ export function WorkflowView() {
   const location = useLocation();
   const { data: workflow, isLoading } = useWorkflow(workflowId || '');
   const { setContext } = useChat();
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, selectedProject } = useProject();
   const { user } = useAuth();
 
   // Comments state
@@ -350,8 +350,10 @@ export function WorkflowView() {
   const [aiProgress, setAiProgress] = React.useState<{ current: number; total: number } | null>(null);
 
   const isProcessed = typedWorkflow ? Boolean((typedWorkflow as any).is_processed) : false;
-  const aiEnabled = typedWorkflow ? (typedWorkflow as any).ai_enabled !== false : true;
   const aiSummary = typedWorkflow as any;
+
+  // AI enabled comes from the project setting, not the workflow
+  const aiEnabled = selectedProject?.ai_enabled !== false;
 
   const handleProcessWithAI = React.useCallback(async () => {
     if (!workflowId || isAIProcessing) return;
