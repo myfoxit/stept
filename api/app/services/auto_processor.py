@@ -256,11 +256,8 @@ class RecordingAutoProcessor:
         prompt = (
             "You are a workflow documentation assistant. Analyze this step from a process recording "
             "and return a JSON object with exactly these fields:\n"
-            '- "title": a concise step title that PRESERVES the exact quoted UI element name from the description. '
-            'If the description says Click "Create new secret key", your title MUST include "Create new secret key". '
-            'Never paraphrase button/link/field names — users need the exact label to follow the guide. '
-            'Add context about WHERE in the app or WHY this step matters.\n'
-            '- "description": a one-sentence description of what this step accomplishes in context\n'
+            '- "title": a concise step title (e.g. "Click the Save button")\n'
+            '- "description": a one-sentence description of what happens in this step\n'
             '- "ui_element": the main UI element being interacted with (e.g. "Save button", "Email field")\n'
             '- "category": one of: navigation, data_entry, confirmation, selection, scrolling, typing, other\n\n'
             f"Step metadata: {context}\n\n"
