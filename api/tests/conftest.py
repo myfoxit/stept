@@ -97,6 +97,19 @@ print(f"[conftest] Tables:      {len(Base.metadata.sorted_tables)}")
 
 
 # ---------------------------------------------------------------------------
+# Helper: verify a user's email directly in the DB (raw SQL to avoid
+# breaking per-test transaction rollback).
+# ---------------------------------------------------------------------------
+async def _verify_user_by_email(email: str) -> None:
+    """Set is_verified=True for the user with the given email."""
+    async with _test_engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE users SET is_verified = true WHERE email = :email"),
+            {"email": email},
+        )
+
+
+# ---------------------------------------------------------------------------
 # 3. Session-scoped: create schema once using metadata.create_all
 # ---------------------------------------------------------------------------
 

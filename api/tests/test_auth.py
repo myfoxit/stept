@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from conftest import _verify_user_by_email
+
 
 # ───────────────────────────── Registration ──────────────────────────────
 
@@ -51,6 +53,9 @@ async def test_login_valid_credentials(async_client: AsyncClient):
         "/api/v1/auth/register",
         json={"email": "login@example.com", "password": "Pass1234!", "name": "loginuser"},
     )
+
+    # Verify email (required after #92 enforcement)
+    await _verify_user_by_email("login@example.com")
 
     resp = await async_client.post(
         "/api/v1/auth/login",
