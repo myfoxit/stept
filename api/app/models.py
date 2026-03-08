@@ -111,7 +111,7 @@ class Folder(Base):
 class User(Base):
     __tablename__ = "users"
     id   = Column(String(16), primary_key=True, default=gen_suffix)
-    name = Column(String, unique=True, index=True)
+    name = Column(String, index=True)
     email            = Column(String, unique=True, index=True, nullable=False)
     # New: normalized email for case/space-insensitive identity
     normalized_email = Column(String, unique=True, index=True, nullable=True)
