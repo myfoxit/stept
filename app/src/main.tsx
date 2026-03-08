@@ -15,6 +15,7 @@ import { ProjectSettingsPage } from "./pages/project-settings";
 import { AiSettingsPage } from "./pages/ai-settings";
 import { PrivacySettingsPage } from "./pages/privacy-settings";
 import { IntegrationsSettingsPage } from "./pages/integrations-settings";
+import { SsoSettingsPage } from "./pages/sso-settings";
 import { JoinProjectPage } from "./pages/join-project";
 import { FolderView } from "@/pages/folder-view";
 import { WorkflowView } from "@/pages/workflow-view";
@@ -74,6 +75,10 @@ createRoot(document.getElementById("root")!).render(
                       <Route
                         path="/projects/:projectId/settings/integrations"
                         element={<IntegrationsSettingsPage />}
+                      />
+                      <Route
+                        path="/projects/:projectId/settings/sso"
+                        element={<SsoSettingsPage />}
                       />
                       <Route
                         path="/folder/:folderId"

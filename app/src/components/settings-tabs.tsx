@@ -8,6 +8,7 @@ const tabs: { label: string; path: string; external?: boolean }[] = [
   { label: 'AI', path: 'settings/ai' },
   { label: 'Privacy', path: 'settings/privacy' },
   { label: 'Integrations', path: 'settings/integrations' },
+  { label: 'SSO', path: 'settings/sso' },
   { label: 'Analytics', path: '/analytics' },
   { label: 'Knowledge Base', path: '/knowledge' },
   { label: 'Audit Log', path: '/audit' },
