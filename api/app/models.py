@@ -117,6 +117,11 @@ class User(Base):
     normalized_email = Column(String, unique=True, index=True, nullable=True)
     hashed_password  = Column(String, nullable=False)
     is_verified      = Column(Boolean, default=False)
+    # OAuth fields
+    google_id        = Column(String, nullable=True, unique=True, index=True)
+    github_id        = Column(String, nullable=True, unique=True, index=True)
+    avatar_url       = Column(String, nullable=True)
+    auth_method      = Column(String, nullable=False, default="email", server_default="email")
     verification_tok = Column(String(32), nullable=True, index=True)
     reset_token      = Column(String(32), nullable=True, index=True)
     reset_expires_at = Column(DateTime, nullable=True)
