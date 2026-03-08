@@ -51,3 +51,19 @@ export const confirmPwReset = (body: PasswordResetConfirmIn) =>
     data: body,
     ...withCred,
   });
+
+export const resendVerification = (body: { email: string }) =>
+  request<{ ok: boolean }>({
+    method: 'POST',
+    url: '/auth/resend-verification',
+    data: body,
+    ...withCred,
+  });
+
+export const verifyEmail = (body: { token: string }) =>
+  request<{ ok: boolean }>({
+    method: 'POST',
+    url: '/auth/verify',
+    data: body,
+    ...withCred,
+  });
