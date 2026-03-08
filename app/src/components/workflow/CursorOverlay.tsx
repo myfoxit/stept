@@ -16,7 +16,7 @@ export function CursorOverlay({ x, y, visible, clicking }: CursorOverlayProps) {
         top: `${y}%`,
         opacity: visible ? 1 : 0,
         transform: `translate(-2px, -2px) ${clicking ? 'scale(0.85)' : 'scale(1)'}`,
-        transition: 'left 800ms cubic-bezier(0.4, 0, 0.2, 1), top 800ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease, transform 150ms ease',
+        transition: 'left 1200ms cubic-bezier(0.25, 0.1, 0.25, 1), top 1200ms cubic-bezier(0.25, 0.1, 0.25, 1), opacity 300ms ease, transform 200ms ease',
         willChange: 'left, top, transform',
       }}
     >

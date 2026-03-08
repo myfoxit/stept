@@ -78,7 +78,7 @@ export function ShareExportModal({
 
   const embedWidth = embedSize === 'small' ? '640px' : embedSize === 'medium' ? '800px' : '100%';
   const embedSrc = publicUrl
-    ? `${publicUrl}/embed${embedMode !== 'slides' ? `?mode=${embedMode}` : ''}`
+    ? `${publicUrl}/embed?mode=${embedMode}`
     : '';
   const embedCode = publicUrl
     ? `<iframe src="${embedSrc}" width="${embedWidth}" height="600" frameborder="0" allow="fullscreen" style="border: 0; border-radius: 8px;"></iframe>`
@@ -152,7 +152,7 @@ export function ShareExportModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
@@ -325,16 +325,16 @@ export function ShareExportModal({
                 </p>
 
                 {/* Live preview */}
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                <div className="rounded-lg border bg-muted/30 p-2">
+                  <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5 px-1">
                     <Code2 className="h-3 w-3" /> Preview
                   </div>
-                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden relative" style={{ height: 180 }}>
+                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden" style={{ height: 420 }}>
                     <iframe
+                      key={`${embedSrc}-${embedMode}`}
                       src={embedSrc}
                       title="Embed preview"
-                      className="absolute inset-0 border-0 pointer-events-none"
-                      style={{ transform: 'scale(0.35)', transformOrigin: 'top left', width: `${100 / 0.35}%`, height: `${100 / 0.35}%` }}
+                      className="w-full h-full border-0"
                     />
                   </div>
                 </div>

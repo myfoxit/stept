@@ -194,7 +194,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       const tx = -(clickPos.x - 50) * 0.6;
       const ty = -(clickPos.y - 50) * 0.6;
       schedule(() => {
-        setZoomTransform(`scale(2.5) translate(${tx}%, ${ty}%)`);
+        setZoomTransform(`scale(1.8) translate(${tx}%, ${ty}%)`);
       }, 50);
     }
 
@@ -206,18 +206,18 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       if (clickPos) {
         setCursorPos({ x: clickPos.x, y: clickPos.y });
       }
-    }, 700);
+    }, 1000);
 
     // Phase 3: Click animation
     schedule(() => {
       if (!playingRef.current) return;
       setAnimState('clicking');
       setClicking(true);
-    }, 1600);
+    }, 2200);
 
     schedule(() => {
       setClicking(false);
-    }, 1800);
+    }, 2500);
 
     // Phase 4: Show tooltip and speak
     schedule(() => {
@@ -228,7 +228,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       if (text) {
         speak(text, () => {
           if (!playingRef.current) return;
-          // Phase 5: Wait
+          // Phase 5: Wait — let the user absorb
           setAnimState('waiting');
           schedule(() => {
             if (!playingRef.current) return;
@@ -245,9 +245,9 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
 
               schedule(() => {
                 advanceStep(idx);
-              }, 350);
-            }, 500);
-          }, 1500);
+              }, 400);
+            }, 600);
+          }, 2000);
         });
       } else {
         schedule(() => {
@@ -259,11 +259,11 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
             setAnimState('transitioning');
             setShowTooltip(false);
             setImageOpacity(0);
-            schedule(() => advanceStep(idx), 350);
-          }, 500);
-        }, 2000);
+            schedule(() => advanceStep(idx), 400);
+          }, 600);
+        }, 3000);
       }
-    }, 2000);
+    }, 2800);
   }, [steps, files, speak, schedule]);
 
   /* ── Advance ── */
@@ -364,7 +364,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
             className="w-full"
             style={{
               transform: zoomTransform,
-              transition: 'transform 600ms cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: 'transform 900ms cubic-bezier(0.25, 0.1, 0.25, 1)',
               transformOrigin: 'center center',
               willChange: 'transform',
             }}
