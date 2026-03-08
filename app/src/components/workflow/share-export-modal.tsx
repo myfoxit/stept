@@ -148,7 +148,7 @@ export function ShareExportModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
@@ -325,12 +325,12 @@ export function ShareExportModal({
                   <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Code2 className="h-3 w-3" /> Preview
                   </div>
-                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden" style={{ height: 160 }}>
+                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden relative" style={{ height: 180 }}>
                     <iframe
                       src={`${publicUrl}/embed`}
                       title="Embed preview"
-                      className="w-full h-full border-0 pointer-events-none"
-                      style={{ transform: 'scale(0.4)', transformOrigin: 'top left', width: '250%', height: '250%' }}
+                      className="absolute inset-0 border-0 pointer-events-none"
+                      style={{ transform: 'scale(0.35)', transformOrigin: 'top left', width: `${100 / 0.35}%`, height: `${100 / 0.35}%` }}
                     />
                   </div>
                 </div>
@@ -338,7 +338,7 @@ export function ShareExportModal({
                 {/* Size selector */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Size</Label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 flex-wrap">
                     {([
                       ['small', 'Small (640px)'],
                       ['medium', 'Medium (800px)'],
@@ -347,7 +347,7 @@ export function ShareExportModal({
                       <button
                         key={value}
                         onClick={() => setEmbedSize(value)}
-                        className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                           embedSize === value
                             ? 'border-primary bg-primary/10 text-primary'
                             : 'border-border text-muted-foreground hover:bg-muted/50'
@@ -361,7 +361,7 @@ export function ShareExportModal({
 
                 {/* Code block */}
                 <div className="relative">
-                  <pre className="rounded-lg bg-slate-900 p-3 overflow-x-auto text-xs text-slate-300 font-mono leading-relaxed">
+                  <pre className="rounded-lg bg-slate-900 p-3 overflow-x-auto text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap break-all">
                     {embedCode}
                   </pre>
                   <Button
