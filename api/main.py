@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin, tts
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin, tts, enterprise_api
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -89,7 +89,7 @@ from starlette.middleware.base import BaseHTTPMiddleware as _BHTTPM
 class PublicCorsMiddleware(_BHTTPM):
     """Override CORS for public endpoints to allow any origin (no credentials)."""
     async def dispatch(self, request, call_next):
-        is_public = request.url.path.startswith("/api/v1/public/") or request.url.path.startswith("/api/v1/tts/")
+        is_public = request.url.path.startswith("/api/v1/public/") or request.url.path.startswith("/api/v1/tts/") or request.url.path.startswith("/api/v1/enterprise/")
         origin = request.headers.get("origin", "")
 
         if is_public and origin:
@@ -97,7 +97,7 @@ class PublicCorsMiddleware(_BHTTPM):
                 from starlette.responses import Response
                 resp = Response(status_code=204)
                 resp.headers["Access-Control-Allow-Origin"] = "*"
-                resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+                resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
                 resp.headers["Access-Control-Allow-Headers"] = "*"
                 resp.headers["Access-Control-Max-Age"] = "86400"
                 return resp
@@ -133,6 +133,7 @@ api_router.include_router(upload.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(privacy.router, tags=["privacy"])
 api_router.include_router(sso_admin.router, tags=["sso-admin"])
 api_router.include_router(tts.router, prefix="/tts", tags=["tts"])
+api_router.include_router(enterprise_api.router, prefix="/enterprise", tags=["enterprise-api"])
 
 
 # Mount the versioned router on the main app
