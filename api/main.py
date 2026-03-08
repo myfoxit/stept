@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin, tts
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -89,7 +89,7 @@ from starlette.middleware.base import BaseHTTPMiddleware as _BHTTPM
 class PublicCorsMiddleware(_BHTTPM):
     """Override CORS for public endpoints to allow any origin (no credentials)."""
     async def dispatch(self, request, call_next):
-        is_public = request.url.path.startswith("/api/v1/public/")
+        is_public = request.url.path.startswith("/api/v1/public/") or request.url.path.startswith("/api/v1/tts/")
         origin = request.headers.get("origin", "")
 
         if is_public and origin:
@@ -132,6 +132,7 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["analytic
 api_router.include_router(upload.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(privacy.router, tags=["privacy"])
 api_router.include_router(sso_admin.router, tags=["sso-admin"])
+api_router.include_router(tts.router, prefix="/tts", tags=["tts"])
 
 
 # Mount the versioned router on the main app

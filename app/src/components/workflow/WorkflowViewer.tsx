@@ -144,7 +144,7 @@ export function WorkflowViewer({
   mode,
   onModeChange,
   compact,
-  showModeSelector = true,
+  showModeSelector = false,
 }: WorkflowViewerProps) {
   return (
     <div>

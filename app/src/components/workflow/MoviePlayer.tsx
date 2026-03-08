@@ -69,6 +69,11 @@ function getStepText(step: PublicStep): string {
 
 /* ── Component ── */
 
+interface TtsConfig {
+  provider: 'openai' | 'browser';
+  available: boolean;
+}
+
 export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) {
   const baseUrl = getApiBaseUrl();
 
@@ -84,9 +89,11 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const [zoomTransform, setZoomTransform] = useState('scale(1) translate(0%, 0%)');
   const [imageOpacity, setImageOpacity] = useState(1);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+  const [ttsConfig, setTtsConfig] = useState<TtsConfig | null>(null);
 
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const playingRef = useRef(playing);
   const speedRef = useRef(speed);
   const mutedRef = useRef(muted);
@@ -102,6 +109,16 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const stepType = step?.step_type || 'screenshot';
   const hasImage = step ? String(step.step_number) in files : false;
 
+  /* ── Fetch TTS config on mount ── */
+
+  useEffect(() => {
+    const url = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/config`;
+    fetch(url)
+      .then((r) => r.json())
+      .then((cfg: TtsConfig) => setTtsConfig(cfg))
+      .catch(() => setTtsConfig({ provider: 'browser', available: false }));
+  }, [baseUrl]);
+
   /* ── Cleanup ── */
 
   const clearAllTimeouts = useCallback(() => {
@@ -114,6 +131,10 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       speechSynthesis.cancel();
     }
     utteranceRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -125,8 +146,39 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
 
   /* ── TTS ── */
 
-  const speak = useCallback((text: string, onEnd: () => void) => {
-    if (mutedRef.current || typeof speechSynthesis === 'undefined' || !isEnglish(text)) {
+  const speakOpenAI = useCallback((text: string, onEnd: () => void) => {
+    const url = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error('TTS failed');
+        return r.blob();
+      })
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const audio = new Audio(objectUrl);
+        audio.playbackRate = speedRef.current;
+        audioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(objectUrl);
+          audioRef.current = null;
+          onEnd();
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          audioRef.current = null;
+          onEnd();
+        };
+        audio.play().catch(() => onEnd());
+      })
+      .catch(() => onEnd());
+  }, [baseUrl]);
+
+  const speakBrowser = useCallback((text: string, onEnd: () => void) => {
+    if (typeof speechSynthesis === 'undefined') {
       onEnd();
       return;
     }
@@ -150,6 +202,21 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     utteranceRef.current = utterance;
     speechSynthesis.speak(utterance);
   }, [cancelSpeech]);
+
+  const speak = useCallback((text: string, onEnd: () => void) => {
+    if (mutedRef.current || !isEnglish(text)) {
+      onEnd();
+      return;
+    }
+
+    cancelSpeech();
+
+    if (ttsConfig?.provider === 'openai' && ttsConfig.available) {
+      speakOpenAI(text, onEnd);
+    } else {
+      speakBrowser(text, onEnd);
+    }
+  }, [cancelSpeech, ttsConfig, speakOpenAI, speakBrowser]);
 
   /* ── Schedule with timeout ── */
 
@@ -357,11 +424,14 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
 
   return (
     <div className="flex flex-col">
-      {/* Viewport */}
-      <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: compact ? 200 : 300 }}>
+      {/* Viewport — fixed aspect ratio to prevent layout jumps */}
+      <div
+        className="relative bg-black rounded-lg overflow-hidden"
+        style={{ aspectRatio: '16 / 10', minHeight: compact ? 400 : 500 }}
+      >
         {stepType === 'screenshot' && hasImage ? (
           <div
-            className="w-full"
+            className="w-full h-full flex items-center justify-center"
             style={{
               transform: zoomTransform,
               transition: 'transform 900ms cubic-bezier(0.25, 0.1, 0.25, 1)',
@@ -369,11 +439,12 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
               willChange: 'transform',
             }}
           >
-            <div style={{ opacity: imageOpacity, transition: 'opacity 300ms ease' }}>
+            <div className="relative w-full h-full flex items-center justify-center" style={{ opacity: imageOpacity, transition: 'opacity 300ms ease' }}>
               <img
                 src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
                 alt={`Step ${currentIndex + 1}`}
-                className="w-full block"
+                className="block"
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               />
               {/* Cursor overlay */}
               <CursorOverlay
@@ -386,7 +457,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
           </div>
         ) : (
           /* Non-screenshot steps as text cards */
-          <div className="flex items-center justify-center min-h-[300px] px-8">
+          <div className="flex items-center justify-center h-full px-8">
             {stepType === 'header' && (
               <h2 className="text-2xl font-bold text-white text-center">{step.content || step.description || 'Header'}</h2>
             )}

@@ -2,7 +2,7 @@
  * Embed workflow viewer — minimal, chromeless version for iframes.
  * No app navigation, compact layout, light background only.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
@@ -22,11 +22,10 @@ export function EmbedWorkflowPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const modeParam = searchParams.get('mode');
-  const [mode, setMode] = useState<ViewMode>(
+  const mode: ViewMode =
     (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded')
       ? modeParam
-      : 'slides'
-  );
+      : 'slides';
 
   const { data: workflow, isLoading, error } = useQuery({
     queryKey: ['public-workflow', token],
@@ -95,9 +94,7 @@ export function EmbedWorkflowPage() {
         workflow={workflow}
         token={token!}
         mode={mode}
-        onModeChange={setMode}
         compact
-        showModeSelector
       />
 
       {/* Footer */}

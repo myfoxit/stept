@@ -84,6 +84,10 @@ services:
       SMTP_FROM: "${SMTP_FROM:-noreply@ondoki.com}"
       # Frontend URL (for email links)
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5173}"
+      # TTS (Text-to-Speech)
+      TTS_PROVIDER: "${TTS_PROVIDER:-browser}"
+      TTS_VOICE: "${TTS_VOICE:-nova}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s

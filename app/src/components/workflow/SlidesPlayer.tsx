@@ -74,36 +74,42 @@ export function SlidesPlayer({ steps, files, token, compact }: SlidesPlayerProps
 
   const descText = step.description || step.generated_description || step.generated_title || step.content || step.window_title || '';
 
+  const containerStyle: React.CSSProperties = {
+    aspectRatio: '16 / 10',
+    minHeight: compact ? 400 : 500,
+  };
+
   return (
     <div className="flex flex-col">
-      {/* Image area */}
-      <div className="relative bg-muted/30 rounded-lg overflow-hidden">
-        <div key={fadeKey} className="animate-in fade-in duration-300">
+      {/* Image area — fixed aspect ratio to prevent layout jumps */}
+      <div className="relative bg-muted/30 rounded-lg overflow-hidden" style={containerStyle}>
+        <div key={fadeKey} className="animate-in fade-in duration-300 h-full">
           {stepType === 'header' && (
-            <div className={`flex items-center justify-center ${compact ? 'min-h-[200px]' : 'min-h-[300px]'}`}>
+            <div className="flex items-center justify-center h-full">
               <h2 className="text-xl font-semibold px-8 text-center">{step.content || step.description || 'Header'}</h2>
             </div>
           )}
           {stepType === 'tip' && (
-            <div className={`flex items-center justify-center ${compact ? 'min-h-[200px]' : 'min-h-[300px]'}`}>
+            <div className="flex items-center justify-center h-full">
               <div className="bg-green-50 dark:bg-green-950 border-l-4 border-green-500 p-6 rounded-r-lg max-w-lg">
                 <strong>Tip:</strong> {step.content || step.description}
               </div>
             </div>
           )}
           {stepType === 'alert' && (
-            <div className={`flex items-center justify-center ${compact ? 'min-h-[200px]' : 'min-h-[300px]'}`}>
+            <div className="flex items-center justify-center h-full">
               <div className="bg-amber-50 dark:bg-amber-950 border-l-4 border-amber-500 p-6 rounded-r-lg max-w-lg">
                 <strong>Alert:</strong> {step.content || step.description}
               </div>
             </div>
           )}
           {stepType === 'screenshot' && hasImage && (
-            <div className="relative">
+            <div className="relative flex items-center justify-center h-full">
               <img
                 src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
                 alt={`Step ${visibleNum}`}
-                className="w-full rounded-lg"
+                className="rounded-lg"
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               />
               {circlePos && (
                 <div
@@ -123,7 +129,7 @@ export function SlidesPlayer({ steps, files, token, compact }: SlidesPlayerProps
             </div>
           )}
           {stepType === 'screenshot' && !hasImage && (
-            <div className={`flex items-center justify-center ${compact ? 'min-h-[200px]' : 'min-h-[300px]'} text-muted-foreground`}>
+            <div className="flex items-center justify-center h-full text-muted-foreground">
               No screenshot available
             </div>
           )}

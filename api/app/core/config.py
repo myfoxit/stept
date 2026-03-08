@@ -138,6 +138,11 @@ class Settings(BaseSettings):
     LLM_MODEL: Optional[str] = None
     LLM_BASE_URL: Optional[str] = None          # custom endpoint URL
 
+    # ── TTS (Text-to-Speech) ────────────────────────────────────
+    TTS_PROVIDER: str = "browser"           # "browser" (Web Speech API) or "openai"
+    TTS_VOICE: str = "nova"                 # OpenAI voice name
+    OPENAI_API_KEY: Optional[str] = None
+
     # ── SendCloak PII obfuscation ──────────────────────────────
     SENDCLOAK_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
     SENDCLOAK_URL: str = "http://sendcloak:9090"
