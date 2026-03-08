@@ -439,20 +439,22 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
               willChange: 'transform',
             }}
           >
-            <div className="relative w-full h-full flex items-center justify-center" style={{ opacity: imageOpacity, transition: 'opacity 300ms ease' }}>
-              <img
-                src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
-                alt={`Step ${currentIndex + 1}`}
-                className="block"
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              />
-              {/* Cursor overlay */}
-              <CursorOverlay
-                x={cursorPos.x}
-                y={cursorPos.y}
-                visible={cursorVisible}
-                clicking={clicking}
-              />
+            <div className="w-full h-full flex items-center justify-center" style={{ opacity: imageOpacity, transition: 'opacity 300ms ease' }}>
+              <div className="relative inline-block" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+                <img
+                  src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
+                  alt={`Step ${currentIndex + 1}`}
+                  className="block"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+                {/* Cursor overlay — positioned relative to the image, not the container */}
+                <CursorOverlay
+                  x={cursorPos.x}
+                  y={cursorPos.y}
+                  visible={cursorVisible}
+                  clicking={clicking}
+                />
+              </div>
             </div>
           </div>
         ) : (

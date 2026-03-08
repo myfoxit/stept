@@ -104,28 +104,30 @@ export function SlidesPlayer({ steps, files, token, compact }: SlidesPlayerProps
             </div>
           )}
           {stepType === 'screenshot' && hasImage && (
-            <div className="relative flex items-center justify-center h-full">
-              <img
-                src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
-                alt={`Step ${visibleNum}`}
-                className="rounded-lg"
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              />
-              {circlePos && (
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${circlePos.x}%`,
-                    top: `${circlePos.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <div className="absolute -inset-4 rounded-full bg-primary/20 animate-pulse" />
-                  <div className="relative h-8 w-8 rounded-full border-2 border-primary bg-primary/30">
-                    <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
+            <div className="flex items-center justify-center h-full">
+              <div className="relative inline-block" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+                <img
+                  src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
+                  alt={`Step ${visibleNum}`}
+                  className="block rounded-lg"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+                {circlePos && (
+                  <div
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${circlePos.x}%`,
+                      top: `${circlePos.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <div className="absolute -inset-4 rounded-full bg-primary/20 animate-pulse" />
+                    <div className="relative h-8 w-8 rounded-full border-2 border-primary bg-primary/30">
+                      <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
           {stepType === 'screenshot' && !hasImage && (
