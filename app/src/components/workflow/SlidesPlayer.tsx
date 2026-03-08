@@ -104,13 +104,12 @@ export function SlidesPlayer({ steps, files, token, compact }: SlidesPlayerProps
             </div>
           )}
           {stepType === 'screenshot' && hasImage && (
-            <div className="flex items-center justify-center h-full">
-              <div className="relative inline-block" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+            <div className="p-4 h-full flex items-center">
+              <div className="relative w-full">
                 <img
                   src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
                   alt={`Step ${visibleNum}`}
-                  className="block rounded-lg"
-                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  className="w-full rounded-lg"
                 />
                 {circlePos && (
                   <div
