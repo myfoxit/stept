@@ -48,13 +48,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = os.getenv("X_FRAME_OPTIONS", "DENY")
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+
+        # Allow embedding for embed routes; deny framing for everything else
+        path = request.url.path
+        is_embed = "/public/workflow/" in path and path.rstrip("/").endswith("/embed")
+        is_public_asset = "/public/" in path
+
+        if is_embed:
+            # No X-Frame-Options — allow framing from any origin
+            response.headers["Content-Security-Policy"] = "frame-ancestors *"
+        else:
+            response.headers["X-Frame-Options"] = os.getenv("X_FRAME_OPTIONS", "DENY")
+            csp = os.getenv("CSP_POLICY", "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'")
+            response.headers["Content-Security-Policy"] = csp
+
         if os.getenv("ENVIRONMENT", "local") == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        csp = os.getenv("CSP_POLICY", "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'")
-        response.headers["Content-Security-Policy"] = csp
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -71,6 +82,31 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+# Permissive CORS for /api/v1/public/* — allows embeds on any domain
+from starlette.middleware.base import BaseHTTPMiddleware as _BHTTPM
+
+class PublicCorsMiddleware(_BHTTPM):
+    """Override CORS for public endpoints to allow any origin (no credentials)."""
+    async def dispatch(self, request, call_next):
+        is_public = request.url.path.startswith("/api/v1/public/")
+        origin = request.headers.get("origin", "")
+
+        if is_public and origin:
+            if request.method == "OPTIONS":
+                from starlette.responses import Response
+                resp = Response(status_code=204)
+                resp.headers["Access-Control-Allow-Origin"] = "*"
+                resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+                resp.headers["Access-Control-Allow-Headers"] = "*"
+                resp.headers["Access-Control-Max-Age"] = "86400"
+                return resp
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            return response
+        return await call_next(request)
+
+app.add_middleware(PublicCorsMiddleware)
 
 
 # Register all feature routers under the versioned router

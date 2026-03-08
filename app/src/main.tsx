@@ -24,6 +24,7 @@ import { ChatProvider } from "@/components/Chat/ChatContext";
 import { ChatPanel } from "@/components/Chat/ChatPanel";
 import { SpotlightProvider } from "@/components/spotlight/SpotlightProvider";
 import { PublicWorkflowPage } from "@/pages/public-workflow";
+import { EmbedWorkflowPage } from "@/pages/embed-workflow";
 import { PublicDocumentPage } from "@/pages/public-document";
 import { SharedWithMePage } from "@/pages/shared-with-me";
 
@@ -115,6 +116,10 @@ createRoot(document.getElementById("root")!).render(
                     <Route
                       path="/public/workflow/:token"
                       element={<PublicWorkflowPage />}
+                    />
+                    <Route
+                      path="/public/workflow/:token/embed"
+                      element={<EmbedWorkflowPage />}
                     />
                     <Route
                       path="/public/document/:token"

@@ -30,6 +30,7 @@ import {
   Lock,
   UserPlus,
   Users,
+  Code2,
 } from 'lucide-react';
 import { exportWorkflow, type ExportFormat } from '@/api/workflows';
 import { useShare } from '@/hooks/use-share';
@@ -67,13 +68,16 @@ export function ShareExportModal({
   const [email, setEmail] = React.useState('');
   const [permission, setPermission] = React.useState<string>('view');
   const [inviteError, setInviteError] = React.useState<string | null>(null);
+  const [embedSize, setEmbedSize] = React.useState<'small' | 'medium' | 'large'>('medium');
+  const [embedCopied, setEmbedCopied] = React.useState(false);
 
   const publicUrl = settings?.share_token
     ? `${window.location.origin}/public/workflow/${settings.share_token}`
     : '';
 
+  const embedWidth = embedSize === 'small' ? '640px' : embedSize === 'medium' ? '800px' : '100%';
   const embedCode = publicUrl
-    ? `<iframe src="${publicUrl}/embed" width="100%" height="600" frameborder="0"></iframe>`
+    ? `<iframe src="${publicUrl}/embed" width="${embedWidth}" height="600" frameborder="0" allow="fullscreen" style="border: 0; border-radius: 8px;"></iframe>`
     : '';
 
   const handleCopy = async (text: string) => {
@@ -315,17 +319,77 @@ export function ShareExportModal({
                 <p className="text-sm text-muted-foreground">
                   Embed this workflow in your website or documentation.
                 </p>
-                <div className="flex gap-2">
-                  <Input value={embedCode} readOnly className="flex-1 font-mono text-xs" />
-                  <Button variant="outline" size="icon" onClick={() => handleCopy(embedCode)}>
-                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+
+                {/* Live preview */}
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <Code2 className="h-3 w-3" /> Preview
+                  </div>
+                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden" style={{ height: 160 }}>
+                    <iframe
+                      src={`${publicUrl}/embed`}
+                      title="Embed preview"
+                      className="w-full h-full border-0 pointer-events-none"
+                      style={{ transform: 'scale(0.4)', transformOrigin: 'top left', width: '250%', height: '250%' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Size selector */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Size</Label>
+                  <div className="flex gap-2">
+                    {([
+                      ['small', 'Small (640px)'],
+                      ['medium', 'Medium (800px)'],
+                      ['large', 'Large (100%)'],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        onClick={() => setEmbedSize(value)}
+                        className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          embedSize === value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:bg-muted/50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Code block */}
+                <div className="relative">
+                  <pre className="rounded-lg bg-slate-900 p-3 overflow-x-auto text-xs text-slate-300 font-mono leading-relaxed">
+                    {embedCode}
+                  </pre>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute top-2 right-2 h-7 text-xs"
+                    onClick={() => {
+                      navigator.clipboard.writeText(embedCode);
+                      setEmbedCopied(true);
+                      setTimeout(() => setEmbedCopied(false), 2000);
+                    }}
+                  >
+                    {embedCopied ? <><Check className="h-3 w-3 mr-1" /> Copied</> : <><Copy className="h-3 w-3 mr-1" /> Copy</>}
                   </Button>
                 </div>
+
+                <p className="text-xs text-muted-foreground">
+                  The workflow must have a public link enabled for embedding to work.
+                </p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground py-4">
-                Enable "Anyone with the link" in the Share tab first to get an embed code.
-              </p>
+              <div className="py-6 text-center">
+                <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm font-medium mb-1">Enable public link first</p>
+                <p className="text-xs text-muted-foreground">
+                  Go to the Share tab and enable "Anyone with the link" to get an embed code.
+                </p>
+              </div>
             )}
           </TabsContent>
 
