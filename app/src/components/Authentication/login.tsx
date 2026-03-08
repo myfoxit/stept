@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import { useSearchParams } from 'react-router-dom';
 import { getApiBaseUrl } from '@/lib/apiClient';
-import { resendVerification } from '@/api/auth';
+import { resendVerification, checkSso } from '@/api/auth';
 import type { AxiosError } from 'axios';
 
 // ---------------------------------------------------------------------------
@@ -161,12 +161,14 @@ export function LoginForm({
   ...props
 }: AuthFormProps) {
   const { login } = useAuth();
+  const [step, setStep] = useState<'email' | 'password'>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const emailError = useMemo(() => (emailTouched ? validateEmail(email) : null), [email, emailTouched]);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [deviceAuth, setDeviceAuth] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -174,13 +176,19 @@ export function LoginForm({
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Handle OAuth error redirect
+  // Handle OAuth/SSO error redirect
   useEffect(() => {
-    const oauthError = searchParams.get('error');
-    if (oauthError === 'oauth_failed') {
-      setError('OAuth login failed. Please try again or use email/password.');
-      setErrorType('oauth');
-      // Clear error param from URL
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      const errorMessages: Record<string, string> = {
+        oauth_failed: 'OAuth login failed. Please try again or use email/password.',
+        sso_failed: 'SSO login failed. Please try again.',
+        sso_no_account: 'No account found for your SSO identity. Contact your administrator.',
+        sso_no_config: 'SSO is not configured for your email domain.',
+        sso_discovery_failed: 'Could not connect to your SSO provider. Please try again.',
+      };
+      setError(errorMessages[errorParam] ?? 'Login failed. Please try again.');
+      setErrorType(errorParam.startsWith('sso_') ? 'sso' : 'oauth');
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('error');
       window.history.replaceState({}, '', window.location.pathname + (newParams.toString() ? '?' + newParams.toString() : ''));
@@ -226,7 +234,33 @@ export function LoginForm({
     setResendSuccess(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 1: Check SSO then advance to password or redirect
+  const handleEmailContinue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailTouched(true);
+    if (validateEmail(email)) return;
+
+    setError(null);
+    setErrorType(null);
+    setSsoLoading(true);
+
+    try {
+      const result = await checkSso(email);
+      if (result.sso) {
+        // Redirect to SSO login (full page redirect)
+        window.location.href = getApiBaseUrl() + '/auth/sso/login?email=' + encodeURIComponent(email);
+        return;
+      }
+    } catch {
+      // SSO check failed — fall through to password step
+    }
+
+    setSsoLoading(false);
+    setStep('password');
+  };
+
+  // Step 2: Submit email + password
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setErrorType(null);
@@ -263,11 +297,7 @@ export function LoginForm({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn('flex flex-col gap-6', className)}
-      {...props}
-    >
+    <div className={cn('flex flex-col gap-6', className)}>
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">
           {deviceAuth ? 'Authorize Desktop App' : 'Login to your account'}
@@ -288,87 +318,128 @@ export function LoginForm({
           </div>
         )}
       </div>
-      <div className="grid gap-6">
-        <div className="grid gap-3">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="m@example.com"
-            required
-            value={email}
-            onChange={handleEmailChange}
-            onBlur={() => setEmailTouched(true)}
-            className={cn(emailError && 'border-destructive')}
-          />
-          <FieldError message={emailError} />
-        </div>
-        <div className="grid gap-3">
-          <div className="flex items-center">
-            <Label htmlFor="password">Password</Label>
+
+      {step === 'email' ? (
+        <form onSubmit={handleEmailContinue} {...props}>
+          <div className="grid gap-6">
+            <div className="grid gap-3">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                required
+                autoFocus
+                value={email}
+                onChange={handleEmailChange}
+                onBlur={() => setEmailTouched(true)}
+                className={cn(emailError && 'border-destructive')}
+              />
+              <FieldError message={emailError} />
+            </div>
+
+            {error && <ErrorAlert>{error}</ErrorAlert>}
+
+            <Button type="submit" className="w-full" disabled={ssoLoading}>
+              {ssoLoading ? 'Checking…' : 'Continue'}
+            </Button>
+            <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+              <span className="bg-background text-muted-foreground relative z-10 px-2">
+                Or continue with
+              </span>
+            </div>
+            <GoogleButton />
+            <GitHubButton />
+          </div>
+          <div className="text-center text-sm mt-6">
+            Don&apos;t have an account?{' '}
             <button
               type="button"
-              onClick={() => onSwitch('reset')}
-              className="ml-auto text-sm underline-offset-4 hover:underline"
+              onClick={() => onSwitch('register')}
+              className="underline underline-offset-4"
             >
-              Forgot your password?
+              Sign up
             </button>
           </div>
-          <Input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={handlePasswordChange}
-          />
-        </div>
-
-        {error && (
-          <ErrorAlert>
-            {error}
-            {errorType === 'not_verified' && !resendSuccess && (
-              <>
-                {' '}
+        </form>
+      ) : (
+        <form onSubmit={handlePasswordSubmit} {...props}>
+          <div className="grid gap-6">
+            <div className="grid gap-3">
+              <Label>Email</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm truncate flex-1">{email}</span>
                 <button
                   type="button"
-                  className="underline underline-offset-4 font-medium"
-                  disabled={resendCooldown > 0}
-                  onClick={handleResendVerification}
+                  onClick={() => { setStep('email'); setPassword(''); setError(null); }}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:underline shrink-0"
                 >
-                  {resendCooldown > 0 ? `Resend verification email (${resendCooldown}s)` : 'Resend verification email'}
+                  Change
                 </button>
-              </>
-            )}
-          </ErrorAlert>
-        )}
-        {resendSuccess && (
-          <p className="text-green-600 text-sm bg-green-600/10 rounded-md px-3 py-2">
-            Verification email sent! Check your inbox.
-          </p>
-        )}
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <div className="flex items-center">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  onClick={() => onSwitch('reset')}
+                  className="ml-auto text-sm underline-offset-4 hover:underline"
+                >
+                  Forgot your password?
+                </button>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                required
+                autoFocus
+                value={password}
+                onChange={handlePasswordChange}
+              />
+            </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Logging in…' : 'Login'}
-        </Button>
-        <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
-          <span className="bg-background text-muted-foreground relative z-10 px-2">
-            Or continue with
-          </span>
-        </div>
-        <GoogleButton />
-        <GitHubButton />
-      </div>
-      <div className="text-center text-sm">
-        Don&apos;t have an account?{' '}
-        <button
-          type="button"
-          onClick={() => onSwitch('register')}
-          className="underline underline-offset-4"
-        >
-          Sign up
-        </button>
-      </div>
-    </form>
+            {error && (
+              <ErrorAlert>
+                {error}
+                {errorType === 'not_verified' && !resendSuccess && (
+                  <>
+                    {' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-4 font-medium"
+                      disabled={resendCooldown > 0}
+                      onClick={handleResendVerification}
+                    >
+                      {resendCooldown > 0 ? `Resend verification email (${resendCooldown}s)` : 'Resend verification email'}
+                    </button>
+                  </>
+                )}
+              </ErrorAlert>
+            )}
+            {resendSuccess && (
+              <p className="text-green-600 text-sm bg-green-600/10 rounded-md px-3 py-2">
+                Verification email sent! Check your inbox.
+              </p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Logging in…' : 'Login'}
+            </Button>
+          </div>
+          <div className="text-center text-sm mt-6">
+            Don&apos;t have an account?{' '}
+            <button
+              type="button"
+              onClick={() => onSwitch('register')}
+              className="underline underline-offset-4"
+            >
+              Sign up
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

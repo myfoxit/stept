@@ -67,3 +67,10 @@ export const verifyEmail = (body: { token: string }) =>
     data: body,
     ...withCred,
   });
+
+export const checkSso = (email: string) =>
+  request<{ sso: boolean; provider_name?: string }>({
+    method: 'GET',
+    url: '/auth/sso/check?email=' + encodeURIComponent(email),
+    ...withCred,
+  });
