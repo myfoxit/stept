@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset your Ondoki password</title>
+  <title>You're invited to Ondoki</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
@@ -19,24 +19,24 @@
           <!-- Body -->
           <tr>
             <td style="padding:32px;">
-              <h1 style="margin:0 0 16px;font-size:20px;color:#18181b;">Reset your password</h1>
+              <h1 style="margin:0 0 16px;font-size:20px;color:#18181b;">You've been invited!</h1>
               <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#3f3f46;">
-                We received a request to reset your password. Click the button below to choose a new one. This link is valid for 1 hour.
+                <strong>{{ inviter_name }}</strong> invited you to join their workspace on Ondoki. Click the button below to accept the invitation.
               </p>
               <table cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="border-radius:6px;background-color:#7c3aed;">
-                    <a href="{{ frontend_url }}/reset-password?token={{ reset_token }}"
+                    <a href="{{ frontend_url }}/invite?token={{ invite_token }}"
                        style="display:inline-block;padding:12px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">
-                      Reset password
+                      Accept invitation
                     </a>
                   </td>
                 </tr>
               </table>
               <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#71717a;">
                 If the button doesn't work, copy and paste this link into your browser:<br>
-                <a href="{{ frontend_url }}/reset-password?token={{ reset_token }}" style="color:#7c3aed;word-break:break-all;">
-                  {{ frontend_url }}/reset-password?token={{ reset_token }}
+                <a href="{{ frontend_url }}/invite?token={{ invite_token }}" style="color:#7c3aed;word-break:break-all;">
+                  {{ frontend_url }}/invite?token={{ invite_token }}
                 </a>
               </p>
             </td>
@@ -45,7 +45,7 @@
           <tr>
             <td style="padding:20px 32px;border-top:1px solid #e4e4e7;">
               <p style="margin:0;font-size:12px;color:#a1a1aa;">
-                If you didn't request a password reset, you can safely ignore this email. Your password won't change.
+                If you don't recognize this invitation, you can safely ignore this email.
               </p>
             </td>
           </tr>
