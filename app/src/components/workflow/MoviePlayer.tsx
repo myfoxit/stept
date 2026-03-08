@@ -257,11 +257,15 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     setImageOpacity(1);
 
     if (clickPos) {
-      // Zoom into click target
-      const tx = -(clickPos.x - 50) * 0.6;
-      const ty = -(clickPos.y - 50) * 0.6;
+      // Zoom into click target, clamped so edges don't go out of view
+      const scale = 1.8;
+      const maxPan = ((scale - 1) / (2 * scale)) * 100; // ~22.2% for 1.8x
+      const rawTx = -(clickPos.x - 50) * 0.6;
+      const rawTy = -(clickPos.y - 50) * 0.6;
+      const tx = Math.max(-maxPan, Math.min(maxPan, rawTx));
+      const ty = Math.max(-maxPan, Math.min(maxPan, rawTy));
       schedule(() => {
-        setZoomTransform(`scale(1.8) translate(${tx}%, ${ty}%)`);
+        setZoomTransform(`scale(${scale}) translate(${tx}%, ${ty}%)`);
       }, 50);
     }
 
