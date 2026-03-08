@@ -91,6 +91,7 @@ def _check_origin(request: Request) -> None:
 _RATE_LIMITS = {
     "login": {"limit": 5, "window": 60, "buckets": defaultdict(deque)},           # 5 attempts per 60s
     "password_reset": {"limit": 5, "window": 60, "buckets": defaultdict(deque)},  # 5 attempts per 60s
+    "resend_verification": {"limit": 3, "window": 60, "buckets": defaultdict(deque)},  # 3 per 60s
 }
 
 def _rate_limit(request: Request, bucket_name: str):
@@ -831,6 +832,32 @@ async def verify(body: VerifyIn, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="INVALID_TOKEN")
     return {"ok": True}
 
+
+class ResendVerificationIn(BaseModel):
+    email: str
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    body: ResendVerificationIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    _check_origin(request)
+    _rate_limit(request, "resend_verification")
+    # Always return ok to prevent email enumeration
+    try:
+        from app.security import normalize_email
+        norm = normalize_email(body.email)
+        user = await db.scalar(select(User).where(User.normalized_email == norm))
+        if user and not user.is_verified and user.verification_tok:
+            from app.emails import send_verification_email
+            send_verification_email(user.email, user.verification_tok)
+    except Exception:
+        pass
+    return {"ok": True}
+
+
 @router.post("/password-reset/request")
 async def password_reset_request(body: PasswordResetRequestIn, db: AsyncSession = Depends(get_db), request: Request = None):
     # Apply rate limiting
@@ -874,5 +901,327 @@ async def test_delete_user(
     return {"deleted": deleted}
 
 # ─────────────────────────────────────────────────────────────────────────────
-# OAuth 2.0 PKCE Flow Endpoints
+# OAuth 2.0 Social Login (Google + GitHub)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _oauth_login_or_create(
+    db: AsyncSession,
+    *,
+    provider: str,          # "google" or "github"
+    provider_id: str,
+    email: str,
+    name: Optional[str],
+    avatar_url: Optional[str],
+    request: Request,
+) -> tuple:
+    """
+    Shared logic for Google and GitHub OAuth callbacks.
+    Returns (user, session_token).
+    """
+    from app.security import normalize_email, hash_password
+    from app.models import Project, project_members
+
+    provider_id_col = User.google_id if provider == "google" else User.github_id
+    norm = normalize_email(email)
+
+    # 1. Check by provider_id (existing OAuth user)
+    user = await db.scalar(select(User).where(provider_id_col == provider_id))
+
+    if not user:
+        # 2. Check by email (link account)
+        user = await db.scalar(select(User).where(User.normalized_email == norm))
+        if user:
+            setattr(user, f"{provider}_id", provider_id)
+            user.is_verified = True
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+        else:
+            # 3. Create new user
+            user = User(
+                id=secrets.token_hex(8),
+                email=email.strip(),
+                normalized_email=norm,
+                name=name or email.split("@")[0],
+                hashed_password=hash_password(secrets.token_urlsafe(32)),
+                is_verified=True,
+                auth_method=provider,
+                avatar_url=avatar_url,
+            )
+            setattr(user, f"{provider}_id", provider_id)
+            db.add(user)
+            await db.flush()
+
+            # Create default workspace
+            default_project = Project(
+                id=secrets.token_hex(8),
+                name="My Workspace",
+                owner_id=user.id,
+                user_id=user.id,
+            )
+            db.add(default_project)
+            await db.flush()
+            await db.execute(
+                project_members.insert().values(
+                    user_id=user.id,
+                    project_id=default_project.id,
+                    role="owner",
+                )
+            )
+
+    session_token = await auth_crud._create_session(
+        db, user,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return user, session_token
+
+
+def _oauth_redirect_with_session(
+    token: str,
+    request: Request,
+    redirect_path: str = "/",
+) -> RedirectResponse:
+    """Create a redirect response to the frontend with the session cookie set."""
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    resp = RedirectResponse(url=f"{frontend_url}{redirect_path}", status_code=302)
+    _set_session_cookie(resp, token, request)
+    _clear_legacy_refresh_cookie(resp)
+    return resp
+
+
+# ── Google OAuth ──────────────────────────────────────────────────────────
+
+@router.get("/google")
+async def google_login(request: Request):
+    """Redirect user to Google OAuth consent screen."""
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth not configured")
+
+    state = secrets.token_urlsafe(32)
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    # Build callback URL based on the request's base URL
+    callback_url = str(request.url_for("google_callback"))
+
+    from authlib.integrations.httpx_client import AsyncOAuth2Client
+    client = AsyncOAuth2Client(
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        redirect_uri=callback_url,
+        scope="openid email profile",
+    )
+    authorization_url, _ = client.create_authorization_url(
+        "https://accounts.google.com/o/oauth2/v2/auth",
+        state=state,
+    )
+
+    resp = RedirectResponse(url=authorization_url, status_code=302)
+    resp.set_cookie(
+        key="oauth_state",
+        value=state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return resp
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle Google OAuth callback."""
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    error_redirect = f"{frontend_url}/login?error=oauth_failed"
+
+    if error or not code:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    # Verify state
+    stored_state = request.cookies.get("oauth_state")
+    if not stored_state or stored_state != state:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    try:
+        from authlib.integrations.httpx_client import AsyncOAuth2Client
+        callback_url = str(request.url_for("google_callback"))
+
+        client = AsyncOAuth2Client(
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            redirect_uri=callback_url,
+        )
+        token_resp = await client.fetch_token(
+            "https://oauth2.googleapis.com/token",
+            code=code,
+        )
+
+        # Get user info
+        import httpx
+        async with httpx.AsyncClient() as http:
+            userinfo_resp = await http.get(
+                "https://openidconnect.googleapis.com/v1/userinfo",
+                headers={"Authorization": f"Bearer {token_resp['access_token']}"},
+            )
+            userinfo_resp.raise_for_status()
+            userinfo = userinfo_resp.json()
+
+        google_id = userinfo["sub"]
+        email = userinfo.get("email")
+        if not email:
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        user, session_token = await _oauth_login_or_create(
+            db,
+            provider="google",
+            provider_id=google_id,
+            email=email,
+            name=userinfo.get("name"),
+            avatar_url=userinfo.get("picture"),
+            request=request,
+        )
+
+        resp = _oauth_redirect_with_session(session_token, request)
+        resp.delete_cookie("oauth_state", path="/")
+        return resp
+
+    except Exception:
+        logger.exception("Google OAuth callback failed")
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+
+# ── GitHub OAuth ──────────────────────────────────────────────────────────
+
+@router.get("/github")
+async def github_login(request: Request):
+    """Redirect user to GitHub authorize screen."""
+    if not settings.GITHUB_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="GitHub OAuth not configured")
+
+    state = secrets.token_urlsafe(32)
+    callback_url = str(request.url_for("github_callback"))
+
+    params = urllib.parse.urlencode({
+        "client_id": settings.GITHUB_CLIENT_ID,
+        "redirect_uri": callback_url,
+        "scope": "user:email",
+        "state": state,
+    })
+
+    resp = RedirectResponse(
+        url=f"https://github.com/login/oauth/authorize?{params}",
+        status_code=302,
+    )
+    resp.set_cookie(
+        key="oauth_state",
+        value=state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return resp
+
+
+@router.get("/github/callback")
+async def github_callback(
+    request: Request,
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle GitHub OAuth callback."""
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    error_redirect = f"{frontend_url}/login?error=oauth_failed"
+
+    if error or not code:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    # Verify state
+    stored_state = request.cookies.get("oauth_state")
+    if not stored_state or stored_state != state:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    try:
+        import httpx
+
+        # Exchange code for access token
+        async with httpx.AsyncClient() as http:
+            token_resp = await http.post(
+                "https://github.com/login/oauth/access_token",
+                json={
+                    "client_id": settings.GITHUB_CLIENT_ID,
+                    "client_secret": settings.GITHUB_CLIENT_SECRET,
+                    "code": code,
+                },
+                headers={"Accept": "application/json"},
+            )
+            token_resp.raise_for_status()
+            token_data = token_resp.json()
+
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        # Get user info
+        async with httpx.AsyncClient() as http:
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            }
+            user_resp = await http.get("https://api.github.com/user", headers=headers)
+            user_resp.raise_for_status()
+            gh_user = user_resp.json()
+
+            # Get verified primary email (GitHub email can be private)
+            emails_resp = await http.get("https://api.github.com/user/emails", headers=headers)
+            emails_resp.raise_for_status()
+            gh_emails = emails_resp.json()
+
+        # Find verified primary email
+        email = None
+        for e in gh_emails:
+            if e.get("primary") and e.get("verified"):
+                email = e["email"]
+                break
+        # Fallback to any verified email
+        if not email:
+            for e in gh_emails:
+                if e.get("verified"):
+                    email = e["email"]
+                    break
+        if not email:
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        github_id = str(gh_user["id"])
+        avatar_url = gh_user.get("avatar_url")
+        name = gh_user.get("name") or gh_user.get("login")
+
+        user, session_token = await _oauth_login_or_create(
+            db,
+            provider="github",
+            provider_id=github_id,
+            email=email,
+            name=name,
+            avatar_url=avatar_url,
+            request=request,
+        )
+
+        resp = _oauth_redirect_with_session(session_token, request)
+        resp.delete_cookie("oauth_state", path="/")
+        return resp
+
+    except Exception:
+        logger.exception("GitHub OAuth callback failed")
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OAuth 2.0 PKCE Flow Endpoints (Desktop App)
 # ─────────────────────────────────────────────────────────────────────────────
