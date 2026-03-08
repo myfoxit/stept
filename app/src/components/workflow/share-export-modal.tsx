@@ -69,6 +69,7 @@ export function ShareExportModal({
   const [permission, setPermission] = React.useState<string>('view');
   const [inviteError, setInviteError] = React.useState<string | null>(null);
   const [embedSize, setEmbedSize] = React.useState<'small' | 'medium' | 'large'>('medium');
+  const [embedMode, setEmbedMode] = React.useState<'slides' | 'movie' | 'expanded'>('slides');
   const [embedCopied, setEmbedCopied] = React.useState(false);
 
   const publicUrl = settings?.share_token
@@ -76,8 +77,11 @@ export function ShareExportModal({
     : '';
 
   const embedWidth = embedSize === 'small' ? '640px' : embedSize === 'medium' ? '800px' : '100%';
+  const embedSrc = publicUrl
+    ? `${publicUrl}/embed${embedMode !== 'slides' ? `?mode=${embedMode}` : ''}`
+    : '';
   const embedCode = publicUrl
-    ? `<iframe src="${publicUrl}/embed" width="${embedWidth}" height="600" frameborder="0" allow="fullscreen" style="border: 0; border-radius: 8px;"></iframe>`
+    ? `<iframe src="${embedSrc}" width="${embedWidth}" height="600" frameborder="0" allow="fullscreen" style="border: 0; border-radius: 8px;"></iframe>`
     : '';
 
   const handleCopy = async (text: string) => {
@@ -327,11 +331,35 @@ export function ShareExportModal({
                   </div>
                   <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden relative" style={{ height: 180 }}>
                     <iframe
-                      src={`${publicUrl}/embed`}
+                      src={embedSrc}
                       title="Embed preview"
                       className="absolute inset-0 border-0 pointer-events-none"
                       style={{ transform: 'scale(0.35)', transformOrigin: 'top left', width: `${100 / 0.35}%`, height: `${100 / 0.35}%` }}
                     />
+                  </div>
+                </div>
+
+                {/* Viewing mode selector */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Viewing mode</Label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {([
+                      ['slides', 'Slides'],
+                      ['movie', 'Movie'],
+                      ['expanded', 'Expanded'],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        onClick={() => setEmbedMode(value)}
+                        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          embedMode === value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:bg-muted/50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
