@@ -602,6 +602,22 @@ class ContextLink(Base):
     )
 
 
+class SsoConfig(Base):
+    """Enterprise SSO (OIDC) configuration per email domain."""
+    __tablename__ = "sso_configs"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    domain = Column(String, unique=True, nullable=False, index=True)
+    provider_name = Column(String, nullable=False)
+    issuer_url = Column(String, nullable=False)
+    client_id = Column(String, nullable=False)
+    client_secret = Column(String, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    auto_create_users = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class McpApiKey(Base):
     """API keys for MCP (Model Context Protocol) access."""
     __tablename__ = "mcp_api_keys"

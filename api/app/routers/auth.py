@@ -92,6 +92,7 @@ _RATE_LIMITS = {
     "login": {"limit": 5, "window": 60, "buckets": defaultdict(deque)},           # 5 attempts per 60s
     "password_reset": {"limit": 5, "window": 60, "buckets": defaultdict(deque)},  # 5 attempts per 60s
     "resend_verification": {"limit": 3, "window": 60, "buckets": defaultdict(deque)},  # 3 per 60s
+    "sso_check": {"limit": 10, "window": 60, "buckets": defaultdict(deque)},  # 10 per 60s
 }
 
 def _rate_limit(request: Request, bucket_name: str):
@@ -1220,6 +1221,313 @@ async def github_callback(
     except Exception:
         logger.exception("GitHub OAuth callback failed")
         return RedirectResponse(url=error_redirect, status_code=302)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Enterprise SSO (OIDC)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# In-memory OIDC discovery cache: { issuer_url: (data_dict, fetched_timestamp) }
+_oidc_discovery_cache: Dict[str, tuple] = {}
+_OIDC_CACHE_TTL = 3600  # 1 hour
+
+
+async def _fetch_oidc_discovery(issuer_url: str) -> dict:
+    """Fetch and cache OIDC .well-known/openid-configuration."""
+    now = dt.datetime.now(dt.timezone.utc).timestamp()
+    cached = _oidc_discovery_cache.get(issuer_url)
+    if cached and now - cached[1] < _OIDC_CACHE_TTL:
+        return cached[0]
+
+    import httpx
+    discovery_url = issuer_url.rstrip("/") + "/.well-known/openid-configuration"
+    async with httpx.AsyncClient(timeout=10) as http:
+        resp = await http.get(discovery_url)
+        resp.raise_for_status()
+        data = resp.json()
+
+    _oidc_discovery_cache[issuer_url] = (data, now)
+    return data
+
+
+async def _fetch_jwks(jwks_uri: str) -> dict:
+    """Fetch JWKS from the IdP."""
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as http:
+        resp = await http.get(jwks_uri)
+        resp.raise_for_status()
+        return resp.json()
+
+
+from app.models import SsoConfig
+
+
+@router.get("/sso/check")
+async def sso_check(
+    request: Request,
+    email: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if an email domain has SSO configured."""
+    _rate_limit(request, "sso_check")
+    domain = email.strip().lower().split("@")[-1] if "@" in email else ""
+    if not domain:
+        return {"sso": False}
+
+    config = await db.scalar(
+        select(SsoConfig).where(SsoConfig.domain == domain, SsoConfig.enabled == True)
+    )
+    if config:
+        return {"sso": True, "provider_name": config.provider_name}
+    return {"sso": False}
+
+
+@router.get("/sso/login")
+async def sso_login(
+    request: Request,
+    email: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Initiate SSO OIDC login for an email domain."""
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    domain = email.strip().lower().split("@")[-1] if "@" in email else ""
+    if not domain:
+        return RedirectResponse(url=f"{frontend_url}/login?error=sso_no_config", status_code=302)
+
+    config = await db.scalar(
+        select(SsoConfig).where(SsoConfig.domain == domain, SsoConfig.enabled == True)
+    )
+    if not config:
+        return RedirectResponse(url=f"{frontend_url}/login?error=sso_no_config", status_code=302)
+
+    try:
+        discovery = await _fetch_oidc_discovery(config.issuer_url)
+    except Exception:
+        logger.exception("OIDC discovery failed for %s", config.issuer_url)
+        return RedirectResponse(url=f"{frontend_url}/login?error=sso_discovery_failed", status_code=302)
+
+    authorization_endpoint = discovery.get("authorization_endpoint")
+    if not authorization_endpoint:
+        return RedirectResponse(url=f"{frontend_url}/login?error=sso_discovery_failed", status_code=302)
+
+    state = secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
+    callback_url = str(request.url_for("sso_callback"))
+
+    # Encode domain in state so we can look up config on callback
+    state_payload = json.dumps({"state": state, "domain": domain, "nonce": nonce})
+    state_b64 = base64.urlsafe_b64encode(state_payload.encode()).decode()
+
+    params = urllib.parse.urlencode({
+        "client_id": config.client_id,
+        "redirect_uri": callback_url,
+        "scope": "openid email profile",
+        "response_type": "code",
+        "state": state_b64,
+        "nonce": nonce,
+    })
+
+    resp = RedirectResponse(url=f"{authorization_endpoint}?{params}", status_code=302)
+    resp.set_cookie(
+        key="sso_state",
+        value=state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return resp
+
+
+@router.get("/sso/callback")
+async def sso_callback(
+    request: Request,
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle SSO OIDC callback."""
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    error_redirect = f"{frontend_url}/login?error=sso_failed"
+
+    if error or not code or not state:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    # Decode state payload
+    try:
+        state_payload = json.loads(base64.urlsafe_b64decode(state).decode())
+        original_state = state_payload["state"]
+        domain = state_payload["domain"]
+        nonce = state_payload["nonce"]
+    except Exception:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    # Verify state cookie
+    stored_state = request.cookies.get("sso_state")
+    if not stored_state or stored_state != original_state:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    # Look up SSO config
+    config = await db.scalar(
+        select(SsoConfig).where(SsoConfig.domain == domain, SsoConfig.enabled == True)
+    )
+    if not config:
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+    try:
+        discovery = await _fetch_oidc_discovery(config.issuer_url)
+        token_endpoint = discovery["token_endpoint"]
+        jwks_uri = discovery["jwks_uri"]
+
+        import httpx
+
+        # Exchange code for tokens
+        callback_url = str(request.url_for("sso_callback"))
+        async with httpx.AsyncClient(timeout=15) as http:
+            token_resp = await http.post(
+                token_endpoint,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": callback_url,
+                    "client_id": config.client_id,
+                    "client_secret": config.client_secret,
+                },
+                headers={"Accept": "application/json"},
+            )
+            token_resp.raise_for_status()
+            token_data = token_resp.json()
+
+        id_token_raw = token_data.get("id_token")
+        if not id_token_raw:
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        # Fetch JWKS and validate ID token
+        jwks_data = await _fetch_jwks(jwks_uri)
+        from jwt import PyJWKClient, PyJWK
+
+        # Build a local JWK set from fetched keys
+        header = jwt.get_unverified_header(id_token_raw)
+        kid = header.get("kid")
+        signing_key = None
+        for key_data in jwks_data.get("keys", []):
+            if key_data.get("kid") == kid:
+                jwk = PyJWK(key_data)
+                signing_key = jwk.key
+                break
+
+        if not signing_key:
+            logger.error("No matching JWK found for kid=%s", kid)
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        claims = jwt.decode(
+            id_token_raw,
+            signing_key,
+            algorithms=["RS256", "ES256"],
+            audience=config.client_id,
+            issuer=config.issuer_url.rstrip("/"),
+            options={"require": ["exp", "iss", "aud", "sub"]},
+        )
+
+        # Verify nonce
+        if claims.get("nonce") != nonce:
+            logger.error("SSO nonce mismatch")
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        sso_email = claims.get("email")
+        sso_name = claims.get("name") or claims.get("preferred_username")
+        sso_sub = claims.get("sub")
+
+        if not sso_email:
+            return RedirectResponse(url=error_redirect, status_code=302)
+
+        # Login or create user (reuse OAuth pattern)
+        user, session_token = await _sso_login_or_create(
+            db,
+            email=sso_email,
+            name=sso_name,
+            sso_sub=sso_sub,
+            auto_create=config.auto_create_users,
+            request=request,
+        )
+        if not user:
+            return RedirectResponse(
+                url=f"{frontend_url}/login?error=sso_no_account", status_code=302
+            )
+
+        resp = _oauth_redirect_with_session(session_token, request)
+        resp.delete_cookie("sso_state", path="/")
+        return resp
+
+    except Exception:
+        logger.exception("SSO callback failed for domain=%s", domain)
+        return RedirectResponse(url=error_redirect, status_code=302)
+
+
+async def _sso_login_or_create(
+    db: AsyncSession,
+    *,
+    email: str,
+    name: Optional[str],
+    sso_sub: str,
+    auto_create: bool,
+    request: Request,
+) -> tuple:
+    """
+    Login or create a user via SSO. Returns (user, session_token) or (None, None).
+    """
+    from app.security import normalize_email, hash_password
+    from app.models import Project, project_members
+
+    norm = normalize_email(email)
+
+    # Check existing user by email
+    user = await db.scalar(select(User).where(User.normalized_email == norm))
+
+    if not user:
+        if not auto_create:
+            return None, None
+        # Create new user
+        user = User(
+            id=secrets.token_hex(8),
+            email=email.strip(),
+            normalized_email=norm,
+            name=name or email.split("@")[0],
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
+            is_verified=True,
+            auth_method="sso",
+        )
+        db.add(user)
+        await db.flush()
+
+        # Create default workspace
+        default_project = Project(
+            id=secrets.token_hex(8),
+            name="My Workspace",
+            owner_id=user.id,
+            user_id=user.id,
+        )
+        db.add(default_project)
+        await db.flush()
+        await db.execute(
+            project_members.insert().values(
+                user_id=user.id,
+                project_id=default_project.id,
+                role="owner",
+            )
+        )
+    else:
+        # Mark as verified if not already
+        user.is_verified = True
+
+    session_token = await auth_crud._create_session(
+        db, user,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return user, session_token
 
 
 # ─────────────────────────────────────────────────────────────────────────────
