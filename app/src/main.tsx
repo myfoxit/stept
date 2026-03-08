@@ -32,6 +32,7 @@ import { AuditLogPage } from "@/pages/audit-log";
 import { AnalyticsDashboardPage } from "@/pages/analytics-dashboard";
 import TrashPage from "@/pages/trash";
 import NotFoundPage from "@/pages/NotFoundPage";
+import VerifyPage from "@/pages/VerifyPage";
 
 const queryClient = new QueryClient();
 
@@ -104,6 +105,7 @@ createRoot(document.getElementById("root")!).render(
                       <Route path="/trash" element={<TrashPage />} />
                     </Route>
                     <Route path="login" element={<LoginPage />} />
+                    <Route path="verify" element={<VerifyPage />} />
                     <Route path="/join-project" element={<JoinProjectPage />} />
                     <Route
                       path="/public/workflow/:token"
