@@ -32,6 +32,7 @@ import { FileViewer } from "@/components/FileViewer";
 import { CommentPanel } from "@/components/Comments/CommentPanel";
 import { useFolderTree } from "@/hooks/api/folders";
 import { useAuth } from "@/providers/auth-provider";
+import { ContentLanguageToggle } from "@/components/ui/content-language-toggle";
 
 // Helper to find a folder name from the tree
 function findFolderName(tree: any[], folderId: string): string | null {
@@ -82,6 +83,10 @@ export default function EditorPage() {
 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
+
+  // Translation preview
+  const [contentLang, setContentLang] = useState("original");
+  const [contentTranslating, setContentTranslating] = useState(false);
 
   const [pageLayout, setPageLayout] = useState<PageLayout>("document");
   const updateLayout = useUpdateDocumentLayout(docId!);
@@ -201,6 +206,13 @@ export default function EditorPage() {
             }
           />
         )}
+
+        <ContentLanguageToggle
+          value={contentLang}
+          onChange={setContentLang}
+          loading={contentTranslating}
+          compact
+        />
 
         <ExportDialog
           onExport={handleExport}

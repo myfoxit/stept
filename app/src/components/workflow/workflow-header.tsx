@@ -18,6 +18,8 @@ interface WorkflowHeaderProps {
   iconOverride?: { type: "tabler" | "favicon"; value: string; color?: string };
   // NEW: update title callback
   onUpdateTitle?: (title: string) => void;
+  // Translation preview
+  translatedName?: string;
 }
 
 export function WorkflowHeader({
@@ -26,8 +28,9 @@ export function WorkflowHeader({
   durationLabel,
   isEditMode = false,
   onUpdateIcon,
-  iconOverride, // NEW
-  onUpdateTitle, // NEW
+  iconOverride,
+  onUpdateTitle,
+  translatedName,
 }: WorkflowHeaderProps) {
   const [showIconPicker, setShowIconPicker] = React.useState(false);
   // NEW: local draft title for inline editing
@@ -124,7 +127,7 @@ export function WorkflowHeader({
             />
           ) : (
             <h1 className="text-2xl font-bold text-slate-900 truncate">
-              {workflow.title ?? "Untitled workflow"}
+              {translatedName ?? workflow.title ?? "Untitled workflow"}
             </h1>
           )}
           <div className="flex items-center gap-4 text-sm text-slate-600">
