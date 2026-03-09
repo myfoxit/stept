@@ -90,7 +90,9 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const [imageOpacity, setImageOpacity] = useState(1);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [ttsConfig, setTtsConfig] = useState<TtsConfig | null>(null);
+  const [imgLayout, setImgLayout] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
+  const imgElRef = useRef<HTMLImageElement | null>(null);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -108,6 +110,54 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const total = steps.length;
   const stepType = step?.step_type || 'screenshot';
   const hasImage = step ? String(step.step_number) in files : false;
+
+  /* ── Compute rendered image rect within the object-contain container ── */
+
+  const computeImgLayout = useCallback(() => {
+    const img = imgElRef.current;
+    if (!img || !img.naturalWidth || !img.naturalHeight) return;
+    const container = img.parentElement;
+    if (!container) return;
+
+    const cW = img.clientWidth;   // CSS width (includes padding area used by object-fit)
+    const cH = img.clientHeight;  // CSS height
+    const nW = img.naturalWidth;
+    const nH = img.naturalHeight;
+
+    // object-fit: contain — image scales to fit within cW×cH
+    const scale = Math.min(cW / nW, cH / nH);
+    const renderedW = nW * scale;
+    const renderedH = nH * scale;
+
+    // object-position: center — offset from the CSS box
+    const offsetX = (cW - renderedW) / 2;
+    const offsetY = (cH - renderedH) / 2;
+
+    // img is inside a container with p-4 (16px padding).
+    // The img element's offset from the container starts at the padding.
+    // We position the overlay absolutely within the same container (relative),
+    // so we need offsets relative to the container:
+    const imgLeft = img.offsetLeft + offsetX;
+    const imgTop = img.offsetTop + offsetY;
+
+    setImgLayout({ left: imgLeft, top: imgTop, width: renderedW, height: renderedH });
+  }, []);
+
+  const handleImageLoad = useCallback(() => {
+    computeImgLayout();
+  }, [computeImgLayout]);
+
+  // Recompute on resize
+  useEffect(() => {
+    const onResize = () => computeImgLayout();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [computeImgLayout]);
+
+  // Reset layout on step change
+  useEffect(() => {
+    setImgLayout(null);
+  }, [currentIndex]);
 
   /* ── Fetch TTS config on mount ── */
 
@@ -443,21 +493,39 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
               willChange: 'transform',
             }}
           >
-            <div className="w-full h-full flex items-center p-4" style={{ opacity: imageOpacity, transition: 'opacity 300ms ease' }}>
-              <div className="relative w-full">
-                <img
-                  src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
-                  alt={`Step ${currentIndex + 1}`}
-                  className="w-full rounded-lg"
-                />
-                {/* Cursor overlay — positioned relative to the image */}
-                <CursorOverlay
-                  x={cursorPos.x}
-                  y={cursorPos.y}
-                  visible={cursorVisible}
-                  clicking={clicking}
-                />
-              </div>
+            {/* 
+              Use a full-size container with the image set to object-contain.
+              The cursor overlay wrapper uses identical sizing so percentage
+              positions map correctly to the visible image area.
+            */}
+            <div className="w-full h-full p-4 relative" style={{ opacity: imageOpacity, transition: 'opacity 300ms ease' }}>
+              <img
+                src={`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`}
+                alt={`Step ${currentIndex + 1}`}
+                className="w-full h-full rounded-lg"
+                style={{ objectFit: 'contain', objectPosition: 'center' }}
+                onLoad={handleImageLoad}
+                ref={imgElRef}
+              />
+              {/* Cursor overlay — positioned over the actual rendered image area */}
+              {imgLayout && (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: imgLayout.left,
+                    top: imgLayout.top,
+                    width: imgLayout.width,
+                    height: imgLayout.height,
+                  }}
+                >
+                  <CursorOverlay
+                    x={cursorPos.x}
+                    y={cursorPos.y}
+                    visible={cursorVisible}
+                    clicking={clicking}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
