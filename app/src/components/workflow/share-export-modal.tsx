@@ -329,7 +329,7 @@ export function ShareExportModal({
                   <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5 px-1">
                     <Code2 className="h-3 w-3" /> Preview
                   </div>
-                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden" style={{ height: 420 }}>
+                  <div className="rounded-md border bg-white dark:bg-slate-900 overflow-hidden" style={{ height: 600 }}>
                     <iframe
                       key={`${embedSrc}-${embedMode}`}
                       src={embedSrc}

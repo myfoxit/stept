@@ -1,7 +1,7 @@
 // src/index.tsx
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "./index.css";
 import { Layout } from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -37,6 +37,13 @@ import NotFoundPage from "@/pages/NotFoundPage";
 import VerifyPage from "@/pages/VerifyPage";
 
 const queryClient = new QueryClient();
+
+/** Hide ChatPanel on embed and public routes where it shouldn't appear */
+function ChatPanelGuard() {
+  const { pathname } = useLocation();
+  if (pathname.includes('/embed') || pathname.startsWith('/public/')) return null;
+  return <ChatPanel />;
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -128,7 +135,7 @@ createRoot(document.getElementById("root")!).render(
 
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
-                  <ChatPanel />
+                  <ChatPanelGuard />
                 </SpotlightProvider>
               </BrowserRouter>
             </ChatProvider>

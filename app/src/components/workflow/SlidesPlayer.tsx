@@ -76,7 +76,7 @@ export function SlidesPlayer({ steps, files, token, compact }: SlidesPlayerProps
 
   const containerStyle: React.CSSProperties = {
     aspectRatio: '16 / 10',
-    minHeight: compact ? 400 : 500,
+    minHeight: compact ? 280 : 500,
   };
 
   return (
