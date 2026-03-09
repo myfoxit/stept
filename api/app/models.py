@@ -666,6 +666,24 @@ class KnowledgeSource(Base):
     creator = relationship("User", backref="knowledge_sources")
 
 
+class ContentTranslation(Base):
+    """Cache for LLM-translated content."""
+    __tablename__ = "content_translations"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    content_hash = Column(String(64), nullable=False)
+    source_text = Column(Text, nullable=False)
+    target_language = Column(String(10), nullable=False)
+    translated_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('content_hash', 'target_language', name='uq_content_hash_target_lang'),
+        Index('ix_content_translations_hash_lang', 'content_hash', 'target_language'),
+    )
+
+
 class AuditAction(enum.Enum):
     VIEW = "view"
     CREATE = "create"
@@ -696,6 +714,3 @@ class AuditLog(Base):
 
     project = relationship("Project", backref="audit_logs")
     user = relationship("User", backref="audit_logs")
-
-
-

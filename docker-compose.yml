@@ -53,7 +53,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
-      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ENVIRONMENT: local
       ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:?ONDOKI_ENCRYPTION_KEY must be set}
       SENDCLOAK_ENABLED: "${SENDCLOAK_ENABLED:-false}"
       SENDCLOAK_URL: "${SENDCLOAK_URL:-http://sendcloak:9090}"

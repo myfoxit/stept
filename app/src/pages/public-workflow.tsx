@@ -7,10 +7,12 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
 import { WorkflowViewer, type ViewMode, type PublicWorkflow } from '@/components/workflow/WorkflowViewer';
+import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
 
-async function fetchPublicWorkflow(token: string): Promise<PublicWorkflow> {
+async function fetchPublicWorkflow(token: string, lang?: string): Promise<PublicWorkflow> {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}`);
+  const langParam = lang && lang !== 'original' ? `?lang=${lang}` : '';
+  const res = await fetch(`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}${langParam}`);
   if (res.status === 403) {
     throw new Error('access_denied');
   }
@@ -23,6 +25,7 @@ export function PublicWorkflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const modeParam = searchParams.get('mode');
+  const langParam = searchParams.get('lang') || 'original';
   const mode: ViewMode = (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded')
     ? modeParam
     : 'expanded';
@@ -39,9 +42,21 @@ export function PublicWorkflowPage() {
     }, { replace: true });
   };
 
-  const { data: workflow, isLoading, error } = useQuery({
-    queryKey: ['public-workflow', token],
-    queryFn: () => fetchPublicWorkflow(token!),
+  const setLang = (lang: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (lang === 'original') {
+        next.delete('lang');
+      } else {
+        next.set('lang', lang);
+      }
+      return next;
+    }, { replace: true });
+  };
+
+  const { data: workflow, isLoading, isFetching, error } = useQuery({
+    queryKey: ['public-workflow', token, langParam],
+    queryFn: () => fetchPublicWorkflow(token!, langParam !== 'original' ? langParam : undefined),
     enabled: !!token,
   });
 
@@ -89,7 +104,14 @@ export function PublicWorkflowPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
         {/* Header */}
-        <h1 className="text-3xl font-bold mb-2">{workflow.name || 'Untitled Workflow'}</h1>
+        <div className="flex items-center justify-between gap-4 mb-2">
+          <h1 className="text-3xl font-bold">{workflow.name || 'Untitled Workflow'}</h1>
+          <ContentLanguageToggle
+            value={langParam}
+            onChange={setLang}
+            loading={isFetching && langParam !== 'original'}
+          />
+        </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground mb-6">
           <span>{workflow.total_steps} steps</span>
           {workflow.estimated_time && <span>• {workflow.estimated_time}</span>}

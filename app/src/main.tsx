@@ -2,6 +2,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import './i18n'; // i18n must init before app renders
 import "./index.css";
 import { Layout } from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";

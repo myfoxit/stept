@@ -11,6 +11,7 @@ from app.models import (
     User, Project, Folder, Document, TextContainer, Session,
     ProcessRecordingSession, ProcessRecordingStep, ProcessRecordingFile,
     AuthCode, RefreshToken, AppSettings, project_members, Embedding,
+    ContentTranslation,
 )
 
 # this is the Alembic Config object, which provides

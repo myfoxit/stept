@@ -1,6 +1,7 @@
 """Public endpoints that don't require authentication."""
+import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -10,6 +11,9 @@ from app.models import ProcessRecordingSession, Document, User
 from app.middleware.rate_limit import RateLimiter
 from app.security import get_current_user_optional
 from app.services.access import can_access_resource
+from app.services.translation import SUPPORTED_LANGUAGES, translate_batch
+
+logger = logging.getLogger(__name__)
 
 # Rate limit: 60 requests per minute for public endpoints
 _public_limiter = RateLimiter(limit=60, window=60)
@@ -68,9 +72,50 @@ def _serialize_workflow(session, permission: str = "view"):
     }
 
 
+async def _translate_workflow_data(data: dict, lang: str, db: AsyncSession) -> dict:
+    """Translate translatable fields of a serialized workflow."""
+    items = []
+
+    # Workflow-level fields
+    if data.get("name"):
+        items.append({"key": "name", "text": data["name"]})
+    if data.get("summary"):
+        items.append({"key": "summary", "text": data["summary"]})
+
+    # Step fields
+    for i, step in enumerate(data.get("steps", [])):
+        for field in ("description", "content", "generated_title", "generated_description"):
+            if step.get(field):
+                items.append({"key": f"step.{i}.{field}", "text": step[field]})
+
+    if not items:
+        return data
+
+    # Batch translate
+    translated_items = await translate_batch(items, lang, db)
+
+    # Map back
+    lookup = {item["key"]: item["translated"] for item in translated_items}
+
+    if "name" in lookup:
+        data["name"] = lookup["name"]
+    if "summary" in lookup:
+        data["summary"] = lookup["summary"]
+
+    for i, step in enumerate(data.get("steps", [])):
+        for field in ("description", "content", "generated_title", "generated_description"):
+            k = f"step.{i}.{field}"
+            if k in lookup:
+                step[field] = lookup[k]
+
+    data["translated_to"] = lang
+    return data
+
+
 @router.get("/workflow/{share_token}")
 async def get_public_workflow(
     share_token: str,
+    lang: Optional[str] = Query(None, description="Target language code for translation"),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
     _rl=Depends(_public_limiter),
@@ -88,13 +133,29 @@ async def get_public_workflow(
             allowed, perm = await can_access_resource("workflow", session.id, current_user, db)
             if allowed:
                 permission = perm
-        return _serialize_workflow(session, permission)
+        data = _serialize_workflow(session, permission)
+
+        # Translate if requested
+        if lang and lang in SUPPORTED_LANGUAGES:
+            try:
+                data = await _translate_workflow_data(data, lang, db)
+            except Exception as e:
+                logger.error(f"Translation failed for workflow {share_token}: {e}")
+                # Return untranslated on failure
+
+        return data
 
     # Not public — check if authenticated user has access via ResourceShare
     if current_user:
         allowed, permission = await can_access_resource("workflow", session.id, current_user, db)
         if allowed:
-            return _serialize_workflow(session, permission)
+            data = _serialize_workflow(session, permission)
+            if lang and lang in SUPPORTED_LANGUAGES:
+                try:
+                    data = await _translate_workflow_data(data, lang, db)
+                except Exception as e:
+                    logger.error(f"Translation failed: {e}")
+            return data
 
     # Resource exists but not accessible — return 403 so frontend can show "Request Access"
     raise HTTPException(status.HTTP_403_FORBIDDEN, "access_denied")

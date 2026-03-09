@@ -200,7 +200,7 @@ export const getExportUrl = (workflowId: string, format: ExportFormat): string =
 export const exportWorkflow = async (
   workflowId: string,
   format: ExportFormat,
-  options?: { embedImages?: boolean; includeImages?: boolean }
+  options?: { embedImages?: boolean; includeImages?: boolean; lang?: string }
 ): Promise<void> => {
   const apiBaseUrl = getApiBaseUrl();
   let url = `${apiBaseUrl}/process-recording/workflow/${workflowId}/export/${format}`;
@@ -212,6 +212,9 @@ export const exportWorkflow = async (
   }
   if (options?.includeImages !== undefined) {
     params.append('include_images', options.includeImages.toString());
+  }
+  if (options?.lang && options.lang !== 'original') {
+    params.append('lang', options.lang);
   }
   if (params.toString()) {
     url += `?${params.toString()}`;

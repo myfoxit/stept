@@ -11,6 +11,7 @@ import io
 
 from app.database import get_session as get_db
 from app.models import ProcessRecordingSession, ProcessRecordingFile, ProcessRecordingStep, ProjectRole, User
+from app.services.translation import translate_batch, SUPPORTED_LANGUAGES
 from app.schemas.process_recording import (
     SessionCreate, SessionResponse, StepMetadata, 
     SessionStatusResponse, FileUploadResponse,
@@ -711,6 +712,7 @@ async def reorder_steps_endpoint(
 async def export_workflow_markdown(
     session_id: str,
     include_images: bool = Query(default=False, description="Include image URLs in markdown"),
+    lang: Optional[str] = Query(default=None, description="Translate to language code"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -760,6 +762,26 @@ async def export_workflow_markdown(
         # Use request context to build URL (simplified)
         image_base_url = "/api/v1/process-recording"
     
+    # Translate if requested
+    if lang and lang in SUPPORTED_LANGUAGES:
+        items = []
+        if workflow_dict.get("name"):
+            items.append({"key": "name", "text": workflow_dict["name"]})
+        for i, step in enumerate(steps_list):
+            for field in ("description", "content"):
+                if step.get(field):
+                    items.append({"key": f"step.{i}.{field}", "text": step[field]})
+        if items:
+            translated = await translate_batch(items, lang, db)
+            lookup = {it["key"]: it["translated"] for it in translated}
+            if "name" in lookup:
+                workflow_dict["name"] = lookup["name"]
+            for i, step in enumerate(steps_list):
+                for field in ("description", "content"):
+                    k = f"step.{i}.{field}"
+                    if k in lookup:
+                        step[field] = lookup[k]
+
     markdown = generate_markdown(
         workflow_dict,
         steps_list,
@@ -783,6 +805,7 @@ async def export_workflow_markdown(
 async def export_workflow_html(
     session_id: str,
     embed_images: bool = Query(default=True, description="Embed images as base64"),
+    lang: Optional[str] = Query(default=None, description="Translate to language code"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -825,6 +848,26 @@ async def export_workflow_html(
     
     files_dict = {f.step_number: f.file_path for f in session.files}
     
+    # Translate if requested
+    if lang and lang in SUPPORTED_LANGUAGES:
+        items = []
+        if workflow_dict.get("name"):
+            items.append({"key": "name", "text": workflow_dict["name"]})
+        for i, step in enumerate(steps_list):
+            for field in ("description", "content"):
+                if step.get(field):
+                    items.append({"key": f"step.{i}.{field}", "text": step[field]})
+        if items:
+            translated = await translate_batch(items, lang, db)
+            lookup = {it["key"]: it["translated"] for it in translated}
+            if "name" in lookup:
+                workflow_dict["name"] = lookup["name"]
+            for i, step in enumerate(steps_list):
+                for field in ("description", "content"):
+                    k = f"step.{i}.{field}"
+                    if k in lookup:
+                        step[field] = lookup[k]
+
     html = await generate_html(
         workflow_dict,
         steps_list,
@@ -848,6 +891,7 @@ async def export_workflow_html(
 @router.get("/workflow/{session_id}/export/pdf")
 async def export_workflow_pdf(
     session_id: str,
+    lang: Optional[str] = Query(default=None, description="Translate to language code"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -891,6 +935,26 @@ async def export_workflow_pdf(
     # Map step_number to file_path (filename only, stored in DB)
     files_dict = {f.step_number: f.file_path for f in session.files}
     
+    # Translate if requested
+    if lang and lang in SUPPORTED_LANGUAGES:
+        items = []
+        if workflow_dict.get("name"):
+            items.append({"key": "name", "text": workflow_dict["name"]})
+        for i, step in enumerate(steps_list):
+            for field in ("description", "content"):
+                if step.get(field):
+                    items.append({"key": f"step.{i}.{field}", "text": step[field]})
+        if items:
+            translated = await translate_batch(items, lang, db)
+            lookup = {it["key"]: it["translated"] for it in translated}
+            if "name" in lookup:
+                workflow_dict["name"] = lookup["name"]
+            for i, step in enumerate(steps_list):
+                for field in ("description", "content"):
+                    k = f"step.{i}.{field}"
+                    if k in lookup:
+                        step[field] = lookup[k]
+
     # Debug logging
     print(f"[PDF Export] Session ID: {session_id}")
     print(f"[PDF Export] Storage path: {session.storage_path}")

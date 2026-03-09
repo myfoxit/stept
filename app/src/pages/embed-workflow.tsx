@@ -7,10 +7,12 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
 import { WorkflowViewer, type ViewMode, type PublicWorkflow } from '@/components/workflow/WorkflowViewer';
+import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
 
-async function fetchPublicWorkflow(token: string): Promise<PublicWorkflow> {
+async function fetchPublicWorkflow(token: string, lang?: string): Promise<PublicWorkflow> {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}`);
+  const langParam = lang ? `?lang=${lang}` : '';
+  const res = await fetch(`${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}${langParam}`);
   if (res.status === 403) throw new Error('access_denied');
   if (!res.ok) throw new Error('not_found');
   return res.json();
@@ -22,14 +24,17 @@ export function EmbedWorkflowPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const modeParam = searchParams.get('mode');
+  const langParam = searchParams.get('lang') || '';
   const mode: ViewMode =
     (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded')
       ? modeParam
       : 'slides';
 
-  const { data: workflow, isLoading, error } = useQuery({
-    queryKey: ['public-workflow', token],
-    queryFn: () => fetchPublicWorkflow(token!),
+  const [contentLang, setContentLang] = React.useState(langParam || 'original');
+
+  const { data: workflow, isLoading, isFetching, error } = useQuery({
+    queryKey: ['public-workflow', token, contentLang],
+    queryFn: () => fetchPublicWorkflow(token!, contentLang !== 'original' ? contentLang : undefined),
     enabled: !!token,
   });
 
@@ -82,7 +87,15 @@ export function EmbedWorkflowPage() {
     <div ref={containerRef} style={styles.root}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>{workflow.name || 'Untitled Workflow'}</h1>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <h1 style={styles.title}>{workflow.name || 'Untitled Workflow'}</h1>
+          <ContentLanguageToggle
+            value={contentLang}
+            onChange={setContentLang}
+            loading={isFetching && contentLang !== 'original'}
+            compact
+          />
+        </div>
         <div style={styles.meta}>
           <span>{workflow.total_steps} steps</span>
           {workflow.estimated_time && <span> · {workflow.estimated_time}</span>}

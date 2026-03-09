@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { exportWorkflow, type ExportFormat } from '@/api/workflows';
 import { useShare } from '@/hooks/use-share';
+import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
 
 interface ShareExportModalProps {
   open: boolean;
@@ -71,6 +72,7 @@ export function ShareExportModal({
   const [embedSize, setEmbedSize] = React.useState<'small' | 'medium' | 'large'>('medium');
   const [embedMode, setEmbedMode] = React.useState<'slides' | 'movie' | 'expanded'>('slides');
   const [embedCopied, setEmbedCopied] = React.useState(false);
+  const [exportLang, setExportLang] = React.useState('original');
 
   const publicUrl = settings?.share_token
     ? `${window.location.origin}/public/workflow/${settings.share_token}`
@@ -96,6 +98,7 @@ export function ShareExportModal({
       await exportWorkflow(workflowId, format, {
         embedImages: true,
         includeImages: true,
+        lang: exportLang !== 'original' ? exportLang : undefined,
       });
     } catch (error) {
       console.error('Export failed:', error);
@@ -423,9 +426,17 @@ export function ShareExportModal({
 
           {/* ─── EXPORT TAB ─── */}
           <TabsContent value="export" className="mt-4 space-y-2">
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-3">
               View in other formats. These options do not automatically update.
             </p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-sm text-muted-foreground">Export language:</span>
+              <ContentLanguageToggle
+                value={exportLang}
+                onChange={setExportLang}
+                compact
+              />
+            </div>
 
             {exportOptions.map((option) => (
               <div
