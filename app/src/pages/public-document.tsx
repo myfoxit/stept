@@ -2,14 +2,16 @@
  * Public document viewer — read-only, no auth required.
  */
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
 import { EditorRenderer } from '@/components/Editor/Renderer';
+import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
 
-async function fetchPublicDocument(token: string) {
+async function fetchPublicDocument(token: string, lang?: string) {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl.replace('/api/v1', '')}/api/v1/public/document/${token}`);
+  const langParam = lang && lang !== 'original' ? `?lang=${lang}` : '';
+  const res = await fetch(`${baseUrl.replace('/api/v1', '')}/api/v1/public/document/${token}${langParam}`);
   if (res.status === 403) {
     throw new Error('access_denied');
   }
@@ -19,9 +21,24 @@ async function fetchPublicDocument(token: string) {
 
 export function PublicDocumentPage() {
   const { token } = useParams<{ token: string }>();
-  const { data: doc, isLoading, error } = useQuery({
-    queryKey: ['public-document', token],
-    queryFn: () => fetchPublicDocument(token!),
+  const [searchParams, setSearchParams] = useSearchParams();
+  const langParam = searchParams.get('lang') || 'original';
+
+  const setLang = (lang: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (lang === 'original') {
+        next.delete('lang');
+      } else {
+        next.set('lang', lang);
+      }
+      return next;
+    }, { replace: true });
+  };
+
+  const { data: doc, isLoading, isFetching, error } = useQuery({
+    queryKey: ['public-document', token, langParam],
+    queryFn: () => fetchPublicDocument(token!, langParam !== 'original' ? langParam : undefined),
     enabled: !!token,
   });
 
@@ -68,7 +85,14 @@ export function PublicDocumentPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold mb-8">{doc.name || 'Untitled Document'}</h1>
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <h1 className="text-3xl font-bold">{doc.name || 'Untitled Document'}</h1>
+          <ContentLanguageToggle
+            value={langParam}
+            onChange={setLang}
+            loading={isFetching && langParam !== 'original'}
+          />
+        </div>
         <EditorRenderer content={doc.content} documentShareToken={token} />
         <div className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>

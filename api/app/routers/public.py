@@ -212,6 +212,7 @@ async def get_public_workflow_image(
 @router.get("/document/{share_token}")
 async def get_public_document(
     share_token: str,
+    lang: Optional[str] = Query(None, description="Target language code for translation"),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
     _rl=Depends(_public_limiter),
@@ -238,7 +239,7 @@ async def get_public_document(
     else:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "access_denied")
 
-    return {
+    data = {
         "id": doc.id,
         "name": doc.name,
         "content": doc.content,
@@ -247,6 +248,27 @@ async def get_public_document(
         "updated_at": doc.updated_at,
         "permission": permission,
     }
+
+    # Translate if requested
+    if lang and lang in SUPPORTED_LANGUAGES:
+        try:
+            items = []
+            if data.get("name"):
+                items.append({"key": "name", "text": data["name"]})
+            if data.get("content"):
+                items.append({"key": "content", "text": data["content"]})
+            if items:
+                translated = await translate_batch(items, lang, db)
+                lookup = {it["key"]: it["translated"] for it in translated}
+                if "name" in lookup:
+                    data["name"] = lookup["name"]
+                if "content" in lookup:
+                    data["content"] = lookup["content"]
+            data["translated_to"] = lang
+        except Exception as e:
+            logger.error(f"Translation failed for document {share_token}: {e}")
+
+    return data
 
 
 @router.get("/document/{share_token}/embedded-workflow/{session_id}")
