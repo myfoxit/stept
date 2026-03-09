@@ -431,11 +431,11 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       {/* Viewport — fixed aspect ratio to prevent layout jumps */}
       <div
         className="relative bg-black rounded-lg overflow-hidden"
-        style={{ aspectRatio: '16 / 10', minHeight: compact ? 400 : 500 }}
+        style={{ aspectRatio: '16 / 10' }}
       >
         {stepType === 'screenshot' && hasImage ? (
           <div
-            className="w-full h-full flex items-center justify-center"
+            className="absolute inset-0"
             style={{
               transform: zoomTransform,
               transition: 'transform 900ms cubic-bezier(0.25, 0.1, 0.25, 1)',
