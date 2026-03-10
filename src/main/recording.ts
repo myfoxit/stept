@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import { BrowserWindow } from 'electron';
 import { ScreenshotService } from './screenshot';
-import type { BlurService } from './blur-service';
 import { ChildProcess, spawn } from 'child_process';
 import { createInterface, Interface as ReadlineInterface } from 'readline';
 import * as path from 'path';
@@ -215,9 +214,6 @@ export class RecordingService extends EventEmitter {
   private pendingElementSupplements: Map<number, NativeElementInfo | null> = new Map();
   // Track the last clicked element's role — used for secure field detection during typing
   private lastClickedElementRole = '';
-  // Optional blur service for PII redaction in screenshots
-  private blurService?: BlurService;
-
   // Native hooks process
   private hooksProcess: ChildProcess | null = null;
   private hooksRl: ReadlineInterface | null = null;
@@ -232,11 +228,6 @@ export class RecordingService extends EventEmitter {
   constructor() {
     super();
     this.screenshotService = new ScreenshotService();
-  }
-
-  /** Inject blur service for PII redaction in screenshots */
-  public setBlurService(service: BlurService): void {
-    this.blurService = service;
   }
 
   /** Set shortcut combos that should NOT be recorded as steps (e.g. "Ctrl+Shift+Space") */
@@ -807,19 +798,6 @@ export class RecordingService extends EventEmitter {
       }
       if (!nativePreCapture && preCapture) {
         nativePreCapture = preCapture;
-      }
-
-      // Apply PII blur regions to the screenshot buffer before annotation
-      if (nativePreCapture && this.blurService && this.blurService.getRegions().length > 0) {
-        try {
-          nativePreCapture = await this.blurService.applyBlurToScreenshot(
-            nativePreCapture,
-            screenshotBounds,
-            scaleFactor
-          );
-        } catch (blurErr) {
-          console.warn('Failed to apply blur to screenshot:', blurErr);
-        }
       }
 
       screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(

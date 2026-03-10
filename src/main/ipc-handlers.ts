@@ -1,4 +1,4 @@
-import { ipcMain, shell, app, screen, WebContents, BrowserWindow, Notification } from 'electron';
+import { ipcMain, shell, app, WebContents, BrowserWindow, Notification } from 'electron';
 import { AuthService } from './auth';
 import { SettingsManager } from './settings';
 import { RecordingService } from './recording';
@@ -9,7 +9,6 @@ import { ContextWatcherService } from './context-watcher';
 import { SmartAnnotationService } from './smart-annotation';
 import { AudioCaptureService } from './audio-capture';
 import { TranscriptionService } from './transcription';
-import { BlurService } from './blur-service';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -152,11 +151,6 @@ export function setupIpcHandlers(
   const smartAnnotation = new SmartAnnotationService(chatService);
   const audioCaptureService = new AudioCaptureService();
   const transcriptionService = new TranscriptionService(() => authService.getAccessToken(), settingsManager);
-  const blurService = new BlurService();
-
-  // Wire blur service into recording for screenshot processing
-  recordingService.setBlurService(blurService);
-
   // Track recorded steps for auto-upload
   let currentRecordingSteps: any[] = [];
   let currentProjectId: string = '';
@@ -169,7 +163,7 @@ export function setupIpcHandlers(
     screenshotService.dispose();
     audioCaptureService.dispose();
     transcriptionService.dispose();
-    blurService.dispose();
+
   });
 
   // Recording IPC handlers
@@ -714,66 +708,6 @@ export function setupIpcHandlers(
 
   ipcMain.handle('utility:get-version', () => app.getVersion());
   ipcMain.handle('utility:get-platform', () => process.platform);
-
-  // Blur IPC handlers
-  ipcMain.handle('blur:activate', async () => {
-    try {
-      const recState = recordingService.getState();
-      let displayBounds: { x: number; y: number; width: number; height: number };
-
-      if (recState.captureArea?.bounds) {
-        displayBounds = recState.captureArea.bounds;
-      } else {
-        const primary = screen.getPrimaryDisplay();
-        displayBounds = primary.bounds;
-      }
-
-      await blurService.activate(displayBounds);
-      return { success: true };
-    } catch (error) {
-      throw new Error(`Failed to activate blur: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  });
-
-  ipcMain.handle('blur:deactivate', async () => {
-    blurService.deactivate();
-    return { success: true };
-  });
-
-  ipcMain.handle('blur:get-state', () => {
-    return blurService.getState();
-  });
-
-  ipcMain.handle('blur:clear', async () => {
-    blurService.clearRegions();
-    return { success: true };
-  });
-
-  // Forward blur state changes to all renderer windows
-  blurService.on('state-changed', (state: { isActive: boolean; regionCount: number }) => {
-    const allWebContents = require('electron').webContents.getAllWebContents();
-    allWebContents.forEach((webContents: WebContents) => {
-      if (!webContents.isDestroyed()) webContents.send('blur:state-changed', state);
-    });
-  });
-
-  blurService.on('regions-changed', (regions: any[]) => {
-    const allWebContents = require('electron').webContents.getAllWebContents();
-    allWebContents.forEach((webContents: WebContents) => {
-      if (!webContents.isDestroyed()) webContents.send('blur:state-changed', {
-        isActive: blurService.getIsActive(),
-        regionCount: regions.length,
-      });
-    });
-  });
-
-  // Deactivate blur when recording stops
-  recordingService.on('state-changed', (state: any) => {
-    if (!state.isRecording && blurService.getIsActive()) {
-      blurService.deactivate();
-      blurService.clearRegions();
-    }
-  });
 
   // Auth event forwarding
   authService.on('status-changed', (status) => {

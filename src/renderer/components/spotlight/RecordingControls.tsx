@@ -10,9 +10,6 @@ import {
   AlertCircle,
   Mic,
   MicOff,
-  Shield,
-  ShieldOff,
-  X,
 } from 'lucide-react';
 import { formatDuration } from './helpers';
 import type { RecState } from './types';
@@ -26,10 +23,6 @@ interface RecordingControlsProps {
   uploadProgress?: { currentFile: number; totalFiles: number } | null;
   audioEnabled: boolean;
   onToggleAudio: () => void;
-  blurState?: { isActive: boolean; regionCount: number };
-  onBlurToggle?: () => void;
-  onBlurClear?: () => void;
-  isWindowMode?: boolean;
   onStartAll: () => void;
   onStartChoose: () => void;
   onStop: () => void;
@@ -45,10 +38,6 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   uploadProgress,
   audioEnabled,
   onToggleAudio,
-  blurState,
-  onBlurToggle,
-  onBlurClear,
-  isWindowMode,
   onStartAll,
   onStartChoose,
   onStop,
@@ -121,39 +110,6 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
                 </>
               )}
             </button>
-
-            {/* Blur toggle — only for full-screen/display recording */}
-            {onBlurToggle && (
-              <button
-                onClick={isWindowMode ? undefined : onBlurToggle}
-                className={`btn-rec-secondary${blurState?.isActive ? ' btn-rec-secondary--active' : ''}${isWindowMode ? ' btn-rec-secondary--disabled' : ''}`}
-                title={
-                  isWindowMode
-                    ? 'Blur is only available for full-screen recording'
-                    : blurState?.isActive
-                    ? 'Blur mode active — click to close overlay'
-                    : 'Blur sensitive areas on screen'
-                }
-                disabled={isWindowMode}
-              >
-                {blurState?.isActive ? <ShieldOff size={12} /> : <Shield size={12} />}
-                {' '}Blur
-                {blurState && blurState.regionCount > 0 && (
-                  <span className="rec-blur-count">{blurState.regionCount}</span>
-                )}
-              </button>
-            )}
-
-            {/* Clear blur regions */}
-            {onBlurClear && blurState && blurState.regionCount > 0 && !blurState.isActive && (
-              <button
-                onClick={onBlurClear}
-                className="btn-rec-secondary btn-rec-secondary--danger"
-                title="Clear all blur regions"
-              >
-                <X size={12} /> Clear
-              </button>
-            )}
 
             <button onClick={onStop} className="btn-rec-stop">
               <Square size={12} fill="currentColor" /> Stop

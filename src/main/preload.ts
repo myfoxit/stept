@@ -126,13 +126,6 @@ export interface ElectronAPI {
   testAudioDevice: (deviceId: string) => Promise<{ level: number }>;
   onAudioStateChanged: (callback: (state: { isCapturing: boolean; isPaused: boolean }) => void) => () => void;
 
-  // Blur (PII redaction)
-  blurActivate: () => Promise<void>;
-  blurDeactivate: () => Promise<void>;
-  blurGetState: () => Promise<{ isActive: boolean; regionCount: number }>;
-  blurClear: () => Promise<void>;
-  onBlurStateChanged: (callback: (state: { isActive: boolean; regionCount: number }) => void) => () => void;
-
   // Utility
   openExternal: (url: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
@@ -271,17 +264,6 @@ const electronAPI: ElectronAPI = {
     const handler = (_e: IpcRendererEvent, state: any) => callback(state);
     ipcRenderer.on('audio:state-changed', handler);
     return () => ipcRenderer.removeListener('audio:state-changed', handler);
-  },
-
-  // Blur (PII redaction)
-  blurActivate: () => ipcRenderer.invoke('blur:activate'),
-  blurDeactivate: () => ipcRenderer.invoke('blur:deactivate'),
-  blurGetState: () => ipcRenderer.invoke('blur:get-state'),
-  blurClear: () => ipcRenderer.invoke('blur:clear'),
-  onBlurStateChanged: (callback) => {
-    const handler = (_e: IpcRendererEvent, state: any) => callback(state);
-    ipcRenderer.on('blur:state-changed', handler);
-    return () => ipcRenderer.removeListener('blur:state-changed', handler);
   },
 
   // Utility
