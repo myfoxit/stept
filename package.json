@@ -15,7 +15,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "npm run build:main && npm run build:renderer",
+    "build": "npm run build:main && npm run build:renderer && cp src/renderer/audio-capture.html lib/renderer/audio-capture.html",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "webpack --mode production",
     "dev": "npm run build:main && npm run dev:renderer",
