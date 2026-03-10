@@ -1271,116 +1271,25 @@ body {
   background: rgba(58, 176, 138, 0.04);
 }
 
-/* ── View Toggle (Workflows / Guides) ── */
-.view-toggle {
-  display: flex;
-  background: #1C1917;
-  border-radius: 8px;
-  padding: 3px;
-  gap: 2px;
-  margin-bottom: 12px;
-}
-
-.view-toggle-btn {
-  flex: 1;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #78716C;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.view-toggle-btn.active {
-  background: #292524;
-  color: #FAFAF9;
-}
-
-.view-toggle-btn:hover:not(.active) {
-  color: #D6D3D1;
-}
-
-/* ── Guides List ── */
-.guides-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.guide-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-  transition: background 0.12s;
-}
-
-.guide-item:hover {
-  background: #1C1917;
-}
-
-.guide-item-icon {
+/* ── Workflow Guide Play Button ── */
+.workflow-play-btn {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  background: rgba(58, 176, 138, 0.1);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.guide-item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.guide-item-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: #FAFAF9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.guide-item-meta {
-  font-size: 11px;
-  color: #78716C;
-  margin-top: 2px;
-}
-
-.guide-play-btn {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: none;
-  border-radius: 6px;
-  background: #3AB08A;
-  color: #fff;
+  border-radius: 5px;
+  background: rgba(58, 176, 138, 0.15);
+  color: #3AB08A;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
+  margin-left: auto;
 }
 
-.guide-play-btn:hover {
-  filter: brightness(1.1);
-  transform: scale(1.05);
-}
-
-.guides-empty {
-  padding: 16px 12px;
-  text-align: center;
-  color: #78716C;
-  font-size: 12px;
+.workflow-play-btn:hover {
+  background: #3AB08A;
+  color: #fff;
+  transform: scale(1.08);
 }

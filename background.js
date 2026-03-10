@@ -1470,6 +1470,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'FETCH_WORKFLOW_GUIDE': {
+        try {
+          const API_BASE_URL = await getApiBaseUrl();
+          const resp = await authedFetch(
+            `${API_BASE_URL}/process-recording/workflow/${encodeURIComponent(message.workflowId)}/interactive-guide`,
+          );
+          if (resp.ok) {
+            sendResponse({ success: true, guide: await resp.json() });
+          } else {
+            sendResponse({ success: false, error: 'No guide found for this workflow' });
+          }
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
       case 'START_GUIDE': {
         try {
           const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
