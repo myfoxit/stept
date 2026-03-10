@@ -562,7 +562,7 @@ async function ensureContentScript(tabId) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ['redaction.js', 'content.js'],
+      files: ['vendor/rrweb-snapshot.min.js', 'redaction.js', 'content.js'],
     });
     // Small delay for script to initialize
     await new Promise((r) => setTimeout(r, 50));
@@ -1009,6 +1009,39 @@ function resetStreamingState() {
   streamingUploaded = new Set();
   streamingQueue = [];
   streamingDraining = false;
+  domSnapshotQueue = [];
+}
+
+// DOM snapshot upload queue
+let domSnapshotQueue = [];
+
+function enqueueDomSnapshotUpload(stepNumber, snapshotJson) {
+  domSnapshotQueue.push({ stepNumber, snapshotJson });
+  drainDomSnapshotQueue();
+}
+
+async function drainDomSnapshotQueue() {
+  if (domSnapshotQueue.length === 0) return;
+  const API_BASE_URL = await getApiBaseUrl();
+
+  while (domSnapshotQueue.length > 0) {
+    const { stepNumber, snapshotJson } = domSnapshotQueue.shift();
+    try {
+      const blob = new Blob([snapshotJson], { type: 'application/json' });
+      const formData = new FormData();
+      formData.append('file', blob, `step_${stepNumber}_dom.json`);
+      formData.append('stepNumber', stepNumber.toString());
+
+      await authedFetch(
+        `${API_BASE_URL}/process-recording/session/${streamingSessionId}/dom-snapshot`,
+        { method: 'POST', body: formData }
+      );
+      debugLog(`DOM snapshot uploaded for step ${stepNumber}`);
+    } catch (e) {
+      debugLog(`DOM snapshot upload failed for step ${stepNumber}:`, e.message);
+      // Non-critical — don't retry
+    }
+  }
 }
 
 // Cloud upload
@@ -1217,10 +1250,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
-      case 'CLICK_EVENT':
+      case 'CLICK_EVENT': {
+        // Extract domSnapshot before addStep (too large for step storage)
+        const domSnapshot = message.data?.domSnapshot;
+        delete message.data.domSnapshot;
         await addStep(message.data);
+        // Queue snapshot for upload alongside the screenshot
+        if (domSnapshot && streamingSessionId) {
+          enqueueDomSnapshotUpload(state.stepCounter, domSnapshot);
+        }
         sendResponse({ success: true });
         break;
+      }
 
       case 'TYPE_EVENT':
         await addStep(message.data);
