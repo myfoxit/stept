@@ -1436,6 +1436,73 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
         return; // keep channel open for async response
 
+      // ── Interactive Guides ──────────────────────────────────
+
+      case 'FETCH_GUIDES': {
+        try {
+          const API_BASE_URL = await getApiBaseUrl();
+          const resp = await authedFetch(
+            `${API_BASE_URL}/guides?project_id=${encodeURIComponent(message.projectId)}`,
+          );
+          if (resp.ok) {
+            sendResponse({ success: true, guides: await resp.json() });
+          } else {
+            sendResponse({ success: false, error: 'Failed to fetch guides' });
+          }
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'FETCH_GUIDE': {
+        try {
+          const API_BASE_URL = await getApiBaseUrl();
+          const resp = await authedFetch(`${API_BASE_URL}/guides/${message.guideId}`);
+          if (resp.ok) {
+            sendResponse({ success: true, guide: await resp.json() });
+          } else {
+            sendResponse({ success: false, error: 'Guide not found' });
+          }
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'START_GUIDE': {
+        try {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (!tab?.id) {
+            sendResponse({ success: false, error: 'No active tab' });
+            break;
+          }
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['guide-runtime.js'],
+          });
+          await new Promise((r) => setTimeout(r, 50));
+          await chrome.tabs.sendMessage(tab.id, { type: 'START_GUIDE', guide: message.guide });
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'STOP_GUIDE': {
+        try {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tab?.id) {
+            await chrome.tabs.sendMessage(tab.id, { type: 'STOP_GUIDE' }).catch(() => {});
+          }
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
       default:
         sendResponse({ error: 'Unknown message type' });
     }

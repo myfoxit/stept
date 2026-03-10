@@ -784,6 +784,90 @@ function timeAgo(date) {
   return date.toLocaleDateString();
 }
 
+// ===== INTERACTIVE GUIDES =====
+const guidesSection = document.getElementById('guidesSection');
+const guidesList = document.getElementById('guidesList');
+const viewWorkflowsBtn = document.getElementById('viewWorkflowsBtn');
+const viewGuidesBtn = document.getElementById('viewGuidesBtn');
+const recentWorkflowsSection = document.getElementById('recentWorkflows');
+const searchContainer = document.getElementById('searchContainer');
+
+viewWorkflowsBtn.addEventListener('click', () => {
+  viewWorkflowsBtn.classList.add('active');
+  viewGuidesBtn.classList.remove('active');
+  recentWorkflowsSection.classList.remove('hidden');
+  searchContainer.classList.remove('hidden');
+  guidesSection.classList.add('hidden');
+});
+
+viewGuidesBtn.addEventListener('click', () => {
+  viewGuidesBtn.classList.add('active');
+  viewWorkflowsBtn.classList.remove('active');
+  guidesSection.classList.remove('hidden');
+  recentWorkflowsSection.classList.add('hidden');
+  searchContainer.classList.add('hidden');
+  loadGuides();
+});
+
+async function loadGuides() {
+  const projectId = spProjectSelector.value;
+  if (!projectId) {
+    guidesList.innerHTML = '<div class="guides-empty">Select a project to see guides</div>';
+    return;
+  }
+
+  guidesList.innerHTML = '<div class="recent-loading">Loading...</div>';
+
+  try {
+    const result = await sendMessage({ type: 'FETCH_GUIDES', projectId });
+    if (!result.success || !result.guides?.length) {
+      guidesList.innerHTML = '<div class="guides-empty">No guides yet. Create one from a workflow.</div>';
+      return;
+    }
+
+    guidesList.innerHTML = result.guides.map((g) => `
+      <div class="guide-item" data-guide-id="${g.id}">
+        <div class="guide-item-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3AB08A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </div>
+        <div class="guide-item-info">
+          <div class="guide-item-title">${escapeHtml(g.name)}</div>
+          <div class="guide-item-meta">${g.step_count || 0} steps</div>
+        </div>
+        <button class="guide-play-btn" data-guide-id="${g.id}" title="Play guide">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </button>
+      </div>
+    `).join('');
+
+    guidesList.querySelectorAll('.guide-play-btn').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await playGuide(btn.dataset.guideId);
+      });
+    });
+  } catch (e) {
+    guidesList.innerHTML = '<div class="guides-empty">Failed to load guides</div>';
+  }
+}
+
+async function playGuide(guideId) {
+  try {
+    const result = await sendMessage({ type: 'FETCH_GUIDE', guideId });
+    if (!result.success || !result.guide) {
+      showToast('Failed to load guide');
+      return;
+    }
+    await sendMessage({ type: 'START_GUIDE', guide: result.guide });
+  } catch (e) {
+    showToast('Failed to start guide');
+  }
+}
+
 // MISS-C002: Show a temporary error toast in the side panel
 function showToast(text, duration = 4000) {
   const existing = document.querySelector('.toast-error');
