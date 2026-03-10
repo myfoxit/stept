@@ -224,6 +224,51 @@ async def upload_image(
             detail=f"Upload failed unexpectedly: {str(e)}"
         )
 
+@router.post("/session/{session_id}/dom-snapshot", status_code=status.HTTP_200_OK)
+async def upload_dom_snapshot(
+    session_id: str,
+    file: UploadFile = File(...),
+    stepNumber: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a DOM snapshot for a recording step. Stored in object storage."""
+    session = await _verify_session_access(db, session_id, current_user.id)
+
+    MAX_SNAPSHOT_SIZE = 5 * 1024 * 1024  # 5MB
+    content = await file.read()
+    if len(content) > MAX_SNAPSHOT_SIZE:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"DOM snapshot too large. Maximum size: {MAX_SNAPSHOT_SIZE // (1024*1024)}MB"
+        )
+
+    try:
+        from app.services.storage import get_storage_backend
+        backend = get_storage_backend(session.storage_type)
+        session_path = await backend.ensure_session_path(session.id)
+        filename = f"step_{stepNumber}_dom.json"
+        await backend.save_file(session_path, filename, content, "application/json")
+
+        # Update step record with dom_snapshot_key
+        stmt = select(ProcessRecordingStep).where(
+            ProcessRecordingStep.session_id == session_id,
+            ProcessRecordingStep.step_number == stepNumber,
+        )
+        result = await db.execute(stmt)
+        step = result.scalar_one_or_none()
+        if step:
+            step.dom_snapshot_key = filename
+            await db.commit()
+    except Exception as e:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"DOM snapshot upload failed: {str(e)}"
+        )
+
+    return {"status": "ok"}
+
+
 @router.post("/session/{session_id}/audio", status_code=status.HTTP_200_OK)
 async def upload_audio(
     session_id: str,

@@ -366,6 +366,9 @@ class ProcessRecordingStep(Base):
     # Spoken narration text (from desktop audio transcription)
     spoken_text = Column(Text, nullable=True)
 
+    # Storage key for DOM snapshot (rrweb-snapshot serialized tree)
+    dom_snapshot_key = Column(String, nullable=True)
+
     # AI annotation fields
     generated_title = Column(String, nullable=True)
     generated_description = Column(Text, nullable=True)
