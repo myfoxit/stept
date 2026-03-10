@@ -215,9 +215,20 @@ export class AudioCaptureService extends EventEmitter {
       },
     });
 
-    // Load a minimal HTML page that runs the MediaRecorder
-    const htmlContent = this.getAudioCaptureHtml();
-    await this.hiddenWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+    // Grant microphone permission for this window
+    this.hiddenWindow.webContents.session.setPermissionRequestHandler(
+      (_webContents, permission, callback) => {
+        if (permission === 'media') {
+          callback(true);
+        } else {
+          callback(false);
+        }
+      }
+    );
+
+    // Load a real HTML file (preload scripts don't work reliably with data: URLs)
+    const htmlPath = path.join(__dirname, '..', 'renderer', 'audio-capture.html');
+    await this.hiddenWindow.loadFile(htmlPath);
 
     this.hiddenWindow.on('closed', () => {
       this.hiddenWindow = null;
@@ -238,12 +249,5 @@ export class AudioCaptureService extends EventEmitter {
     this.hiddenWindow = null;
   }
 
-  private getAudioCaptureHtml(): string {
-    return `<!DOCTYPE html>
-<html><head><title>Audio Capture</title></head>
-<body><script>
-  // This runs in the hidden BrowserWindow with audio-capture-preload
-  // The preload script sets up IPC bridges
-</script></body></html>`;
-  }
+
 }
