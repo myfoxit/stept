@@ -48,6 +48,10 @@ let state = {
 let contextMatches = [];
 let lastContextUrl = null;
 
+// Pre-captured screenshot state — taken at pointerdown before click effects
+let pendingPreCapture = null; // { dataUrl, timestamp }
+const PRE_CAPTURE_MAX_AGE_MS = 2000; // Discard pre-captures older than 2s
+
 // Streaming upload state — images upload in background during recording
 let streamingSessionId = null;
 let streamingUploaded = new Set(); // stepNumbers already uploaded
@@ -815,11 +819,21 @@ async function addStep(stepData) {
     stepData.actionType && stepData.actionType.includes('Click');
 
   if (isClickAction) {
-    try {
-      screenshot = await captureScreenshot();
-    } catch (e) {
-      debugLog('Screenshot capture threw:', e);
-      screenshot = null;
+    // Use pre-captured screenshot (taken at pointerdown, before click effects)
+    if (pendingPreCapture && (Date.now() - pendingPreCapture.timestamp) < PRE_CAPTURE_MAX_AGE_MS) {
+      screenshot = pendingPreCapture.dataUrl;
+      pendingPreCapture = null; // Consume it
+      debugLog('Using pre-captured screenshot (taken at pointerdown)');
+    } else {
+      // Fallback: capture now (e.g. if pre-capture failed or timed out)
+      pendingPreCapture = null;
+      debugLog('Pre-capture unavailable, falling back to post-click capture');
+      try {
+        screenshot = await captureScreenshot();
+      } catch (e) {
+        debugLog('Screenshot capture threw:', e);
+        screenshot = null;
+      }
     }
     // MISS-C002: Notify sidepanel when screenshot capture fails
     if (!screenshot) {
@@ -829,6 +843,15 @@ async function addStep(stepData) {
           stepNumber: state.stepCounter,
         })
         .catch(() => {});
+    }
+  }
+
+  // Draw click marker on screenshot if we have click position and viewport size
+  if (screenshot && isClickAction && stepData.clickPosition && stepData.viewportSize) {
+    try {
+      screenshot = await drawClickMarker(screenshot, stepData.clickPosition, stepData.viewportSize);
+    } catch (e) {
+      debugLog('Click marker drawing failed:', e);
     }
   }
 
@@ -1154,6 +1177,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         resumeRecording();
         sendResponse({ success: true });
         break;
+
+      case 'PRE_CAPTURE': {
+        // Capture screenshot immediately at pointerdown, before click effects propagate
+        try {
+          const dataUrl = await captureScreenshot();
+          pendingPreCapture = dataUrl ? { dataUrl, timestamp: Date.now() } : null;
+          sendResponse({ dataUrl: dataUrl || null });
+        } catch (e) {
+          debugLog('Pre-capture failed:', e);
+          pendingPreCapture = null;
+          sendResponse({ dataUrl: null });
+        }
+        break;
+      }
 
       case 'CLICK_EVENT':
         await addStep(message.data);

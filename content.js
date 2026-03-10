@@ -688,6 +688,10 @@ function handleClick(event) {
 
   flushTypedText();
 
+  // Pre-capture screenshot immediately at pointerdown, BEFORE click effects propagate.
+  // Background stores the result and uses it when CLICK_EVENT arrives later.
+  chrome.runtime.sendMessage({ type: 'PRE_CAPTURE' }).catch(() => {});
+
   const target = event.target;
   const rect = target.getBoundingClientRect();
   const now = Date.now();
@@ -1068,6 +1072,6 @@ function generateClickDescription(elementInfo, x, y, prefix) {
     return `${prefix} "${cleanLabel(elementInfo.text)}"`;
   }
 
-  // Fallback
-  return `${prefix} on the page`;
+  // Fallback — screenshot shows where the click happened
+  return `${prefix} here`;
 }
