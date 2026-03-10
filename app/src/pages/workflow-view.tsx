@@ -100,22 +100,18 @@ export function WorkflowView() {
           if (step.content) items.push({ key: `step.${i}.content`, text: step.content });
         });
 
-        // Translate each via the translation API
+        // Translate all texts in one batch request
+        const resp = await fetch(`${baseUrl}/translation/translate-batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ items, target_language: previewLang }),
+        });
         const results: Record<string, string> = {};
-        await Promise.all(
-          items.map(async (item) => {
-            const resp = await fetch(`${baseUrl}/translation/translate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ text: item.text, target_language: previewLang }),
-            });
-            if (resp.ok) {
-              const data = await resp.json();
-              results[item.key] = data.translated;
-            }
-          })
-        );
+        if (resp.ok) {
+          const data = await resp.json();
+          Object.assign(results, data.results);
+        }
 
         if (!cancelled) {
           setTranslatedSteps(results);

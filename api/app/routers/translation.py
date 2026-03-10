@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session as get_db
 from app.middleware.rate_limit import RateLimiter
-from app.services.translation import SUPPORTED_LANGUAGES, translate_text
+from app.services.translation import SUPPORTED_LANGUAGES, translate_text, translate_batch
 
 router = APIRouter()
 
@@ -66,3 +66,39 @@ async def translate(
         language=body.target_language,
         cached=cached,
     )
+
+
+class BatchItem(BaseModel):
+    key: str
+    text: str
+
+
+class BatchTranslateRequest(BaseModel):
+    items: list[BatchItem]
+    target_language: str
+
+
+class BatchTranslateResponse(BaseModel):
+    results: dict[str, str]
+    language: str
+
+
+@router.post("/translation/translate-batch")
+async def translate_batch_endpoint(
+    body: BatchTranslateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> BatchTranslateResponse:
+    """Translate multiple texts in one request. Uses cache + batched LLM call."""
+    await _translate_limiter.check()
+
+    if body.target_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported language: {body.target_language}",
+        )
+
+    items = [{"key": item.key, "text": item.text} for item in body.items]
+    translated_items = await translate_batch(items, body.target_language, db)
+
+    results = {item["key"]: item["translated"] for item in translated_items}
+    return BatchTranslateResponse(results=results, language=body.target_language)
