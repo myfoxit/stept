@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Share2, Download } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Share2, Download, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,7 +59,7 @@ export function WorkflowView() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: workflow, isLoading } = useWorkflow(workflowId || '');
+  const { data: workflow, isLoading, error } = useWorkflow(workflowId || '');
   const { setContext } = useChat();
   const { selectedProjectId, selectedProject } = useProject();
   const { user } = useAuth();
@@ -493,6 +493,28 @@ export function WorkflowView() {
 
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-80 w-full rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error?.response?.status === 403) {
+    return (
+      <div>
+        <SiteHeader name="Workflow" />
+        <div className="container mx-auto max-w-7xl p-6 rounded-full">
+          <div className="py-12 text-center">
+            <ShieldAlert className="mx-auto mb-4 h-12 w-12 text-destructive" />
+            <h2 className="mb-2 text-2xl font-semibold">Access Denied</h2>
+            <p className="mb-4 text-muted-foreground">
+              You don&apos;t have permission to view this workflow. You may be
+              logged into a different account.
+            </p>
+            <Button onClick={() => navigate(-1)} variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Go Back
+            </Button>
           </div>
         </div>
       </div>
