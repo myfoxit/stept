@@ -489,34 +489,78 @@ async def authorize(
         
         return RedirectResponse(url=login_url, status_code=302)
     
-    # User is logged in, generate authorization code
+    # User is logged in — redirect to consent page instead of silently issuing code
+    frontend_url = settings.FRONTEND_URL
+    consent_params = {
+        "email": current_user.email,
+        "response_type": response_type,
+        "code_challenge": code_challenge,
+        "code_challenge_method": code_challenge_method,
+        "redirect_uri": redirect_uri,
+    }
+    if state:
+        consent_params["state"] = state
+
+    consent_url = f"{frontend_url}/auth/device-consent?" + urllib.parse.urlencode(consent_params)
+    return RedirectResponse(url=consent_url, status_code=302)
+
+class AuthorizeConfirmIn(BaseModel):
+    response_type: str
+    code_challenge: str
+    code_challenge_method: str
+    redirect_uri: str
+    state: Optional[str] = None
+
+
+@router.post("/authorize/confirm")
+async def authorize_confirm(
+    body: AuthorizeConfirmIn,
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm device authorization after user consent. Re-verifies session and PKCE params."""
+
+    # Re-verify session — do not trust frontend blindly
+    try:
+        current_user = await get_current_user(request, db)
+    except HTTPException:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+
+    # Validate PKCE params
+    if body.response_type != "code":
+        raise HTTPException(status_code=400, detail="unsupported_response_type")
+    if body.code_challenge_method != "S256":
+        raise HTTPException(status_code=400, detail="Only S256 is supported")
+
+    # Issue authorization code
     auth_code = _generate_auth_code()
     expires_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) + dt.timedelta(minutes=10)
-    
+
     code_obj = AuthCode(
         code=auth_code,
         user_id=current_user.id,
-        code_challenge=code_challenge,
-        code_challenge_method=code_challenge_method,
-        redirect_uri=redirect_uri,
-        expires_at=expires_at
+        code_challenge=body.code_challenge,
+        code_challenge_method=body.code_challenge_method,
+        redirect_uri=body.redirect_uri,
+        expires_at=expires_at,
     )
     db.add(code_obj)
     await db.commit()
-    
+
     # Build redirect URL with code (and state if provided)
     redirect_params = {"code": auth_code}
-    if state:
-        redirect_params["state"] = state
-    
-    redirect_url = redirect_uri
+    if body.state:
+        redirect_params["state"] = body.state
+
+    redirect_url = body.redirect_uri
     if "?" in redirect_url:
         redirect_url += "&"
     else:
         redirect_url += "?"
     redirect_url += urllib.parse.urlencode(redirect_params)
-    
-    return RedirectResponse(url=redirect_url, status_code=302)
+
+    return {"redirect_uri": redirect_url}
+
 
 # Add a device authorization info endpoint
 @router.get("/device/info")
