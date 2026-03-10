@@ -76,6 +76,8 @@ export function WorkflowView() {
   // NEW: Derive edit mode from URL
   const isEditMode = location.pathname.endsWith('/edit');
 
+  const typedWorkflow = workflow as Workflow | undefined;
+
   // Fetch translated content when language changes
   React.useEffect(() => {
     if (previewLang === 'original' || !workflowId) {
@@ -167,8 +169,6 @@ export function WorkflowView() {
     handlePanMove,
     handlePanEnd,
   } = useZoomPan();
-
-  const typedWorkflow = workflow as Workflow | undefined;
 
   // NEW: initialize iconOverride from workflow when it changes (if backend provides fields)
   React.useEffect(() => {
