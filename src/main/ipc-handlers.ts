@@ -224,6 +224,7 @@ export function setupIpcHandlers(
       await recordingService.startRecording(captureArea, projectId);
 
       // Start audio capture if enabled
+      console.log(`[Audio] audioEnabled=${currentAudioEnabled}`);
       if (currentAudioEnabled) {
         const settings = settingsManager.getSettings();
         const deviceId = settings.preferredAudioDevice || undefined;

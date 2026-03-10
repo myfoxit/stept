@@ -4,6 +4,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
+const DEBUG_LOG = path.join(os.tmpdir(), 'ondoki-audio-debug.log');
+function debugLog(msg: string): void {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(DEBUG_LOG, line); } catch {}
+  console.log('[AudioCapture]', msg);
+}
+
 export interface AudioDevice {
   deviceId: string;
   label: string;
@@ -66,19 +73,23 @@ export class AudioCaptureService extends EventEmitter {
    * Start capturing audio from the microphone.
    */
   public async startCapture(deviceId?: string): Promise<void> {
+    debugLog(`startCapture called, deviceId=${deviceId}, isCapturing=${this.isCapturing}`);
     if (this.isCapturing) {
       throw new Error('Audio capture is already in progress');
     }
 
     await fs.promises.mkdir(this.outputDir, { recursive: true });
+    debugLog(`Output dir ready: ${this.outputDir}`);
     this.audioChunks = [];
     this.startTime = Date.now();
 
     const win = await this.ensureHiddenWindow();
+    debugLog(`Hidden window ready, id=${win.id}, destroyed=${win.isDestroyed()}`);
     this.registerIpcHandlers();
 
     return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
+        debugLog('TIMEOUT: audio capture start timed out after 5s');
         reject(new Error('Timed out starting audio capture'));
       }, 5000);
 
@@ -88,6 +99,7 @@ export class AudioCaptureService extends EventEmitter {
         ipcMain.removeListener('audio-capture:error', errorHandler);
         this.isCapturing = true;
         this.isPaused = false;
+        debugLog('SUCCESS: audio capture started');
         this.emit('state-changed', { isCapturing: true, isPaused: false });
         resolve();
       };
@@ -96,12 +108,14 @@ export class AudioCaptureService extends EventEmitter {
         clearTimeout(timeout);
         ipcMain.removeListener('audio-capture:started', successHandler);
         ipcMain.removeListener('audio-capture:error', errorHandler);
+        debugLog(`ERROR from preload: ${errorMsg}`);
         reject(new Error(`Audio capture failed: ${errorMsg}`));
       };
 
       ipcMain.once('audio-capture:started', successHandler);
       ipcMain.once('audio-capture:error', errorHandler);
 
+      debugLog('Sending audio-capture:start to hidden window');
       win.webContents.send('audio-capture:start', { deviceId });
     });
   }
@@ -204,6 +218,9 @@ export class AudioCaptureService extends EventEmitter {
       return this.hiddenWindow;
     }
 
+    const preloadPath = path.join(__dirname, 'audio-capture-preload.js');
+    debugLog(`Preload path: ${preloadPath}, exists: ${fs.existsSync(preloadPath)}`);
+
     this.hiddenWindow = new BrowserWindow({
       show: false,
       width: 1,
@@ -211,7 +228,7 @@ export class AudioCaptureService extends EventEmitter {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, 'audio-capture-preload.js'),
+        preload: preloadPath,
       },
     });
 
@@ -228,7 +245,9 @@ export class AudioCaptureService extends EventEmitter {
 
     // Load a real HTML file (preload scripts don't work reliably with data: URLs)
     const htmlPath = path.join(__dirname, '..', 'renderer', 'audio-capture.html');
+    debugLog(`HTML path: ${htmlPath}, exists: ${fs.existsSync(htmlPath)}`);
     await this.hiddenWindow.loadFile(htmlPath);
+    debugLog('HTML file loaded successfully');
 
     this.hiddenWindow.on('closed', () => {
       this.hiddenWindow = null;

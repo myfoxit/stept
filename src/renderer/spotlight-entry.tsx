@@ -346,7 +346,7 @@ const SpotlightApp: React.FC = () => {
         await window.electronAPI?.setRecordingStarting?.(false);
       }
     },
-    [selectedProjectId],
+    [selectedProjectId, audioEnabled],
   );
 
   const handleStartRecording = useCallback(async () => {
