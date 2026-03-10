@@ -57,7 +57,7 @@ export class TranscriptionService extends EventEmitter {
       const formData = new FormData();
       formData.append('file', blob, 'recording.webm');
 
-      const response = await fetch(`${apiBase}/transcribe`, {
+      const response = await fetch(`${apiBase}/transcription/transcribe`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData as any,

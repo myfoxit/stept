@@ -371,6 +371,7 @@ export class CloudUploadService extends EventEmitter {
       scrollDelta: s.scrollDelta,
       generatedTitle: s.generatedTitle,
       generatedDescription: s.generatedDescription,
+      spokenText: s.spokenText || undefined,
       ownerApp: s.ownerApp || undefined,
       elementInfo: s.nativeElement || (
         (s.elementName || s.elementRole || s.elementDescription) ? {
