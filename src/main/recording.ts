@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { BrowserWindow } from 'electron';
 import { ScreenshotService } from './screenshot';
+import type { BlurService } from './blur-service';
 import { ChildProcess, spawn } from 'child_process';
 import { createInterface, Interface as ReadlineInterface } from 'readline';
 import * as path from 'path';
@@ -212,6 +213,10 @@ export class RecordingService extends EventEmitter {
   private ignoredShortcuts: Set<string> = new Set();
   // Mac: element supplement events arrive async after click, keyed by timestamp
   private pendingElementSupplements: Map<number, NativeElementInfo | null> = new Map();
+  // Track the last clicked element's role — used for secure field detection during typing
+  private lastClickedElementRole = '';
+  // Optional blur service for PII redaction in screenshots
+  private blurService?: BlurService;
 
   // Native hooks process
   private hooksProcess: ChildProcess | null = null;
@@ -227,6 +232,11 @@ export class RecordingService extends EventEmitter {
   constructor() {
     super();
     this.screenshotService = new ScreenshotService();
+  }
+
+  /** Inject blur service for PII redaction in screenshots */
+  public setBlurService(service: BlurService): void {
+    this.blurService = service;
   }
 
   /** Set shortcut combos that should NOT be recorded as steps (e.g. "Ctrl+Shift+Space") */
@@ -737,6 +747,9 @@ export class RecordingService extends EventEmitter {
     const elementRole = element?.role || '';
     const elementDescription = element?.description || element?.title || '';
 
+    // Track last clicked element role for secure field detection during typing
+    this.lastClickedElementRole = elementRole;
+
     // Screenshot — use the display where the click happened
     const captureRegion = this.getCaptureRegion();
     let screenshotBounds = captureRegion;
@@ -795,7 +808,20 @@ export class RecordingService extends EventEmitter {
       if (!nativePreCapture && preCapture) {
         nativePreCapture = preCapture;
       }
-      
+
+      // Apply PII blur regions to the screenshot buffer before annotation
+      if (nativePreCapture && this.blurService && this.blurService.getRegions().length > 0) {
+        try {
+          nativePreCapture = await this.blurService.applyBlurToScreenshot(
+            nativePreCapture,
+            screenshotBounds,
+            scaleFactor
+          );
+        } catch (blurErr) {
+          console.warn('Failed to apply blur to screenshot:', blurErr);
+        }
+      }
+
       screenshotPath = await this.screenshotService.takeAnnotatedScreenshot(
         screenshotBounds,
         screenshotRelative,
@@ -1054,7 +1080,7 @@ export class RecordingService extends EventEmitter {
         timestamp: new Date(),
         actionType: 'Type',
         windowTitle,
-        description: this.buildTypeDescription(this.currentText, windowTitle),
+        description: this.buildTypeDescription(this.currentText, windowTitle, this.lastClickedElementRole),
         textTyped: this.currentText,
         globalMousePosition: { x: 0, y: 0 },
         relativeMousePosition: { x: 0, y: 0 },
@@ -1079,14 +1105,34 @@ export class RecordingService extends EventEmitter {
   // Helpers
   // ------------------------------------------------------------------
 
+  /** Roles that are never actionable — containers, layout, structural elements (macOS + Windows) */
+  private static readonly GENERIC_CONTAINER_ROLES = new Set([
+    // macOS AX roles
+    'AXGroup', 'AXScrollArea', 'AXWebArea', 'AXWindow', 'AXApplication',
+    'AXLayoutArea', 'AXSplitGroup', 'AXSplitter', 'AXOutline',
+    'AXBrowser', 'AXSheet', 'AXDrawer', 'AXGrowArea',
+    'AXMatte', 'AXRuler', 'AXSystemWide', 'AXUnknown',
+    // Windows UIA / MSAA roles
+    'Pane', 'Window', 'Document', 'Group', 'ScrollBar',
+    'TitleBar', 'MenuBar', 'StatusBar', 'ToolBar',
+    'Custom', 'Separator', 'Thumb',
+    // Empty role
+    '',
+  ]);
+
   private formatElementName(element: NativeElementInfo | null, windowTitle?: string): string {
     if (!element) return '';
 
-    // Reject low-confidence generic elements — they'll fall through to "Click here"
+    const role = element.role || '';
+
+    // Reject low-confidence generic/container elements — but NEVER reject actionable roles
+    // Actionable elements (buttons, links, etc.) are kept even at low confidence
     if (element.confidence === 'low') {
-      const role = element.role || '';
-      const genericRoles = new Set(['AXGroup', 'AXScrollArea', 'AXWebArea', 'AXWindow', 'AXApplication', '']);
-      if (genericRoles.has(role)) return '';
+      if (RecordingService.GENERIC_CONTAINER_ROLES.has(role)
+          && !RecordingService.ACTIONABLE_ROLES.has(role)
+          && !RecordingService.FIELD_ROLES.has(role)) {
+        return '';
+      }
     }
 
     let name = element.title || element.description || (element.value && element.value.length < 50 ? element.value : '');
@@ -1095,14 +1141,19 @@ export class RecordingService extends EventEmitter {
       return '';
     }
 
-    // Strip browser suffixes from element names — Chrome tab/link AXTitle embeds
+    // Strip browser/app suffixes from element names — Chrome tab/link AXTitle embeds
     // the app name and profile: "Page Title - Google Chrome – Alexander (Alex)"
-    name = this.shortenWindowTitle(name);
+    name = this.stripBrowserCruft(name);
 
     // Reject if the element name IS (or closely matches) the window title — it's just the container
-    if (windowTitle) {
-      const stripped = this.shortenWindowTitle(windowTitle).toLowerCase();
-      if (name.toLowerCase() === stripped || name.toLowerCase() === windowTitle.toLowerCase()) return '';
+    // But NEVER reject actionable elements — they are real UI targets
+    if (windowTitle && !RecordingService.ACTIONABLE_ROLES.has(role)) {
+      const shortWin = this.shortenWindowTitle(windowTitle).toLowerCase();
+      const shortName = name.toLowerCase();
+      if (shortName === shortWin || shortName === windowTitle.toLowerCase()
+          || shortWin.includes(shortName) || shortName.includes(shortWin)) {
+        return '';
+      }
     }
 
     return name;
@@ -1113,27 +1164,19 @@ export class RecordingService extends EventEmitter {
     return role.replace(/^AX/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
   }
 
+  /** Strip ALL common browser/app patterns from a string (element titles, etc.) */
+  private stripBrowserCruft(name: string): string {
+    return name
+      // Strip " – ProfileName (DisplayName)" suffix (Chrome profiles with em-dash)
+      .replace(/\s*–\s*[^–]+$/, '')
+      // Strip browser app suffixes (en-dash, em-dash, or hyphen variants)
+      .replace(/\s*[-–—]\s*(Google Chrome|Chrome|Firefox|Mozilla Firefox|Safari|Microsoft Edge|Edge|Arc|Brave|Opera|Vivaldi|Waterfox|Chromium|Tor Browser)(\s*[-–—]\s*.*)?$/i, '')
+      .trim() || name;
+  }
+
   /** Shorten window title by stripping common browser suffixes */
   private shortenWindowTitle(title: string): string {
-    let shortened = title;
-
-    // Strip Chrome profile suffix FIRST: " – ProfileName" at end (em-dash)
-    // e.g. "Page - Google Chrome – Alexander (Alex)" → "Page - Google Chrome"
-    shortened = shortened.replace(/ – [^–]+$/, '');
-
-    // Then strip browser app suffix
-    const browserSuffixes = [
-      ' - Google Chrome', ' - Chrome', ' - Firefox', ' - Safari',
-      ' - Microsoft Edge', ' - Arc', ' - Brave', ' — Mozilla Firefox',
-      ' – Google Chrome',
-    ];
-    for (const suffix of browserSuffixes) {
-      if (shortened.endsWith(suffix)) {
-        shortened = shortened.slice(0, -suffix.length);
-        break;
-      }
-    }
-    return shortened || title;
+    return this.stripBrowserCruft(title);
   }
 
   private static readonly ACTIONABLE_ROLES = new Set([
@@ -1153,10 +1196,18 @@ export class RecordingService extends EventEmitter {
     'Edit', 'ComboBox', 'Text',
   ]);
 
-  /** Build a rich type description, truncating long text */
-  private buildTypeDescription(text: string, windowTitle: string): string {
-    const displayText = text.length > 40 ? text.slice(0, 40) + '...' : text;
+  /** Build a rich type description, truncating long text. Shows typed text unless it's a secure field. */
+  private buildTypeDescription(text: string, windowTitle: string, elementRole?: string): string {
     const shortTitle = this.shortenWindowTitle(windowTitle);
+
+    // Hide typed text for password / secure fields — these are highly sensitive
+    const isSecureField = elementRole === 'AXSecureTextField'
+      || elementRole === 'PasswordBox';
+    if (isSecureField) {
+      return `Type password in ${shortTitle}`;
+    }
+
+    const displayText = text.length > 40 ? text.slice(0, 40) + '...' : text;
     return `Type "${displayText}" in ${shortTitle}`;
   }
 
@@ -1197,9 +1248,8 @@ export class RecordingService extends EventEmitter {
       return `${verb} on ${this.humanReadableRole(elementRole)}`;
     }
 
-    // 6. Fallback: use shortened window title
-    const shortTitle = this.shortenWindowTitle(windowTitle);
-    return `${verb} in ${shortTitle}`;
+    // 6. Fallback: "Click here" — the annotated screenshot shows where
+    return `${verb} here`;
   }
 
   private isPointInCaptureArea(x: number, y: number): boolean {

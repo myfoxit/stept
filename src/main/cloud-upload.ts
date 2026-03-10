@@ -39,6 +39,7 @@ export class CloudUploadService extends EventEmitter {
   // Streaming session state
   private activeSessionId: string | null = null;
   private activeBaseUrl: string | null = null;
+  private pendingAudioPath: string | null = null;
   private uploadQueue: Array<{ stepNumber: number; filePath: string }> = [];
   private uploadedCount = 0;
   private totalEnqueued = 0;
@@ -143,6 +144,13 @@ export class CloudUploadService extends EventEmitter {
     this.emit('status-changed', 'Uploading metadata...');
     await this.uploadMetadata(baseUrl, accessToken, this.activeSessionId, steps);
 
+    // Upload audio if available
+    if (this.pendingAudioPath && fs.existsSync(this.pendingAudioPath)) {
+      this.emit('status-changed', 'Uploading audio...');
+      await this.uploadAudio(baseUrl, accessToken, this.activeSessionId, this.pendingAudioPath);
+      this.pendingAudioPath = null;
+    }
+
     // Finalize
     this.emit('status-changed', 'Finalizing...');
     const finalizeData = await this.finalizeSession(baseUrl, accessToken, this.activeSessionId);
@@ -208,9 +216,17 @@ export class CloudUploadService extends EventEmitter {
   // Internal
   // ------------------------------------------------------------------
 
+  /**
+   * Set the audio file path to be uploaded during finishUpload.
+   */
+  public setAudioPath(audioPath: string): void {
+    this.pendingAudioPath = audioPath;
+  }
+
   private resetStreamingState(): void {
     this.activeSessionId = null;
     this.activeBaseUrl = null;
+    this.pendingAudioPath = null;
     this.uploadQueue = [];
     this.uploadedCount = 0;
     this.totalEnqueued = 0;
@@ -395,6 +411,29 @@ export class CloudUploadService extends EventEmitter {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Failed to upload step ${stepNumber}: ${response.status} ${text}`);
+    }
+  }
+
+  private async uploadAudio(baseUrl: string, token: string, sessionId: string, audioPath: string): Promise<void> {
+    try {
+      const fileBuffer = fs.readFileSync(audioPath);
+      const blob = new Blob([fileBuffer], { type: 'audio/webm' });
+
+      const formData = new FormData();
+      formData.append('file', blob, 'recording.webm');
+
+      const response = await fetch(`${baseUrl}/session/${sessionId}/audio`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData as any,
+      });
+      if (!response.ok) {
+        console.warn(`[Upload] Audio upload returned ${response.status}`);
+      } else {
+        console.log('[Upload] Audio uploaded successfully');
+      }
+    } catch (e) {
+      console.warn('[Upload] Audio upload failed:', (e as Error).message);
     }
   }
 

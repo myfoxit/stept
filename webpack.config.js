@@ -74,7 +74,8 @@ module.exports = (env, argv) => {
       hot: true,
       historyApiFallback: true,
     },
-    devtool: isProduction ? 'source-map' : 'eval-source-map',
+    // Use non-eval source maps — eval-based maps are blocked by CSP (script-src 'self')
+    devtool: isProduction ? 'source-map' : 'cheap-module-source-map',
     externals: {
       electron: 'commonjs electron',
     },

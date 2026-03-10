@@ -13,7 +13,8 @@ export interface CaptureArea {
 export interface Rectangle { x: number; y: number; width: number; height: number; }
 export interface Display { id: string; name: string; bounds: Rectangle; workArea: Rectangle; isPrimary: boolean; scaleFactor: number; }
 export interface WindowInfo { handle: number; title: string; bounds: Rectangle; isVisible: boolean; processId: number; }
-export interface RecordingState { isRecording: boolean; isPaused: boolean; startTime?: Date; stepCount: number; captureArea?: CaptureArea; }
+export interface RecordingState { isRecording: boolean; isPaused: boolean; startTime?: Date; stepCount: number; captureArea?: CaptureArea; audioEnabled?: boolean; }
+export interface AudioDevice { deviceId: string; label: string; kind: string; }
 
 export interface RecordedStep {
   stepNumber: number; timestamp: Date; actionType: string; windowTitle: string;
@@ -37,6 +38,7 @@ export interface Settings {
   autoAnnotateSteps: boolean; autoGenerateGuide: boolean; frontendUrl: string;
   spotlightShortcut: string; recordingShortcut: string;
   minimizeOnRecord: boolean;
+  audioEnabled: boolean; preferredAudioDevice: string;
 }
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string; timestamp?: Date; }
@@ -44,7 +46,7 @@ export interface UploadResult { success: boolean; error?: string; url?: string; 
 
 export interface ElectronAPI {
   // Recording
-  startRecording: (captureArea: CaptureArea, projectId?: string) => Promise<void>;
+  startRecording: (captureArea: CaptureArea, projectId?: string, audioEnabled?: boolean) => Promise<void>;
   stopRecording: () => Promise<void>;
   pauseRecording: () => Promise<void>;
   resumeRecording: () => Promise<void>;
@@ -119,6 +121,18 @@ export interface ElectronAPI {
   // Recording toggle (from global shortcut)
   onToggleRecording: (callback: () => void) => () => void;
 
+  // Audio
+  getAudioDevices: () => Promise<AudioDevice[]>;
+  testAudioDevice: (deviceId: string) => Promise<{ level: number }>;
+  onAudioStateChanged: (callback: (state: { isCapturing: boolean; isPaused: boolean }) => void) => () => void;
+
+  // Blur (PII redaction)
+  blurActivate: () => Promise<void>;
+  blurDeactivate: () => Promise<void>;
+  blurGetState: () => Promise<{ isActive: boolean; regionCount: number }>;
+  blurClear: () => Promise<void>;
+  onBlurStateChanged: (callback: (state: { isActive: boolean; regionCount: number }) => void) => () => void;
+
   // Utility
   openExternal: (url: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
@@ -127,7 +141,7 @@ export interface ElectronAPI {
 
 const electronAPI: ElectronAPI = {
   // Recording
-  startRecording: (captureArea, projectId?) => ipcRenderer.invoke('recording:start', captureArea, projectId),
+  startRecording: (captureArea, projectId?, audioEnabled?) => ipcRenderer.invoke('recording:start', captureArea, projectId, audioEnabled),
   stopRecording: () => ipcRenderer.invoke('recording:stop'),
   pauseRecording: () => ipcRenderer.invoke('recording:pause'),
   resumeRecording: () => ipcRenderer.invoke('recording:resume'),
@@ -248,6 +262,26 @@ const electronAPI: ElectronAPI = {
     const handler = () => callback();
     ipcRenderer.on('toggle-recording', handler);
     return () => ipcRenderer.removeListener('toggle-recording', handler);
+  },
+
+  // Audio
+  getAudioDevices: () => ipcRenderer.invoke('audio:get-devices'),
+  testAudioDevice: (deviceId) => ipcRenderer.invoke('audio:test-device', deviceId),
+  onAudioStateChanged: (callback) => {
+    const handler = (_e: IpcRendererEvent, state: any) => callback(state);
+    ipcRenderer.on('audio:state-changed', handler);
+    return () => ipcRenderer.removeListener('audio:state-changed', handler);
+  },
+
+  // Blur (PII redaction)
+  blurActivate: () => ipcRenderer.invoke('blur:activate'),
+  blurDeactivate: () => ipcRenderer.invoke('blur:deactivate'),
+  blurGetState: () => ipcRenderer.invoke('blur:get-state'),
+  blurClear: () => ipcRenderer.invoke('blur:clear'),
+  onBlurStateChanged: (callback) => {
+    const handler = (_e: IpcRendererEvent, state: any) => callback(state);
+    ipcRenderer.on('blur:state-changed', handler);
+    return () => ipcRenderer.removeListener('blur:state-changed', handler);
   },
 
   // Utility

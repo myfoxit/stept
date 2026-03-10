@@ -1,4 +1,4 @@
-import { ipcMain, shell, app, WebContents, BrowserWindow, Notification } from 'electron';
+import { ipcMain, shell, app, screen, WebContents, BrowserWindow, Notification } from 'electron';
 import { AuthService } from './auth';
 import { SettingsManager } from './settings';
 import { RecordingService } from './recording';
@@ -7,6 +7,9 @@ import { ChatService } from './chat';
 import { CloudUploadService } from './cloud-upload';
 import { ContextWatcherService } from './context-watcher';
 import { SmartAnnotationService } from './smart-annotation';
+import { AudioCaptureService } from './audio-capture';
+import { TranscriptionService } from './transcription';
+import { BlurService } from './blur-service';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -69,6 +72,7 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   'llmProvider', 'llmApiKey', 'llmModel', 'llmBaseUrl',
   'autoAnnotateSteps', 'autoGenerateGuide', 'frontendUrl',
   'spotlightShortcut', 'recordingShortcut', 'minimizeOnRecord',
+  'audioEnabled', 'preferredAudioDevice',
 ]);
 
 function validateSettingsUpdate(settings: unknown): void {
@@ -92,6 +96,8 @@ function validateSettingsUpdate(settings: unknown): void {
   if (s.spotlightShortcut !== undefined) assertString(s.spotlightShortcut, 'spotlightShortcut');
   if (s.recordingShortcut !== undefined) assertString(s.recordingShortcut, 'recordingShortcut');
   if (s.minimizeOnRecord !== undefined) assertBoolean(s.minimizeOnRecord, 'minimizeOnRecord');
+  if (s.audioEnabled !== undefined) assertBoolean(s.audioEnabled, 'audioEnabled');
+  if (s.preferredAudioDevice !== undefined) assertString(s.preferredAudioDevice, 'preferredAudioDevice');
 }
 
 /** Validate a chat message array */
@@ -144,19 +150,30 @@ export function setupIpcHandlers(
   const cloudUploadService = new CloudUploadService(() => authService.getAccessToken(), settingsManager);
   const contextWatcher = new ContextWatcherService();
   const smartAnnotation = new SmartAnnotationService(chatService);
+  const audioCaptureService = new AudioCaptureService();
+  const transcriptionService = new TranscriptionService(() => authService.getAccessToken(), settingsManager);
+  const blurService = new BlurService();
+
+  // Wire blur service into recording for screenshot processing
+  recordingService.setBlurService(blurService);
 
   // Track recorded steps for auto-upload
   let currentRecordingSteps: any[] = [];
   let currentProjectId: string = '';
   let currentUserId: string = '';
+  let currentAudioEnabled = false;
+  let currentRecordingStartTime = 0;
 
   app.on('before-quit', () => {
     recordingService.dispose();
     screenshotService.dispose();
+    audioCaptureService.dispose();
+    transcriptionService.dispose();
+    blurService.dispose();
   });
 
   // Recording IPC handlers
-  ipcMain.handle('recording:start', async (event, captureArea, projectId) => {
+  ipcMain.handle('recording:start', async (event, captureArea, projectId, audioEnabled) => {
     try {
       validateCaptureArea(captureArea);
       assertOptionalString(projectId, 'projectId');
@@ -166,6 +183,8 @@ export function setupIpcHandlers(
 
       currentRecordingSteps = [];
       currentProjectId = projectId || '';
+      currentAudioEnabled = !!audioEnabled;
+      currentRecordingStartTime = Date.now();
 
       // Configure ignored shortcuts so they don't create steps
       const settings = settingsManager.getSettings();
@@ -209,6 +228,21 @@ export function setupIpcHandlers(
       });
 
       await recordingService.startRecording(captureArea, projectId);
+
+      // Start audio capture if enabled
+      if (currentAudioEnabled) {
+        const settings = settingsManager.getSettings();
+        const deviceId = settings.preferredAudioDevice || undefined;
+        audioCaptureService.startCapture(deviceId).then(() => {
+          console.log('[Audio] Capture started');
+          event.sender.send('audio:state-changed', { isCapturing: true, isPaused: false });
+        }).catch((err) => {
+          console.warn('[Audio] Failed to start capture:', err.message);
+          currentAudioEnabled = false;
+          event.sender.send('audio:state-changed', { isCapturing: false, isPaused: false });
+        });
+      }
+
       app.emit('recording-started');
       return { success: true };
     } catch (error) {
@@ -218,11 +252,46 @@ export function setupIpcHandlers(
 
   ipcMain.handle('recording:stop', async (event) => {
     try {
+      // Stop audio capture first (in parallel with recording stop)
+      let audioResultPromise: Promise<any> = Promise.resolve(null);
+      if (currentAudioEnabled && audioCaptureService.getIsCapturing()) {
+        audioResultPromise = audioCaptureService.stopCapture();
+        event.sender.send('audio:state-changed', { isCapturing: false, isPaused: false });
+      }
+
       await recordingService.stopRecording();
       app.emit('recording-stopped');
 
       if (currentRecordingSteps.length > 0 && currentProjectId) {
         event.sender.send('upload:started');
+
+        // Wait for audio to finalize
+        const audioResult = await audioResultPromise;
+        let transcriptText: string | undefined;
+
+        // Transcribe audio if available
+        if (audioResult?.filePath) {
+          try {
+            const transcription = await transcriptionService.transcribe(audioResult.filePath);
+            if (transcription && transcription.segments.length > 0) {
+              // Align transcript segments to steps
+              const aligned = transcriptionService.alignToSteps(
+                transcription.segments,
+                currentRecordingSteps,
+                currentRecordingStartTime
+              );
+              // Attach per-step transcript text
+              for (const [stepNumber, text] of aligned) {
+                const step = currentRecordingSteps.find(s => s.stepNumber === stepNumber);
+                if (step) step.spokenText = text;
+              }
+              transcriptText = transcription.fullText;
+              console.log(`[Audio] Transcription complete: ${transcription.segments.length} segments`);
+            }
+          } catch (e) {
+            console.warn('[Audio] Transcription failed, continuing without:', e);
+          }
+        }
 
         // Batch-annotate the full workflow (10s timeout) — runs in parallel with drain
         let workflowTitle: string | undefined;
@@ -252,7 +321,7 @@ export function setupIpcHandlers(
 
         if (aiAvailable && projectAiEnabled) {
           try {
-            const annotationPromise = smartAnnotation.annotateWorkflow(currentRecordingSteps);
+            const annotationPromise = smartAnnotation.annotateWorkflow(currentRecordingSteps, transcriptText);
             const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000));
             const annotation = await Promise.race([annotationPromise, timeoutPromise]);
 
@@ -276,6 +345,11 @@ export function setupIpcHandlers(
         }
 
         try {
+          // Set audio path for upload if available
+          if (audioResult?.filePath) {
+            cloudUploadService.setAudioPath(audioResult.filePath);
+          }
+
           // finishUpload waits for in-flight images, then sends metadata + finalizes
           const result = await cloudUploadService.finishUpload(
             currentRecordingSteps,
@@ -318,18 +392,26 @@ export function setupIpcHandlers(
     }
   });
 
-  ipcMain.handle('recording:pause', async () => {
+  ipcMain.handle('recording:pause', async (event) => {
     try {
       recordingService.pauseRecording();
+      if (currentAudioEnabled && audioCaptureService.getIsCapturing()) {
+        audioCaptureService.pauseCapture();
+        event.sender.send('audio:state-changed', { isCapturing: true, isPaused: true });
+      }
       return { success: true };
     } catch (error) {
       throw new Error(`Failed to pause recording: ${error instanceof Error ? error.message : String(error)}`);
     }
   });
 
-  ipcMain.handle('recording:resume', async () => {
+  ipcMain.handle('recording:resume', async (event) => {
     try {
       recordingService.resumeRecording();
+      if (currentAudioEnabled && audioCaptureService.getIsCapturing()) {
+        audioCaptureService.resumeCapture();
+        event.sender.send('audio:state-changed', { isCapturing: true, isPaused: false });
+      }
       return { success: true };
     } catch (error) {
       throw new Error(`Failed to resume recording: ${error instanceof Error ? error.message : String(error)}`);
@@ -601,6 +683,22 @@ export function setupIpcHandlers(
 
   // Removed unexposed IPC channel: spotlight:open
 
+  // Audio IPC handlers
+  ipcMain.handle('audio:get-devices', async () => {
+    try {
+      return await audioCaptureService.getDevices();
+    } catch (error) {
+      console.warn('[Audio] Failed to get devices:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('audio:test-device', async (_event, deviceId) => {
+    assertString(deviceId, 'deviceId');
+    // Return a basic level indicator — actual level monitoring would need AudioContext
+    return { level: 0.5 };
+  });
+
   // Utility IPC handlers
   ipcMain.handle('utility:open-external', async (event, url) => {
     try {
@@ -616,6 +714,66 @@ export function setupIpcHandlers(
 
   ipcMain.handle('utility:get-version', () => app.getVersion());
   ipcMain.handle('utility:get-platform', () => process.platform);
+
+  // Blur IPC handlers
+  ipcMain.handle('blur:activate', async () => {
+    try {
+      const recState = recordingService.getState();
+      let displayBounds: { x: number; y: number; width: number; height: number };
+
+      if (recState.captureArea?.bounds) {
+        displayBounds = recState.captureArea.bounds;
+      } else {
+        const primary = screen.getPrimaryDisplay();
+        displayBounds = primary.bounds;
+      }
+
+      await blurService.activate(displayBounds);
+      return { success: true };
+    } catch (error) {
+      throw new Error(`Failed to activate blur: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+
+  ipcMain.handle('blur:deactivate', async () => {
+    blurService.deactivate();
+    return { success: true };
+  });
+
+  ipcMain.handle('blur:get-state', () => {
+    return blurService.getState();
+  });
+
+  ipcMain.handle('blur:clear', async () => {
+    blurService.clearRegions();
+    return { success: true };
+  });
+
+  // Forward blur state changes to all renderer windows
+  blurService.on('state-changed', (state: { isActive: boolean; regionCount: number }) => {
+    const allWebContents = require('electron').webContents.getAllWebContents();
+    allWebContents.forEach((webContents: WebContents) => {
+      if (!webContents.isDestroyed()) webContents.send('blur:state-changed', state);
+    });
+  });
+
+  blurService.on('regions-changed', (regions: any[]) => {
+    const allWebContents = require('electron').webContents.getAllWebContents();
+    allWebContents.forEach((webContents: WebContents) => {
+      if (!webContents.isDestroyed()) webContents.send('blur:state-changed', {
+        isActive: blurService.getIsActive(),
+        regionCount: regions.length,
+      });
+    });
+  });
+
+  // Deactivate blur when recording stops
+  recordingService.on('state-changed', (state: any) => {
+    if (!state.isRecording && blurService.getIsActive()) {
+      blurService.deactivate();
+      blurService.clearRegions();
+    }
+  });
 
   // Auth event forwarding
   authService.on('status-changed', (status) => {

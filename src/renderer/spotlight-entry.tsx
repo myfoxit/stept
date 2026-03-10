@@ -58,6 +58,12 @@ const SpotlightApp: React.FC = () => {
   >([]);
   const [captureLoading, setCaptureLoading] = useState(false);
 
+  // Audio
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
+  // Blur
+  const [blurState, setBlurState] = useState<{ isActive: boolean; regionCount: number }>({ isActive: false, regionCount: 0 });
+
   // Upload toast
   const [uploadStatus, setUploadStatus] = useState<
     'idle' | 'uploading' | 'success' | 'error'
@@ -195,6 +201,16 @@ const SpotlightApp: React.FC = () => {
       document.dispatchEvent(new CustomEvent('ondoki-toggle-recording'));
     });
 
+    // Blur state changes
+    const unsubBlur = api.onBlurStateChanged?.((state: any) => {
+      setBlurState(state);
+    });
+
+    // Get initial blur state
+    api.blurGetState?.().then((state: any) => {
+      if (state) setBlurState(state);
+    });
+
     return () => {
       unsubAuth?.();
       unsubShow?.();
@@ -208,6 +224,7 @@ const SpotlightApp: React.FC = () => {
       unsubUpErr?.();
       unsubUpProgress?.();
       unsubToggleRec?.();
+      unsubBlur?.();
     };
   }, []);
 
@@ -330,6 +347,7 @@ const SpotlightApp: React.FC = () => {
         await window.electronAPI?.startRecording(
           captureArea as any,
           selectedProjectId,
+          audioEnabled,
         );
         setRec({ isRecording: true, isPaused: false, stepCount: 0 });
         setDuration(0);
@@ -388,6 +406,26 @@ const SpotlightApp: React.FC = () => {
       console.error('Failed to toggle pause:', e);
     }
   }, [rec.isPaused]);
+
+  const handleBlurToggle = useCallback(async () => {
+    try {
+      if (blurState.isActive) {
+        await window.electronAPI?.blurDeactivate();
+      } else {
+        await window.electronAPI?.blurActivate();
+      }
+    } catch (e) {
+      console.error('Failed to toggle blur:', e);
+    }
+  }, [blurState.isActive]);
+
+  const handleBlurClear = useCallback(async () => {
+    try {
+      await window.electronAPI?.blurClear();
+    } catch (e) {
+      console.error('Failed to clear blur:', e);
+    }
+  }, []);
 
   const sendAiMessage = useCallback(async () => {
     const text = query.trim();
@@ -514,6 +552,11 @@ const SpotlightApp: React.FC = () => {
               uploadStatus={uploadStatus}
               uploadError={uploadError}
               uploadProgress={uploadProgress}
+              audioEnabled={audioEnabled}
+              onToggleAudio={() => setAudioEnabled((prev) => !prev)}
+              blurState={blurState}
+              onBlurToggle={handleBlurToggle}
+              onBlurClear={handleBlurClear}
               onStartAll={() => doStartRecording({ type: 'all-displays' })}
               onStartChoose={handleStartRecording}
               onStop={handleStopRecording}

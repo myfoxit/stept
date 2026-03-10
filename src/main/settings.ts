@@ -18,6 +18,8 @@ export interface Settings {
   spotlightShortcut: string;
   recordingShortcut: string;
   minimizeOnRecord: boolean;
+  audioEnabled: boolean;
+  preferredAudioDevice: string;
 }
 
 export interface WindowState {
@@ -48,6 +50,8 @@ const defaultSettings: Settings = {
   spotlightShortcut: 'Ctrl+Shift+Space',
   recordingShortcut: 'Ctrl+Shift+R',
   minimizeOnRecord: true,
+  audioEnabled: false,
+  preferredAudioDevice: '',
 };
 
 const defaultWindowState: WindowState = { width: 1200, height: 800, isMaximized: false };

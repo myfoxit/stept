@@ -454,6 +454,40 @@
     color: #ccc;
     cursor: not-allowed;
   }
+  .btn-mic-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-mic-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-mic-toggle--active {
+    border-color: var(--accent);
+    background: rgba(62, 175, 138, 0.08);
+    color: var(--accent);
+  }
+  .rec-audio-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    color: var(--accent);
+    animation: pulse-mic 1.5s infinite;
+  }
+  @keyframes pulse-mic {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
   .rec-active-card {
     padding: 12px 14px;
     border-radius: var(--radius-md);
@@ -526,6 +560,33 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
+  }
+  .btn-rec-secondary--active {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: rgb(109, 62, 216);
+  }
+  .btn-rec-secondary--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-rec-secondary--danger {
+    color: var(--recording);
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+  .rec-blur-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: rgba(139, 92, 246, 0.18);
+    color: rgb(109, 62, 216);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 4px;
+    margin-left: 2px;
   }
   .btn-rec-stop {
     padding: 7px 18px;
