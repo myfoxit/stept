@@ -928,6 +928,11 @@ function flushTypedText() {
     });
 
   typedText = '';
+
+  // Sync focusedFieldValue so handleFocusOut doesn't duplicate this step
+  if (activeElement && isInputLike(activeElement)) {
+    focusedFieldValue = activeElement.value || '';
+  }
 }
 
 // ===== ELEMENT IDENTIFICATION =====
