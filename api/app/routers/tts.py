@@ -1,7 +1,11 @@
-"""TTS (Text-to-Speech) endpoints — public, rate-limited."""
+"""TTS (Text-to-Speech) endpoints — public, rate-limited.
+
+Audio is cached persistently using the configured storage backend (S3, local, etc.)
+so rebuilding the Docker container doesn't lose cached audio.
+"""
 
 import hashlib
-from pathlib import Path
+import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,13 +14,14 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.middleware.rate_limit import RateLimiter
+from app.services.storage import get_storage_backend
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _tts_rate_limiter = RateLimiter(limit=30, window=60)
 
-TTS_CACHE_DIR = Path("/tmp/tts_cache")
-TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+TTS_STORAGE_PREFIX = "tts_cache"
 
 
 class SpeakRequest(BaseModel):
@@ -27,6 +32,25 @@ class SpeakRequest(BaseModel):
 
 def _cache_key(text: str, voice: str) -> str:
     return hashlib.sha256(f"{text}|{voice}".encode()).hexdigest()
+
+
+async def _read_cached(key: str) -> bytes | None:
+    """Try to read cached TTS audio from persistent storage."""
+    backend = get_storage_backend(prefix_override=TTS_STORAGE_PREFIX)
+    try:
+        data = await backend.read_file(TTS_STORAGE_PREFIX, f"{key}.mp3")
+        return data
+    except Exception:
+        return None
+
+
+async def _write_cached(key: str, audio_bytes: bytes) -> None:
+    """Write TTS audio to persistent storage."""
+    backend = get_storage_backend(prefix_override=TTS_STORAGE_PREFIX)
+    try:
+        await backend.save_file(TTS_STORAGE_PREFIX, f"{key}.mp3", audio_bytes, "audio/mpeg")
+    except Exception:
+        logger.warning("Failed to cache TTS audio to storage", exc_info=True)
 
 
 async def _generate_tts(text: str, voice: str) -> bytes:
@@ -65,12 +89,11 @@ async def tts_speak(body: SpeakRequest, _rl=Depends(_tts_rate_limiter)):
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
 
-    # Check cache
+    # Check persistent cache (S3 / local storage)
     key = _cache_key(text, voice)
-    cache_path = TTS_CACHE_DIR / f"{key}.mp3"
-
-    if cache_path.exists():
-        return Response(content=cache_path.read_bytes(), media_type="audio/mpeg")
+    cached = await _read_cached(key)
+    if cached:
+        return Response(content=cached, media_type="audio/mpeg")
 
     try:
         audio_bytes = await _generate_tts(text, voice)
@@ -79,7 +102,7 @@ async def tts_speak(body: SpeakRequest, _rl=Depends(_tts_rate_limiter)):
     except httpx.RequestError:
         raise HTTPException(status_code=502, detail="Failed to reach OpenAI TTS service")
 
-    # Cache the result
-    cache_path.write_bytes(audio_bytes)
+    # Cache persistently
+    await _write_cached(key, audio_bytes)
 
     return Response(content=audio_bytes, media_type="audio/mpeg")
