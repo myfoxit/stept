@@ -224,6 +224,59 @@ async def upload_image(
             detail=f"Upload failed unexpectedly: {str(e)}"
         )
 
+@router.post("/session/{session_id}/audio", status_code=status.HTTP_200_OK)
+async def upload_audio(
+    session_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload an audio recording file for a session"""
+    await _verify_session_access(db, session_id, current_user.id)
+
+    ALLOWED_AUDIO_MIME = {
+        "audio/webm", "audio/wav", "audio/mpeg", "audio/mp3",
+        "audio/ogg", "audio/mp4", "audio/x-wav", "video/webm",
+    }
+    MAX_AUDIO_SIZE = 25 * 1024 * 1024  # 25MB
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_AUDIO_MIME:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unsupported audio type: {content_type}. Allowed: {', '.join(ALLOWED_AUDIO_MIME)}"
+        )
+
+    try:
+        file_content = await file.read()
+        if len(file_content) > MAX_AUDIO_SIZE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Audio file too large. Maximum size: {MAX_AUDIO_SIZE // (1024*1024)}MB"
+            )
+
+        session = await db.get(ProcessRecordingSession, session_id)
+        if not session:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+        from app.services.storage import get_storage_backend
+        backend = get_storage_backend(session.storage_type)
+
+        filename = file.filename or "recording.webm"
+        stored_path = await backend.save_file(
+            session.storage_path, filename, file_content, content_type
+        )
+
+        return {"success": True, "filename": filename, "file_path": stored_path}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Audio upload failed for session %s", session_id)
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Audio upload failed: {str(e)}"
+        )
+
 @router.post("/session/{session_id}/finalize", status_code=status.HTTP_200_OK)
 async def finalize_upload_session(
     session_id: str,

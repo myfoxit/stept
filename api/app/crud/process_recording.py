@@ -130,6 +130,7 @@ async def upload_metadata(
             url=meta.url,
             owner_app=meta.owner_app,
             element_info=meta.element_info,
+            spoken_text=meta.spoken_text,
             generated_title=meta.generated_title if ai_enabled else None,
             generated_description=meta.generated_description if ai_enabled else None,
             is_annotated=bool(meta.generated_title) if ai_enabled else False,
@@ -171,6 +172,7 @@ async def upload_metadata(
             "url": meta.url,
             "owner_app": meta.owner_app,
             "element_info": meta.element_info,
+            "spoken_text": meta.spoken_text,
         })
 
     backend = get_storage_backend(session.storage_type)

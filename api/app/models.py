@@ -363,6 +363,9 @@ class ProcessRecordingStep(Base):
     #           testId, elementRect}
     # Future clients can add arbitrary keys — schema is intentionally open
     
+    # Spoken narration text (from desktop audio transcription)
+    spoken_text = Column(Text, nullable=True)
+
     # AI annotation fields
     generated_title = Column(String, nullable=True)
     generated_description = Column(Text, nullable=True)

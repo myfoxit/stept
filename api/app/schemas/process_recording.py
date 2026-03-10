@@ -59,6 +59,9 @@ class StepMetadata(BaseModel):
     owner_app: Optional[str] = Field(None, alias="ownerApp")
     element_info: Optional[dict] = Field(None, alias="elementInfo")
     
+    # Spoken narration text (from desktop audio transcription)
+    spoken_text: Optional[str] = Field(None, alias="spokenText")
+
     # AI-generated fields from desktop app
     generated_title: Optional[str] = Field(None, alias="generatedTitle")
     generated_description: Optional[str] = Field(None, alias="generatedDescription")
