@@ -6,6 +6,7 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  Loader2,
 } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/apiClient';
 import { CursorOverlay } from './CursorOverlay';
@@ -67,6 +68,87 @@ function getStepText(step: PublicStep): string {
   return step.description || step.generated_description || step.generated_title || step.content || step.window_title || '';
 }
 
+/** Fetch a single TTS blob with retry logic (up to 2 retries on failure). */
+async function fetchTtsBlob(
+  url: string,
+  text: string,
+  signal: AbortSignal,
+): Promise<Blob> {
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal,
+      });
+      if (!r.ok) throw new Error(`TTS ${r.status}`);
+      return await r.blob();
+    } catch (err) {
+      if (signal.aborted) throw err;
+      if (attempt === maxRetries) throw err;
+      // Wait 1-2 seconds before retrying
+      await new Promise((resolve) => setTimeout(resolve, 1000 + attempt * 1000));
+    }
+  }
+  throw new Error('unreachable');
+}
+
+/**
+ * Preload all TTS audio blobs with concurrency limit and spacing.
+ * Returns a Map<stepIndex, Blob>.
+ */
+async function preloadAllTts(
+  baseUrl: string,
+  steps: PublicStep[],
+  signal: AbortSignal,
+): Promise<Map<number, Blob>> {
+  const url = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
+  const cache = new Map<number, Blob>();
+
+  // Collect steps that need TTS
+  const tasks: { idx: number; text: string }[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const text = getStepText(steps[i]);
+    if (text && isEnglish(text)) {
+      tasks.push({ idx: i, text });
+    }
+  }
+
+  if (tasks.length === 0) return cache;
+
+  // Process with concurrency limit of 3, 200ms spacing between starts
+  const concurrency = 3;
+  let running = 0;
+  let taskIdx = 0;
+
+  await new Promise<void>((resolve, reject) => {
+    function startNext() {
+      if (signal.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+      if (taskIdx >= tasks.length && running === 0) { resolve(); return; }
+
+      while (running < concurrency && taskIdx < tasks.length) {
+        const task = tasks[taskIdx++];
+        running++;
+
+        // Stagger starts by 200ms per task
+        const delay = (taskIdx - 1) * 200;
+        setTimeout(() => {
+          if (signal.aborted) { running--; startNext(); return; }
+          fetchTtsBlob(url, task.text, signal)
+            .then((blob) => { cache.set(task.idx, blob); })
+            .catch(() => { /* preload failure is not fatal — step will fall back */ })
+            .finally(() => { running--; startNext(); });
+        }, delay);
+      }
+    }
+    startNext();
+  });
+
+  return cache;
+}
+
 /* ── Component ── */
 
 interface TtsConfig {
@@ -78,7 +160,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const baseUrl = getApiBaseUrl();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [animState, setAnimState] = useState<AnimState>('idle');
@@ -91,6 +173,8 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [ttsConfig, setTtsConfig] = useState<TtsConfig | null>(null);
   const [imgLayout, setImgLayout] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const [ttsPreloading, setTtsPreloading] = useState(false);
+  const [ttsReady, setTtsReady] = useState(false);
 
   const imgElRef = useRef<HTMLImageElement | null>(null);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -100,6 +184,9 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const speedRef = useRef(speed);
   const mutedRef = useRef(muted);
   const currentIndexRef = useRef(currentIndex);
+  const ttsCacheRef = useRef<Map<number, Blob>>(new Map());
+  const preloadAbortRef = useRef<AbortController | null>(null);
+  const pendingPlayRef = useRef(false);
 
   playingRef.current = playing;
   speedRef.current = speed;
@@ -169,6 +256,44 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       .catch(() => setTtsConfig({ provider: 'browser', available: false }));
   }, [baseUrl]);
 
+  /* ── Preload TTS audio when config is ready ── */
+
+  const startPreload = useCallback(() => {
+    if (!ttsConfig || ttsConfig.provider !== 'openai' || !ttsConfig.available) {
+      setTtsReady(true);
+      return;
+    }
+
+    // Already preloaded or in progress
+    if (ttsReady || ttsPreloading) return;
+
+    setTtsPreloading(true);
+    const controller = new AbortController();
+    preloadAbortRef.current = controller;
+
+    preloadAllTts(baseUrl, steps, controller.signal)
+      .then((cache) => {
+        ttsCacheRef.current = cache;
+        setTtsReady(true);
+      })
+      .catch(() => {
+        // If aborted, don't update state
+        if (!controller.signal.aborted) {
+          setTtsReady(true); // proceed anyway — will fall back per-step
+        }
+      })
+      .finally(() => {
+        setTtsPreloading(false);
+      });
+  }, [baseUrl, steps, ttsConfig, ttsReady, ttsPreloading]);
+
+  // Start preloading as soon as ttsConfig arrives
+  useEffect(() => {
+    if (ttsConfig) {
+      startPreload();
+    }
+  }, [ttsConfig, startPreload]);
+
   /* ── Cleanup ── */
 
   const clearAllTimeouts = useCallback(() => {
@@ -183,6 +308,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     utteranceRef.current = null;
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       audioRef.current = null;
     }
   }, []);
@@ -191,41 +317,41 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     return () => {
       clearAllTimeouts();
       cancelSpeech();
+      // Cancel any in-flight preload requests
+      preloadAbortRef.current?.abort();
+      // Revoke any cached object URLs (blobs don't need revoking, only objectURLs do)
     };
   }, [clearAllTimeouts, cancelSpeech]);
 
   /* ── TTS ── */
 
-  const speakOpenAI = useCallback((text: string, onEnd: () => void) => {
-    const url = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error('TTS failed');
-        return r.blob();
-      })
-      .then((blob) => {
-        const objectUrl = URL.createObjectURL(blob);
-        const audio = new Audio(objectUrl);
-        audio.playbackRate = speedRef.current;
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(objectUrl);
-          audioRef.current = null;
-          onEnd();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(objectUrl);
-          audioRef.current = null;
-          onEnd();
-        };
-        audio.play().catch(() => onEnd());
-      })
-      .catch(() => onEnd());
-  }, [baseUrl]);
+  const speakFromCache = useCallback((stepIdx: number, text: string, onEnd: () => void) => {
+    const blob = ttsCacheRef.current.get(stepIdx);
+    if (!blob) {
+      // Preload failed for this step — fall back to browser TTS
+      onEnd();
+      return;
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    const audio = new Audio(objectUrl);
+    audio.playbackRate = speedRef.current;
+    audioRef.current = audio;
+    audio.onended = () => {
+      URL.revokeObjectURL(objectUrl);
+      audioRef.current = null;
+      onEnd();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      audioRef.current = null;
+      onEnd();
+    };
+    audio.play().catch(() => {
+      URL.revokeObjectURL(objectUrl);
+      audioRef.current = null;
+      onEnd();
+    });
+  }, []);
 
   const speakBrowser = useCallback((text: string, onEnd: () => void) => {
     if (typeof speechSynthesis === 'undefined') {
@@ -253,20 +379,21 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     speechSynthesis.speak(utterance);
   }, [cancelSpeech]);
 
-  const speak = useCallback((text: string, onEnd: () => void) => {
+  const speak = useCallback((stepIdx: number, text: string, onEnd: () => void) => {
     if (mutedRef.current || !isEnglish(text)) {
       onEnd();
       return;
     }
 
+    // Cancel any currently playing audio before starting new
     cancelSpeech();
 
     if (ttsConfig?.provider === 'openai' && ttsConfig.available) {
-      speakOpenAI(text, onEnd);
+      speakFromCache(stepIdx, text, onEnd);
     } else {
       speakBrowser(text, onEnd);
     }
-  }, [cancelSpeech, ttsConfig, speakOpenAI, speakBrowser]);
+  }, [cancelSpeech, ttsConfig, speakFromCache, speakBrowser]);
 
   /* ── Schedule with timeout ── */
 
@@ -347,7 +474,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       setShowTooltip(true);
 
       if (text) {
-        speak(text, () => {
+        speak(idx, text, () => {
           if (!playingRef.current) return;
           // Phase 5: Wait — let the user absorb
           setAnimState('waiting');
@@ -414,8 +541,15 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
 
   /* ── Play/Pause ── */
 
+  // When user presses play but TTS isn't ready yet, defer playback
   useEffect(() => {
+    if (playing && !ttsReady && ttsConfig?.provider === 'openai' && ttsConfig.available) {
+      pendingPlayRef.current = true;
+      return;
+    }
+
     if (playing) {
+      pendingPlayRef.current = false;
       clearAllTimeouts();
       cancelSpeech();
       // Small delay to let state settle
@@ -424,11 +558,25 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       }, 100);
       timeoutsRef.current.push(id);
     } else {
+      pendingPlayRef.current = false;
       clearAllTimeouts();
       cancelSpeech();
       setAnimState('idle');
     }
-  }, [playing, clearAllTimeouts, cancelSpeech, runStepAnimation]);
+  }, [playing, ttsReady, ttsConfig, clearAllTimeouts, cancelSpeech, runStepAnimation]);
+
+  // When preload finishes and a play was pending, start playback
+  useEffect(() => {
+    if (ttsReady && pendingPlayRef.current && playingRef.current) {
+      pendingPlayRef.current = false;
+      clearAllTimeouts();
+      cancelSpeech();
+      const id = setTimeout(() => {
+        runStepAnimation(currentIndexRef.current);
+      }, 100);
+      timeoutsRef.current.push(id);
+    }
+  }, [ttsReady, clearAllTimeouts, cancelSpeech, runStepAnimation]);
 
   /* ── Manual nav ── */
 
@@ -476,6 +624,9 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   const clickPos = getClickPercent(step);
   const progress = total > 1 ? (currentIndex / (total - 1)) * 100 : 100;
 
+  // Show preloading state
+  const showPreloadingOverlay = ttsPreloading && !ttsReady && playing;
+
   return (
     <div className="flex flex-col">
       {/* Viewport — fixed aspect ratio to prevent layout jumps */}
@@ -483,6 +634,16 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
         className="relative bg-black rounded-lg overflow-hidden"
         style={{ aspectRatio: '16 / 10' }}
       >
+        {/* Preloading overlay */}
+        {showPreloadingOverlay && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70">
+            <div className="flex items-center gap-3 text-white text-sm">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Preparing audio…</span>
+            </div>
+          </div>
+        )}
+
         {stepType === 'screenshot' && hasImage ? (
           <div
             className="absolute inset-0"
@@ -493,7 +654,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
               willChange: 'transform',
             }}
           >
-            {/* 
+            {/*
               Use a full-size container with the image set to object-contain.
               The cursor overlay wrapper uses identical sizing so percentage
               positions map correctly to the visible image area.
