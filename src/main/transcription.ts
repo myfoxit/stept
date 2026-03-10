@@ -92,6 +92,20 @@ export class TranscriptionService extends EventEmitter {
    * Align transcription segments to recording steps by timestamp.
    * Each step gets the transcript text that overlaps its time window.
    */
+  /**
+   * Align transcription segments to recording steps.
+   * 
+   * Logic: each step gets the speech that was spoken in the window
+   * BEFORE that step's click (i.e., between the previous click and this click).
+   * 
+   * Step 1: gets all speech from recording start → step 1 click time
+   * Step 2: gets all speech from step 1 click → step 2 click time
+   * Step N: gets all speech from step N-1 click → step N click time
+   * Last step also gets any trailing speech (up to 30s after)
+   * 
+   * Segments are assigned based on their midpoint falling within the window,
+   * so each segment is assigned to exactly one step.
+   */
   public alignToSteps(
     segments: TranscriptionSegment[],
     steps: any[],
@@ -101,22 +115,28 @@ export class TranscriptionService extends EventEmitter {
 
     if (!segments.length || !steps.length) return alignedMap;
 
+    // Calculate click times relative to recording start (in seconds)
+    const clickTimes = steps.map(s =>
+      (new Date(s.timestamp).getTime() - recordingStartTime) / 1000
+    );
+
     for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      const stepTime = (new Date(step.timestamp).getTime() - recordingStartTime) / 1000;
-      const nextStepTime = i < steps.length - 1
-        ? (new Date(steps[i + 1].timestamp).getTime() - recordingStartTime) / 1000
-        : stepTime + 30; // last step: capture up to 30s after
+      // Window: from previous click (or recording start) to this click
+      const windowStart = i === 0 ? 0 : clickTimes[i - 1];
+      const windowEnd = i === steps.length - 1
+        ? clickTimes[i] + 30  // last step: also capture trailing speech
+        : clickTimes[i];
 
-      // Find segments that overlap this step's time window
-      const overlapping = segments.filter(seg =>
-        seg.end > stepTime && seg.start < nextStepTime
-      );
+      // Assign segments whose midpoint falls within this window
+      const matched = segments.filter(seg => {
+        const midpoint = (seg.start + seg.end) / 2;
+        return midpoint >= windowStart && midpoint < windowEnd;
+      });
 
-      if (overlapping.length > 0) {
-        const text = overlapping.map(s => s.text).join(' ').trim();
+      if (matched.length > 0) {
+        const text = matched.map(s => s.text).join(' ').trim();
         if (text) {
-          alignedMap.set(step.stepNumber, text);
+          alignedMap.set(steps[i].stepNumber, text);
         }
       }
     }
