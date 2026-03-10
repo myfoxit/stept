@@ -50,6 +50,7 @@ let lastContextUrl = null;
 
 // Pre-captured screenshot state — taken at pointerdown before click effects
 let pendingPreCapture = null; // { dataUrl, timestamp }
+let preCapturePromise = null; // In-flight pre-capture Promise (so CLICK_EVENT can await it)
 const PRE_CAPTURE_MAX_AGE_MS = 2000; // Discard pre-captures older than 2s
 
 // Streaming upload state — images upload in background during recording
@@ -819,6 +820,13 @@ async function addStep(stepData) {
     stepData.actionType && stepData.actionType.includes('Click');
 
   if (isClickAction) {
+    // Wait for in-flight pre-capture if one is pending (race condition safety)
+    if (preCapturePromise) {
+      debugLog('Waiting for in-flight pre-capture to complete...');
+      await preCapturePromise;
+      preCapturePromise = null;
+    }
+
     // Use pre-captured screenshot (taken at pointerdown, before click effects)
     if (pendingPreCapture && (Date.now() - pendingPreCapture.timestamp) < PRE_CAPTURE_MAX_AGE_MS) {
       screenshot = pendingPreCapture.dataUrl;
@@ -1179,16 +1187,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
 
       case 'PRE_CAPTURE': {
-        // Capture screenshot immediately at pointerdown, before click effects propagate
-        try {
-          const dataUrl = await captureScreenshot();
-          pendingPreCapture = dataUrl ? { dataUrl, timestamp: Date.now() } : null;
+        // Capture screenshot immediately at pointerdown, before click effects propagate.
+        // Uses captureScreenshotRaw() directly — no dock hide/show round-trip for speed.
+        // Stores a Promise so CLICK_EVENT can await it if it arrives before capture completes.
+        preCapturePromise = (async () => {
+          try {
+            // Temporarily hide dock inline (sync CSS, no message round-trip)
+            if (sender.tab?.id) {
+              chrome.tabs.sendMessage(sender.tab.id, { type: 'HIDE_DOCK_TEMP' }).catch(() => {});
+            }
+            const dataUrl = await captureScreenshotRaw();
+            if (sender.tab?.id) {
+              chrome.tabs.sendMessage(sender.tab.id, { type: 'SHOW_DOCK_TEMP' }).catch(() => {});
+            }
+            if (dataUrl) {
+              pendingPreCapture = { dataUrl, timestamp: Date.now() };
+            }
+            return dataUrl;
+          } catch (e) {
+            debugLog('Pre-capture failed:', e);
+            pendingPreCapture = null;
+            return null;
+          }
+        })();
+        preCapturePromise.then((dataUrl) => {
           sendResponse({ dataUrl: dataUrl || null });
-        } catch (e) {
-          debugLog('Pre-capture failed:', e);
-          pendingPreCapture = null;
-          sendResponse({ dataUrl: null });
-        }
+          preCapturePromise = null;
+        });
         break;
       }
 
