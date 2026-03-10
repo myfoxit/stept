@@ -797,9 +797,31 @@ function isInputLike(el) {
     (el.isContentEditable && tag !== 'body');
 }
 
+function captureDomSnapshot() {
+  try {
+    if (typeof rrwebSnapshot === 'undefined' || !rrwebSnapshot.snapshot) return null;
+    const snap = rrwebSnapshot.snapshot(document, {
+      blockClass: 'ondoki-exclude',
+      maskTextClass: 'ondoki-mask',
+      inlineStylesheet: false,
+      recordCanvas: false,
+    });
+    return snap ? JSON.stringify(snap) : null;
+  } catch (e) {
+    debugLog('DOM snapshot failed:', e);
+    return null;
+  }
+}
+
 function sendClickStep(stepData) {
+  // Capture DOM snapshot for click events (non-blocking, best-effort)
+  const domSnapshot = captureDomSnapshot();
+  const messageData = domSnapshot
+    ? Object.assign({}, stepData, { domSnapshot: domSnapshot })
+    : stepData;
+
   chrome.runtime
-    .sendMessage({ type: 'CLICK_EVENT', data: stepData })
+    .sendMessage({ type: 'CLICK_EVENT', data: messageData })
     .catch((err) => {
       debugLog('Failed to send click event', err);
     });
@@ -961,6 +983,17 @@ function gatherElementInfo(target) {
       width: target.getBoundingClientRect().width,
       height: target.getBoundingClientRect().height,
     },
+    // Enhanced element capture fields
+    selector: generateStableSelector(target),
+    xpath: generateXPath(target),
+    dataId: target.getAttribute('data-id') || null,
+    dataRole: target.getAttribute('data-role') || null,
+    ariaDescription: target.getAttribute('aria-description') || null,
+    ariaLabelledby: target.getAttribute('aria-labelledby') || null,
+    parentChain: getParentChain(target, 3),
+    siblingText: getSiblingText(target),
+    isInIframe: window !== window.top,
+    iframeSrc: window !== window.top ? window.location.href : null,
   };
 }
 
@@ -1079,4 +1112,139 @@ function generateClickDescription(elementInfo, x, y, prefix) {
 
   // Fallback — screenshot shows where the click happened
   return `${prefix} here`;
+}
+
+// ===== ENHANCED ELEMENT CAPTURE HELPERS =====
+
+function generateStableSelector(el) {
+  try {
+    // Try #id first (skip if id contains digits — likely auto-generated)
+    if (el.id && !/\d/.test(el.id)) {
+      const sel = `#${CSS.escape(el.id)}`;
+      if (document.querySelectorAll(sel).length === 1) return sel;
+    }
+
+    const tag = el.tagName.toLowerCase();
+
+    // Try tag[stable-attr="value"] for common stable attributes
+    const stableAttrs = [
+      'data-testid', 'data-test', 'data-cy', 'data-id',
+      'aria-label', 'name', 'placeholder', 'title', 'alt', 'role',
+    ];
+    for (const attr of stableAttrs) {
+      const val = el.getAttribute(attr);
+      if (val) {
+        const sel = `${tag}[${attr}="${CSS.escape(val)}"]`;
+        if (document.querySelectorAll(sel).length === 1) return sel;
+      }
+    }
+
+    // Try compound: tag[attr1][attr2]...
+    const attrParts = stableAttrs
+      .map(attr => {
+        const val = el.getAttribute(attr);
+        return val ? `[${attr}="${CSS.escape(val)}"]` : null;
+      })
+      .filter(Boolean);
+    if (attrParts.length >= 2) {
+      const sel = tag + attrParts.join('');
+      if (document.querySelectorAll(sel).length === 1) return sel;
+    }
+
+    // Fallback: nth-of-type path from nearest ancestor with stable id
+    const parts = [];
+    let current = el;
+    while (current && current !== document.documentElement) {
+      const ctag = current.tagName.toLowerCase();
+      if (current.id && !/\d/.test(current.id)) {
+        parts.unshift(`#${CSS.escape(current.id)}`);
+        break;
+      }
+      const parent = current.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter(c => c.tagName === current.tagName);
+        const idx = siblings.indexOf(current) + 1;
+        parts.unshift(siblings.length > 1 ? `${ctag}:nth-of-type(${idx})` : ctag);
+      } else {
+        parts.unshift(ctag);
+      }
+      current = parent;
+    }
+    const sel = parts.join(' > ');
+    if (sel && document.querySelectorAll(sel).length === 1) return sel;
+
+    return sel || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function generateXPath(el) {
+  try {
+    const parts = [];
+    let current = el;
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+      const tag = current.tagName.toLowerCase();
+      const parent = current.parentNode;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter(c => c.tagName === current.tagName);
+        const idx = siblings.indexOf(current) + 1;
+        parts.unshift(`${tag}[${idx}]`);
+      } else {
+        parts.unshift(tag);
+      }
+      current = parent;
+    }
+    return '/' + parts.join('/');
+  } catch (e) {
+    return null;
+  }
+}
+
+function getParentChain(el, depth) {
+  try {
+    const chain = [];
+    let current = el.parentElement;
+    let level = 0;
+    while (current && level < depth && current !== document.documentElement) {
+      const info = {
+        tag: current.tagName.toLowerCase(),
+        id: current.id || null,
+        role: current.getAttribute('role') || null,
+        ariaLabel: current.getAttribute('aria-label') || null,
+        testId: current.getAttribute('data-testid') || current.getAttribute('data-test') || null,
+        className: typeof current.className === 'string'
+          ? current.className.split(/\s+/).slice(0, 3).join(' ') || null
+          : null,
+      };
+      // Only include ancestors with at least one identifying attribute
+      if (info.id || info.role || info.ariaLabel || info.testId) {
+        chain.push(info);
+      }
+      current = current.parentElement;
+      level++;
+    }
+    return chain.length > 0 ? chain : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getSiblingText(el) {
+  try {
+    const parent = el.parentElement;
+    if (!parent) return null;
+    const texts = [];
+    for (const child of parent.children) {
+      if (child === el) continue;
+      const text = (child.textContent || '').trim();
+      if (text.length > 0 && text.length <= 50) {
+        texts.push(text.substring(0, 50));
+        if (texts.length >= 3) break;
+      }
+    }
+    return texts.length > 0 ? texts : null;
+  } catch (e) {
+    return null;
+  }
 }
