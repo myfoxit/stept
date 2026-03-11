@@ -50,65 +50,21 @@ class VideoProcessor:
         )
         return float(result.stdout.strip())
 
-    def _detect_scenes(self) -> list[float]:
-        """Return timestamps for frame extraction using interval sampling + scene detection.
-
-        For screen recordings, pure scene detection often fails (UI changes are subtle).
-        Instead: sample at regular intervals, then supplement with scene-change timestamps
-        to capture transitions the interval might miss.
-        """
+    def _get_frame_timestamps(self) -> list[float]:
+        """Sample frames at even intervals across the full video duration."""
         duration = self._run_ffprobe_duration()
+        if duration <= 0:
+            return [0.0]
 
-        # Calculate interval to get ~max_frames samples across the video
-        # Skip first 5% and last 2% to avoid intros/outros
-        start_time = min(duration * 0.05, 5.0)  # skip at most 5s of intro
-        end_time = duration * 0.98
-        usable = end_time - start_time
-
-        if usable <= 0:
-            return [0.5]
-
-        interval = max(usable / self.max_frames, 2.0)  # at least 2s apart
+        # Even intervals across entire video
+        interval = max(duration / self.max_frames, 1.0)
         timestamps = []
-        t = start_time
-        while t < end_time and len(timestamps) < self.max_frames:
+        t = 0.0
+        while t < duration and len(timestamps) < self.max_frames:
             timestamps.append(round(t, 2))
             t += interval
 
-        # Also try scene detection to catch major transitions
-        try:
-            result = subprocess.run(
-                [
-                    "ffmpeg", "-i", self.video_path,
-                    "-vf", f"select='gt(scene,{self.scene_threshold})',showinfo",
-                    "-vsync", "vfr",
-                    "-f", "null", "-",
-                ],
-                capture_output=True, text=True, timeout=600,
-            )
-            scene_times = []
-            for line in result.stderr.splitlines():
-                m = re.search(r"pts_time:([\d.]+)", line)
-                if m:
-                    st = float(m.group(1))
-                    if start_time <= st <= end_time:
-                        scene_times.append(st)
-
-            # Merge scene timestamps that aren't too close to existing ones
-            for st in scene_times:
-                if all(abs(st - existing) > interval * 0.5 for existing in timestamps):
-                    timestamps.append(round(st, 2))
-        except Exception:
-            logger.warning("Scene detection failed, using interval sampling only")
-
-        timestamps.sort()
-
-        # Final cap
-        if len(timestamps) > self.max_frames:
-            step = len(timestamps) / self.max_frames
-            timestamps = [timestamps[int(i * step)] for i in range(self.max_frames)]
-
-        logger.info("Frame extraction: %d timestamps over %.1fs video (interval=%.1fs)",
+        logger.info("Frame extraction: %d frames over %.1fs video (every %.1fs)",
                      len(timestamps), duration, interval)
         return timestamps
 
@@ -268,7 +224,7 @@ class VideoProcessor:
         transcript = await self._transcribe_audio(audio_path)
         await self._progress("extracting_frames", 40)
 
-        timestamps = self._detect_scenes()
+        timestamps = self._get_frame_timestamps()
         frame_paths = self._extract_frames(timestamps, workdir)
         await self._progress("analyzing", 60)
 
