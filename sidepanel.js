@@ -955,8 +955,12 @@ async function renderGuideSteps(guide, currentIndex, stepStatus) {
 async function _loadStepImage(container, step, index) {
   if (!step.screenshot_url) {
     console.log(`[Guide] Step ${index}: no screenshot_url`);
+    container.innerHTML = '<div style="padding:8px;color:#9AA0A6;font-size:11px;">No screenshot</div>';
     return;
   }
+
+  // Show loading state
+  container.innerHTML = '<div style="padding:8px;color:#9AA0A6;font-size:11px;">Loading image…</div>';
 
   // Check cache
   let dataUrl = _guideImageCache[step.screenshot_url];
@@ -964,17 +968,28 @@ async function _loadStepImage(container, step, index) {
     try {
       console.log(`[Guide] Step ${index}: fetching image from ${step.screenshot_url}`);
       const result = await sendMessage({ type: 'API_FETCH_BLOB', url: step.screenshot_url });
-      console.log(`[Guide] Step ${index}: fetch result:`, result ? (result.dataUrl ? `OK (${result.dataUrl.length} chars)` : result.error || 'no dataUrl') : 'null');
-      if (result && result.dataUrl) {
+      const hasData = result && result.dataUrl;
+      const errMsg = result ? (result.error || 'no dataUrl in response') : 'null response';
+      console.log(`[Guide] Step ${index}: fetch result:`, hasData ? `OK (${result.dataUrl.length} chars)` : errMsg);
+      if (hasData) {
         dataUrl = result.dataUrl;
         _guideImageCache[step.screenshot_url] = dataUrl;
+      } else {
+        container.innerHTML = `<div style="padding:8px;color:#EA4335;font-size:11px;">Image failed: ${errMsg}</div>`;
+        return;
       }
     } catch (e) {
       console.error(`[Guide] Step ${index}: image fetch error:`, e);
+      container.innerHTML = `<div style="padding:8px;color:#EA4335;font-size:11px;">Error: ${e.message}</div>`;
       return;
     }
   }
-  if (!dataUrl) return;
+
+  // Check if container is still in DOM (race condition guard)
+  if (!container.isConnected) {
+    console.warn(`[Guide] Step ${index}: container detached from DOM, skipping render`);
+    return;
+  }
 
   // Build click marker if we have position data
   let clickMarkerHtml = '';
@@ -995,6 +1010,7 @@ async function _loadStepImage(container, step, index) {
     ${clickMarkerHtml}
   `;
   container.style.minHeight = '';
+  console.log(`[Guide] Step ${index}: image rendered, container connected: ${container.isConnected}`);
 }
 
 function hideGuideSteps() {
