@@ -1295,29 +1295,83 @@ body {
 }
 
 /* Guide Steps Panel */
-.guide-steps-panel { padding: 0 12px; }
-.guide-steps-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; font-size: 13px; font-weight: 600; color: #1C1917; }
+/* Guide Steps Panel — Tango-style vertical stepper */
+.guide-steps-panel { padding: 0 16px; }
+.guide-steps-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0 4px 0;
+}
+.guide-steps-header .guide-exit-btn {
+  background: none; border: none; cursor: pointer; color: #3C4043;
+  font-size: 13px; font-weight: 400; padding: 4px 0; display: flex; align-items: center; gap: 4px;
+}
+.guide-steps-header .guide-exit-btn:hover { color: #1C1917; }
 .guide-steps-close { background: none; border: none; cursor: pointer; color: #78716C; padding: 4px; border-radius: 4px; display: flex; align-items: center; }
 .guide-steps-close:hover { color: #1C1917; background: #F5F5F4; }
-.guide-steps-list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 160px); overflow-y: auto; padding-bottom: 8px; }
+.guide-steps-title {
+  font-size: 17px; font-weight: 700; color: #202124; padding: 8px 0 12px 0; line-height: 1.3;
+}
+.guide-steps-list {
+  display: flex; flex-direction: column; gap: 0;
+  max-height: calc(100vh - 200px); overflow-y: auto; padding-bottom: 8px;
+}
 
-/* Guide step cards — reuse step-card class, add active/completed states */
-.guide-step-card {
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+/* Vertical stepper: each step item */
+.guide-stepper-item {
+  display: flex; gap: 12px; position: relative; cursor: pointer;
+  padding: 0 0 0 0; min-height: 36px;
 }
-.guide-step-card:hover { border-color: #D6D3D1; }
-.guide-step-card.active {
-  border-color: #3AB08A !important;
-  box-shadow: 0 0 0 2px rgba(58, 176, 138, 0.2);
+.guide-stepper-item:last-child .guide-stepper-line { display: none; }
+
+/* Left column: circle + connector line */
+.guide-stepper-left {
+  display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 24px;
 }
-.guide-step-card.completed { opacity: 0.5; }
-.guide-step-card.completed:hover { opacity: 0.7; }
-.guide-step-card .step-number {
-  min-width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
+.guide-stepper-circle {
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 11px; font-weight: 600; transition: all 0.2s;
 }
-.guide-step-card.active .step-number { background: #3AB08A; color: white; }
+.guide-stepper-circle.future { background: #E0E0E0; color: #9AA0A6; }
+.guide-stepper-circle.active { background: #3AB08A; color: white; }
+.guide-stepper-circle.completed { background: #34A853; color: white; }
+.guide-stepper-circle.roadblock { background: #EA4335; color: white; }
+.guide-stepper-line {
+  width: 2px; flex: 1; background: #DADCE0; min-height: 12px;
+}
+
+/* Right column: step content */
+.guide-stepper-content {
+  flex: 1; padding-bottom: 16px; min-width: 0;
+}
+.guide-stepper-instruction {
+  font-size: 13px; color: #202124; font-weight: 500; line-height: 1.4; padding-top: 2px;
+  word-break: break-word;
+}
+.guide-stepper-item.future .guide-stepper-instruction { color: #9AA0A6; }
+.guide-stepper-item.completed .guide-stepper-instruction { color: #5F6368; }
+
+/* Expanded step detail (screenshot + actions) for active/roadblock steps */
+.guide-stepper-detail {
+  margin-top: 8px;
+}
+.guide-stepper-roadblock-msg {
+  font-size: 12px; color: #3C4043; line-height: 1.5; margin-bottom: 8px;
+}
+.guide-stepper-screenshot {
+  position: relative; border-radius: 6px; overflow: hidden;
+  border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 8px;
+  background: #FAFAF9;
+}
+.guide-stepper-screenshot img {
+  width: 100%; display: block; border-radius: 5px;
+}
+.guide-stepper-mark-complete {
+  background: none; border: 1px solid #D93025; color: #D93025; border-radius: 16px;
+  padding: 5px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s;
+  font-family: inherit;
+}
+.guide-stepper-mark-complete:hover { background: #FEF2F2; }
 
 .guide-stop-btn { width: 100%; margin-top: 12px; padding: 8px; border: 1px solid #E7E5E4; border-radius: 8px; background: white; color: #DC2626; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; font-family: inherit; }
 .guide-stop-btn:hover { background: #FEF2F2; border-color: #FECACA; }

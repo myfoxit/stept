@@ -531,6 +531,21 @@
       color: #A8A29E;
       margin-bottom: 14px;
     }
+
+    .guide-roadblock-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .guide-roadblock-step-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #D6D3D1;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: #292524;
+      border-radius: 6px;
+    }
   `;
 
   // ── Guide Runner ──────────────────────────────────────────────────
@@ -623,6 +638,20 @@
       this._clearOverlay();
 
       const step = this.steps[index];
+      const actionType = (step.action_type || '').toLowerCase();
+
+      // Hover steps can't be guided — treat as roadblock
+      const isHoverStep = actionType.includes('hover') || actionType.includes('mouseover');
+      if (isHoverStep) {
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: index,
+          totalSteps: this.steps.length,
+          stepStatus: 'roadblock',
+        }).catch(() => {});
+        this._renderRoadblock(step);
+        return;
+      }
 
       // Check URL mismatch
       let urlMismatch = false;
@@ -646,17 +675,28 @@
 
       this.currentResult = result;
 
+      // Determine step status for sidepanel
+      let stepStatus = 'active';
+      if (!result) stepStatus = 'notfound';
+
       // Notify background of step change
       chrome.runtime.sendMessage({
         type: 'GUIDE_STEP_CHANGED',
         currentIndex: index,
         totalSteps: this.steps.length,
+        stepStatus,
       }).catch(() => {});
 
       if (result) {
         // Feature 8: Check if element needs intermediate action (hidden ancestor)
         const intermediateAncestor = needsIntermediateAction(result.element);
         if (intermediateAncestor) {
+          chrome.runtime.sendMessage({
+            type: 'GUIDE_STEP_CHANGED',
+            currentIndex: index,
+            totalSteps: this.steps.length,
+            stepStatus: 'intermediate',
+          }).catch(() => {});
           this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
           return;
         }
@@ -976,6 +1016,68 @@
             }
             break;
           }
+        }
+      });
+
+      this._notFoundPanel = panel;
+      this.shadow.appendChild(panel);
+    }
+
+    _renderRoadblock(step) {
+      const idx = this.currentIndex;
+      const total = this.steps.length;
+
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow.appendChild(this._backdrop);
+      }
+      this._overlay.style.clipPath = "none";
+
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+
+      panel.innerHTML = `
+        <div class="guide-roadblock-icon">⚠</div>
+        <div class="guide-not-found-title">We hit a roadblock</div>
+        <div class="guide-not-found-desc">
+          This step involves a hover action that can't be automated.
+          Try performing the action on the screen to move forward.
+        </div>
+        <div class="guide-roadblock-step-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
+        <div class="guide-tooltip-progress">
+          Step ${idx + 1} of ${total}
+        </div>
+        <div class="guide-tooltip-actions" style="justify-content: center;">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          <button class="guide-btn guide-btn-done" data-action="done">&#10003; Mark as complete</button>
+        </div>
+      `;
+
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        panel.addEventListener(evt, (e) => e.stopPropagation());
+      }
+
+      panel.addEventListener("click", (e) => {
+        const action = e.target.closest("[data-action]")?.dataset.action;
+        if (!action) return;
+        switch (action) {
+          case "back":
+            this.showStep(this.currentIndex - 1);
+            break;
+          case "skip":
+          case "done":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
         }
       });
 

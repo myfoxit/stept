@@ -1702,6 +1702,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'GUIDE_STEP_CHANGED': {
         if (activeGuideState) {
           activeGuideState.currentIndex = message.currentIndex;
+          activeGuideState.stepStatus = message.stepStatus || 'active';
         }
         notifyGuideStateUpdate();
         sendResponse({ success: true });

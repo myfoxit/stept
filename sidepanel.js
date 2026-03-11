@@ -824,9 +824,10 @@ async function playGuideForWorkflow(workflowId) {
 // Cache of fetched guide image data URLs keyed by screenshot_url
 const _guideImageCache = {};
 
-async function renderGuideSteps(guide, currentIndex) {
+async function renderGuideSteps(guide, currentIndex, stepStatus) {
   const panel = document.getElementById('guideStepsPanel');
   const list = document.getElementById('guideStepsList');
+  const titleEl = document.getElementById('guideTitle');
   const recentWorkflows = document.getElementById('recentWorkflows');
 
   if (!guide || !guide.steps || !guide.steps.length) {
@@ -838,6 +839,11 @@ async function renderGuideSteps(guide, currentIndex) {
   panel.style.display = '';
   recentWorkflows.style.display = 'none';
 
+  // Set guide title
+  if (titleEl) {
+    titleEl.textContent = guide.title || 'Interactive Guide';
+  }
+
   const guideId = guide.id || '';
   const needsFullRender = list.dataset.guideId !== guideId;
 
@@ -845,51 +851,101 @@ async function renderGuideSteps(guide, currentIndex) {
     list.dataset.guideId = guideId;
     list.innerHTML = '';
 
-    // Reuse the EXACT same step card layout from recording view
     guide.steps.forEach((step, i) => {
-      const card = document.createElement('div');
-      card.className = 'step-card guide-step-card';
-      card.dataset.stepIndex = i;
+      const item = document.createElement('div');
+      item.className = 'guide-stepper-item future';
+      item.dataset.stepIndex = i;
 
       const desc = step.title || step.description || step.action_type || `Step ${i + 1}`;
 
-      card.innerHTML = `
-        <div class="step-top-row">
-          <span class="step-number">${i + 1}</span>
-          <div class="step-text">
-            <p class="step-description">${escapeHtml(desc)}</p>
-            ${step.expected_url ? `<p class="step-url">${escapeHtml(step.expected_url)}</p>` : ''}
-          </div>
+      item.innerHTML = `
+        <div class="guide-stepper-left">
+          <div class="guide-stepper-circle future">${i + 1}</div>
+          <div class="guide-stepper-line"></div>
         </div>
-        <div class="step-screenshot-container" data-step-index="${i}" style="min-height: 40px; background: #FAFAF9;">
+        <div class="guide-stepper-content">
+          <div class="guide-stepper-instruction">${escapeHtml(desc)}</div>
+          <div class="guide-stepper-detail" style="display:none"></div>
         </div>
       `;
 
-      // Click card → jump to that step in the guide
-      card.addEventListener('click', () => {
+      // Click item → jump to that step in the guide
+      item.addEventListener('click', (e) => {
+        // Don't jump if clicking inside a button
+        if (e.target.closest('button')) return;
         sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex: i });
       });
 
-      list.appendChild(card);
-
-      // Load image async into the screenshot container
-      if (step.screenshot_url) {
-        _loadStepImage(card.querySelector('.step-screenshot-container'), step, i);
-      }
+      list.appendChild(item);
     });
   }
 
-  // Update active/completed styling
-  list.querySelectorAll('.guide-step-card').forEach((card) => {
-    const idx = parseInt(card.dataset.stepIndex);
-    card.classList.toggle('active', idx === currentIndex);
-    card.classList.toggle('completed', idx < currentIndex);
+  // Update states: completed / active / roadblock / future
+  const currentStatus = stepStatus || 'active';
+  list.querySelectorAll('.guide-stepper-item').forEach((item) => {
+    const idx = parseInt(item.dataset.stepIndex);
+    const circle = item.querySelector('.guide-stepper-circle');
+    const detail = item.querySelector('.guide-stepper-detail');
+    const step = guide.steps[idx];
+
+    // Remove all state classes
+    item.classList.remove('completed', 'active', 'roadblock', 'future');
+    circle.classList.remove('completed', 'active', 'roadblock', 'future');
+
+    if (idx < currentIndex) {
+      // Completed
+      item.classList.add('completed');
+      circle.classList.add('completed');
+      circle.innerHTML = '✓';
+      detail.style.display = 'none';
+      detail.innerHTML = '';
+    } else if (idx === currentIndex) {
+      const isRoadblock = currentStatus === 'roadblock' || currentStatus === 'notfound';
+      if (isRoadblock) {
+        item.classList.add('roadblock');
+        circle.classList.add('roadblock');
+        circle.innerHTML = '⚠';
+        // Show expanded detail with roadblock message + screenshot
+        detail.style.display = '';
+        let detailHtml = `<div class="guide-stepper-roadblock-msg">We hit a roadblock. Try taking action on the screen to move forward.</div>`;
+        detailHtml += `<div class="guide-stepper-screenshot" data-step-index="${idx}"></div>`;
+        detailHtml += `<button class="guide-stepper-mark-complete" data-action="mark-complete" data-step-index="${idx}">✓ Mark as complete</button>`;
+        detail.innerHTML = detailHtml;
+        // Load screenshot
+        if (step && step.screenshot_url) {
+          _loadStepImage(detail.querySelector('.guide-stepper-screenshot'), step, idx);
+        }
+        // Wire mark complete
+        detail.querySelector('.guide-stepper-mark-complete')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex: idx + 1 });
+        });
+      } else {
+        item.classList.add('active');
+        circle.classList.add('active');
+        circle.textContent = idx + 1;
+        // Show expanded detail with screenshot for active step
+        detail.style.display = '';
+        let detailHtml = `<div class="guide-stepper-screenshot" data-step-index="${idx}"></div>`;
+        detail.innerHTML = detailHtml;
+        if (step && step.screenshot_url) {
+          _loadStepImage(detail.querySelector('.guide-stepper-screenshot'), step, idx);
+        }
+      }
+    } else {
+      // Future
+      item.classList.add('future');
+      circle.classList.add('future');
+      circle.textContent = idx + 1;
+      detail.style.display = 'none';
+      detail.innerHTML = '';
+    }
   });
 
   // Scroll active into view
-  const activeCard = list.querySelector('.guide-step-card.active');
-  if (activeCard) {
-    activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const activeItem = list.querySelector('.guide-stepper-item.active, .guide-stepper-item.roadblock');
+  if (activeItem) {
+    activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
 
@@ -989,7 +1045,7 @@ chrome.runtime.onMessage.addListener((message) => {
     const guideState = message.guideState;
     if (guideState && guideState.guide) {
       activeGuideData = { guide: guideState.guide, currentIndex: guideState.currentIndex };
-      renderGuideSteps(guideState.guide, guideState.currentIndex);
+      renderGuideSteps(guideState.guide, guideState.currentIndex, guideState.stepStatus);
     } else {
       hideGuideSteps();
     }
