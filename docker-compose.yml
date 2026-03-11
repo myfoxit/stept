@@ -168,7 +168,7 @@ services:
     container_name: ondoki-media-worker
     profiles: ["video"]
     restart: unless-stopped
-    command: celery -A app.tasks worker --loglevel=info --queues=celery,media --concurrency=1
+    command: celery -A app.tasks worker --loglevel=info --queues=media --concurrency=1
     depends_on:
       db:
         condition: service_healthy

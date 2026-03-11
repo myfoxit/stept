@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api/ ./
 
-CMD ["celery", "-A", "app.tasks", "worker", "--loglevel=info", "--queues=video", "--concurrency=1"]
+CMD ["celery", "-A", "app.tasks", "worker", "--loglevel=info", "--queues=media", "--concurrency=1"]

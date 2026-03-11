@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Eye, HelpCircle, MoreVertical, Pencil, Plus, Search, Settings, Trash2, Users, Video } from 'lucide-react';
+import { Check, ChevronDown, Eye, HelpCircle, MoreVertical, Pencil, Plus, Search, Settings, Trash2, Users } from 'lucide-react';
 import * as React from "react";
 
 
@@ -62,11 +62,6 @@ const data = {
       title: "Team",
       url: "/team",
       icon: Users,
-    },
-    {
-      title: "Video Import",
-      url: "/video-import",
-      icon: Video,
     },
     {
       title: "Trash",
