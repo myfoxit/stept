@@ -51,31 +51,65 @@ class VideoProcessor:
         return float(result.stdout.strip())
 
     def _detect_scenes(self) -> list[float]:
-        """Return list of timestamps (seconds) where scene changes occur."""
-        result = subprocess.run(
-            [
-                "ffmpeg", "-i", self.video_path,
-                "-vf", f"select='gt(scene,{self.scene_threshold})',showinfo",
-                "-vsync", "vfr",
-                "-f", "null", "-",
-            ],
-            capture_output=True, text=True, timeout=600,
-        )
+        """Return timestamps for frame extraction using interval sampling + scene detection.
+
+        For screen recordings, pure scene detection often fails (UI changes are subtle).
+        Instead: sample at regular intervals, then supplement with scene-change timestamps
+        to capture transitions the interval might miss.
+        """
+        duration = self._run_ffprobe_duration()
+
+        # Calculate interval to get ~max_frames samples across the video
+        # Skip first 5% and last 2% to avoid intros/outros
+        start_time = min(duration * 0.05, 5.0)  # skip at most 5s of intro
+        end_time = duration * 0.98
+        usable = end_time - start_time
+
+        if usable <= 0:
+            return [0.5]
+
+        interval = max(usable / self.max_frames, 2.0)  # at least 2s apart
         timestamps = []
-        for line in result.stderr.splitlines():
-            m = re.search(r"pts_time:([\d.]+)", line)
-            if m:
-                timestamps.append(float(m.group(1)))
+        t = start_time
+        while t < end_time and len(timestamps) < self.max_frames:
+            timestamps.append(round(t, 2))
+            t += interval
 
-        # Always include the first frame
-        if not timestamps or timestamps[0] > 1.0:
-            timestamps.insert(0, 0.5)
+        # Also try scene detection to catch major transitions
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg", "-i", self.video_path,
+                    "-vf", f"select='gt(scene,{self.scene_threshold})',showinfo",
+                    "-vsync", "vfr",
+                    "-f", "null", "-",
+                ],
+                capture_output=True, text=True, timeout=600,
+            )
+            scene_times = []
+            for line in result.stderr.splitlines():
+                m = re.search(r"pts_time:([\d.]+)", line)
+                if m:
+                    st = float(m.group(1))
+                    if start_time <= st <= end_time:
+                        scene_times.append(st)
 
-        # Sample evenly if too many scenes detected
+            # Merge scene timestamps that aren't too close to existing ones
+            for st in scene_times:
+                if all(abs(st - existing) > interval * 0.5 for existing in timestamps):
+                    timestamps.append(round(st, 2))
+        except Exception:
+            logger.warning("Scene detection failed, using interval sampling only")
+
+        timestamps.sort()
+
+        # Final cap
         if len(timestamps) > self.max_frames:
             step = len(timestamps) / self.max_frames
             timestamps = [timestamps[int(i * step)] for i in range(self.max_frames)]
 
+        logger.info("Frame extraction: %d timestamps over %.1fs video (interval=%.1fs)",
+                     len(timestamps), duration, interval)
         return timestamps
 
     def _extract_frames(self, timestamps: list[float], output_dir: str) -> list[str]:
@@ -155,16 +189,23 @@ class VideoProcessor:
             {
                 "type": "text",
                 "text": (
-                    "You are an expert at creating step-by-step guides from screen recordings. "
-                    "Below are screenshots extracted from a screen recording, numbered starting from 0. "
-                    f"There are {len(frame_data_urls)} screenshots total.\n\n"
-                    + (f"Narration transcript:\n{transcript}\n\n" if transcript else "No narration was detected.\n\n")
-                    + "Generate a step-by-step guide. For each step provide:\n"
+                    "You are an expert at creating step-by-step process documentation from screen recordings. "
+                    "These screenshots are taken at regular intervals from a screen recording showing someone "
+                    "performing a task on a computer.\n\n"
+                    f"There are {len(frame_data_urls)} screenshots total, numbered 0 to {len(frame_data_urls) - 1}.\n\n"
+                    + (f"Audio narration transcript:\n{transcript}\n\n" if transcript else "")
+                    + "Your job:\n"
+                    "1. Analyze what the user is doing across these screenshots\n"
+                    "2. Identify the distinct ACTIONS/STEPS the user performs (clicking buttons, typing, navigating menus, etc.)\n"
+                    "3. Skip intro/outro screens, loading screens, and frames that don't show meaningful actions\n"
+                    "4. Write clear, actionable step titles (e.g. 'Click Settings in the menu bar', 'Select Default Browser')\n"
+                    "5. Write descriptions that tell the reader exactly what to do, not what they see\n\n"
+                    "For each step provide:\n"
                     "- step_number (starting from 1)\n"
-                    "- title (short action title)\n"
-                    "- description (what the user does in this step)\n"
-                    "- screenshot_index (0-based index of the screenshot that best represents this step)\n\n"
-                    "Return ONLY valid JSON: an array of objects with those fields. No markdown fences."
+                    "- title (short imperative action, e.g. 'Open Settings')\n"
+                    "- description (1-2 sentences explaining what to do and where)\n"
+                    "- screenshot_index (0-based index of the screenshot that best shows this step)\n\n"
+                    "Return ONLY valid JSON: an array of objects with those 4 fields. No markdown fences, no extra text."
                 ),
             }
         ]
