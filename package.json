@@ -15,7 +15,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "npm run build:main && npm run build:renderer && cp src/renderer/audio-capture.html lib/renderer/audio-capture.html",
+    "build": "npm run build:main && npm run build:renderer && shx cp src/renderer/audio-capture.html lib/renderer/audio-capture.html",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "webpack --mode production",
     "dev": "npm run build:main && npm run dev:renderer",
@@ -63,6 +63,7 @@
     "postcss": "^8.4.38",
     "postcss-loader": "^8.1.1",
     "rimraf": "^5.0.5",
+    "shx": "^0.4.0",
     "style-loader": "^4.0.0",
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
