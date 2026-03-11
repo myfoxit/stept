@@ -36,8 +36,12 @@ if celery_app:
             from app.models import ProcessRecordingSession, ProcessRecordingStep
             from app.crud.media_jobs import get_job_for_session, transition_job
             from app.services.video_processor import VideoProcessor
+            from app.services.llm import load_db_config
             from app.utils import gen_suffix
             from datetime import datetime
+
+            # Load LLM config from DB (normally done at FastAPI startup, but worker needs it too)
+            await load_db_config()
 
             async with AsyncSessionLocal() as db:
                 # Get session and job

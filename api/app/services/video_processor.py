@@ -179,7 +179,8 @@ class VideoProcessor:
         messages = [{"role": "user", "content": content_parts}]
 
         response = await chat_completion(messages, stream=False)
-        text = extract_text_from_response(response)
+        response_json = response.json()
+        text = extract_text_from_response(response_json)
 
         # Parse JSON from response
         text = text.strip()
