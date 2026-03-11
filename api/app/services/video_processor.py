@@ -150,7 +150,7 @@ class VideoProcessor:
         return results
 
     async def _generate_steps_with_llm(
-        self, frame_data_urls: list[str], transcript: str
+        self, frame_data_urls: list[str], transcript: str, frame_size: dict | None = None
     ) -> list[dict]:
         """Use vision LLM to generate step-by-step guide from frames + transcript."""
         from app.services.llm import chat_completion, extract_text_from_response
@@ -175,7 +175,12 @@ class VideoProcessor:
                     "- title (short imperative action, e.g. 'Open Settings')\n"
                     "- description (1-2 sentences explaining what to do and where)\n"
                     "- screenshot_index (0-based index of the screenshot that best shows this step)\n"
-                    "Return ONLY valid JSON: an array of objects with those 4 fields. No markdown fences, no extra text."
+                    "- click_position (object with x and y — the pixel coordinates of the CENTER of the UI element being interacted with in this step. "
+                    + (f"Each screenshot is exactly {frame_size['width']}px wide and {frame_size['height']}px tall. " if frame_size and frame_size.get('width') else "")
+                    + "For example, if the user clicks a button, give the center coordinates of that button. "
+                    "x=0 is the left edge, y=0 is the top edge. "
+                    "Be precise — look at where the element actually is in the screenshot, not where you think it might be.)\n\n"
+                    "Return ONLY valid JSON: an array of objects with those 5 fields. No markdown fences, no extra text."
                 ),
             }
         ]
@@ -251,16 +256,9 @@ class VideoProcessor:
         frame_urls = self._frames_to_base64(frame_paths)
         await self._progress("generating", 75)
 
-        steps = await self._generate_steps_with_llm(frame_urls, transcript)
+        steps = await self._generate_steps_with_llm(frame_urls, transcript, frame_size)
 
-        # Detect click positions via frame differencing
-        cursor_positions = {}
-        try:
-            from app.services.cursor_detector import ClickDetector
-            detector = ClickDetector()
-            cursor_positions = detector.detect_clicks(frame_paths)
-        except Exception as e:
-            logger.warning("Click detection failed: %s — continuing without", e)
+        # Click positions come from LLM (in the step data as click_position)
         await self._progress("done", 100)
 
         return {
@@ -270,6 +268,6 @@ class VideoProcessor:
             "frame_timestamps": timestamps[:len(frame_paths)],
             "frame_paths": frame_paths,
             "frame_size": frame_size,
-            "cursor_positions": cursor_positions,
+
             "steps": steps,
         }

@@ -84,21 +84,23 @@ if celery_app:
                     from app.models import ProcessRecordingFile
                     frame_paths = pipeline_result.get("frame_paths", [])
                     frame_size = pipeline_result.get("frame_size", {})
-                    cursor_positions = pipeline_result.get("cursor_positions", {})
 
                     for step_data in pipeline_result["steps"]:
                         step_num = step_data["step_number"]
                         screenshot_idx = step_data.get("screenshot_index", step_num - 1)
                         screenshot_idx = max(0, min(screenshot_idx, len(frame_paths) - 1)) if frame_paths else -1
 
-                        # Cursor position from OpenCV detection
-                        cursor = cursor_positions.get(screenshot_idx)
+                        # Click position from LLM (center of UI element being interacted with)
+                        click = step_data.get("click_position")
                         screenshot_rel = None
-                        if cursor and isinstance(cursor, dict):
-                            screenshot_rel = {
-                                "x": cursor["x"],
-                                "y": cursor["y"],
-                            }
+                        if click and isinstance(click, dict):
+                            x = click.get("x", 0)
+                            y = click.get("y", 0)
+                            # Validate bounds
+                            fw = frame_size.get("width", 9999)
+                            fh = frame_size.get("height", 9999)
+                            if 0 <= x <= fw and 0 <= y <= fh:
+                                screenshot_rel = {"x": x, "y": y}
 
                         step = ProcessRecordingStep(
                             id=gen_suffix(16),
