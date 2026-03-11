@@ -32,6 +32,7 @@ import { SharedWithMePage } from "@/pages/shared-with-me";
 import { TeamPage } from "@/pages/team";
 import { KnowledgeBasePage } from "@/pages/knowledge-base";
 import { AuditLogPage } from "@/pages/audit-log";
+import { VideoImportPage } from "@/pages/video-import";
 import { AnalyticsDashboardPage } from "@/pages/analytics-dashboard";
 import TrashPage from "@/pages/trash";
 import NotFoundPage from "@/pages/NotFoundPage";
@@ -113,6 +114,7 @@ createRoot(document.getElementById("root")!).render(
                         element={<KnowledgeBasePage />}
                       />
                       <Route path="/audit" element={<AuditLogPage />} />
+                      <Route path="/video-import" element={<VideoImportPage />} />
                       <Route
                         path="/analytics"
                         element={<AnalyticsDashboardPage />}

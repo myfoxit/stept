@@ -29,6 +29,85 @@ if celery_app:
             return {"guide_markdown": guide_md}
         return asyncio.run(_run())
 
+    @celery_app.task(bind=True, name="ondoki.process_video_import", queue="media")
+    def process_video_import_task(self, session_id: str, video_path: str):
+        async def _run():
+            from app.database import AsyncSessionLocal
+            from app.models import ProcessRecordingSession, ProcessRecordingStep
+            from app.crud.media_jobs import get_job_for_session, transition_job
+            from app.services.video_processor import VideoProcessor
+            from app.utils import gen_suffix
+            from datetime import datetime
+
+            async with AsyncSessionLocal() as db:
+                # Get session and job
+                from sqlalchemy import select
+                result = await db.execute(
+                    select(ProcessRecordingSession).where(ProcessRecordingSession.id == session_id)
+                )
+                session = result.scalar_one()
+                job = await get_job_for_session(db, session_id, "video_import")
+
+                # Transition job to running
+                await transition_job(db, job.id, "running", progress=0, stage="starting", increment_attempt=True)
+                await db.commit()
+
+                try:
+                    # Progress callback updates session + job
+                    async def update_progress(stage: str, pct: int):
+                        session.processing_stage = stage
+                        session.processing_progress = pct
+                        job.stage = stage
+                        job.progress = pct
+                        await db.commit()
+
+                    def sync_progress(stage: str, pct: int):
+                        asyncio.get_event_loop().run_until_complete(update_progress(stage, pct))
+
+                    processor = VideoProcessor(
+                        video_path=video_path,
+                        progress_callback=sync_progress,
+                    )
+                    pipeline_result = await processor.process()
+
+                    # Create ProcessRecordingStep entries from LLM output
+                    for step_data in pipeline_result["steps"]:
+                        step = ProcessRecordingStep(
+                            id=gen_suffix(16),
+                            session_id=session_id,
+                            step_number=step_data["step_number"],
+                            step_type="screenshot",
+                            timestamp=datetime.utcnow(),
+                            action_type="video_frame",
+                            generated_title=step_data.get("title"),
+                            generated_description=step_data.get("description"),
+                            is_annotated=True,
+                        )
+                        db.add(step)
+
+                    # Update session
+                    session.status = "completed"
+                    session.is_processed = True
+                    session.processing_stage = "done"
+                    session.processing_progress = 100
+                    session.video_duration_seconds = pipeline_result.get("duration")
+                    session.total_steps = len(pipeline_result["steps"])
+
+                    # Transition job to succeeded
+                    await transition_job(db, job.id, "succeeded", progress=100, stage="done")
+                    await db.commit()
+
+                    return {"session_id": session_id, "steps": len(pipeline_result["steps"])}
+
+                except Exception as exc:
+                    session.processing_stage = "failed"
+                    session.processing_error = str(exc)[:500]
+                    await transition_job(db, job.id, "failed", error=str(exc)[:500])
+                    await db.commit()
+                    raise
+
+        return asyncio.run(_run())
+
     @celery_app.task(bind=True, name="ondoki.index_workflow")
     def index_workflow_task(self, session_id: str):
         return asyncio.run(

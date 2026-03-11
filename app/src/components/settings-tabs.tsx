@@ -11,6 +11,7 @@ const tabs: { label: string; path: string; external?: boolean }[] = [
   { label: 'SSO', path: 'settings/sso' },
   { label: 'Analytics', path: '/analytics' },
   { label: 'Knowledge Base', path: '/knowledge' },
+  { label: 'Video \u2192 Guide', path: '/video-import' },
   { label: 'Audit Log', path: '/audit' },
   { label: 'Documentation', path: 'https://docs.ondoki.app', external: true },
 ];
