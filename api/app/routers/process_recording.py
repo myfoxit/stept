@@ -1654,9 +1654,9 @@ async def get_interactive_guide(
 
         is_navigation = (step.action_type or "").lower() == "navigate"
 
-        # Screenshot URL: /api/v1/process-recording/{session_id}/{step_number}/image
+        # Screenshot URL: /api/v1/process-recording/session/{session_id}/image/{step_number}
         has_image = step.step_number in files_dict
-        screenshot_url = f"/api/v1/process-recording/{session_id}/{step.step_number}/image" if has_image else None
+        screenshot_url = f"/api/v1/process-recording/session/{session_id}/image/{step.step_number}" if has_image else None
 
         guide_steps.append({
             "title": step_title,
