@@ -78,7 +78,7 @@ class SessionStatusResponse(BaseModel):
     files_uploaded: int
     metadata: Optional[List[Dict[str, Any]]] = []  # Make it optional with default empty list
     storage_type: str
-    storage_path: str
+    storage_path: Optional[str] = None
     
     class Config:
         from_attributes = True
