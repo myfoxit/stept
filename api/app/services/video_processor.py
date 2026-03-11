@@ -253,15 +253,14 @@ class VideoProcessor:
 
         steps = await self._generate_steps_with_llm(frame_urls, transcript)
 
-        # Detect cursor positions via OpenCV template matching
+        # Detect click positions via frame differencing
         cursor_positions = {}
         try:
-            from app.services.cursor_detector import CursorDetector
-            detector = CursorDetector()
-            cursor_positions = detector.detect_batch(frame_paths)
-            logger.info("Cursor detected in %d/%d frames", len(cursor_positions), len(frame_paths))
+            from app.services.cursor_detector import ClickDetector
+            detector = ClickDetector()
+            cursor_positions = detector.detect_clicks(frame_paths)
         except Exception as e:
-            logger.warning("Cursor detection failed: %s — continuing without", e)
+            logger.warning("Click detection failed: %s — continuing without", e)
         await self._progress("done", 100)
 
         return {
