@@ -154,7 +154,7 @@
       inset: 0;
       background: rgba(0, 0, 0, 0.45);
       transition: clip-path 0.3s ease;
-      pointer-events: auto;
+      pointer-events: none;
     }
 
     .guide-highlight {
@@ -296,6 +296,25 @@
       line-height: 1.4;
     }
 
+    .guide-navigate-btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: #78350F;
+      color: #FDE68A;
+      border: 1px solid #92400E;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .guide-navigate-btn:hover {
+      background: #92400E;
+    }
+
     .guide-not-found {
       background: #1C1917;
       border: 1px solid #292524;
@@ -338,6 +357,12 @@
       this.positionInterval = null;
       this.currentResult = null;
       this._clickHandler = null;
+      // Persistent overlay elements for in-place updates
+      this._backdrop = null;
+      this._overlay = null;
+      this._highlight = null;
+      this._tooltip = null;
+      this._notFoundPanel = null;
     }
 
     async start() {
@@ -357,7 +382,14 @@
         this.host = null;
         this.shadow = null;
       }
+      this._backdrop = null;
+      this._overlay = null;
+      this._highlight = null;
+      this._tooltip = null;
+      this._notFoundPanel = null;
       activeRunner = null;
+      // Notify background that guide stopped
+      chrome.runtime.sendMessage({ type: 'GUIDE_STOPPED' }).catch(() => {});
     }
 
     _createHost() {
@@ -372,13 +404,15 @@
     }
 
     _clearOverlay() {
-      if (!this.shadow) return;
-      // Remove all except <style>
-      Array.from(this.shadow.children).forEach((child) => {
-        if (child.tagName !== "STYLE") child.remove();
-      });
       this._clearPositionTracking();
       this._removeClickHandler();
+      // Hide persistent elements instead of removing them
+      if (this._highlight) this._highlight.style.display = "none";
+      if (this._tooltip) this._tooltip.style.display = "none";
+      if (this._notFoundPanel) {
+        this._notFoundPanel.remove();
+        this._notFoundPanel = null;
+      }
     }
 
     async showStep(index) {
@@ -388,6 +422,9 @@
       }
       this.currentIndex = index;
       this._clearOverlay();
+
+      // Brief delay to let UI transitions settle before showing next step
+      await new Promise((r) => setTimeout(r, 100));
 
       const step = this.steps[index];
 
@@ -411,6 +448,13 @@
 
       this.currentResult = result;
 
+      // Notify background of step change
+      chrome.runtime.sendMessage({
+        type: 'GUIDE_STEP_CHANGED',
+        currentIndex: index,
+        totalSteps: this.steps.length,
+      }).catch(() => {});
+
       if (result) {
         this._scrollToElement(result.element);
         await new Promise((r) => setTimeout(r, 100)); // wait for scroll
@@ -430,33 +474,36 @@
       const rect = result.element.getBoundingClientRect();
       const pad = 6;
 
-      // Backdrop with cutout
-      const backdrop = document.createElement("div");
-      backdrop.className = "guide-backdrop";
+      // Create or update backdrop with cutout (in-place)
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow.appendChild(this._backdrop);
+      }
+      this._updateCutout(this._overlay, rect, pad);
 
-      const overlay = document.createElement("div");
-      overlay.className = "guide-backdrop-overlay";
-      this._updateCutout(overlay, rect, pad);
-      overlay.addEventListener("click", (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-      });
-      backdrop.appendChild(overlay);
-      this.shadow.appendChild(backdrop);
+      // Create or update highlight ring (in-place)
+      if (!this._highlight) {
+        this._highlight = document.createElement("div");
+        this._highlight.className = "guide-highlight";
+        this.shadow.appendChild(this._highlight);
+      }
+      this._highlight.style.display = "";
+      this._highlight.style.left = `${rect.left - pad}px`;
+      this._highlight.style.top = `${rect.top - pad}px`;
+      this._highlight.style.width = `${rect.width + pad * 2}px`;
+      this._highlight.style.height = `${rect.height + pad * 2}px`;
 
-      // Highlight ring
-      const highlight = document.createElement("div");
-      highlight.className = "guide-highlight";
-      highlight.style.left = `${rect.left - pad}px`;
-      highlight.style.top = `${rect.top - pad}px`;
-      highlight.style.width = `${rect.width + pad * 2}px`;
-      highlight.style.height = `${rect.height + pad * 2}px`;
-      this.shadow.appendChild(highlight);
-
-      // Tooltip
-      const tooltip = this._createTooltip(step, urlMismatch);
-      this.shadow.appendChild(tooltip);
-      this._positionTooltip(tooltip, rect);
+      // Recreate tooltip (content changes each step)
+      if (this._tooltip) {
+        this._tooltip.remove();
+      }
+      this._tooltip = this._createTooltip(step, urlMismatch);
+      this.shadow.appendChild(this._tooltip);
+      this._positionTooltip(this._tooltip, rect);
     }
 
     _updateCutout(overlay, rect, pad) {
@@ -484,7 +531,10 @@
       let html = `<button class="guide-close-btn" data-action="close">&times;</button>`;
 
       if (urlMismatch) {
-        html += `<div class="guide-url-warning">This step expects a different page. You may need to navigate there first.</div>`;
+        html += `<div class="guide-url-warning">
+          This step expects a different page.
+          <br><button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
+        </div>`;
       }
 
       html += `
@@ -532,6 +582,17 @@
           case "close":
             this.stop();
             break;
+          case "navigate": {
+            const step = this.steps[this.currentIndex];
+            if (step.expected_url) {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_NAVIGATE',
+                url: step.expected_url,
+                stepIndex: this.currentIndex,
+              });
+            }
+            break;
+          }
         }
       });
 
@@ -588,23 +649,35 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
-      // Semi-transparent backdrop
-      const backdrop = document.createElement("div");
-      backdrop.className = "guide-backdrop";
-      const overlay = document.createElement("div");
-      overlay.className = "guide-backdrop-overlay";
-      overlay.style.clipPath = "none";
-      backdrop.appendChild(overlay);
-      this.shadow.appendChild(backdrop);
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow.appendChild(this._backdrop);
+      }
+      this._overlay.style.clipPath = "none";
 
       const panel = document.createElement("div");
       panel.className = "guide-not-found";
-      panel.innerHTML = `
+
+      let notFoundHtml = `
         <div class="guide-not-found-title">Element not found</div>
         <div class="guide-not-found-desc">
           Could not locate the target element for step ${idx + 1}.
           ${urlMismatch ? "This step expects a different page." : "The page may have changed."}
         </div>
+      `;
+
+      if (urlMismatch && step.expected_url) {
+        notFoundHtml += `<div style="margin-bottom: 12px;">
+          <button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
+        </div>`;
+      }
+
+      notFoundHtml += `
         <div class="guide-tooltip-progress">
           Step ${idx + 1} of ${total}
         </div>
@@ -614,6 +687,8 @@
           <button class="guide-btn guide-btn-primary" data-action="close">Close</button>
         </div>
       `;
+
+      panel.innerHTML = notFoundHtml;
 
       panel.addEventListener("click", (e) => {
         const action = e.target.closest("[data-action]")?.dataset.action;
@@ -629,9 +704,21 @@
           case "close":
             this.stop();
             break;
+          case "navigate": {
+            const step = this.steps[this.currentIndex];
+            if (step.expected_url) {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_NAVIGATE',
+                url: step.expected_url,
+                stepIndex: this.currentIndex,
+              });
+            }
+            break;
+          }
         }
       });
 
+      this._notFoundPanel = panel;
       this.shadow.appendChild(panel);
     }
 
@@ -665,21 +752,18 @@
 
         const rect = result.element.getBoundingClientRect();
         const pad = 6;
-        const highlight = this.shadow?.querySelector(".guide-highlight");
-        const overlay = this.shadow?.querySelector(".guide-backdrop-overlay");
-        const tooltip = this.shadow?.querySelector(".guide-tooltip");
 
-        if (highlight) {
-          highlight.style.left = `${rect.left - pad}px`;
-          highlight.style.top = `${rect.top - pad}px`;
-          highlight.style.width = `${rect.width + pad * 2}px`;
-          highlight.style.height = `${rect.height + pad * 2}px`;
+        if (this._highlight) {
+          this._highlight.style.left = `${rect.left - pad}px`;
+          this._highlight.style.top = `${rect.top - pad}px`;
+          this._highlight.style.width = `${rect.width + pad * 2}px`;
+          this._highlight.style.height = `${rect.height + pad * 2}px`;
         }
-        if (overlay) {
-          this._updateCutout(overlay, rect, pad);
+        if (this._overlay) {
+          this._updateCutout(this._overlay, rect, pad);
         }
-        if (tooltip) {
-          this._positionTooltip(tooltip, rect);
+        if (this._tooltip) {
+          this._positionTooltip(this._tooltip, rect);
         }
       }, 200);
     }
@@ -736,8 +820,13 @@
     if (message.type === "START_GUIDE") {
       try {
         if (activeRunner) activeRunner.stop();
-        activeRunner = new GuideRunner(message.guide);
-        activeRunner.start();
+        const runner = new GuideRunner(message.guide);
+        activeRunner = runner;
+        if (typeof message.startIndex === "number" && message.startIndex > 0) {
+          runner.start().then(() => runner.showStep(message.startIndex));
+        } else {
+          runner.start();
+        }
         sendResponse({ success: true });
       } catch (e) {
         sendResponse({ success: false, error: e.message });

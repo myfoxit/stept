@@ -44,6 +44,17 @@ let state = {
   authState: null,
 };
 
+// Active guide state for sidepanel sync
+let activeGuideState = null; // { guide, currentIndex, tabId }
+
+function notifyGuideStateUpdate() {
+  // Send guide state to all extension views (sidepanel)
+  chrome.runtime.sendMessage({
+    type: 'GUIDE_STATE_UPDATE',
+    guideState: activeGuideState,
+  }).catch(() => {});
+}
+
 // Context link matches for the current tab
 let contextMatches = [];
 let lastContextUrl = null;
@@ -1512,12 +1523,64 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ success: false, error: 'No active tab' });
             break;
           }
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['guide-runtime.js'],
-          });
-          await new Promise((r) => setTimeout(r, 50));
-          await chrome.tabs.sendMessage(tab.id, { type: 'START_GUIDE', guide: message.guide });
+
+          const guide = message.guide;
+          const startIndex = message.startIndex || 0;
+
+          // Track active guide state
+          activeGuideState = { guide, currentIndex: startIndex, tabId: tab.id };
+
+          // Check if we need to navigate to the first step's URL
+          const targetStep = guide.steps?.[startIndex];
+          const targetUrl = targetStep?.expected_url;
+          let needsNavigation = false;
+
+          if (targetUrl && tab.url) {
+            try {
+              const expected = new URL(targetUrl);
+              const current = new URL(tab.url);
+              needsNavigation = expected.pathname !== current.pathname;
+            } catch {}
+          }
+
+          if (needsNavigation && targetUrl) {
+            // Navigate first, then inject after page loads
+            chrome.tabs.update(tab.id, { url: targetUrl });
+            // Wait for navigation to complete then inject
+            const onCompleted = (details) => {
+              if (details.tabId === tab.id && details.frameId === 0) {
+                chrome.webNavigation.onCompleted.removeListener(onCompleted);
+                // Re-inject guide-runtime.js after navigation
+                chrome.scripting.executeScript({
+                  target: { tabId: tab.id },
+                  files: ['guide-runtime.js'],
+                }).then(() => {
+                  return new Promise((r) => setTimeout(r, 100));
+                }).then(() => {
+                  return chrome.tabs.sendMessage(tab.id, {
+                    type: 'START_GUIDE',
+                    guide,
+                    startIndex,
+                  });
+                }).catch(() => {});
+              }
+            };
+            chrome.webNavigation.onCompleted.addListener(onCompleted);
+          } else {
+            await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['guide-runtime.js'],
+            });
+            await new Promise((r) => setTimeout(r, 50));
+            await chrome.tabs.sendMessage(tab.id, {
+              type: 'START_GUIDE',
+              guide,
+              startIndex,
+            });
+          }
+
+          // Notify sidepanel of guide state
+          notifyGuideStateUpdate();
           sendResponse({ success: true });
         } catch (e) {
           sendResponse({ success: false, error: e.message });
@@ -1531,10 +1594,133 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (tab?.id) {
             await chrome.tabs.sendMessage(tab.id, { type: 'STOP_GUIDE' }).catch(() => {});
           }
+          activeGuideState = null;
+          notifyGuideStateUpdate();
           sendResponse({ success: true });
         } catch (e) {
           sendResponse({ success: false, error: e.message });
         }
+        break;
+      }
+
+      case 'GUIDE_STEP_CHANGED': {
+        if (activeGuideState) {
+          activeGuideState.currentIndex = message.currentIndex;
+        }
+        notifyGuideStateUpdate();
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'GUIDE_STOPPED': {
+        activeGuideState = null;
+        notifyGuideStateUpdate();
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'GUIDE_NAVIGATE': {
+        try {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (!tab?.id || !message.url) {
+            sendResponse({ success: false, error: 'No active tab or URL' });
+            break;
+          }
+          const guide = activeGuideState?.guide;
+          const stepIndex = message.stepIndex || 0;
+          chrome.tabs.update(tab.id, { url: message.url });
+          // After navigation completes, re-inject and resume guide at stepIndex
+          const onCompleted = (details) => {
+            if (details.tabId === tab.id && details.frameId === 0) {
+              chrome.webNavigation.onCompleted.removeListener(onCompleted);
+              if (guide) {
+                chrome.scripting.executeScript({
+                  target: { tabId: tab.id },
+                  files: ['guide-runtime.js'],
+                }).then(() => {
+                  return new Promise((r) => setTimeout(r, 100));
+                }).then(() => {
+                  return chrome.tabs.sendMessage(tab.id, {
+                    type: 'START_GUIDE',
+                    guide,
+                    startIndex: stepIndex,
+                  });
+                }).catch(() => {});
+              }
+            }
+          };
+          chrome.webNavigation.onCompleted.addListener(onCompleted);
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'GUIDE_GO_TO_STEP': {
+        try {
+          if (!activeGuideState) {
+            sendResponse({ success: false, error: 'No active guide' });
+            break;
+          }
+          const stepIndex = message.stepIndex;
+          activeGuideState.currentIndex = stepIndex;
+          const guide = activeGuideState.guide;
+          const tabId = activeGuideState.tabId;
+
+          // Check if step requires navigation
+          const targetStep = guide.steps?.[stepIndex];
+          const targetUrl = targetStep?.expected_url;
+          let needsNavigation = false;
+
+          if (targetUrl && tabId) {
+            try {
+              const tab = await chrome.tabs.get(tabId);
+              const expected = new URL(targetUrl);
+              const current = new URL(tab.url);
+              needsNavigation = expected.pathname !== current.pathname;
+            } catch {}
+          }
+
+          if (needsNavigation && targetUrl) {
+            chrome.tabs.update(tabId, { url: targetUrl });
+            const onCompleted = (details) => {
+              if (details.tabId === tabId && details.frameId === 0) {
+                chrome.webNavigation.onCompleted.removeListener(onCompleted);
+                chrome.scripting.executeScript({
+                  target: { tabId },
+                  files: ['guide-runtime.js'],
+                }).then(() => {
+                  return new Promise((r) => setTimeout(r, 100));
+                }).then(() => {
+                  return chrome.tabs.sendMessage(tabId, {
+                    type: 'START_GUIDE',
+                    guide,
+                    startIndex: stepIndex,
+                  });
+                }).catch(() => {});
+              }
+            };
+            chrome.webNavigation.onCompleted.addListener(onCompleted);
+          } else {
+            // Same page — just tell content to jump to step
+            await chrome.tabs.sendMessage(tabId, {
+              type: 'START_GUIDE',
+              guide,
+              startIndex: stepIndex,
+            });
+          }
+
+          notifyGuideStateUpdate();
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
+      case 'GET_GUIDE_STATE': {
+        sendResponse({ guideState: activeGuideState });
         break;
       }
 

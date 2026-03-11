@@ -804,6 +804,8 @@ function timeAgo(date) {
 
 // ===== GUIDE PLAYBACK (from workflow items) =====
 
+let activeGuideData = null; // { guide, currentIndex }
+
 async function playGuideForWorkflow(workflowId) {
   try {
     const result = await sendMessage({ type: 'FETCH_WORKFLOW_GUIDE', workflowId });
@@ -811,11 +813,77 @@ async function playGuideForWorkflow(workflowId) {
       showToast('No guide found for this workflow');
       return;
     }
+    activeGuideData = { guide: result.guide, currentIndex: 0 };
     await sendMessage({ type: 'START_GUIDE', guide: result.guide });
+    renderGuideSteps(result.guide, 0);
   } catch (e) {
     showToast('Failed to start guide');
   }
 }
+
+function renderGuideSteps(guide, currentIndex) {
+  const panel = document.getElementById('guideStepsPanel');
+  const list = document.getElementById('guideStepsList');
+  const recentWorkflows = document.getElementById('recentWorkflows');
+
+  if (!guide || !guide.steps || !guide.steps.length) {
+    panel.style.display = 'none';
+    recentWorkflows.style.display = '';
+    return;
+  }
+
+  panel.style.display = '';
+  recentWorkflows.style.display = 'none';
+
+  list.innerHTML = guide.steps.map((step, i) => {
+    const title = (step.title || step.description || `Step ${i + 1}`).slice(0, 60);
+    const badge = step.action_type || 'step';
+    const isActive = i === currentIndex;
+    const isCompleted = i < currentIndex;
+    let cls = 'guide-step-item';
+    if (isActive) cls += ' active';
+    if (isCompleted) cls += ' completed';
+
+    const numberContent = isCompleted
+      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
+      : (i + 1);
+
+    return `
+      <div class="${cls}" data-step-index="${i}">
+        <div class="guide-step-number">${numberContent}</div>
+        <span class="guide-step-title">${escapeHtml(title)}</span>
+        <span class="guide-step-badge">${escapeHtml(badge)}</span>
+      </div>
+    `;
+  }).join('');
+
+  // Attach click handlers to step items
+  list.querySelectorAll('.guide-step-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const stepIndex = parseInt(item.dataset.stepIndex);
+      sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex });
+    });
+  });
+}
+
+function hideGuideSteps() {
+  const panel = document.getElementById('guideStepsPanel');
+  const recentWorkflows = document.getElementById('recentWorkflows');
+  panel.style.display = 'none';
+  recentWorkflows.style.display = '';
+  activeGuideData = null;
+}
+
+// Guide panel button handlers
+document.getElementById('guideStopBtn')?.addEventListener('click', () => {
+  sendMessage({ type: 'STOP_GUIDE' });
+  hideGuideSteps();
+});
+
+document.getElementById('guideStepsClose')?.addEventListener('click', () => {
+  sendMessage({ type: 'STOP_GUIDE' });
+  hideGuideSteps();
+});
 
 // MISS-C002: Show a temporary error toast in the side panel
 function showToast(text, duration = 4000) {
@@ -845,6 +913,14 @@ chrome.runtime.onMessage.addListener((message) => {
     refreshState();
   } else if (message.type === 'CONTEXT_MATCHES_UPDATED') {
     renderContextMatches(message.matches || []);
+  } else if (message.type === 'GUIDE_STATE_UPDATE') {
+    const guideState = message.guideState;
+    if (guideState && guideState.guide) {
+      activeGuideData = { guide: guideState.guide, currentIndex: guideState.currentIndex };
+      renderGuideSteps(guideState.guide, guideState.currentIndex);
+    } else {
+      hideGuideSteps();
+    }
   }
 });
 
