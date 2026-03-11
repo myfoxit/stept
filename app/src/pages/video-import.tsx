@@ -194,7 +194,7 @@ export function VideoImportPage() {
                 <div className="flex gap-2 mt-3 justify-center">
                   {uploadStatus.sessionId && (
                     <Button asChild variant="default" onClick={(e) => e.stopPropagation()}>
-                      <Link to={`/workflows/${uploadStatus.sessionId}`}>View Guide <ExternalLink className="ml-1 h-4 w-4" /></Link>
+                      <Link to={`/workflow/${uploadStatus.sessionId}`}>View Guide <ExternalLink className="ml-1 h-4 w-4" /></Link>
                     </Button>
                   )}
                   <Button variant="outline" onClick={(e) => { e.stopPropagation(); setUploadStatus({ stage: 'idle', progress: 0, sessionId: null, error: null }); }}>
@@ -242,7 +242,7 @@ export function VideoImportPage() {
                   </div>
                   <div className="flex-shrink-0 text-sm">
                     {imp.is_processed && (
-                      <Link to={`/workflows/${imp.session_id}`} className="inline-flex items-center gap-1 text-green-600 hover:underline">
+                      <Link to={`/workflow/${imp.session_id}`} className="inline-flex items-center gap-1 text-green-600 hover:underline">
                         <CheckCircle2 className="h-4 w-4" /> View Guide
                       </Link>
                     )}
