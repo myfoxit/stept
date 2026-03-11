@@ -38,6 +38,7 @@ if celery_app:
             from app.services.video_processor import VideoProcessor
             from app.services.llm import load_db_config
             from app.utils import gen_suffix
+            from pathlib import Path
             from datetime import datetime
 
             # Load LLM config from DB (normally done at FastAPI startup, but worker needs it too)
