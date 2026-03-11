@@ -881,6 +881,7 @@ async function renderGuideSteps(guide, currentIndex, stepStatus) {
   }
 
   // Update states: completed / active / roadblock / future
+  // Track what's currently rendered to avoid destroying async-loaded images
   const currentStatus = stepStatus || 'active';
   list.querySelectorAll('.guide-stepper-item').forEach((item) => {
     const idx = parseInt(item.dataset.stepIndex);
@@ -888,52 +889,54 @@ async function renderGuideSteps(guide, currentIndex, stepStatus) {
     const detail = item.querySelector('.guide-stepper-detail');
     const step = guide.steps[idx];
 
+    // Determine desired state for this item
+    let desiredState;
+    if (idx < currentIndex) desiredState = 'completed';
+    else if (idx === currentIndex) {
+      const isRoadblock = currentStatus === 'roadblock' || currentStatus === 'notfound';
+      desiredState = isRoadblock ? 'roadblock' : 'active';
+    } else desiredState = 'future';
+
+    // Skip re-render if state hasn't changed (prevents destroying async-loaded images)
+    if (item.dataset.renderedState === desiredState) return;
+    item.dataset.renderedState = desiredState;
+
     // Remove all state classes
     item.classList.remove('completed', 'active', 'roadblock', 'future');
     circle.classList.remove('completed', 'active', 'roadblock', 'future');
 
-    if (idx < currentIndex) {
-      // Completed
+    if (desiredState === 'completed') {
       item.classList.add('completed');
       circle.classList.add('completed');
       circle.innerHTML = '✓';
       detail.style.display = 'none';
       detail.innerHTML = '';
-    } else if (idx === currentIndex) {
-      const isRoadblock = currentStatus === 'roadblock' || currentStatus === 'notfound';
-      if (isRoadblock) {
-        item.classList.add('roadblock');
-        circle.classList.add('roadblock');
-        circle.innerHTML = '⚠';
-        // Show expanded detail with roadblock message + screenshot
-        detail.style.display = '';
-        let detailHtml = `<div class="guide-stepper-roadblock-msg">We hit a roadblock. Try taking action on the screen to move forward.</div>`;
-        detailHtml += `<div class="guide-stepper-screenshot" data-step-index="${idx}"></div>`;
-        detailHtml += `<button class="guide-stepper-mark-complete" data-action="mark-complete" data-step-index="${idx}">✓ Mark as complete</button>`;
-        detail.innerHTML = detailHtml;
-        // Load screenshot
-        if (step && step.screenshot_url) {
-          _loadStepImage(detail.querySelector('.guide-stepper-screenshot'), step, idx);
-        }
-        // Wire mark complete
-        detail.querySelector('.guide-stepper-mark-complete')?.addEventListener('click', (e) => {
-          e.stopPropagation();
-          sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex: idx + 1 });
-        });
-      } else {
-        item.classList.add('active');
-        circle.classList.add('active');
-        circle.textContent = idx + 1;
-        // Show expanded detail with screenshot for active step
-        detail.style.display = '';
-        let detailHtml = `<div class="guide-stepper-screenshot" data-step-index="${idx}"></div>`;
-        detail.innerHTML = detailHtml;
-        if (step && step.screenshot_url) {
-          _loadStepImage(detail.querySelector('.guide-stepper-screenshot'), step, idx);
-        }
+    } else if (desiredState === 'roadblock') {
+      item.classList.add('roadblock');
+      circle.classList.add('roadblock');
+      circle.innerHTML = '⚠';
+      detail.style.display = '';
+      let detailHtml = `<div class="guide-stepper-roadblock-msg">We hit a roadblock. Try taking action on the screen to move forward.</div>`;
+      detailHtml += `<div class="guide-stepper-screenshot" data-step-index="${idx}"></div>`;
+      detailHtml += `<button class="guide-stepper-mark-complete" data-action="mark-complete" data-step-index="${idx}">✓ Mark as complete</button>`;
+      detail.innerHTML = detailHtml;
+      if (step && step.screenshot_url) {
+        _loadStepImage(detail.querySelector('.guide-stepper-screenshot'), step, idx);
+      }
+      detail.querySelector('.guide-stepper-mark-complete')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex: idx + 1 });
+      });
+    } else if (desiredState === 'active') {
+      item.classList.add('active');
+      circle.classList.add('active');
+      circle.textContent = idx + 1;
+      detail.style.display = '';
+      detail.innerHTML = `<div class="guide-stepper-screenshot" data-step-index="${idx}"></div>`;
+      if (step && step.screenshot_url) {
+        _loadStepImage(detail.querySelector('.guide-stepper-screenshot'), step, idx);
       }
     } else {
-      // Future
       item.classList.add('future');
       circle.classList.add('future');
       circle.textContent = idx + 1;

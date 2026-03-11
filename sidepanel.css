@@ -1360,7 +1360,7 @@ body {
 .guide-stepper-screenshot {
   position: relative; border-radius: 6px; overflow: hidden;
   border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 8px;
-  background: #FAFAF9;
+  background: #FAFAF9; min-height: 60px;
 }
 .guide-stepper-screenshot img {
   width: 100%; display: block; border-radius: 5px;
