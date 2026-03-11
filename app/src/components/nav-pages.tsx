@@ -1,4 +1,28 @@
-import { ChevronDown, ChevronRight, ClipboardCheck, Copy, File, FileText, Files, Folder, FolderOpen, FolderPlus, Globe, Inbox, LayoutGrid, Lock, Monitor, MoreHorizontal, Move, Pencil, Play, Plus, Share2, Trash2, Upload } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  Copy,
+  File,
+  FileText,
+  Files,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Globe,
+  Inbox,
+  LayoutGrid,
+  Lock,
+  Monitor,
+  MoreHorizontal,
+  Move,
+  Pencil,
+  Play,
+  Plus,
+  Share2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -338,14 +362,19 @@ function NavPageItem({
     }
     if (isWorkflow) {
       return (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+          <path
+            d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M17 14l.75 2.25L20 17l-2.25.75L17 20l-.75-2.25L14 17l2.25-.75L17 14z"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linejoin="round"
+          />
         </svg>
       );
     }
@@ -485,17 +514,25 @@ function NavPageItem({
                 className="flex items-center gap-1"
               >
                 {isWorkflow ? (
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                    <path
+                      d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2z"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M17 14l.75 2.25L20 17l-2.25.75L17 20l-.75-2.25L14 17l2.25-.75L17 14z"
+                      stroke="currentColor"
+                      stroke-width="1.2"
+                      stroke-linejoin="round"
+                    />
                   </svg>
                 ) : doc.source_file_mime ? (
-                  <FileTypeIcon mime={doc.source_file_mime} className="size-3.5 flex-shrink-0" />
+                  <FileTypeIcon
+                    mime={doc.source_file_mime}
+                    className="size-3.5 flex-shrink-0"
+                  />
                 ) : (
                   <File
                     className="size-3.5 flex-shrink-0 opacity-50"
@@ -594,7 +631,9 @@ function NavPageItem({
                       <FileText className="mr-2 size-4" />
                       New Page
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onUploadFile?.(doc.id, doc.is_private)}>
+                    <DropdownMenuItem
+                      onSelect={() => onUploadFile?.(doc.id, doc.is_private)}
+                    >
                       <Upload className="mr-2 size-4" />
                       Upload File
                     </DropdownMenuItem>
@@ -896,7 +935,9 @@ export function NavPages({ userRole }: { userRole: string }) {
   const moveWorkflow = useMoveWorkflow();
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [uploadTargetFolder, setUploadTargetFolder] = React.useState<string | null>(null);
+  const [uploadTargetFolder, setUploadTargetFolder] = React.useState<
+    string | null
+  >(null);
   const [uploadIsPrivate, setUploadIsPrivate] = React.useState(false);
 
   const [dragCounter, setDragCounter] = React.useState(0);
@@ -1083,14 +1124,19 @@ export function NavPages({ userRole }: { userRole: string }) {
                 to="/documents/workflows"
                 className="flex items-center gap-2 h-7 px-2"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v4m0 14v4m-9.66-7h4M17.66 12h4.34M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                  <path
+                    d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2z"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M17 14l.75 2.25L20 17l-2.25.75L17 20l-.75-2.25L14 17l2.25-.75L17 14z"
+                    stroke="currentColor"
+                    stroke-width="1.2"
+                    stroke-linejoin="round"
+                  />
                 </svg>
 
                 <span className="text-sm">Workflows</span>
