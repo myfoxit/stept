@@ -87,7 +87,37 @@ async def get_filtered_workflows_endpoint(
             limit=limit,
             user_id=current_user.id,  # NEW: Pass user_id for privacy filtering
         )
-        return workflows
+
+        # Compute has_guide for each workflow: True if any step has non-null element_info
+        from sqlalchemy import func as sqlfunc
+        wf_ids = [w.id for w in workflows]
+        has_guide_map = {}
+        if wf_ids:
+            stmt = (
+                select(
+                    ProcessRecordingStep.session_id,
+                    sqlfunc.count(ProcessRecordingStep.id),
+                )
+                .where(
+                    ProcessRecordingStep.session_id.in_(wf_ids),
+                    ProcessRecordingStep.element_info.isnot(None),
+                )
+                .group_by(ProcessRecordingStep.session_id)
+            )
+            rows = await db.execute(stmt)
+            has_guide_map = {row[0]: row[1] > 0 for row in rows}
+
+        # Serialize with has_guide field
+        result = []
+        for w in workflows:
+            data = {
+                c.name: getattr(w, c.name)
+                for c in w.__table__.columns
+            }
+            data["has_guide"] = has_guide_map.get(w.id, False)
+            result.append(data)
+
+        return result
     except Exception as e:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
@@ -480,6 +510,13 @@ async def get_workflow_summary(session_id: str, db: AsyncSession = Depends(get_d
     # Count steps without loading them
     from sqlalchemy import func as sqlfunc
     step_count = await db.scalar(select(sqlfunc.count(ProcessRecordingStep.id)).where(ProcessRecordingStep.session_id == session_id))
+    # Check if workflow has interactive guide data (any step with element_info)
+    guide_step_count = await db.scalar(
+        select(sqlfunc.count(ProcessRecordingStep.id)).where(
+            ProcessRecordingStep.session_id == session_id,
+            ProcessRecordingStep.element_info.isnot(None),
+        )
+    )
     return {
         "id": session.id, "name": session.name, "status": session.status,
         "created_at": session.created_at, "updated_at": session.updated_at,
@@ -489,6 +526,7 @@ async def get_workflow_summary(session_id: str, db: AsyncSession = Depends(get_d
         "total_steps": step_count,
         "guide_markdown": session.guide_markdown,
         "estimated_time": session.estimated_time, "difficulty": session.difficulty,
+        "has_guide": (guide_step_count or 0) > 0,
     }
 
 
@@ -1575,6 +1613,64 @@ async def stream_guide_endpoint(
     )
 
 
+@router.get("/workflow/{session_id}/interactive-guide")
+async def get_interactive_guide(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Build an interactive guide JSON for the guide-runtime overlay."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found")
+    if session.project_id:
+        await check_project_permission(
+            db=db, user_id=current_user.id,
+            project_id=session.project_id, required_role=ProjectRole.VIEWER,
+        )
+
+    # Load steps ordered by step_number
+    stmt = (
+        select(ProcessRecordingStep)
+        .where(ProcessRecordingStep.session_id == session_id)
+        .order_by(ProcessRecordingStep.step_number)
+    )
+    result = await db.execute(stmt)
+    steps = result.scalars().all()
+
+    guide_steps = []
+    for step in steps:
+        ei = step.element_info or {}
+
+        # Title fallback chain: generated_title → generated_description → description
+        step_title = step.generated_title or step.generated_description or step.description or f"Step {step.step_number}"
+
+        is_navigation = (step.action_type or "").lower() == "navigate"
+
+        guide_steps.append({
+            "title": step_title,
+            "description": step.generated_description or step.description or "",
+            "selector": ei.get("selector"),
+            "xpath": ei.get("xpath"),
+            "testId": ei.get("testId"),
+            "element_text": ei.get("text"),
+            "element_role": ei.get("role"),
+            "ariaLabel": ei.get("ariaLabel"),
+            "parentChain": ei.get("parentChain"),
+            "element_info": ei,
+            "expected_url": step.url,
+            "action_type": step.action_type,
+            "step_number": step.step_number,
+            "is_navigation": is_navigation,
+        })
+
+    return {
+        "id": session.id,
+        "title": session.generated_title or session.name or "Untitled Workflow",
+        "steps": guide_steps,
+    }
+
+
 @router.get("/workflow/{session_id}/guide", response_model=GuideResponse)
 async def get_guide_endpoint(
     session_id: str,
@@ -1624,6 +1720,8 @@ async def get_ai_summary(
             "is_annotated": step.is_annotated,
         })
 
+    has_guide = any(s.element_info for s in session.steps)
+
     return {
         "recording_id": session_id,
         "generated_title": session.generated_title,
@@ -1633,6 +1731,7 @@ async def get_ai_summary(
         "difficulty": session.difficulty,
         "is_processed": session.is_processed,
         "guide_markdown": session.guide_markdown,
+        "has_guide": has_guide,
         "steps": steps_data,
     }
 
