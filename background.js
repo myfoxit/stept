@@ -57,8 +57,15 @@ function notifyGuideStateUpdate() {
 
 // Helper: inject guide-runtime and start guide on a tab that's already loaded
 async function _injectGuideNow(tabId, guide, startIndex) {
+  // Try sending directly first (guide-runtime may already be loaded)
+  try {
+    const resp = await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
+    if (resp && resp.success) return; // already loaded, started successfully
+  } catch {
+    // No listener — need to inject
+  }
   await chrome.scripting.executeScript({ target: { tabId }, files: ['guide-runtime.js'] });
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 300));
   await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
 }
 

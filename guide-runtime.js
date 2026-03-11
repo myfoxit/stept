@@ -8,9 +8,12 @@
 (function () {
   "use strict";
 
-  // Allow re-injection: clean up previous instance instead of blocking
+  // Allow re-injection: clean up previous instance without triggering GUIDE_STOPPED
   if (window.__ondokiGuideRunner) {
-    try { window.__ondokiGuideRunner.stop(); } catch {}
+    try {
+      window.__ondokiGuideRunner._replacing = true;
+      window.__ondokiGuideRunner.stop();
+    } catch {}
   }
   window.__ondokiGuideLoaded = true;
 
@@ -359,6 +362,7 @@
       this.positionInterval = null;
       this.currentResult = null;
       this._clickHandler = null;
+      this._stepSeq = 0; // concurrency guard: increments on each showStep call
       // Persistent overlay elements for in-place updates
       this._backdrop = null;
       this._overlay = null;
@@ -390,8 +394,10 @@
       this._tooltip = null;
       this._notFoundPanel = null;
       activeRunner = null;
-      // Notify background that guide stopped
-      chrome.runtime.sendMessage({ type: 'GUIDE_STOPPED' }).catch(() => {});
+      // Only notify background if this is a user-initiated stop (not a replacement)
+      if (!this._replacing) {
+        chrome.runtime.sendMessage({ type: 'GUIDE_STOPPED' }).catch(() => {});
+      }
     }
 
     _createHost() {
@@ -422,6 +428,8 @@
         this.stop();
         return;
       }
+      // Concurrency guard: if another showStep starts, this one aborts
+      const seq = ++this._stepSeq;
       this.currentIndex = index;
       this._clearOverlay();
 
@@ -440,10 +448,12 @@
       // Find element with retry (more attempts, longer waits for freshly loaded pages)
       let result = null;
       for (let attempt = 0; attempt < 5; attempt++) {
+        if (this._stepSeq !== seq) return; // another showStep started, abort
         result = await findGuideElement(step);
         if (result) break;
         await new Promise((r) => setTimeout(r, attempt < 2 ? 800 : 1500));
       }
+      if (this._stepSeq !== seq) return; // abort if superseded
 
       this.currentResult = result;
 
@@ -852,7 +862,10 @@
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "START_GUIDE") {
       try {
-        if (activeRunner) activeRunner.stop();
+        if (activeRunner) {
+          activeRunner._replacing = true; // don't send GUIDE_STOPPED
+          activeRunner.stop();
+        }
         const runner = new GuideRunner(message.guide);
         activeRunner = runner;
         window.__ondokiGuideRunner = runner;
