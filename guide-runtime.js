@@ -17,11 +17,70 @@
   }
   window.__ondokiGuideLoaded = true;
 
+  // ── CSS Zoom Compensation ─────────────────────────────────────────
+
+  function getPageZoom() {
+    let zoom = 1;
+    for (const el of [document.documentElement, document.body]) {
+      if (!el) continue;
+      const z = getComputedStyle(el).zoom;
+      if (z && z !== "normal") {
+        const n = parseFloat(z);
+        if (!isNaN(n) && n > 0) zoom *= n;
+      }
+    }
+    return zoom;
+  }
+
+  // ── Searchable Roots (document + shadow roots + same-origin iframes) ──
+
+  function collectSearchRoots(root = document, depth = 0) {
+    // Returns array of { root: Document|ShadowRoot, iframeOffset: {x,y} }
+    const results = [{ root, iframeOffset: { x: 0, y: 0 }, depth }];
+    if (depth > 5) return results; // prevent infinite recursion
+
+    try {
+      // Traverse shadow roots
+      root.querySelectorAll("*").forEach((el) => {
+        if (el.shadowRoot && el.id !== "ondoki-guide-overlay") {
+          results.push(...collectSearchRoots(el.shadowRoot, depth + 1).map((r) => ({
+            ...r,
+            iframeOffset: results[0].iframeOffset, // same offset as parent
+          })));
+        }
+      });
+
+      // Traverse same-origin iframes
+      root.querySelectorAll("iframe").forEach((iframe) => {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return; // cross-origin or not loaded
+          const iframeRect = iframe.getBoundingClientRect();
+          const parentOffset = results[0].iframeOffset;
+          const offset = {
+            x: parentOffset.x + iframeRect.left,
+            y: parentOffset.y + iframeRect.top,
+          };
+          results.push(
+            ...collectSearchRoots(doc, depth + 1).map((r) => ({
+              ...r,
+              iframeOffset: { x: offset.x + r.iframeOffset.x, y: offset.y + r.iframeOffset.y },
+            }))
+          );
+        } catch {
+          // cross-origin iframe — skip
+        }
+      });
+    } catch {}
+
+    return results;
+  }
+
   // ── Element Finder ────────────────────────────────────────────────
 
-  function safeQuerySelector(selector) {
+  function safeQuerySelector(root, selector) {
     try {
-      return document.querySelector(selector);
+      return root.querySelector(selector);
     } catch {
       return null;
     }
@@ -31,7 +90,8 @@
     if (!el || !el.getBoundingClientRect) return false;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) return false;
-    const style = getComputedStyle(el);
+    const win = el.ownerDocument?.defaultView || window;
+    const style = win.getComputedStyle(el);
     return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
   }
 
@@ -44,7 +104,7 @@
     for (const el of candidates) {
       if (!isVisible(el)) continue;
       const elText = (el.textContent || "").trim().toLowerCase();
-      if (elText === target) return el; // exact match
+      if (elText === target) return el;
       if (opts.fuzzy && elText.includes(target)) {
         const score = Math.abs(elText.length - target.length);
         if (score < bestScore) {
@@ -56,85 +116,93 @@
     return best;
   }
 
-  function findByParentContext(step) {
-    const chain = step.element_info?.parentChain;
-    if (!chain || !chain.length) return null;
-
-    // Try to find a unique ancestor from the parent chain, then find target within it
-    for (const ancestor of chain) {
-      let container = null;
-      if (ancestor.id) {
-        container = document.getElementById(ancestor.id);
-      } else if (ancestor.testId) {
-        container = document.querySelector(`[data-testid="${CSS.escape(ancestor.testId)}"]`);
-      } else if (ancestor.role) {
-        const candidates = document.querySelectorAll(`[role="${ancestor.role}"]`);
-        if (candidates.length === 1) container = candidates[0];
-      }
-      if (!container) continue;
-
-      // Search within this container
-      if (step.element_info?.tagName && step.element_text) {
-        const els = container.querySelectorAll(step.element_info.tagName);
-        const match = findByText(els, step.element_text, { fuzzy: true });
-        if (match) return match;
-      }
-      if (step.selector) {
-        const el = container.querySelector(step.selector);
-        if (el && isVisible(el)) return el;
-      }
-    }
-    return null;
-  }
-
-  async function findGuideElement(step) {
-    // Level 1: CSS selector
+  // Search a single root for the step's element using all strategies
+  function findInRoot(root, step) {
+    // CSS selector
     if (step.selector) {
-      const el = safeQuerySelector(step.selector);
+      const el = safeQuerySelector(root, step.selector);
       if (el && isVisible(el)) return { element: el, confidence: 1.0, method: "selector" };
     }
 
-    // Level 2: data-testid
+    // data-testid
     const testId = step.element_info?.testId;
     if (testId) {
       for (const attr of ["data-testid", "data-test", "data-cy"]) {
         try {
-          const el = document.querySelector(`[${attr}="${CSS.escape(testId)}"]`);
+          const el = root.querySelector(`[${attr}="${CSS.escape(testId)}"]`);
           if (el && isVisible(el)) return { element: el, confidence: 0.95, method: "testid" };
         } catch {}
       }
     }
 
-    // Level 3: ARIA role + text
+    // ARIA role + text
     if (step.element_role && step.element_text) {
-      const candidates = document.querySelectorAll(`[role="${step.element_role}"]`);
-      const match = findByText(candidates, step.element_text);
+      const candidates = root.querySelectorAll(`[role="${step.element_role}"]`);
+      const match = findByText(Array.from(candidates), step.element_text);
       if (match) return { element: match, confidence: 0.85, method: "role+text" };
     }
 
-    // Level 4: Tag + text (fuzzy)
+    // Tag + text (fuzzy)
     if (step.element_info?.tagName && step.element_text) {
-      const candidates = document.querySelectorAll(step.element_info.tagName);
-      const match = findByText(candidates, step.element_text, { fuzzy: true });
+      const candidates = root.querySelectorAll(step.element_info.tagName);
+      const match = findByText(Array.from(candidates), step.element_text, { fuzzy: true });
       if (match) return { element: match, confidence: 0.7, method: "tag+text" };
     }
 
-    // Level 5: XPath
-    if (step.xpath) {
+    // XPath (only works on Document nodes, not ShadowRoot)
+    if (step.xpath && root.nodeType === Node.DOCUMENT_NODE) {
       try {
-        const result = document.evaluate(step.xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const result = root.evaluate(step.xpath, root, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
         const el = result.singleNodeValue;
         if (el && isVisible(el)) return { element: el, confidence: 0.6, method: "xpath" };
       } catch {}
     }
 
-    // Level 6: Parent chain context
+    // Parent chain context
     if (step.element_info?.parentChain?.length) {
-      const el = findByParentContext(step);
-      if (el) return { element: el, confidence: 0.5, method: "parent-context" };
+      const chain = step.element_info.parentChain;
+      for (const ancestor of chain) {
+        let container = null;
+        if (ancestor.id) {
+          container = root.getElementById ? root.getElementById(ancestor.id) : root.querySelector(`#${CSS.escape(ancestor.id)}`);
+        } else if (ancestor.testId) {
+          container = safeQuerySelector(root, `[data-testid="${CSS.escape(ancestor.testId)}"]`);
+        } else if (ancestor.role) {
+          const candidates = root.querySelectorAll(`[role="${ancestor.role}"]`);
+          if (candidates.length === 1) container = candidates[0];
+        }
+        if (!container) continue;
+        if (step.element_info?.tagName && step.element_text) {
+          const els = container.querySelectorAll(step.element_info.tagName);
+          const match = findByText(Array.from(els), step.element_text, { fuzzy: true });
+          if (match) return { element: match, confidence: 0.5, method: "parent-context" };
+        }
+      }
     }
 
     return null;
+  }
+
+  // Main finder: searches document + all shadow roots + all same-origin iframes
+  async function findGuideElement(step) {
+    const searchRoots = collectSearchRoots();
+
+    let bestResult = null;
+
+    for (const { root, iframeOffset } of searchRoots) {
+      const result = findInRoot(root, step);
+      if (result) {
+        result.iframeOffset = iframeOffset;
+        // Return immediately on high-confidence match
+        if (result.confidence >= 0.85) return result;
+        // Keep the best
+        if (!bestResult || result.confidence > bestResult.confidence) {
+          bestResult = result;
+        }
+      }
+    }
+
+    return bestResult;
   }
 
   // ── Overlay Renderer ──────────────────────────────────────────────
@@ -465,7 +533,7 @@
       }).catch(() => {});
 
       if (result) {
-        this._scrollToElement(result.element);
+        this._scrollToElement(result);
         await new Promise((r) => setTimeout(r, 100)); // wait for scroll
         this._renderOverlay(step, result, urlMismatch);
         this._startPositionTracking(step, result);
@@ -475,18 +543,33 @@
       }
     }
 
-    _scrollToElement(el) {
-      // Only scroll if element is not already visible — scrolling triggers modal/dropdown close
-      const rect = el.getBoundingClientRect();
+    _scrollToElement(result) {
+      // Use adjusted rect (accounts for iframe offset) to check visibility
+      const rect = this._getAdjustedRect(result);
       const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
         && rect.left >= 0 && rect.right <= window.innerWidth;
       if (!inView) {
-        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        result.element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       }
     }
 
+    // Get the element rect in top-frame coordinates (accounting for iframe offset + zoom)
+    _getAdjustedRect(result) {
+      const raw = result.element.getBoundingClientRect();
+      const offset = result.iframeOffset || { x: 0, y: 0 };
+      const zoom = getPageZoom();
+      return {
+        left: (raw.left + offset.x) * zoom,
+        top: (raw.top + offset.y) * zoom,
+        right: (raw.right + offset.x) * zoom,
+        bottom: (raw.bottom + offset.y) * zoom,
+        width: raw.width * zoom,
+        height: raw.height * zoom,
+      };
+    }
+
     _renderOverlay(step, result, urlMismatch) {
-      const rect = result.element.getBoundingClientRect();
+      const rect = this._getAdjustedRect(result);
       const pad = 6;
 
       // Create or update backdrop with cutout (in-place)
@@ -775,7 +858,7 @@
           return;
         }
 
-        const rect = result.element.getBoundingClientRect();
+        const rect = this._getAdjustedRect(result);
         const pad = 6;
 
         if (this._highlight) {
