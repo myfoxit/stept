@@ -1629,7 +1629,7 @@ async def get_interactive_guide(
             project_id=session.project_id, required_role=ProjectRole.VIEWER,
         )
 
-    # Load steps ordered by step_number
+    # Load steps and files ordered by step_number
     stmt = (
         select(ProcessRecordingStep)
         .where(ProcessRecordingStep.session_id == session_id)
@@ -1637,6 +1637,13 @@ async def get_interactive_guide(
     )
     result = await db.execute(stmt)
     steps = result.scalars().all()
+
+    # Build files lookup for screenshot URLs
+    files_stmt = select(ProcessRecordingFile).where(
+        ProcessRecordingFile.session_id == session_id
+    )
+    files_result = await db.execute(files_stmt)
+    files_dict = {f.step_number: f for f in files_result.scalars().all()}
 
     guide_steps = []
     for step in steps:
@@ -1646,6 +1653,10 @@ async def get_interactive_guide(
         step_title = step.generated_title or step.generated_description or step.description or f"Step {step.step_number}"
 
         is_navigation = (step.action_type or "").lower() == "navigate"
+
+        # Screenshot URL: /api/v1/process-recording/{session_id}/{step_number}/image
+        has_image = step.step_number in files_dict
+        screenshot_url = f"/api/v1/process-recording/{session_id}/{step.step_number}/image" if has_image else None
 
         guide_steps.append({
             "title": step_title,
@@ -1662,6 +1673,9 @@ async def get_interactive_guide(
             "action_type": step.action_type,
             "step_number": step.step_number,
             "is_navigation": is_navigation,
+            "screenshot_url": screenshot_url,
+            "screenshot_size": step.screenshot_size,
+            "screenshot_relative_position": step.screenshot_relative_position,
         })
 
     return {
