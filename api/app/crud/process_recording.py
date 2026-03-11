@@ -653,6 +653,10 @@ async def get_file_access(
     if not session:
         return None
 
+    # If file_path is absolute and exists, serve directly (e.g. video import frames)
+    if os.path.isabs(file_record.file_path) and os.path.exists(file_record.file_path):
+        return {"type": "local", "path": file_record.file_path}
+
     backend = get_storage_backend(session.storage_type)
 
     # Local resolution
