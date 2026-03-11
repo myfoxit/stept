@@ -41,7 +41,9 @@ if celery_app:
             from datetime import datetime
 
             # Load LLM config from DB (normally done at FastAPI startup, but worker needs it too)
-            await load_db_config()
+            db_cfg = await load_db_config()
+            logger.info("Video import: LLM config loaded — provider=%s, model=%s, has_key=%s",
+                        db_cfg.get("provider"), db_cfg.get("model"), bool(db_cfg.get("api_key")))
 
             async with AsyncSessionLocal() as db:
                 # Get session and job
