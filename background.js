@@ -389,6 +389,24 @@ async function initiateLogin() {
 
 async function handleAuthCallback(callbackUrl) {
   const API_BASE_URL = await getApiBaseUrl();
+
+  // Restore PKCE state from session storage if service worker restarted during auth flow
+  // (common on Windows where SW is terminated aggressively after ~30s idle)
+  if (!state.codeVerifier || !state.authState) {
+    try {
+      const pkce = await chrome.storage.session.get(['pkceCodeVerifier', 'pkceAuthState']);
+      if (pkce.pkceCodeVerifier) state.codeVerifier = pkce.pkceCodeVerifier;
+      if (pkce.pkceAuthState) state.authState = pkce.pkceAuthState;
+      debugLog('Restored PKCE state from session storage after SW restart');
+    } catch (e) {
+      debugLog('Failed to restore PKCE state:', e);
+    }
+  }
+
+  if (!state.codeVerifier) {
+    throw new Error('PKCE code verifier lost — please try logging in again');
+  }
+
   const url = new URL(callbackUrl);
   const code = url.searchParams.get('code');
   const returnedState = url.searchParams.get('state');
