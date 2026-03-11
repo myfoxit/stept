@@ -821,7 +821,10 @@ async function playGuideForWorkflow(workflowId) {
   }
 }
 
-function renderGuideSteps(guide, currentIndex) {
+// Cache of fetched guide image data URLs keyed by screenshot_url
+const _guideImageCache = {};
+
+async function renderGuideSteps(guide, currentIndex) {
   const panel = document.getElementById('guideStepsPanel');
   const list = document.getElementById('guideStepsList');
   const recentWorkflows = document.getElementById('recentWorkflows');
@@ -835,7 +838,6 @@ function renderGuideSteps(guide, currentIndex) {
   panel.style.display = '';
   recentWorkflows.style.display = 'none';
 
-  // Re-render only if guide changed (not just step index)
   const guideId = guide.id || '';
   const needsFullRender = list.dataset.guideId !== guideId;
 
@@ -843,81 +845,89 @@ function renderGuideSteps(guide, currentIndex) {
     list.dataset.guideId = guideId;
     list.innerHTML = '';
 
+    // Reuse the EXACT same step card layout from recording view
     guide.steps.forEach((step, i) => {
       const card = document.createElement('div');
-      card.className = 'guide-step-card';
+      card.className = 'step-card guide-step-card';
       card.dataset.stepIndex = i;
 
-      const title = step.title || step.description || `Step ${i + 1}`;
-      const badge = step.action_type || 'step';
-
-      // Build click marker HTML if we have position data
-      let clickMarkerHtml = '';
-      if (step.screenshot_relative_position && step.screenshot_size) {
-        const xPct = (step.screenshot_relative_position.x / step.screenshot_size.width) * 100;
-        const yPct = (step.screenshot_relative_position.y / step.screenshot_size.height) * 100;
-        clickMarkerHtml = `
-          <div class="click-marker" style="left: ${xPct}%; top: ${yPct}%;">
-            <div class="click-marker-pulse"></div>
-            <div class="click-marker-ring"></div>
-            <div class="click-marker-dot"></div>
-          </div>
-        `;
-      }
+      const desc = step.title || step.description || step.action_type || `Step ${i + 1}`;
 
       card.innerHTML = `
-        <div class="guide-step-header">
-          <div class="guide-step-number">${i + 1}</div>
-          <span class="guide-step-title">${escapeHtml(title)}</span>
-          <span class="guide-step-badge">${escapeHtml(badge)}</span>
-        </div>
-        ${step.screenshot_url ? `
-          <div class="step-screenshot-container guide-step-img-container">
-            <img class="step-screenshot" data-src="${step.screenshot_url}" alt="Step ${i + 1}">
-            ${clickMarkerHtml}
+        <div class="step-top-row">
+          <span class="step-number">${i + 1}</span>
+          <div class="step-text">
+            <p class="step-description">${escapeHtml(desc)}</p>
+            ${step.expected_url ? `<p class="step-url">${escapeHtml(step.expected_url)}</p>` : ''}
           </div>
-        ` : ''}
+        </div>
+        <div class="step-screenshot-container" data-step-index="${i}" style="min-height: 40px; background: #FAFAF9;">
+        </div>
       `;
 
+      // Click card → jump to that step in the guide
       card.addEventListener('click', () => {
         sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex: i });
       });
 
       list.appendChild(card);
-    });
 
-    // Lazy-load images via authenticated fetch
-    _loadGuideImages(list);
+      // Load image async into the screenshot container
+      if (step.screenshot_url) {
+        _loadStepImage(card.querySelector('.step-screenshot-container'), step, i);
+      }
+    });
   }
 
-  // Update active/completed state on all cards
+  // Update active/completed styling
   list.querySelectorAll('.guide-step-card').forEach((card) => {
     const idx = parseInt(card.dataset.stepIndex);
     card.classList.toggle('active', idx === currentIndex);
     card.classList.toggle('completed', idx < currentIndex);
   });
 
-  // Scroll active card into view
+  // Scroll active into view
   const activeCard = list.querySelector('.guide-step-card.active');
   if (activeCard) {
     activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
 
-async function _loadGuideImages(container) {
-  const imgs = container.querySelectorAll('img[data-src]');
-  for (const img of imgs) {
-    const src = img.dataset.src;
-    if (!src) continue;
+async function _loadStepImage(container, step, index) {
+  if (!step.screenshot_url) return;
+
+  // Check cache
+  let dataUrl = _guideImageCache[step.screenshot_url];
+  if (!dataUrl) {
     try {
-      const result = await sendMessage({ type: 'API_FETCH_BLOB', url: src });
+      const result = await sendMessage({ type: 'API_FETCH_BLOB', url: step.screenshot_url });
       if (result && result.dataUrl) {
-        img.src = result.dataUrl;
+        dataUrl = result.dataUrl;
+        _guideImageCache[step.screenshot_url] = dataUrl;
       }
-    } catch {
-      // Image load failed — leave placeholder
-    }
+    } catch { return; }
   }
+  if (!dataUrl) return;
+
+  // Build click marker if we have position data
+  let clickMarkerHtml = '';
+  if (step.screenshot_relative_position && step.screenshot_size) {
+    const xPct = (step.screenshot_relative_position.x / step.screenshot_size.width) * 100;
+    const yPct = (step.screenshot_relative_position.y / step.screenshot_size.height) * 100;
+    clickMarkerHtml = `
+      <div class="click-marker" style="left: ${xPct}%; top: ${yPct}%;">
+        <div class="click-marker-pulse"></div>
+        <div class="click-marker-ring"></div>
+        <div class="click-marker-dot"></div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <img class="step-screenshot" src="${dataUrl}" alt="Step ${index + 1}">
+    ${clickMarkerHtml}
+  `;
+  container.style.minHeight = '';
 }
 
 function hideGuideSteps() {

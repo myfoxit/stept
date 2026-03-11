@@ -1574,43 +1574,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const targetStep = guide.steps?.[startIndex];
           const targetUrl = targetStep?.expected_url;
 
-          // Find or create the right tab for the guide
-          let tabId = message.tabId;
+          let tabId = null;
 
-          if (!tabId && targetUrl) {
-            // Try to find an existing tab with a matching URL
+          if (targetUrl) {
+            // 1. Try to find an already-open tab with matching origin+path
             try {
-              const expectedOrigin = new URL(targetUrl).origin;
-              const expectedPath = new URL(targetUrl).pathname;
+              const expected = new URL(targetUrl);
               const allTabs = await chrome.tabs.query({ currentWindow: true });
               const match = allTabs.find(t => {
                 try {
                   const u = new URL(t.url);
-                  return u.origin === expectedOrigin && u.pathname === expectedPath;
+                  return u.origin === expected.origin && u.pathname === expected.pathname;
                 } catch { return false; }
               });
               if (match) {
                 tabId = match.id;
-                await chrome.tabs.update(tabId, { active: true }); // focus the tab
+                await chrome.tabs.update(tabId, { active: true });
               }
             } catch {}
+
+            // 2. No matching tab found → create a NEW tab
+            if (!tabId) {
+              const newTab = await chrome.tabs.create({ url: targetUrl, active: true });
+              tabId = newTab.id;
+              activeGuideState = { guide, currentIndex: startIndex, tabId };
+              _injectGuideAfterLoad(tabId, guide, startIndex);
+              notifyGuideStateUpdate();
+              sendResponse({ success: true });
+              break;
+            }
           }
 
+          // Fallback: no target URL — use the active tab
           if (!tabId) {
-            // No matching tab — use active tab or create new
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             tabId = activeTab?.id;
           }
-
           if (!tabId) {
             sendResponse({ success: false, error: 'No active tab' });
             break;
           }
 
-          // Track active guide state
           activeGuideState = { guide, currentIndex: startIndex, tabId };
 
-          // Check if current tab URL matches the target
+          // Check if current tab needs navigation
           let needsNavigation = false;
           if (targetUrl) {
             try {
@@ -1622,7 +1629,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
 
           if (needsNavigation && targetUrl) {
-            // Navigate then inject after full page load
             await chrome.tabs.update(tabId, { url: targetUrl, active: true });
             _injectGuideAfterLoad(tabId, guide, startIndex);
           } else {

@@ -379,6 +379,13 @@
     stop() {
       this._clearPositionTracking();
       this._removeClickHandler();
+      // Remove document-level event interceptors
+      if (this._docEventHandlers) {
+        for (const { evt, handler } of this._docEventHandlers) {
+          document.removeEventListener(evt, handler, true);
+        }
+        this._docEventHandlers = null;
+      }
       if (this.host) {
         this.host.remove();
         this.host = null;
@@ -398,25 +405,28 @@
       this.host = document.createElement("ondoki-guide-overlay");
       this.shadow = this.host.attachShadow({ mode: "closed" });
 
-      // CRITICAL: Stop all click/pointer events on the host from bubbling to the document.
-      // Without this, clicks on tooltip buttons propagate out of shadow DOM
-      // as clicks on the host element, which modal/dropdown "outside click"
-      // handlers detect and close the modal.
-      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
-        this.host.addEventListener(evt, (e) => {
-          // Only stop propagation for events that originate inside the tooltip
-          // (not the transparent backdrop area where we want clicks to pass through)
-          if (e.composedPath()[0] !== this.host) {
-            e.stopPropagation();
-          }
-        }, true);
-      }
-
       const style = document.createElement("style");
       style.textContent = STYLES;
       this.shadow.appendChild(style);
 
       document.documentElement.appendChild(this.host);
+
+      // CRITICAL: Intercept events at the DOCUMENT level in capture phase.
+      // This fires BEFORE any framework's outside-click handlers.
+      // If the event came from our overlay (tooltip buttons etc), eat it completely
+      // so modal/dropdown handlers never see it.
+      this._docEventHandlers = [];
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup", "focusin", "focusout"]) {
+        const handler = (e) => {
+          if (!this.host) return;
+          const path = e.composedPath();
+          if (path.includes(this.host)) {
+            e.stopImmediatePropagation();
+          }
+        };
+        document.addEventListener(evt, handler, true); // capture phase, runs FIRST
+        this._docEventHandlers.push({ evt, handler });
+      }
     }
 
     _clearOverlay() {
@@ -795,8 +805,7 @@
     }
 
     _setupClickAdvance(element, step) {
-      // For click steps: advance when user clicks anywhere in the cutout area
-      // We use both a direct element listener AND a document-level listener for reliability
+      // For click steps: advance when user clicks the target element
       const isClickStep = step.action_type && step.action_type.toLowerCase().includes("click");
       if (!isClickStep) return;
 
@@ -805,38 +814,37 @@
         if (this.currentIndex >= this.steps.length - 1) {
           this.stop();
         } else {
-          // Delay to allow the click to take effect on the page
           setTimeout(() => this.showStep(this.currentIndex + 1), 400);
         }
       };
 
-      // Direct handler on the target element
+      // Handler directly on the target element (clicks in the cutout go to the page element)
       this._clickHandler = (e) => advance();
-      element.addEventListener("click", this._clickHandler, { once: true, capture: true });
+      element.addEventListener("click", this._clickHandler, { once: true });
       this._clickElement = element;
 
-      // Fallback: document-level listener that checks if click is near the highlighted element
-      this._docClickHandler = (e) => {
-        if (!this.currentResult?.element) return;
-        const rect = this.currentResult.element.getBoundingClientRect();
-        const pad = 20; // generous click area
-        if (e.clientX >= rect.left - pad && e.clientX <= rect.right + pad
-          && e.clientY >= rect.top - pad && e.clientY <= rect.bottom + pad) {
-          advance();
-        }
-      };
-      document.addEventListener("click", this._docClickHandler, { once: true, capture: true });
+      // Also listen on parent in case the exact element gets replaced (SPAs)
+      if (element.parentElement) {
+        this._parentClickHandler = (e) => {
+          if (e.target === element || element.contains(e.target)) {
+            advance();
+          }
+        };
+        element.parentElement.addEventListener("click", this._parentClickHandler, { once: true });
+        this._clickParent = element.parentElement;
+      }
     }
 
     _removeClickHandler() {
       if (this._clickHandler && this._clickElement) {
-        this._clickElement.removeEventListener("click", this._clickHandler, { capture: true });
+        this._clickElement.removeEventListener("click", this._clickHandler);
         this._clickHandler = null;
         this._clickElement = null;
       }
-      if (this._docClickHandler) {
-        document.removeEventListener("click", this._docClickHandler, { capture: true });
-        this._docClickHandler = null;
+      if (this._parentClickHandler && this._clickParent) {
+        this._clickParent.removeEventListener("click", this._parentClickHandler);
+        this._parentClickHandler = null;
+        this._clickParent = null;
       }
     }
 
