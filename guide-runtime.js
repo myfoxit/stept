@@ -183,6 +183,32 @@
     return null;
   }
 
+  // ── Cross-origin iframe child frame mode (Feature 4) ──────────────
+  if (window !== window.top) {
+    // Running inside a child frame — only listen for element search requests
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'GUIDE_FIND_IN_FRAME') {
+        const result = findInRoot(document, message.step);
+        if (result) {
+          const rect = result.element.getBoundingClientRect();
+          let frameRect = null;
+          try { frameRect = self.frameElement?.getBoundingClientRect(); } catch {}
+          sendResponse({
+            found: true,
+            rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+            frameRect: frameRect ? { left: frameRect.left, top: frameRect.top, width: frameRect.width, height: frameRect.height } : null,
+            confidence: result.confidence,
+            method: result.method,
+          });
+        } else {
+          sendResponse({ found: false });
+        }
+      }
+      return false;
+    });
+    return; // Do NOT create overlay or register START_GUIDE in child frames
+  }
+
   // Main finder: searches document + all shadow roots + all same-origin iframes
   async function findGuideElement(step) {
     const searchRoots = collectSearchRoots();
@@ -202,7 +228,69 @@
       }
     }
 
+    // Feature 4: If no high-confidence local result, try cross-origin frames via background
+    if (!bestResult || bestResult.confidence < 0.85) {
+      try {
+        const [activeTab] = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+        if (activeTab?.id) {
+          const resp = await chrome.runtime.sendMessage({
+            type: 'GUIDE_FIND_IN_FRAMES',
+            step,
+            tabId: activeTab.id,
+          });
+          if (resp && resp.found && (!bestResult || (resp.confidence || 0) > bestResult.confidence)) {
+            // Cross-origin match — we can't get the element directly, but return info
+            // for now, prefer local results if any exist
+            // (Cross-origin elements can't be directly manipulated from top frame)
+          }
+        }
+      } catch {} // ignore errors from cross-origin search
+    }
+
     return bestResult;
+  }
+
+  // ── Obstructed Element Detection (Feature 3) ─────────────────────
+
+  function isObstructed(el) {
+    if (!el || !el.getBoundingClientRect) return null;
+    const rect = el.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const topEl = document.elementFromPoint(centerX, centerY);
+    if (!topEl) return null;
+    if (topEl === el || el.contains(topEl)) return null;
+    // Check if it's part of our overlay
+    let node = topEl;
+    while (node) {
+      if (node.tagName && node.tagName.toLowerCase() === 'ondoki-guide-overlay') return null;
+      node = node.parentElement;
+    }
+    return topEl;
+  }
+
+  // ── Intermediate Action Detection (Feature 8) ───────────────────
+
+  function needsIntermediateAction(el) {
+    let node = el.parentElement;
+    while (node && node !== document.documentElement) {
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none') return node;
+      if (style.visibility === 'hidden') return node;
+      if (node.getAttribute('aria-expanded') === 'false') return node;
+      if (node.tagName === 'DETAILS' && !node.hasAttribute('open')) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function describeElement(el) {
+    const tag = el.tagName?.toLowerCase() || 'element';
+    const text = (el.textContent || '').trim().slice(0, 40);
+    const label = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+    if (label) return `${tag} "${label}"`;
+    if (text) return `${tag} "${text}"`;
+    return tag;
   }
 
   // ── Overlay Renderer ──────────────────────────────────────────────
@@ -358,6 +446,33 @@
 
     .guide-close-btn:hover { color: #D6D3D1; background: #292524; }
 
+    .guide-btn-done {
+      background: #059669;
+      color: #fff;
+    }
+
+    .guide-obstruction-warning {
+      background: #451A03;
+      border: 1px solid #92400E;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #FDE68A;
+      line-height: 1.4;
+    }
+
+    .guide-intermediate-hint {
+      background: #1E1B4B;
+      border: 1px solid #3730A3;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #C7D2FE;
+      line-height: 1.4;
+    }
+
     .guide-url-warning {
       background: #451A03;
       border: 1px solid #78350F;
@@ -451,6 +566,7 @@
     stop() {
       this._clearPositionTracking();
       this._removeClickHandler();
+      this._disconnectCompletionObserver();
       if (this.host) {
         this.host.remove();
         this.host = null;
@@ -482,12 +598,17 @@
     _clearOverlay() {
       this._clearPositionTracking();
       this._removeClickHandler();
+      this._disconnectCompletionObserver();
       // Hide persistent elements instead of removing them
       if (this._highlight) this._highlight.style.display = "none";
       if (this._tooltip) this._tooltip.style.display = "none";
       if (this._notFoundPanel) {
         this._notFoundPanel.remove();
         this._notFoundPanel = null;
+      }
+      if (this._intermediatePanel) {
+        this._intermediatePanel.remove();
+        this._intermediatePanel = null;
       }
     }
 
@@ -533,11 +654,22 @@
       }).catch(() => {});
 
       if (result) {
+        // Feature 8: Check if element needs intermediate action (hidden ancestor)
+        const intermediateAncestor = needsIntermediateAction(result.element);
+        if (intermediateAncestor) {
+          this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
+          return;
+        }
+
+        // Feature 3: Check if element is obstructed
+        const obstructor = isObstructed(result.element);
+
         this._scrollToElement(result);
         await new Promise((r) => setTimeout(r, 100)); // wait for scroll
-        this._renderOverlay(step, result, urlMismatch);
+        this._renderOverlay(step, result, urlMismatch, obstructor);
         this._startPositionTracking(step, result);
         this._setupClickAdvance(result.element, step);
+        this._setupCompletionDetection(result.element, step);
       } else {
         this._renderNotFound(step, urlMismatch);
       }
@@ -568,7 +700,7 @@
       };
     }
 
-    _renderOverlay(step, result, urlMismatch) {
+    _renderOverlay(step, result, urlMismatch, obstructor) {
       const rect = this._getAdjustedRect(result);
       const pad = 6;
 
@@ -599,7 +731,7 @@
       if (this._tooltip) {
         this._tooltip.remove();
       }
-      this._tooltip = this._createTooltip(step, urlMismatch);
+      this._tooltip = this._createTooltip(step, urlMismatch, obstructor);
       this.shadow.appendChild(this._tooltip);
       this._positionTooltip(this._tooltip, rect);
     }
@@ -618,7 +750,7 @@
       )`;
     }
 
-    _createTooltip(step, urlMismatch) {
+    _createTooltip(step, urlMismatch, obstructor) {
       const total = this.steps.length;
       const idx = this.currentIndex;
       const progressPct = ((idx + 1) / total) * 100;
@@ -635,6 +767,19 @@
         </div>`;
       }
 
+      // Feature 3: Obstruction warning
+      if (obstructor) {
+        const obDesc = describeElement(obstructor);
+        html += `<div class="guide-obstruction-warning">
+          This element is behind another element. You may need to close a dialog or scroll.
+          <br><small>Obstructed by: &lt;${this._esc(obDesc)}&gt;</small>
+        </div>`;
+      }
+
+      // Feature 2: Determine if this is a non-click step (Type, Key, Select, Navigate)
+      const actionType = (step.action_type || '').toLowerCase();
+      const isNonClickStep = actionType.includes('type') || actionType.includes('key') || actionType.includes('select') || actionType.includes('navigate');
+
       html += `
         <div class="guide-tooltip-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
         ${step.description && step.description !== step.title ? `<div class="guide-tooltip-desc">${this._esc(step.description)}</div>` : ""}
@@ -648,6 +793,7 @@
           ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
           <div class="guide-spacer"></div>
           <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          ${isNonClickStep ? `<button class="guide-btn guide-btn-done" data-action="done">&#10003; Step Done</button>` : ""}
           <button class="guide-btn guide-btn-primary" data-action="next">${idx === total - 1 ? "Finish" : "Next"}</button>
         </div>
       `;
@@ -675,6 +821,13 @@
             break;
           case "back":
             this.showStep(this.currentIndex - 1);
+            break;
+          case "done":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
             break;
           case "skip":
             if (this.currentIndex >= this.steps.length - 1) {
@@ -925,6 +1078,159 @@
         this._parentClickHandler = null;
         this._clickParent = null;
       }
+    }
+
+    // Feature 5: Completion detection via MutationObserver and event listeners
+    _setupCompletionDetection(element, step) {
+      const actionType = (step.action_type || '').toLowerCase();
+      const advance = () => {
+        this._disconnectCompletionObserver();
+        if (this.currentIndex >= this.steps.length - 1) {
+          this.stop();
+        } else {
+          this.showStep(this.currentIndex + 1);
+        }
+      };
+
+      if (actionType.includes('type')) {
+        // Watch for value changes on input/textarea
+        const onInput = () => {
+          // Show subtle completion indicator then auto-advance
+          if (this._tooltip) {
+            const indicator = this._tooltip.querySelector('.guide-completion-indicator');
+            if (!indicator) {
+              const div = document.createElement('div');
+              div.className = 'guide-completion-indicator';
+              div.style.cssText = 'color:#059669;font-size:12px;margin-top:6px;';
+              div.textContent = 'Step completed \u2713';
+              this._tooltip.appendChild(div);
+            }
+          }
+          clearTimeout(this._completionTimeout);
+          this._completionTimeout = setTimeout(advance, 1500);
+        };
+        element.addEventListener('input', onInput);
+        this._completionCleanup = () => element.removeEventListener('input', onInput);
+      } else if (actionType.includes('click')) {
+        // Watch for element removal from DOM after click (e.g. dropdown closing)
+        if (element.parentElement) {
+          this._completionObserver = new MutationObserver((mutations) => {
+            if (!element.isConnected) {
+              setTimeout(advance, 400);
+            }
+          });
+          this._completionObserver.observe(element.parentElement, { childList: true, subtree: true });
+        }
+      } else if (actionType.includes('select')) {
+        const onChange = () => {
+          setTimeout(advance, 500);
+        };
+        element.addEventListener('change', onChange, { once: true });
+        this._completionCleanup = () => element.removeEventListener('change', onChange);
+      }
+      // Navigate steps are auto-skipped — no detection needed
+    }
+
+    _disconnectCompletionObserver() {
+      if (this._completionObserver) {
+        this._completionObserver.disconnect();
+        this._completionObserver = null;
+      }
+      if (this._completionCleanup) {
+        this._completionCleanup();
+        this._completionCleanup = null;
+      }
+      if (this._completionTimeout) {
+        clearTimeout(this._completionTimeout);
+        this._completionTimeout = null;
+      }
+    }
+
+    // Feature 8: Intermediate action hint (element hidden behind collapsed ancestor)
+    _renderIntermediateHint(step, ancestor, urlMismatch) {
+      const idx = this.currentIndex;
+      const total = this.steps.length;
+
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow.appendChild(this._backdrop);
+      }
+
+      // Try to highlight the ancestor if it's visible
+      const ancestorRect = ancestor.getBoundingClientRect();
+      if (ancestorRect.width > 0 && ancestorRect.height > 0) {
+        const zoom = getPageZoom();
+        const rect = {
+          left: ancestorRect.left * zoom, top: ancestorRect.top * zoom,
+          right: ancestorRect.right * zoom, bottom: ancestorRect.bottom * zoom,
+          width: ancestorRect.width * zoom, height: ancestorRect.height * zoom,
+        };
+        const pad = 6;
+        this._updateCutout(this._overlay, rect, pad);
+        if (!this._highlight) {
+          this._highlight = document.createElement("div");
+          this._highlight.className = "guide-highlight";
+          this.shadow.appendChild(this._highlight);
+        }
+        this._highlight.style.display = "";
+        this._highlight.style.borderColor = "#6366F1";
+        this._highlight.style.boxShadow = "0 0 0 4px rgba(99, 102, 241, 0.25)";
+        this._highlight.style.left = `${rect.left - pad}px`;
+        this._highlight.style.top = `${rect.top - pad}px`;
+        this._highlight.style.width = `${rect.width + pad * 2}px`;
+        this._highlight.style.height = `${rect.height + pad * 2}px`;
+      } else {
+        this._overlay.style.clipPath = "none";
+      }
+
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+
+      const ancestorDesc = describeElement(ancestor);
+      panel.innerHTML = `
+        <div class="guide-intermediate-hint">
+          First, open <strong>${this._esc(ancestorDesc)}</strong> to reveal the target element.
+        </div>
+        <div class="guide-not-found-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
+        <div class="guide-tooltip-progress">Step ${idx + 1} of ${total}</div>
+        <div class="guide-tooltip-actions" style="justify-content: center;">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          <button class="guide-btn guide-btn-primary" data-action="retry">Check again</button>
+        </div>
+      `;
+
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        panel.addEventListener(evt, (e) => e.stopPropagation());
+      }
+
+      panel.addEventListener("click", (e) => {
+        const action = e.target.closest("[data-action]")?.dataset.action;
+        if (!action) return;
+        switch (action) {
+          case "retry":
+            this.showStep(this.currentIndex);
+            break;
+          case "back":
+            this.showStep(this.currentIndex - 1);
+            break;
+          case "skip":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
+        }
+      });
+
+      this._intermediatePanel = panel;
+      this.shadow.appendChild(panel);
     }
 
     _esc(text) {

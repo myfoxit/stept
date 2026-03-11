@@ -53,6 +53,20 @@ function notifyGuideStateUpdate() {
     type: 'GUIDE_STATE_UPDATE',
     guideState: activeGuideState,
   }).catch(() => {});
+
+  // Feature 7: Persist guide progress to session storage
+  if (activeGuideState) {
+    chrome.storage.session.set({
+      guideProgress: {
+        guideId: activeGuideState.guide?.id,
+        guide: activeGuideState.guide,
+        currentIndex: activeGuideState.currentIndex,
+        tabId: activeGuideState.tabId,
+      },
+    }).catch(() => {});
+  } else {
+    chrome.storage.session.remove('guideProgress').catch(() => {});
+  }
 }
 
 // Helper: inject guide-runtime and start guide on a tab that's already loaded
@@ -64,7 +78,7 @@ async function _injectGuideNow(tabId, guide, startIndex) {
   } catch {
     // No listener — need to inject
   }
-  await chrome.scripting.executeScript({ target: { tabId }, files: ['guide-runtime.js'] });
+  await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['guide-runtime.js'] });
   await new Promise(r => setTimeout(r, 300));
   await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
 }
@@ -130,6 +144,21 @@ chrome.storage.local.get(
       if (pkce.pkceAuthState) state.authState = pkce.pkceAuthState;
     } catch (e) {
       debugLog('Failed to restore PKCE state:', e);
+    }
+
+    // Feature 7: Restore guide progress from session storage
+    try {
+      const gp = await chrome.storage.session.get(['guideProgress']);
+      if (gp.guideProgress && gp.guideProgress.guide) {
+        activeGuideState = {
+          guide: gp.guideProgress.guide,
+          currentIndex: gp.guideProgress.currentIndex || 0,
+          tabId: gp.guideProgress.tabId,
+        };
+        debugLog('Restored guide progress:', activeGuideState);
+      }
+    } catch (e) {
+      debugLog('Failed to restore guide progress:', e);
     }
 
     if (result.selectedProjectId) {
@@ -1748,6 +1777,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'GUIDE_FIND_IN_FRAMES': {
+        // Feature 4: Broadcast element search to all frames of a tab
+        try {
+          const tabId = message.tabId || activeGuideState?.tabId;
+          if (!tabId) { sendResponse({ found: false }); break; }
+          const frames = await chrome.webNavigation.getAllFrames({ tabId });
+          const results = [];
+          for (const frame of frames) {
+            if (frame.frameId === 0) continue; // skip top frame
+            try {
+              const resp = await chrome.tabs.sendMessage(tabId, {
+                type: 'GUIDE_FIND_IN_FRAME',
+                step: message.step,
+              }, { frameId: frame.frameId });
+              if (resp && resp.found) {
+                results.push(resp);
+              }
+            } catch {} // frame may not have listener
+          }
+          // Pick best match by confidence
+          if (results.length > 0) {
+            results.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+            sendResponse(results[0]);
+          } else {
+            sendResponse({ found: false });
+          }
+        } catch (e) {
+          sendResponse({ found: false });
+        }
+        break;
+      }
+
       case 'GET_GUIDE_STATE': {
         sendResponse({ guideState: activeGuideState });
         break;
@@ -1897,10 +1958,24 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 });
 
-chrome.webNavigation.onCompleted.addListener((details) => {
+chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (details.frameId !== 0) return;
   trackPageChange(details.tabId, 'navigation');
   checkContextLinks(details.url);
+
+  // Feature 7: Resume guide on navigation if there's saved progress for this tab
+  if (activeGuideState && activeGuideState.tabId === details.tabId && activeGuideState.guide) {
+    const step = activeGuideState.guide.steps?.[activeGuideState.currentIndex];
+    if (step) {
+      // Check if the navigated URL matches a step's expected URL (or just re-inject)
+      try {
+        await new Promise(r => setTimeout(r, 1000)); // wait for page to settle
+        await _injectGuideNow(details.tabId, activeGuideState.guide, activeGuideState.currentIndex);
+      } catch (e) {
+        debugLog('Guide re-inject on navigation failed:', e);
+      }
+    }
+  }
 });
 
 // Listen for tab updates to inject content script into newly loaded pages
