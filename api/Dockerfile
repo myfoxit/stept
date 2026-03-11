@@ -26,6 +26,7 @@ COPY . .
 
 # Run as non-root user
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN mkdir -p /app/storage/recordings /app/uploads && chown -R appuser:appgroup /app/storage /app/uploads
 USER appuser
 
 # Run the application
