@@ -6,6 +6,7 @@ import {
   Loader2,
   Check,
   CircleAlert,
+  Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,8 @@ interface AIToolbarProps {
   processingProgress?: { current: number; total: number } | null;
   onProcessAll: () => void;
   onGenerateGuide: () => void;
+  onGuideMe?: () => void;
+  hasGuide?: boolean;
   onAutoTag?: () => void;
   difficulty?: string | null;
   estimatedTime?: string | null;
@@ -29,6 +32,8 @@ export function AIToolbar({
   processingProgress,
   onProcessAll,
   onGenerateGuide,
+  onGuideMe,
+  hasGuide,
   onAutoTag,
   difficulty,
   estimatedTime,
@@ -73,6 +78,19 @@ export function AIToolbar({
           <FileText className="mr-1.5 h-4 w-4" />
           Generate Guide
         </Button>
+
+        {/* Guide Me Button */}
+        {hasGuide && onGuideMe && (
+          <Button
+            onClick={onGuideMe}
+            disabled={isProcessing}
+            size="sm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Play className="mr-1.5 h-4 w-4" />
+            Guide Me
+          </Button>
+        )}
 
         {/* Auto-tag Button */}
         {onAutoTag && (
