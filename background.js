@@ -1379,6 +1379,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'API_FETCH_BLOB': {
+        // Authenticated GET that returns image as data URL
+        try {
+          const resp = await authedFetch(message.url);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const reader = new FileReader();
+            const dataUrl = await new Promise((resolve) => {
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            sendResponse({ dataUrl });
+          } else {
+            sendResponse(null);
+          }
+        } catch (e) {
+          debugLog('API_FETCH_BLOB error:', e.message);
+          sendResponse(null);
+        }
+        break;
+      }
+
       case 'SET_SETTINGS':
         if (message.apiBaseUrl) {
           await chrome.storage.local.set({ apiBaseUrl: message.apiBaseUrl });

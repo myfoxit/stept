@@ -8,8 +8,10 @@
 (function () {
   "use strict";
 
-  // Guard against double-injection
-  if (window.__ondokiGuideLoaded) return;
+  // Allow re-injection: clean up previous instance instead of blocking
+  if (window.__ondokiGuideRunner) {
+    try { window.__ondokiGuideRunner.stop(); } catch {}
+  }
   window.__ondokiGuideLoaded = true;
 
   // ── Element Finder ────────────────────────────────────────────────
@@ -423,9 +425,6 @@
       this.currentIndex = index;
       this._clearOverlay();
 
-      // Brief delay to let UI transitions settle before showing next step
-      await new Promise((r) => setTimeout(r, 100));
-
       const step = this.steps[index];
 
       // Check URL mismatch
@@ -467,7 +466,13 @@
     }
 
     _scrollToElement(el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      // Only scroll if element is not already visible — scrolling triggers modal/dropdown close
+      const rect = el.getBoundingClientRect();
+      const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
+        && rect.left >= 0 && rect.right <= window.innerWidth;
+      if (!inView) {
+        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
     }
 
     _renderOverlay(step, result, urlMismatch) {
@@ -776,22 +781,37 @@
     }
 
     _setupClickAdvance(element, step) {
-      // If step is a click action, also advance when user clicks the target element
-      if (!step.action_type || !step.action_type.toLowerCase().includes("click")) return;
+      // For click steps: advance when user clicks anywhere in the cutout area
+      // We use both a direct element listener AND a document-level listener for reliability
+      const isClickStep = step.action_type && step.action_type.toLowerCase().includes("click");
+      if (!isClickStep) return;
 
-      this._clickHandler = (e) => {
-        // Advance to next step
+      const advance = () => {
         this._removeClickHandler();
         if (this.currentIndex >= this.steps.length - 1) {
           this.stop();
         } else {
-          // Delay slightly to allow the click to take effect
-          setTimeout(() => this.showStep(this.currentIndex + 1), 300);
+          // Delay to allow the click to take effect on the page
+          setTimeout(() => this.showStep(this.currentIndex + 1), 400);
         }
       };
 
+      // Direct handler on the target element
+      this._clickHandler = (e) => advance();
       element.addEventListener("click", this._clickHandler, { once: true, capture: true });
       this._clickElement = element;
+
+      // Fallback: document-level listener that checks if click is near the highlighted element
+      this._docClickHandler = (e) => {
+        if (!this.currentResult?.element) return;
+        const rect = this.currentResult.element.getBoundingClientRect();
+        const pad = 20; // generous click area
+        if (e.clientX >= rect.left - pad && e.clientX <= rect.right + pad
+          && e.clientY >= rect.top - pad && e.clientY <= rect.bottom + pad) {
+          advance();
+        }
+      };
+      document.addEventListener("click", this._docClickHandler, { once: true, capture: true });
     }
 
     _removeClickHandler() {
@@ -799,6 +819,10 @@
         this._clickElement.removeEventListener("click", this._clickHandler, { capture: true });
         this._clickHandler = null;
         this._clickElement = null;
+      }
+      if (this._docClickHandler) {
+        document.removeEventListener("click", this._docClickHandler, { capture: true });
+        this._docClickHandler = null;
       }
     }
 
@@ -813,6 +837,7 @@
   // ── Active Runner Singleton ───────────────────────────────────────
 
   let activeRunner = null;
+  window.__ondokiGuideRunner = null;
 
   // ── Message Handling ──────────────────────────────────────────────
 
@@ -822,6 +847,7 @@
         if (activeRunner) activeRunner.stop();
         const runner = new GuideRunner(message.guide);
         activeRunner = runner;
+        window.__ondokiGuideRunner = runner;
         if (typeof message.startIndex === "number" && message.startIndex > 0) {
           runner.start().then(() => runner.showStep(message.startIndex));
         } else {

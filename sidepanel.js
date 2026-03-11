@@ -835,35 +835,89 @@ function renderGuideSteps(guide, currentIndex) {
   panel.style.display = '';
   recentWorkflows.style.display = 'none';
 
-  list.innerHTML = guide.steps.map((step, i) => {
-    const title = (step.title || step.description || `Step ${i + 1}`).slice(0, 60);
-    const badge = step.action_type || 'step';
-    const isActive = i === currentIndex;
-    const isCompleted = i < currentIndex;
-    let cls = 'guide-step-item';
-    if (isActive) cls += ' active';
-    if (isCompleted) cls += ' completed';
+  // Re-render only if guide changed (not just step index)
+  const guideId = guide.id || '';
+  const needsFullRender = list.dataset.guideId !== guideId;
 
-    const numberContent = isCompleted
-      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
-      : (i + 1);
+  if (needsFullRender) {
+    list.dataset.guideId = guideId;
+    list.innerHTML = '';
 
-    return `
-      <div class="${cls}" data-step-index="${i}">
-        <div class="guide-step-number">${numberContent}</div>
-        <span class="guide-step-title">${escapeHtml(title)}</span>
-        <span class="guide-step-badge">${escapeHtml(badge)}</span>
-      </div>
-    `;
-  }).join('');
+    guide.steps.forEach((step, i) => {
+      const card = document.createElement('div');
+      card.className = 'guide-step-card';
+      card.dataset.stepIndex = i;
 
-  // Attach click handlers to step items
-  list.querySelectorAll('.guide-step-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      const stepIndex = parseInt(item.dataset.stepIndex);
-      sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex });
+      const title = step.title || step.description || `Step ${i + 1}`;
+      const badge = step.action_type || 'step';
+
+      // Build click marker HTML if we have position data
+      let clickMarkerHtml = '';
+      if (step.screenshot_relative_position && step.screenshot_size) {
+        const xPct = (step.screenshot_relative_position.x / step.screenshot_size.width) * 100;
+        const yPct = (step.screenshot_relative_position.y / step.screenshot_size.height) * 100;
+        clickMarkerHtml = `
+          <div class="click-marker" style="left: ${xPct}%; top: ${yPct}%;">
+            <div class="click-marker-pulse"></div>
+            <div class="click-marker-ring"></div>
+            <div class="click-marker-dot"></div>
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="guide-step-header">
+          <div class="guide-step-number">${i + 1}</div>
+          <span class="guide-step-title">${escapeHtml(title)}</span>
+          <span class="guide-step-badge">${escapeHtml(badge)}</span>
+        </div>
+        ${step.screenshot_url ? `
+          <div class="step-screenshot-container guide-step-img-container">
+            <img class="step-screenshot" data-src="${step.screenshot_url}" alt="Step ${i + 1}">
+            ${clickMarkerHtml}
+          </div>
+        ` : ''}
+      `;
+
+      card.addEventListener('click', () => {
+        sendMessage({ type: 'GUIDE_GO_TO_STEP', stepIndex: i });
+      });
+
+      list.appendChild(card);
     });
+
+    // Lazy-load images via authenticated fetch
+    _loadGuideImages(list);
+  }
+
+  // Update active/completed state on all cards
+  list.querySelectorAll('.guide-step-card').forEach((card) => {
+    const idx = parseInt(card.dataset.stepIndex);
+    card.classList.toggle('active', idx === currentIndex);
+    card.classList.toggle('completed', idx < currentIndex);
   });
+
+  // Scroll active card into view
+  const activeCard = list.querySelector('.guide-step-card.active');
+  if (activeCard) {
+    activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+async function _loadGuideImages(container) {
+  const imgs = container.querySelectorAll('img[data-src]');
+  for (const img of imgs) {
+    const src = img.dataset.src;
+    if (!src) continue;
+    try {
+      const result = await sendMessage({ type: 'API_FETCH_BLOB', url: src });
+      if (result && result.dataUrl) {
+        img.src = result.dataUrl;
+      }
+    } catch {
+      // Image load failed — leave placeholder
+    }
+  }
 }
 
 function hideGuideSteps() {
