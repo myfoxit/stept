@@ -37,6 +37,7 @@ import TrashPage from "@/pages/trash";
 import NotFoundPage from "@/pages/NotFoundPage";
 import VerifyPage from "@/pages/VerifyPage";
 import { DeviceConsentPage } from "@/pages/device-consent";
+import { VideoImportPage } from "@/pages/video-import";
 
 const queryClient = new QueryClient();
 
@@ -118,6 +119,7 @@ createRoot(document.getElementById("root")!).render(
                         element={<AnalyticsDashboardPage />}
                       />
                       <Route path="/trash" element={<TrashPage />} />
+                      <Route path="/video-import" element={<VideoImportPage />} />
                     </Route>
                     <Route path="login" element={<LoginPage />} />
                     <Route path="verify" element={<VerifyPage />} />
