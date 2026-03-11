@@ -54,19 +54,16 @@ if celery_app:
 
                 try:
                     # Progress callback updates session + job
-                    async def update_progress(stage: str, pct: int):
+                    async def progress_cb(stage: str, pct: int):
                         session.processing_stage = stage
                         session.processing_progress = pct
                         job.stage = stage
                         job.progress = pct
                         await db.commit()
 
-                    def sync_progress(stage: str, pct: int):
-                        asyncio.get_event_loop().run_until_complete(update_progress(stage, pct))
-
                     processor = VideoProcessor(
                         video_path=video_path,
-                        progress_callback=sync_progress,
+                        progress_callback=progress_cb,
                     )
                     pipeline_result = await processor.process()
 

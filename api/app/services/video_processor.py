@@ -7,7 +7,8 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Callable
+import inspect
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +23,18 @@ class VideoProcessor:
         video_path: str,
         scene_threshold: float = SCENE_THRESHOLD,
         max_frames: int = MAX_FRAMES,
-        progress_callback: Callable[[str, int], None] | None = None,
+        progress_callback: Callable[[str, int], Any] | None = None,
     ):
         self.video_path = video_path
         self.scene_threshold = scene_threshold
         self.max_frames = max_frames
-        self._progress = progress_callback or (lambda stage, pct: None)
+        self._progress_cb = progress_callback
+
+    async def _progress(self, stage: str, pct: int):
+        if self._progress_cb is not None:
+            result = self._progress_cb(stage, pct)
+            if inspect.isawaitable(result):
+                await result
 
     def _run_ffprobe_duration(self) -> float:
         result = subprocess.run(
@@ -185,30 +192,30 @@ class VideoProcessor:
         with tempfile.TemporaryDirectory(prefix="ondoki_video_") as tmpdir:
             # Get duration
             duration = self._run_ffprobe_duration()
-            self._progress("extracting_audio", 10)
+            await self._progress("extracting_audio", 10)
 
             # Extract audio + transcribe
             audio_path = self._extract_audio(tmpdir)
-            self._progress("transcribing", 20)
+            await self._progress("transcribing", 20)
 
             transcript = await self._transcribe_audio(audio_path)
-            self._progress("extracting_frames", 40)
+            await self._progress("extracting_frames", 40)
 
             # Detect scenes + extract frames
             timestamps = self._detect_scenes()
             frame_paths = self._extract_frames(timestamps, tmpdir)
-            self._progress("analyzing", 60)
+            await self._progress("analyzing", 60)
 
             if not frame_paths:
                 raise RuntimeError("No frames could be extracted from the video")
 
             # Convert to base64 for LLM
             frame_urls = self._frames_to_base64(frame_paths)
-            self._progress("generating", 75)
+            await self._progress("generating", 75)
 
             # Generate steps via vision LLM
             steps = await self._generate_steps_with_llm(frame_urls, transcript)
-            self._progress("done", 100)
+            await self._progress("done", 100)
 
             return {
                 "duration": duration,
