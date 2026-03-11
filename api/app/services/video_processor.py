@@ -150,7 +150,7 @@ class VideoProcessor:
         return results
 
     async def _generate_steps_with_llm(
-        self, frame_data_urls: list[str], transcript: str, frame_size: dict | None = None
+        self, frame_data_urls: list[str], transcript: str
     ) -> list[dict]:
         """Use vision LLM to generate step-by-step guide from frames + transcript."""
         from app.services.llm import chat_completion, extract_text_from_response
@@ -175,12 +175,7 @@ class VideoProcessor:
                     "- title (short imperative action, e.g. 'Open Settings')\n"
                     "- description (1-2 sentences explaining what to do and where)\n"
                     "- screenshot_index (0-based index of the screenshot that best shows this step)\n"
-                    "- cursor_position (object with x and y as pixel coordinates of where the user is clicking or interacting. "
-                    + (f"Each screenshot is {frame_size['width']}x{frame_size['height']} pixels. " if frame_size and frame_size.get('width') else "")
-                    + "x must be between 0 and the image width, y between 0 and the image height. "
-                    "Look for the mouse cursor/arrow in the screenshot. If visible, return its exact pixel position. "
-                    "If not visible, return the pixel position of the center of the UI element being interacted with.)\n\n"
-                    "Return ONLY valid JSON: an array of objects with those 5 fields. No markdown fences, no extra text."
+                    "Return ONLY valid JSON: an array of objects with those 4 fields. No markdown fences, no extra text."
                 ),
             }
         ]
@@ -256,7 +251,17 @@ class VideoProcessor:
         frame_urls = self._frames_to_base64(frame_paths)
         await self._progress("generating", 75)
 
-        steps = await self._generate_steps_with_llm(frame_urls, transcript, frame_size)
+        steps = await self._generate_steps_with_llm(frame_urls, transcript)
+
+        # Detect cursor positions via OpenCV template matching
+        cursor_positions = {}
+        try:
+            from app.services.cursor_detector import CursorDetector
+            detector = CursorDetector()
+            cursor_positions = detector.detect_batch(frame_paths)
+            logger.info("Cursor detected in %d/%d frames", len(cursor_positions), len(frame_paths))
+        except Exception as e:
+            logger.warning("Cursor detection failed: %s — continuing without", e)
         await self._progress("done", 100)
 
         return {
@@ -266,5 +271,6 @@ class VideoProcessor:
             "frame_timestamps": timestamps[:len(frame_paths)],
             "frame_paths": frame_paths,
             "frame_size": frame_size,
+            "cursor_positions": cursor_positions,
             "steps": steps,
         }
