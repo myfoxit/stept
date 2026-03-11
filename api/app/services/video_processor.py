@@ -130,7 +130,9 @@ class VideoProcessor:
                     files={"file": ("audio.wav", f, "audio/wav")},
                     data={"model": WHISPER_MODEL, "response_format": "text"},
                 )
-                resp.raise_for_status()
+                if resp.status_code != 200:
+                    logger.warning("Whisper API failed (%s): %s — continuing without transcript", resp.status_code, resp.text[:200])
+                    return ""
                 return resp.text.strip()
 
     def _frames_to_base64(self, frame_paths: list[str]) -> list[str]:
