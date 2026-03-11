@@ -308,16 +308,7 @@ class ProcessRecordingSession(Base):
     difficulty = Column(String, nullable=True)  # easy, medium, advanced
     is_processed = Column(Boolean, nullable=False, default=False)
     guide_markdown = Column(Text, nullable=True)
-
-    # Video import fields
-    source_type = Column(String(20), default="desktop")  # desktop, cli, video
-    video_filename = Column(String, nullable=True)
-    video_size_bytes = Column(BigInteger, nullable=True)
-    video_duration_seconds = Column(Float, nullable=True)
-    processing_progress = Column(Integer, default=0)  # 0-100
-    processing_stage = Column(String, nullable=True)  # uploading, extracting_audio, transcribing, extracting_frames, analyzing, generating, done, failed
-    processing_error = Column(String, nullable=True)
-
+    
     search_tsv = Column(TSVECTOR, nullable=True)  # tsvector for full-text search
 
     # Ranking signals
@@ -334,32 +325,6 @@ class ProcessRecordingSession(Base):
     project = relationship("Project", backref="recording_sessions")
     folder = relationship("Folder", backref="recording_sessions")
     owner = relationship("User", foreign_keys=[owner_id], backref="private_workflows")
-
-
-class MediaProcessingJob(Base):
-    __tablename__ = "media_processing_jobs"
-
-    id = Column(String(16), primary_key=True, default=gen_suffix)
-    session_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
-    job_type = Column(String(32), nullable=False, default="video_import")
-    status = Column(String(16), nullable=False, default="queued", index=True)  # queued, running, succeeded, failed
-    progress = Column(Integer, nullable=False, default=0)
-    stage = Column(String(64), nullable=True)
-    error = Column(String, nullable=True)
-    task_id = Column(String(64), nullable=True, unique=True, index=True)
-    attempts = Column(Integer, nullable=False, default=0)
-    max_attempts = Column(Integer, nullable=False, default=3)
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    session = relationship("ProcessRecordingSession", backref=backref("media_jobs", cascade="all, delete-orphan"))
-
-    __table_args__ = (
-        UniqueConstraint('session_id', 'job_type', name='_media_job_session_type_unique'),
-    )
-
 
 class ProcessRecordingStep(Base):
     __tablename__ = "process_recording_steps"
