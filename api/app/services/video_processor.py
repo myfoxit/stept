@@ -127,6 +127,20 @@ class VideoProcessor:
                     return ""
                 return resp.text.strip()
 
+    @staticmethod
+    def _get_image_size(path: str) -> dict:
+        """Get image dimensions using ffprobe."""
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height",
+             "-of", "csv=p=0:s=x", path],
+            capture_output=True, text=True, timeout=10,
+        )
+        parts = result.stdout.strip().split("x")
+        if len(parts) == 2:
+            return {"width": int(parts[0]), "height": int(parts[1])}
+        return {"width": 0, "height": 0}
+
     def _frames_to_base64(self, frame_paths: list[str]) -> list[str]:
         results = []
         for path in frame_paths:
@@ -160,8 +174,9 @@ class VideoProcessor:
                     "- step_number (starting from 1)\n"
                     "- title (short imperative action, e.g. 'Open Settings')\n"
                     "- description (1-2 sentences explaining what to do and where)\n"
-                    "- screenshot_index (0-based index of the screenshot that best shows this step)\n\n"
-                    "Return ONLY valid JSON: an array of objects with those 4 fields. No markdown fences, no extra text."
+                    "- screenshot_index (0-based index of the screenshot that best shows this step)\n"
+                    "- cursor_position (object with x and y as pixel coordinates of where the mouse cursor is pointing or where the user is clicking/interacting in that screenshot. Look for the mouse arrow/pointer/cursor in the image. If you can see it, return its pixel position. If you cannot find a visible cursor, estimate the position of the UI element being interacted with. The coordinates should be in pixels relative to the screenshot dimensions.)\n\n"
+                    "Return ONLY valid JSON: an array of objects with those 5 fields. No markdown fences, no extra text."
                 ),
             }
         ]
@@ -231,6 +246,9 @@ class VideoProcessor:
         if not frame_paths:
             raise RuntimeError("No frames could be extracted from the video")
 
+        # Get frame dimensions from first frame
+        frame_size = self._get_image_size(frame_paths[0])
+
         frame_urls = self._frames_to_base64(frame_paths)
         await self._progress("generating", 75)
 
@@ -243,5 +261,6 @@ class VideoProcessor:
             "frame_count": len(frame_paths),
             "frame_timestamps": timestamps[:len(frame_paths)],
             "frame_paths": frame_paths,
+            "frame_size": frame_size,
             "steps": steps,
         }
