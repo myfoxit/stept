@@ -179,8 +179,18 @@ class VideoProcessor:
         messages = [{"role": "user", "content": content_parts}]
 
         response = await chat_completion(messages, stream=False)
+
+        # chat_completion(stream=False) returns httpx.Response
+        if response.status_code != 200:
+            logger.error("LLM API error %s: %s", response.status_code, response.text[:500])
+            raise RuntimeError(f"LLM API returned {response.status_code}: {response.text[:200]}")
+
         response_json = response.json()
         text = extract_text_from_response(response_json)
+
+        if not text or not text.strip():
+            logger.error("LLM returned empty text. Full response: %s", json.dumps(response_json)[:500])
+            raise RuntimeError("LLM returned empty response — check model/API key configuration")
 
         # Parse JSON from response
         text = text.strip()
@@ -188,7 +198,11 @@ class VideoProcessor:
             text = re.sub(r"^```\w*\n?", "", text)
             text = re.sub(r"\n?```$", "", text)
 
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            logger.error("LLM response not valid JSON: %s", text[:500])
+            raise RuntimeError(f"LLM did not return valid JSON: {text[:200]}")
 
     async def process(self) -> dict:
         """Run the full pipeline: scene detection, audio extraction, transcription, LLM analysis."""
