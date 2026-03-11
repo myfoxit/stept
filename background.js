@@ -1404,28 +1404,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'API_FETCH_BLOB': {
         // Authenticated GET that returns image as data URL
         try {
-          // Resolve relative URLs against API base
           let fetchUrl = message.url;
-          if (fetchUrl.startsWith('/api/')) {
+          if (fetchUrl.startsWith('/api/') || fetchUrl.startsWith('/v1/')) {
             const API_BASE_URL = await getApiBaseUrl();
             const baseOrigin = new URL(API_BASE_URL).origin;
             fetchUrl = baseOrigin + fetchUrl;
           }
-          const resp = await authedFetch(fetchUrl);
+          debugLog('API_FETCH_BLOB fetching:', fetchUrl);
+          // Use redirect: 'follow' explicitly, and strip auth header on redirect
+          const resp = await authedFetch(fetchUrl, { redirect: 'follow' });
+          debugLog('API_FETCH_BLOB status:', resp.status, resp.statusText);
           if (resp.ok) {
             const blob = await resp.blob();
+            debugLog('API_FETCH_BLOB blob size:', blob.size, 'type:', blob.type);
             const reader = new FileReader();
-            const dataUrl = await new Promise((resolve) => {
+            const dataUrl = await new Promise((resolve, reject) => {
               reader.onloadend = () => resolve(reader.result);
+              reader.onerror = () => reject(reader.error);
               reader.readAsDataURL(blob);
             });
             sendResponse({ dataUrl });
           } else {
-            sendResponse(null);
+            debugLog('API_FETCH_BLOB failed:', resp.status, await resp.text().catch(() => ''));
+            sendResponse({ error: `HTTP ${resp.status}` });
           }
         } catch (e) {
           debugLog('API_FETCH_BLOB error:', e.message);
-          sendResponse(null);
+          sendResponse({ error: e.message });
         }
         break;
       }

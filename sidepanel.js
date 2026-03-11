@@ -894,18 +894,26 @@ async function renderGuideSteps(guide, currentIndex) {
 }
 
 async function _loadStepImage(container, step, index) {
-  if (!step.screenshot_url) return;
+  if (!step.screenshot_url) {
+    console.log(`[Guide] Step ${index}: no screenshot_url`);
+    return;
+  }
 
   // Check cache
   let dataUrl = _guideImageCache[step.screenshot_url];
   if (!dataUrl) {
     try {
+      console.log(`[Guide] Step ${index}: fetching image from ${step.screenshot_url}`);
       const result = await sendMessage({ type: 'API_FETCH_BLOB', url: step.screenshot_url });
+      console.log(`[Guide] Step ${index}: fetch result:`, result ? (result.dataUrl ? `OK (${result.dataUrl.length} chars)` : result.error || 'no dataUrl') : 'null');
       if (result && result.dataUrl) {
         dataUrl = result.dataUrl;
         _guideImageCache[step.screenshot_url] = dataUrl;
       }
-    } catch { return; }
+    } catch (e) {
+      console.error(`[Guide] Step ${index}: image fetch error:`, e);
+      return;
+    }
   }
   if (!dataUrl) return;
 

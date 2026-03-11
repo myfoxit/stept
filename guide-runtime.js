@@ -379,13 +379,6 @@
     stop() {
       this._clearPositionTracking();
       this._removeClickHandler();
-      // Remove document-level event interceptors
-      if (this._docEventHandlers) {
-        for (const { evt, handler } of this._docEventHandlers) {
-          document.removeEventListener(evt, handler, true);
-        }
-        this._docEventHandlers = null;
-      }
       if (this.host) {
         this.host.remove();
         this.host = null;
@@ -410,23 +403,6 @@
       this.shadow.appendChild(style);
 
       document.documentElement.appendChild(this.host);
-
-      // CRITICAL: Intercept events at the DOCUMENT level in capture phase.
-      // This fires BEFORE any framework's outside-click handlers.
-      // If the event came from our overlay (tooltip buttons etc), eat it completely
-      // so modal/dropdown handlers never see it.
-      this._docEventHandlers = [];
-      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup", "focusin", "focusout"]) {
-        const handler = (e) => {
-          if (!this.host) return;
-          const path = e.composedPath();
-          if (path.includes(this.host)) {
-            e.stopImmediatePropagation();
-          }
-        };
-        document.addEventListener(evt, handler, true); // capture phase, runs FIRST
-        this._docEventHandlers.push({ evt, handler });
-      }
     }
 
     _clearOverlay() {
@@ -585,11 +561,17 @@
 
       tooltip.innerHTML = html;
 
-      // Wire up buttons
+      // Stop ALL events on the tooltip from reaching the document.
+      // In shadow DOM, stopPropagation prevents crossing the shadow boundary,
+      // so modal "outside click" handlers on document never see these clicks.
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        tooltip.addEventListener(evt, (e) => e.stopPropagation());
+      }
+
+      // Wire up action buttons
       tooltip.addEventListener("click", (e) => {
         const action = e.target.closest("[data-action]")?.dataset.action;
         if (!action) return;
-        e.stopPropagation();
         switch (action) {
           case "next":
             if (this.currentIndex >= this.steps.length - 1) {
@@ -719,10 +701,14 @@
 
       panel.innerHTML = notFoundHtml;
 
+      // Stop events from reaching document (same as tooltip)
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        panel.addEventListener(evt, (e) => e.stopPropagation());
+      }
+
       panel.addEventListener("click", (e) => {
         const action = e.target.closest("[data-action]")?.dataset.action;
         if (!action) return;
-        e.stopPropagation();
         switch (action) {
           case "back":
             this.showStep(this.currentIndex - 1);
