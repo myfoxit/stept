@@ -67,18 +67,28 @@ if celery_app:
                         job.progress = pct
                         await db.commit()
 
+                    # Output frames to persistent storage alongside the video
+                    frames_dir = str(Path(video_path).parent / "frames")
                     processor = VideoProcessor(
                         video_path=video_path,
+                        output_dir=frames_dir,
                         progress_callback=progress_cb,
                     )
                     pipeline_result = await processor.process()
 
-                    # Create ProcessRecordingStep entries from LLM output
+                    # Create ProcessRecordingStep + File entries from LLM output
+                    from app.models import ProcessRecordingFile
+                    frame_paths = pipeline_result.get("frame_paths", [])
+
                     for step_data in pipeline_result["steps"]:
+                        step_num = step_data["step_number"]
+                        screenshot_idx = step_data.get("screenshot_index", step_num - 1)
+                        screenshot_idx = max(0, min(screenshot_idx, len(frame_paths) - 1)) if frame_paths else -1
+
                         step = ProcessRecordingStep(
                             id=gen_suffix(16),
                             session_id=session_id,
-                            step_number=step_data["step_number"],
+                            step_number=step_num,
                             step_type="screenshot",
                             timestamp=datetime.utcnow(),
                             action_type="video_frame",
@@ -87,6 +97,20 @@ if celery_app:
                             is_annotated=True,
                         )
                         db.add(step)
+
+                        # Create file record pointing to the persisted frame
+                        if 0 <= screenshot_idx < len(frame_paths):
+                            frame_path = Path(frame_paths[screenshot_idx])
+                            file_record = ProcessRecordingFile(
+                                id=gen_suffix(16),
+                                session_id=session_id,
+                                step_number=step_num,
+                                filename=frame_path.name,
+                                file_path=str(frame_path),
+                                file_size=frame_path.stat().st_size if frame_path.exists() else 0,
+                                mime_type="image/png",
+                            )
+                            db.add(file_record)
 
                     # Update session
                     session.status = "completed"

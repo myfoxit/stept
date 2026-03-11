@@ -21,11 +21,13 @@ class VideoProcessor:
     def __init__(
         self,
         video_path: str,
+        output_dir: str | None = None,
         scene_threshold: float = SCENE_THRESHOLD,
         max_frames: int = MAX_FRAMES,
         progress_callback: Callable[[str, int], Any] | None = None,
     ):
         self.video_path = video_path
+        self.output_dir = output_dir
         self.scene_threshold = scene_threshold
         self.max_frames = max_frames
         self._progress_cb = progress_callback
@@ -206,39 +208,43 @@ class VideoProcessor:
 
     async def process(self) -> dict:
         """Run the full pipeline: scene detection, audio extraction, transcription, LLM analysis."""
-        with tempfile.TemporaryDirectory(prefix="ondoki_video_") as tmpdir:
-            # Get duration
-            duration = self._run_ffprobe_duration()
-            await self._progress("extracting_audio", 10)
+        # Use output_dir if provided (frames persist), otherwise temp dir (frames cleaned up)
+        if self.output_dir:
+            os.makedirs(self.output_dir, exist_ok=True)
+            return await self._run_pipeline(self.output_dir)
+        else:
+            with tempfile.TemporaryDirectory(prefix="ondoki_video_") as tmpdir:
+                return await self._run_pipeline(tmpdir)
 
-            # Extract audio + transcribe
-            audio_path = self._extract_audio(tmpdir)
-            await self._progress("transcribing", 20)
+    async def _run_pipeline(self, workdir: str) -> dict:
+        """Internal pipeline execution."""
+        duration = self._run_ffprobe_duration()
+        await self._progress("extracting_audio", 10)
 
-            transcript = await self._transcribe_audio(audio_path)
-            await self._progress("extracting_frames", 40)
+        audio_path = self._extract_audio(workdir)
+        await self._progress("transcribing", 20)
 
-            # Detect scenes + extract frames
-            timestamps = self._detect_scenes()
-            frame_paths = self._extract_frames(timestamps, tmpdir)
-            await self._progress("analyzing", 60)
+        transcript = await self._transcribe_audio(audio_path)
+        await self._progress("extracting_frames", 40)
 
-            if not frame_paths:
-                raise RuntimeError("No frames could be extracted from the video")
+        timestamps = self._detect_scenes()
+        frame_paths = self._extract_frames(timestamps, workdir)
+        await self._progress("analyzing", 60)
 
-            # Convert to base64 for LLM
-            frame_urls = self._frames_to_base64(frame_paths)
-            await self._progress("generating", 75)
+        if not frame_paths:
+            raise RuntimeError("No frames could be extracted from the video")
 
-            # Generate steps via vision LLM
-            steps = await self._generate_steps_with_llm(frame_urls, transcript)
-            await self._progress("done", 100)
+        frame_urls = self._frames_to_base64(frame_paths)
+        await self._progress("generating", 75)
 
-            return {
-                "duration": duration,
-                "transcript": transcript,
-                "frame_count": len(frame_paths),
-                "frame_timestamps": timestamps[:len(frame_paths)],
-                "frame_paths": frame_paths,
-                "steps": steps,
-            }
+        steps = await self._generate_steps_with_llm(frame_urls, transcript)
+        await self._progress("done", 100)
+
+        return {
+            "duration": duration,
+            "transcript": transcript,
+            "frame_count": len(frame_paths),
+            "frame_timestamps": timestamps[:len(frame_paths)],
+            "frame_paths": frame_paths,
+            "steps": steps,
+        }
