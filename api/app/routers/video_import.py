@@ -2,7 +2,8 @@ import os
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +24,7 @@ ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 @router.post("/upload")
 async def upload_video(
     file: UploadFile = File(...),
+    project_id: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -50,6 +52,8 @@ async def upload_video(
         processing_stage="uploading",
         processing_progress=0,
         client_name="VideoImport",
+        project_id=project_id,
+        owner_id=current_user.id,
     )
     db.add(session)
     await db.flush()

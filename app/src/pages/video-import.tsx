@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { SettingsLayout } from '@/components/settings-layout';
 import { apiClient } from '@/lib/apiClient';
+import { useProject } from '@/providers/project-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, FileVideo, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Upload, FileVideo, CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react';
 
 interface ImportSession {
   session_id: string;
@@ -37,6 +39,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export function VideoImportPage() {
+  const { selectedProjectId } = useProject();
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({
     stage: 'idle', progress: 0, sessionId: null, error: null,
   });
@@ -100,6 +103,9 @@ export function VideoImportPage() {
 
     const formData = new FormData();
     formData.append('file', file);
+    if (selectedProjectId) {
+      formData.append('project_id', selectedProjectId);
+    }
 
     try {
       const res = await apiClient.post('/video-import/upload', formData, {
@@ -185,9 +191,16 @@ export function VideoImportPage() {
               <>
                 <CheckCircle2 className="mx-auto h-12 w-12 text-green-500 mb-4" />
                 <p className="text-lg font-medium text-green-600">Guide generated successfully!</p>
-                <Button variant="outline" className="mt-3" onClick={(e) => { e.stopPropagation(); setUploadStatus({ stage: 'idle', progress: 0, sessionId: null, error: null }); }}>
-                  Upload another
-                </Button>
+                <div className="flex gap-2 mt-3 justify-center">
+                  {uploadStatus.sessionId && (
+                    <Button asChild variant="default" onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/workflows/${uploadStatus.sessionId}`}>View Guide <ExternalLink className="ml-1 h-4 w-4" /></Link>
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={(e) => { e.stopPropagation(); setUploadStatus({ stage: 'idle', progress: 0, sessionId: null, error: null }); }}>
+                    Upload another
+                  </Button>
+                </div>
               </>
             )}
             {uploadStatus.stage === 'error' && (
@@ -229,9 +242,9 @@ export function VideoImportPage() {
                   </div>
                   <div className="flex-shrink-0 text-sm">
                     {imp.is_processed && (
-                      <span className="inline-flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="h-4 w-4" /> Done
-                      </span>
+                      <Link to={`/workflows/${imp.session_id}`} className="inline-flex items-center gap-1 text-green-600 hover:underline">
+                        <CheckCircle2 className="h-4 w-4" /> View Guide
+                      </Link>
                     )}
                     {imp.processing_stage === 'failed' && (
                       <span className="inline-flex items-center gap-1 text-destructive">
