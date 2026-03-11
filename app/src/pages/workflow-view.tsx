@@ -38,6 +38,7 @@ import {
 import {
   processRecording,
   getAISummary,
+  getInteractiveGuide,
   type ProcessingStatus,
   type AISummary,
   type StepAnnotation,
@@ -430,6 +431,74 @@ export function WorkflowView() {
     setGuideOpen(true);
   }, []);
 
+  const handleGuideMe = React.useCallback(async () => {
+    if (!workflowId) return;
+    try {
+      const guide = await getInteractiveGuide(workflowId);
+      if (!guide.steps || guide.steps.length === 0) {
+        console.warn('No interactive guide steps available');
+        return;
+      }
+
+      // Try sending to the Ondoki Chrome extension via externally_connectable
+      // The extension ID is different for self-hosted vs Chrome Web Store builds,
+      // so we try multiple discovery methods:
+
+      // Method 1: Check for the extension's content script presence
+      const extensionReady = !!(window as any).__ondokiContentLoaded;
+
+      if (extensionReady) {
+        // Extension content script is loaded — use window.postMessage relay
+        window.postMessage({
+          type: 'ONDOKI_START_GUIDE',
+          guide,
+        }, '*');
+      } else {
+        // Method 2: Try known extension IDs (cloud build + dev)
+        const extensionIds = [
+          (window as any).__ONDOKI_EXTENSION_ID__, // Injected by extension
+          // Add your cloud extension ID here when published
+        ].filter(Boolean);
+
+        let sent = false;
+        for (const extId of extensionIds) {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              chrome.runtime.sendMessage(extId, { type: 'START_GUIDE', guide }, (response: any) => {
+                if (chrome.runtime.lastError) {
+                  reject(chrome.runtime.lastError);
+                } else if (response?.success) {
+                  resolve();
+                } else {
+                  reject(new Error(response?.error || 'Unknown error'));
+                }
+              });
+            });
+            sent = true;
+            break;
+          } catch {
+            continue;
+          }
+        }
+
+        if (!sent) {
+          // Fallback: Navigate to first step URL with guide param
+          // Extension will pick it up via URL detection
+          const firstUrl = guide.steps[0]?.expected_url;
+          if (firstUrl) {
+            const url = new URL(firstUrl);
+            url.searchParams.set('ondoki-guide', workflowId);
+            window.open(url.toString(), '_blank');
+          } else {
+            console.warn('Guide Me: No extension detected and no step URL available');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Guide Me failed:', e);
+    }
+  }, [workflowId]);
+
   const handleAnnotationUpdate = React.useCallback(() => {
     refreshWorkflow();
   }, [refreshWorkflow]);
@@ -787,6 +856,8 @@ export function WorkflowView() {
               processingProgress={aiProgress}
               onProcessAll={handleProcessWithAI}
               onGenerateGuide={handleGenerateGuide}
+              onGuideMe={handleGuideMe}
+              hasGuide={(typedWorkflow as any)?.has_guide || (steps && steps.length > 0)}
               difficulty={aiSummary?.difficulty}
               estimatedTime={aiSummary?.estimated_time}
               tags={aiSummary?.tags}

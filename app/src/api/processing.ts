@@ -96,6 +96,39 @@ export async function getGuide(recordingId: string): Promise<GuideResponse> {
   });
 }
 
+// ── Interactive Guide Types ──────────────────────────────────────────────────
+
+export interface InteractiveGuideStep {
+  title: string;
+  description: string;
+  selector: string | null;
+  xpath: string | null;
+  testId: string | null;
+  element_text: string | null;
+  element_role: string | null;
+  ariaLabel: string | null;
+  parentChain: Array<Record<string, unknown>> | null;
+  element_info: Record<string, unknown>;
+  expected_url: string | null;
+  action_type: string | null;
+  step_number: number;
+  is_navigation: boolean;
+}
+
+export interface InteractiveGuide {
+  id: string;
+  title: string;
+  steps: InteractiveGuideStep[];
+}
+
+/** Get interactive guide data for the guide-runtime overlay */
+export async function getInteractiveGuide(recordingId: string): Promise<InteractiveGuide> {
+  return request<InteractiveGuide>({
+    method: 'GET',
+    url: `/process-recording/workflow/${recordingId}/interactive-guide`,
+  });
+}
+
 /** Get AI summary and step annotations */
 export async function getAISummary(recordingId: string): Promise<AISummary> {
   return request<AISummary>({
