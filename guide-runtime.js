@@ -398,6 +398,20 @@
       this.host = document.createElement("ondoki-guide-overlay");
       this.shadow = this.host.attachShadow({ mode: "closed" });
 
+      // CRITICAL: Stop all click/pointer events on the host from bubbling to the document.
+      // Without this, clicks on tooltip buttons propagate out of shadow DOM
+      // as clicks on the host element, which modal/dropdown "outside click"
+      // handlers detect and close the modal.
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        this.host.addEventListener(evt, (e) => {
+          // Only stop propagation for events that originate inside the tooltip
+          // (not the transparent backdrop area where we want clicks to pass through)
+          if (e.composedPath()[0] !== this.host) {
+            e.stopPropagation();
+          }
+        }, true);
+      }
+
       const style = document.createElement("style");
       style.textContent = STYLES;
       this.shadow.appendChild(style);
@@ -437,12 +451,12 @@
         } catch {}
       }
 
-      // Find element with retry
+      // Find element with retry (more attempts, longer waits for freshly loaded pages)
       let result = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 5; attempt++) {
         result = await findGuideElement(step);
         if (result) break;
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, attempt < 2 ? 800 : 1500));
       }
 
       this.currentResult = result;

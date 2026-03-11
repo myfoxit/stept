@@ -55,6 +55,28 @@ function notifyGuideStateUpdate() {
   }).catch(() => {});
 }
 
+// Helper: inject guide-runtime and start guide on a tab that's already loaded
+async function _injectGuideNow(tabId, guide, startIndex) {
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['guide-runtime.js'] });
+  await new Promise(r => setTimeout(r, 200));
+  await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
+}
+
+// Helper: wait for tab to finish loading, then inject guide
+function _injectGuideAfterLoad(tabId, guide, startIndex) {
+  const onCompleted = (details) => {
+    if (details.tabId !== tabId || details.frameId !== 0) return;
+    chrome.webNavigation.onCompleted.removeListener(onCompleted);
+    // Wait extra for SPA hydration / JS frameworks to render
+    setTimeout(async () => {
+      try {
+        await _injectGuideNow(tabId, guide, startIndex);
+      } catch (e) { debugLog('Guide inject after load failed:', e); }
+    }, 1500);
+  };
+  chrome.webNavigation.onCompleted.addListener(onCompleted);
+}
+
 // Context link matches for the current tab
 let contextMatches = [];
 let lastContextUrl = null;
@@ -1382,7 +1404,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'API_FETCH_BLOB': {
         // Authenticated GET that returns image as data URL
         try {
-          const resp = await authedFetch(message.url);
+          // Resolve relative URLs against API base
+          let fetchUrl = message.url;
+          if (fetchUrl.startsWith('/api/')) {
+            const API_BASE_URL = await getApiBaseUrl();
+            const baseOrigin = new URL(API_BASE_URL).origin;
+            fetchUrl = baseOrigin + fetchUrl;
+          }
+          const resp = await authedFetch(fetchUrl);
           if (resp.ok) {
             const blob = await resp.blob();
             const reader = new FileReader();
@@ -1540,68 +1569,66 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'START_GUIDE': {
         try {
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (!tab?.id) {
+          const guide = message.guide;
+          const startIndex = message.startIndex || 0;
+          const targetStep = guide.steps?.[startIndex];
+          const targetUrl = targetStep?.expected_url;
+
+          // Find or create the right tab for the guide
+          let tabId = message.tabId;
+
+          if (!tabId && targetUrl) {
+            // Try to find an existing tab with a matching URL
+            try {
+              const expectedOrigin = new URL(targetUrl).origin;
+              const expectedPath = new URL(targetUrl).pathname;
+              const allTabs = await chrome.tabs.query({ currentWindow: true });
+              const match = allTabs.find(t => {
+                try {
+                  const u = new URL(t.url);
+                  return u.origin === expectedOrigin && u.pathname === expectedPath;
+                } catch { return false; }
+              });
+              if (match) {
+                tabId = match.id;
+                await chrome.tabs.update(tabId, { active: true }); // focus the tab
+              }
+            } catch {}
+          }
+
+          if (!tabId) {
+            // No matching tab — use active tab or create new
+            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            tabId = activeTab?.id;
+          }
+
+          if (!tabId) {
             sendResponse({ success: false, error: 'No active tab' });
             break;
           }
 
-          const guide = message.guide;
-          const startIndex = message.startIndex || 0;
-
           // Track active guide state
-          activeGuideState = { guide, currentIndex: startIndex, tabId: tab.id };
+          activeGuideState = { guide, currentIndex: startIndex, tabId };
 
-          // Check if we need to navigate to the first step's URL
-          const targetStep = guide.steps?.[startIndex];
-          const targetUrl = targetStep?.expected_url;
+          // Check if current tab URL matches the target
           let needsNavigation = false;
-
-          if (targetUrl && tab.url) {
+          if (targetUrl) {
             try {
+              const tab = await chrome.tabs.get(tabId);
               const expected = new URL(targetUrl);
-              const current = new URL(tab.url);
-              needsNavigation = expected.pathname !== current.pathname;
-            } catch {}
+              const current = new URL(tab.url || '');
+              needsNavigation = expected.origin !== current.origin || expected.pathname !== current.pathname;
+            } catch { needsNavigation = true; }
           }
 
           if (needsNavigation && targetUrl) {
-            // Navigate first, then inject after page loads
-            chrome.tabs.update(tab.id, { url: targetUrl });
-            // Wait for navigation to complete then inject
-            const onCompleted = (details) => {
-              if (details.tabId === tab.id && details.frameId === 0) {
-                chrome.webNavigation.onCompleted.removeListener(onCompleted);
-                // Re-inject guide-runtime.js after navigation
-                chrome.scripting.executeScript({
-                  target: { tabId: tab.id },
-                  files: ['guide-runtime.js'],
-                }).then(() => {
-                  return new Promise((r) => setTimeout(r, 100));
-                }).then(() => {
-                  return chrome.tabs.sendMessage(tab.id, {
-                    type: 'START_GUIDE',
-                    guide,
-                    startIndex,
-                  });
-                }).catch(() => {});
-              }
-            };
-            chrome.webNavigation.onCompleted.addListener(onCompleted);
+            // Navigate then inject after full page load
+            await chrome.tabs.update(tabId, { url: targetUrl, active: true });
+            _injectGuideAfterLoad(tabId, guide, startIndex);
           } else {
-            await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['guide-runtime.js'],
-            });
-            await new Promise((r) => setTimeout(r, 50));
-            await chrome.tabs.sendMessage(tab.id, {
-              type: 'START_GUIDE',
-              guide,
-              startIndex,
-            });
+            await _injectGuideNow(tabId, guide, startIndex);
           }
 
-          // Notify sidepanel of guide state
           notifyGuideStateUpdate();
           sendResponse({ success: true });
         } catch (e) {
@@ -1643,35 +1670,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'GUIDE_NAVIGATE': {
         try {
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (!tab?.id || !message.url) {
-            sendResponse({ success: false, error: 'No active tab or URL' });
+          const tabId = activeGuideState?.tabId;
+          if (!tabId || !message.url) {
+            sendResponse({ success: false, error: 'No active guide tab or URL' });
             break;
           }
           const guide = activeGuideState?.guide;
-          const stepIndex = message.stepIndex || 0;
-          chrome.tabs.update(tab.id, { url: message.url });
-          // After navigation completes, re-inject and resume guide at stepIndex
-          const onCompleted = (details) => {
-            if (details.tabId === tab.id && details.frameId === 0) {
-              chrome.webNavigation.onCompleted.removeListener(onCompleted);
-              if (guide) {
-                chrome.scripting.executeScript({
-                  target: { tabId: tab.id },
-                  files: ['guide-runtime.js'],
-                }).then(() => {
-                  return new Promise((r) => setTimeout(r, 100));
-                }).then(() => {
-                  return chrome.tabs.sendMessage(tab.id, {
-                    type: 'START_GUIDE',
-                    guide,
-                    startIndex: stepIndex,
-                  });
-                }).catch(() => {});
-              }
-            }
-          };
-          chrome.webNavigation.onCompleted.addListener(onCompleted);
+          const stepIndex = message.stepIndex || activeGuideState?.currentIndex || 0;
+          await chrome.tabs.update(tabId, { url: message.url, active: true });
+          if (guide) {
+            _injectGuideAfterLoad(tabId, guide, stepIndex);
+          }
           sendResponse({ success: true });
         } catch (e) {
           sendResponse({ success: false, error: e.message });
@@ -1705,32 +1714,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
 
           if (needsNavigation && targetUrl) {
-            chrome.tabs.update(tabId, { url: targetUrl });
-            const onCompleted = (details) => {
-              if (details.tabId === tabId && details.frameId === 0) {
-                chrome.webNavigation.onCompleted.removeListener(onCompleted);
-                chrome.scripting.executeScript({
-                  target: { tabId },
-                  files: ['guide-runtime.js'],
-                }).then(() => {
-                  return new Promise((r) => setTimeout(r, 100));
-                }).then(() => {
-                  return chrome.tabs.sendMessage(tabId, {
-                    type: 'START_GUIDE',
-                    guide,
-                    startIndex: stepIndex,
-                  });
-                }).catch(() => {});
-              }
-            };
-            chrome.webNavigation.onCompleted.addListener(onCompleted);
+            await chrome.tabs.update(tabId, { url: targetUrl, active: true });
+            _injectGuideAfterLoad(tabId, guide, stepIndex);
           } else {
             // Same page — just tell content to jump to step
-            await chrome.tabs.sendMessage(tabId, {
-              type: 'START_GUIDE',
-              guide,
-              startIndex: stepIndex,
-            });
+            await chrome.tabs.update(tabId, { active: true });
+            await _injectGuideNow(tabId, guide, stepIndex);
           }
 
           notifyGuideStateUpdate();
