@@ -397,7 +397,11 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     const blob = ttsCacheRef.current.get(stepIdx);
     if (!blob) {
       // Preload failed for this step — fall back to browser TTS
-      onEnd();
+      if (isEnglish(text)) {
+        speakBrowser(text, onEnd);
+      } else {
+        onEnd();
+      }
       return;
     }
     const objectUrl = URL.createObjectURL(blob);
