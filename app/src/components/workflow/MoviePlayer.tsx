@@ -400,7 +400,6 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     const ttsUrl = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
     fetchTtsBlob(ttsUrl, text)
       .then((blob) => {
-        // Store in cache for potential replay
         ttsCacheRef.current.set(stepIdx, blob);
         playBlob(blob, onEnd);
       })
