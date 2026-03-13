@@ -10,7 +10,7 @@ from app.services.translation import SUPPORTED_LANGUAGES, translate_text, transl
 
 router = APIRouter()
 
-_translate_limiter = RateLimiter(limit=30, window=60)
+_translate_limiter = RateLimiter(limit=30, window=60)  # used via Depends()
 
 
 class TranslateRequest(BaseModel):
@@ -42,9 +42,9 @@ async def list_languages() -> list[LanguageInfo]:
 async def translate(
     body: TranslateRequest,
     db: AsyncSession = Depends(get_db),
+    _rl=Depends(_translate_limiter),
 ) -> TranslateResponse:
     """Translate a single text to the target language."""
-    await _translate_limiter.check()
 
     if body.target_language not in SUPPORTED_LANGUAGES:
         raise HTTPException(
@@ -87,9 +87,9 @@ class BatchTranslateResponse(BaseModel):
 async def translate_batch_endpoint(
     body: BatchTranslateRequest,
     db: AsyncSession = Depends(get_db),
+    _rl=Depends(_translate_limiter),
 ) -> BatchTranslateResponse:
     """Translate multiple texts in one request. Uses cache + batched LLM call."""
-    await _translate_limiter.check()
 
     if body.target_language not in SUPPORTED_LANGUAGES:
         raise HTTPException(
