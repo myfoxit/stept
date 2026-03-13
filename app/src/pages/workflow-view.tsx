@@ -55,6 +55,9 @@ import { CommentPanel } from '@/components/Comments/CommentPanel';
 import { useAuth } from '@/providers/auth-provider';
 // Translation is only on public/embed views, not the editable view
 import { VersionHistoryPanel } from '@/components/VersionHistory/VersionHistoryPanel';
+import { WorkflowHealthBanner } from '@/components/workflow-health-banner';
+import { StepHealthBadge } from '@/components/step-health-badge';
+import { useWorkflowHealth } from '@/hooks/use-staleness';
 
 
 export function WorkflowView() {
@@ -62,6 +65,7 @@ export function WorkflowView() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: workflow, isLoading, error } = useWorkflow(workflowId || '');
+  const { data: workflowHealth } = useWorkflowHealth(workflowId);
   const { setContext } = useChat();
   const { selectedProjectId, selectedProject } = useProject();
   const { user } = useAuth();
@@ -725,6 +729,17 @@ export function WorkflowView() {
           isEditMode={isEditMode}
           onAnnotationUpdate={handleAnnotationUpdate}
         />
+        {workflowHealth && (
+          <div className="flex justify-center">
+            <div className="w-full max-w-3xl px-4 -mt-3">
+              <StepHealthBadge
+                stepHealth={workflowHealth.steps.find(
+                  (s) => s.step_number === backendStepNumber,
+                )}
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -787,6 +802,10 @@ export function WorkflowView() {
           </div>
           {selectedProjectId && workflowId && (
             <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
+          )}
+
+          {workflowHealth && (
+            <WorkflowHealthBanner health={workflowHealth} />
           )}
 
           {aiEnabled && (

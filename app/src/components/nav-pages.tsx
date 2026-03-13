@@ -60,6 +60,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
+import { HealthDot } from "@/components/health-dot";
 import { apiClient } from "@/lib/apiClient";
 import { useProject } from "@/providers/project-provider";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
@@ -540,6 +541,14 @@ function NavPageItem({
                   />
                 )}
                 <span className="truncate">{doc.name || "Untitled"}</span>
+                {isWorkflow && (doc as any).health_score != null && (
+                  <HealthDot
+                    healthScore={(doc as any).health_score}
+                    healthStatus={(doc as any).health_status}
+                    lastVerifiedAt={(doc as any).last_verified_at}
+                    className="ml-auto"
+                  />
+                )}
               </Link>
             )}
           </SidebarMenuButton>
