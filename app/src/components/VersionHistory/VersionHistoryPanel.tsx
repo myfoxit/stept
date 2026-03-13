@@ -191,13 +191,13 @@ export function VersionHistoryPanel({
                 onClick={handleBackToCurrent}
                 className={`w-full rounded-md px-2.5 py-2 text-left transition-colors ${
                   !selectedVersionId
-                    ? 'bg-primary/8 ring-1 ring-primary/20'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40'
                     : 'hover:bg-muted/50'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <div className={`h-1.5 w-1.5 rounded-full ${!selectedVersionId ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`} />
-                  <span className="text-xs font-medium">Current version</span>
+                  <div className={`h-2 w-2 rounded-full ${!selectedVersionId ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`} />
+                  <span className={`text-xs font-medium ${!selectedVersionId ? 'text-emerald-700 dark:text-emerald-300' : ''}`}>Current version</span>
                 </div>
               </button>
 
@@ -221,18 +221,18 @@ export function VersionHistoryPanel({
                           onClick={() => handleSelect(version.id)}
                           className={`w-full rounded-md px-2.5 py-2 text-left transition-colors ${
                             isSelected
-                              ? 'bg-primary/8 ring-1 ring-primary/20'
+                              ? 'bg-blue-50 dark:bg-blue-950/40'
                               : 'hover:bg-muted/50'
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               {isFetching ? (
-                                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
                               ) : (
-                                <div className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-muted-foreground/25'}`} />
+                                <div className={`h-2 w-2 rounded-full ${isSelected ? 'bg-blue-500' : 'bg-muted-foreground/25'}`} />
                               )}
-                              <span className="text-xs font-medium">
+                              <span className={`text-xs font-medium ${isSelected ? 'text-blue-700 dark:text-blue-300' : ''}`}>
                                 Revision {displayNumber}
                               </span>
                             </div>
