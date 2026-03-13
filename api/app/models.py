@@ -330,6 +330,16 @@ class ProcessRecordingSession(Base):
     # Version history
     version = Column(Integer, nullable=False, default=1, server_default="1")
 
+    # Staleness detection health columns
+    health_score = Column(Float, nullable=True)
+    health_status = Column(String(10), nullable=True)  # healthy | aging | stale | unknown
+    last_verified_at = Column(DateTime, nullable=True)
+    last_verified_source = Column(String(20), nullable=True)
+    reliable_step_count = Column(Integer, default=0)
+    unreliable_step_count = Column(Integer, default=0)
+    failed_step_count = Column(Integer, default=0)
+    coverage = Column(Float, nullable=True)
+
     # Relationships
     user = relationship("User", back_populates="recording_sessions", foreign_keys=[user_id])
     files = relationship("ProcessRecordingFile", back_populates="session", cascade="all, delete-orphan")
@@ -772,3 +782,171 @@ class AuditLog(Base):
 
     project = relationship("Project", backref="audit_logs")
     user = relationship("User", backref="audit_logs")
+
+
+# ── Staleness Detection Models ───────────────────────────────────────────────
+
+class WorkflowStepCheck(Base):
+    """Per-step verification results from any trigger (replay, scheduled, manual)."""
+    __tablename__ = "workflow_step_checks"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    workflow_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), nullable=False)
+    step_number = Column(Integer, nullable=False)
+
+    # Source of this check
+    check_source = Column(String(20), nullable=False)  # guide_replay | scheduled | manual | age_decay
+
+    # Element finder result
+    element_found = Column(Boolean, nullable=True)
+    finder_method = Column(String(20), nullable=True)  # selector | testid | role+text | tag+text | xpath | parent-context
+    finder_confidence = Column(Float, nullable=True)
+
+    # URL check
+    expected_url = Column(String, nullable=True)
+    actual_url = Column(String, nullable=True)
+    url_matched = Column(Boolean, nullable=True)
+
+    # Step status
+    status = Column(String(20), nullable=False)  # passed | failed | needs_auth | url_error | skipped
+
+    # LLM verification (nullable)
+    llm_visible = Column(Boolean, nullable=True)
+    llm_explanation = Column(Text, nullable=True)
+
+    # Who/when
+    checked_by = Column(String(16), nullable=True)  # user_id for replay, NULL for scheduled
+    checked_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    workflow = relationship("ProcessRecordingSession", backref="step_checks")
+
+    __table_args__ = (
+        Index("ix_step_check_workflow", "workflow_id", "step_number"),
+        Index("ix_step_check_time", "checked_at"),
+        Index("ix_step_check_source", "check_source", "checked_at"),
+    )
+
+
+class StepReliability(Base):
+    """Per-step reliability tracking (materialized, updated after each check)."""
+    __tablename__ = "step_reliability"
+
+    workflow_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), primary_key=True)
+    step_number = Column(Integer, primary_key=True)
+
+    total_checks = Column(Integer, nullable=False, default=0)
+    found_count = Column(Integer, nullable=False, default=0)
+    reliability = Column(Float, nullable=False, default=0.0)
+    is_reliable = Column(Boolean, nullable=False, default=False)
+
+    # Recent window (last 5 checks)
+    recent_checks = Column(Integer, nullable=False, default=0)
+    recent_found = Column(Integer, nullable=False, default=0)
+
+    last_found_at = Column(DateTime, nullable=True)
+    last_checked_at = Column(DateTime, nullable=True)
+    last_method = Column(String(20), nullable=True)
+
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    workflow = relationship("ProcessRecordingSession", backref="step_reliabilities")
+
+
+class VerificationConfig(Base):
+    """Project-level verification configuration (auth, schedule, options)."""
+    __tablename__ = "verification_configs"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    enabled = Column(Boolean, nullable=False, default=False)
+
+    # Auth (one login per project)
+    login_url = Column(String, nullable=True)
+    encrypted_email = Column(Text, nullable=True)
+    encrypted_password = Column(Text, nullable=True)
+    email_selector = Column(String, nullable=True)
+    password_selector = Column(String, nullable=True)
+    submit_selector = Column(String, nullable=True)
+    post_login_wait_ms = Column(Integer, default=2000)
+
+    # Schedule
+    schedule = Column(String(10), default="weekly")  # daily | weekly | monthly | manual
+    schedule_day = Column(Integer, default=0)
+    schedule_hour = Column(Integer, default=3)
+    schedule_scope = Column(String(10), default="all")  # all | stale | selected
+
+    # LLM
+    llm_enabled = Column(Boolean, nullable=False, default=False)
+
+    # Notifications
+    notify_email = Column(Boolean, nullable=False, default=True)
+    notify_in_app = Column(Boolean, nullable=False, default=True)
+
+    # Run tracking
+    last_run_at = Column(DateTime, nullable=True)
+    last_run_status = Column(String(10), nullable=True)
+    last_run_stats = Column(JSON, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    project = relationship("Project", backref="verification_config")
+
+
+class VerificationJob(Base):
+    """Job queue for manual and scheduled verification runs."""
+    __tablename__ = "verification_jobs"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+
+    workflow_ids = Column(JSON, nullable=False)  # ["abc", "def"] or ["*"]
+    trigger = Column(String(10), nullable=False)  # scheduled | manual
+    triggered_by = Column(String(16), nullable=True)
+
+    status = Column(String(12), nullable=False, default="queued")  # queued | running | completed | failed | cancelled
+    progress = Column(JSON, nullable=True)
+    results = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
+
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    project = relationship("Project", backref="verification_jobs")
+
+    __table_args__ = (
+        Index("ix_job_project", "project_id", "status"),
+        Index("ix_job_created", "created_at"),
+    )
+
+
+class StalenessAlert(Base):
+    """Actionable alerts when reliable steps start failing."""
+    __tablename__ = "staleness_alerts"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    workflow_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), nullable=False)
+
+    alert_type = Column(String(20), nullable=False)  # element_missing | url_changed | age_decay | auth_failed
+    severity = Column(String(10), nullable=False)  # warning | critical
+    title = Column(String(255), nullable=False)
+    details = Column(JSON, nullable=True)
+
+    resolved = Column(Boolean, default=False)
+    resolved_by = Column(String(16), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    dismissed = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, server_default=func.now())
+
+    project = relationship("Project", backref="staleness_alerts")
+    workflow = relationship("ProcessRecordingSession", backref="staleness_alerts")
+
+    __table_args__ = (
+        Index("ix_alert_project", "project_id", "resolved", "dismissed"),
+        Index("ix_alert_workflow", "workflow_id"),
+    )

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin, tts, enterprise_api, translation, transcription, video_import
+from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin, tts, enterprise_api, translation, transcription, video_import, staleness
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -137,6 +137,7 @@ api_router.include_router(enterprise_api.router, prefix="/enterprise", tags=["en
 api_router.include_router(translation.router, tags=["translation"])
 api_router.include_router(transcription.router, prefix="/transcription", tags=["transcription"])
 api_router.include_router(video_import.router, prefix="/video-import", tags=["video-import"])
+api_router.include_router(staleness.router, tags=["staleness"])
 
 
 # Mount the versioned router on the main app
