@@ -282,3 +282,37 @@ export const permanentDeleteWorkflow = (workflowId: string) =>
     method: 'DELETE',
     url: `/process-recording/workflows/${workflowId}/permanent`,
   });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VERSION HISTORY
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface WorkflowVersionRead {
+  id: string;
+  version_number: number;
+  name: string | null;
+  total_steps: number | null;
+  created_by: string | null;
+  created_at: string;
+  change_summary: string | null;
+  steps_snapshot?: any[];
+}
+
+export const listWorkflowVersions = (workflowId: string, limit = 50) =>
+  request<WorkflowVersionRead[]>({
+    method: 'GET',
+    url: `/process-recording/workflow/${workflowId}/versions`,
+    params: { limit },
+  });
+
+export const getWorkflowVersion = (workflowId: string, versionId: string) =>
+  request<WorkflowVersionRead>({
+    method: 'GET',
+    url: `/process-recording/workflow/${workflowId}/versions/${versionId}`,
+  });
+
+export const restoreWorkflowVersion = (workflowId: string, versionId: string) =>
+  request<any>({
+    method: 'POST',
+    url: `/process-recording/workflow/${workflowId}/versions/${versionId}/restore`,
+  });

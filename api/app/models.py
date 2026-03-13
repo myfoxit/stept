@@ -327,6 +327,9 @@ class ProcessRecordingSession(Base):
     # Soft delete
     deleted_at = Column(DateTime, nullable=True, index=True)
 
+    # Version history
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+
     # Relationships
     user = relationship("User", back_populates="recording_sessions", foreign_keys=[user_id])
     files = relationship("ProcessRecordingFile", back_populates="session", cascade="all, delete-orphan")
@@ -334,6 +337,21 @@ class ProcessRecordingSession(Base):
     project = relationship("Project", backref="recording_sessions")
     folder = relationship("Folder", backref="recording_sessions")
     owner = relationship("User", foreign_keys=[owner_id], backref="private_workflows")
+
+class WorkflowVersion(Base):
+    __tablename__ = "workflow_versions"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    session_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    steps_snapshot = Column(JSON, nullable=False)
+    name = Column(String, nullable=True)
+    total_steps = Column(Integer, nullable=True)
+    created_by = Column(String(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+    change_summary = Column(String, nullable=True)
+
+    session = relationship("ProcessRecordingSession", backref="versions")
+
 
 class MediaProcessingJob(Base):
     __tablename__ = "media_processing_jobs"

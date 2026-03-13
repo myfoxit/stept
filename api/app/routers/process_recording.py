@@ -10,7 +10,7 @@ from datetime import datetime
 import io
 
 from app.database import get_session as get_db
-from app.models import ProcessRecordingSession, ProcessRecordingFile, ProcessRecordingStep, ProjectRole, User
+from app.models import ProcessRecordingSession, ProcessRecordingFile, ProcessRecordingStep, ProjectRole, User, WorkflowVersion
 from app.services.translation import translate_batch, SUPPORTED_LANGUAGES
 from app.schemas.process_recording import (
     SessionCreate, SessionResponse, StepMetadata, 
@@ -32,6 +32,90 @@ from fastapi import Body  # NEW: accept JSON body in update endpoint
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+async def _maybe_create_workflow_version(
+    db: AsyncSession,
+    session: ProcessRecordingSession,
+    user_id: str,
+    change_summary: str | None = None,
+) -> bool:
+    """Snapshot current steps as a version. Throttled to 60s between snapshots. Returns True if version was created."""
+    from sqlalchemy import func as sqlfunc, delete as sa_delete
+    from app.utils import gen_suffix
+
+    # Throttle: check last version timestamp
+    last_ver = (await db.execute(
+        select(WorkflowVersion)
+        .where(WorkflowVersion.session_id == session.id)
+        .order_by(WorkflowVersion.version_number.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+    if last_ver and last_ver.created_at:
+        last_time = last_ver.created_at.replace(tzinfo=None) if last_ver.created_at.tzinfo else last_ver.created_at
+        if (datetime.utcnow() - last_time).total_seconds() < 60:
+            return False
+
+    # Load current steps
+    steps_result = await db.execute(
+        select(ProcessRecordingStep)
+        .where(ProcessRecordingStep.session_id == session.id)
+        .order_by(ProcessRecordingStep.step_number)
+    )
+    current_steps = steps_result.scalars().all()
+
+    # Build snapshot
+    snapshot = []
+    for s in current_steps:
+        snapshot.append({
+            "step_number": s.step_number,
+            "step_type": s.step_type,
+            "action_type": s.action_type,
+            "window_title": s.window_title,
+            "description": s.description,
+            "content": s.content,
+            "url": s.url,
+            "owner_app": s.owner_app,
+            "generated_title": s.generated_title,
+            "generated_description": s.generated_description,
+            "ui_element": s.ui_element,
+            "step_category": s.step_category,
+            "spoken_text": s.spoken_text,
+        })
+
+    ver = WorkflowVersion(
+        id=gen_suffix(16),
+        session_id=session.id,
+        version_number=session.version or 1,
+        steps_snapshot=snapshot,
+        name=session.name,
+        total_steps=len(snapshot),
+        created_by=user_id,
+        change_summary=change_summary,
+    )
+    db.add(ver)
+    session.version = (session.version or 1) + 1
+
+    # Prune: keep max 50 versions
+    count_result = await db.execute(
+        select(sqlfunc.count()).select_from(WorkflowVersion).where(WorkflowVersion.session_id == session.id)
+    )
+    total = count_result.scalar() or 0
+    if total > 50:
+        old_ids = (await db.execute(
+            select(WorkflowVersion.id)
+            .where(WorkflowVersion.session_id == session.id)
+            .order_by(WorkflowVersion.version_number.asc())
+            .limit(total - 50)
+        )).scalars().all()
+        if old_ids:
+            await db.execute(
+                sa_delete(WorkflowVersion).where(WorkflowVersion.id.in_(old_ids))
+            )
+
+    return True
+
 
 router = APIRouter()
 
@@ -737,6 +821,7 @@ async def create_step_endpoint(
         )
     
     try:
+        await _maybe_create_workflow_version(db, session, current_user.id, "Step added")
         step = await create_step(
             db,
             session_id,
@@ -772,6 +857,7 @@ async def update_step_endpoint(
         )
     
     try:
+        await _maybe_create_workflow_version(db, session, current_user.id, "Step updated")
         step = await update_step(
             db,
             session_id,
@@ -806,6 +892,7 @@ async def delete_step_endpoint(
         )
     
     try:
+        await _maybe_create_workflow_version(db, session, current_user.id, "Step deleted")
         await delete_step(db, session_id, step_number)
         return {"status": "success", "message": f"Step {step_number} deleted"}
     except Exception as e:
@@ -833,6 +920,7 @@ async def reorder_steps_endpoint(
         )
     
     try:
+        await _maybe_create_workflow_version(db, session, current_user.id, "Steps reordered")
         reorders = [{"step_number": r.step_number, "new_position": r.new_position} for r in reorder_data.reorders]
         await reorder_steps(db, session_id, reorders)
         return {"status": "success", "message": "Steps reordered"}
@@ -1850,6 +1938,192 @@ async def improve_step_endpoint(
             status.HTTP_502_BAD_GATEWAY,
             detail=f"Step improvement failed: {exc}",
         )
+
+
+# ── Version History endpoints ─────────────────────────────────────────────────
+
+@router.get("/workflow/{session_id}/versions")
+async def list_workflow_versions(
+    session_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List workflow versions (without steps_snapshot)."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+    if session.project_id:
+        await check_project_permission(db, current_user.id, session.project_id, ProjectRole.VIEWER)
+
+    result = await db.execute(
+        select(
+            WorkflowVersion.id,
+            WorkflowVersion.version_number,
+            WorkflowVersion.name,
+            WorkflowVersion.total_steps,
+            WorkflowVersion.created_by,
+            WorkflowVersion.created_at,
+            WorkflowVersion.change_summary,
+        )
+        .where(WorkflowVersion.session_id == session_id)
+        .order_by(WorkflowVersion.version_number.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = result.all()
+    return [
+        {
+            "id": r.id,
+            "version_number": r.version_number,
+            "name": r.name,
+            "total_steps": r.total_steps,
+            "created_by": r.created_by,
+            "created_at": r.created_at,
+            "change_summary": r.change_summary,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/workflow/{session_id}/versions/{version_id}")
+async def get_workflow_version(
+    session_id: str,
+    version_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a specific workflow version including steps_snapshot."""
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+    if session.project_id:
+        await check_project_permission(db, current_user.id, session.project_id, ProjectRole.VIEWER)
+
+    ver = await db.scalar(
+        select(WorkflowVersion).where(
+            WorkflowVersion.id == version_id,
+            WorkflowVersion.session_id == session_id,
+        )
+    )
+    if not ver:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Version not found")
+
+    return {
+        "id": ver.id,
+        "version_number": ver.version_number,
+        "name": ver.name,
+        "total_steps": ver.total_steps,
+        "steps_snapshot": ver.steps_snapshot,
+        "created_by": ver.created_by,
+        "created_at": ver.created_at,
+        "change_summary": ver.change_summary,
+    }
+
+
+@router.post("/workflow/{session_id}/versions/{version_id}/restore")
+async def restore_workflow_version(
+    session_id: str,
+    version_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore workflow steps from a version snapshot. Saves current state as version first."""
+    from sqlalchemy import delete as sa_delete
+    from app.utils import gen_suffix
+
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+    if session.project_id:
+        await check_project_permission(db, current_user.id, session.project_id, ProjectRole.EDITOR)
+
+    ver = await db.scalar(
+        select(WorkflowVersion).where(
+            WorkflowVersion.id == version_id,
+            WorkflowVersion.session_id == session_id,
+        )
+    )
+    if not ver:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Version not found")
+
+    # Save current state as a version first (force, skip throttle)
+    current_steps_result = await db.execute(
+        select(ProcessRecordingStep)
+        .where(ProcessRecordingStep.session_id == session_id)
+        .order_by(ProcessRecordingStep.step_number)
+    )
+    current_steps = current_steps_result.scalars().all()
+    snapshot = []
+    for s in current_steps:
+        snapshot.append({
+            "step_number": s.step_number,
+            "step_type": s.step_type,
+            "action_type": s.action_type,
+            "window_title": s.window_title,
+            "description": s.description,
+            "content": s.content,
+            "url": s.url,
+            "owner_app": s.owner_app,
+            "generated_title": s.generated_title,
+            "generated_description": s.generated_description,
+            "ui_element": s.ui_element,
+            "step_category": s.step_category,
+            "spoken_text": s.spoken_text,
+        })
+    save_ver = WorkflowVersion(
+        id=gen_suffix(16),
+        session_id=session_id,
+        version_number=session.version or 1,
+        steps_snapshot=snapshot,
+        name=session.name,
+        total_steps=len(snapshot),
+        created_by=current_user.id,
+        change_summary=f"Before restore to v{ver.version_number}",
+    )
+    db.add(save_ver)
+
+    # Delete all current steps
+    await db.execute(
+        sa_delete(ProcessRecordingStep).where(ProcessRecordingStep.session_id == session_id)
+    )
+
+    # Recreate steps from snapshot
+    for step_data in ver.steps_snapshot:
+        new_step = ProcessRecordingStep(
+            id=gen_suffix(16),
+            session_id=session_id,
+            step_number=step_data.get("step_number", 1),
+            step_type=step_data.get("step_type"),
+            timestamp=datetime.utcnow(),
+            action_type=step_data.get("action_type"),
+            window_title=step_data.get("window_title"),
+            description=step_data.get("description"),
+            content=step_data.get("content"),
+            url=step_data.get("url"),
+            owner_app=step_data.get("owner_app"),
+            generated_title=step_data.get("generated_title"),
+            generated_description=step_data.get("generated_description"),
+            ui_element=step_data.get("ui_element"),
+            step_category=step_data.get("step_category"),
+            spoken_text=step_data.get("spoken_text"),
+        )
+        db.add(new_step)
+
+    session.version = (session.version or 1) + 1
+    session.total_steps = len(ver.steps_snapshot)
+    await db.commit()
+
+    return {
+        "status": "success",
+        "version": session.version,
+        "message": f"Restored from version {ver.version_number}",
+        "total_steps": len(ver.steps_snapshot),
+    }
 
 
 # ── Trash endpoints ──────────────────────────────────────────────────────────

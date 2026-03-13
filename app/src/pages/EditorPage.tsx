@@ -1,4 +1,4 @@
-import { Download, Eye, Folder as FolderIcon, Lock, Share2 } from 'lucide-react';
+import { Download, Eye, Folder as FolderIcon, History, Lock, Share2 } from 'lucide-react';
 import { useParams } from "react-router-dom";
 import { OndokiEditor } from "@/components/Editor/OndokiEditor";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import { CommentPanel } from "@/components/Comments/CommentPanel";
 import { useFolderTree } from "@/hooks/api/folders";
 import { useAuth } from "@/providers/auth-provider";
 import { ContentLanguageToggle } from "@/components/ui/content-language-toggle";
+import { VersionHistoryPanel } from "@/components/VersionHistory/VersionHistoryPanel";
 
 // Helper to find a folder name from the tree
 function findFolderName(tree: any[], folderId: string): string | null {
@@ -82,6 +83,7 @@ export default function EditorPage() {
   }, [doc, sharedTree, privateTree]);
 
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
 
   // Translation preview
@@ -214,6 +216,13 @@ export default function EditorPage() {
           compact
         />
 
+        {!isReadOnly && (
+          <Button variant="outline" size="sm" onClick={() => setVersionHistoryOpen(true)}>
+            <History />
+            <span className=" hidden md:inline">History</span>
+          </Button>
+        )}
+
         <ExportDialog
           onExport={handleExport}
           title="Export Document"
@@ -320,6 +329,18 @@ export default function EditorPage() {
           resourceId={docId}
           currentUserId={user.id}
           onCountChange={setCommentCount}
+        />
+      )}
+
+      {docId && (
+        <VersionHistoryPanel
+          open={versionHistoryOpen}
+          onClose={() => setVersionHistoryOpen(false)}
+          docId={docId}
+          onRestore={() => {
+            // Refetch the document after restore
+            window.location.reload();
+          }}
         />
       )}
     </div>

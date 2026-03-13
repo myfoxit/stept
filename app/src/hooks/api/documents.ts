@@ -1,4 +1,4 @@
-import { getDocument, saveDocument, linkDocument, unlinkDocument, moveDocument, deleteDocument, listDocuments, createDocument, duplicateDocument, getFilteredDocuments, getDocumentLock, acquireDocumentLock, releaseDocumentLock, type DocumentLockStatus } from '@/api/documents';
+import { getDocument, saveDocument, linkDocument, unlinkDocument, moveDocument, deleteDocument, listDocuments, createDocument, duplicateDocument, getFilteredDocuments, getDocumentLock, acquireDocumentLock, releaseDocumentLock, type DocumentLockStatus, listDocumentVersions, getDocumentVersion, restoreDocumentVersion, type DocumentVersionRead } from '@/api/documents';
 import { getTextContainer, getAllTextContainer, saveTextContainer, createTextContainer } from '@/api/text_container';
 import type { PageLayout } from '@/components/page-layout-selector';
 import { apiClient, type ApiError } from '@/lib/apiClient';
@@ -271,6 +271,35 @@ export const useReleaseDocumentLock = (docId: string) => {
     mutationFn: () => releaseDocumentLock(docId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...queryKeys.document(docId), 'lock'] });
+    },
+  });
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VERSION HISTORY HOOKS
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const useDocumentVersions = (docId: string) =>
+  useQuery<DocumentVersionRead[], ApiError>({
+    queryKey: [...queryKeys.document(docId), 'versions'],
+    queryFn: () => listDocumentVersions(docId),
+    enabled: !!docId,
+  });
+
+export const useDocumentVersion = (docId: string, versionId: string | null) =>
+  useQuery<DocumentVersionRead, ApiError>({
+    queryKey: [...queryKeys.document(docId), 'versions', versionId],
+    queryFn: () => getDocumentVersion(docId, versionId!),
+    enabled: !!docId && !!versionId,
+  });
+
+export const useRestoreDocumentVersion = (docId: string) => {
+  const qc = useQueryClient();
+  return useMutation<DocumentRead, ApiError, string>({
+    mutationFn: (versionId: string) => restoreDocumentVersion(docId, versionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
+      qc.invalidateQueries({ queryKey: [...queryKeys.document(docId), 'versions'] });
     },
   });
 };

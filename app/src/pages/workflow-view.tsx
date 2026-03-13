@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil, Share2, Download, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Share2, Download, History, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -54,6 +54,7 @@ import { CommentButton } from '@/components/Comments/CommentButton';
 import { CommentPanel } from '@/components/Comments/CommentPanel';
 import { useAuth } from '@/providers/auth-provider';
 import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
+import { VersionHistoryPanel } from '@/components/VersionHistory/VersionHistoryPanel';
 import { getApiBaseUrl } from '@/lib/apiClient';
 
 export function WorkflowView() {
@@ -399,6 +400,7 @@ export function WorkflowView() {
   };
 
   const [shareModalOpen, setShareModalOpen] = React.useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = React.useState(false);
 
   // AI state
   const [guideOpen, setGuideOpen] = React.useState(false);
@@ -794,6 +796,10 @@ export function WorkflowView() {
               Edit
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setVersionHistoryOpen(true)}>
+            <History className="mr-1 h-3 w-3" />
+            History
+          </Button>
           <Button size="sm" variant="outline" onClick={handleShare}>
             <Share2 className="mr-1 h-3 w-3" />
             Share
@@ -933,6 +939,17 @@ export function WorkflowView() {
             resourceId={workflowId}
             currentUserId={user.id}
             onCountChange={setCommentCount}
+          />
+        )}
+
+        {workflowId && (
+          <VersionHistoryPanel
+            open={versionHistoryOpen}
+            onClose={() => setVersionHistoryOpen(false)}
+            workflowId={workflowId}
+            onRestore={() => {
+              refreshWorkflow();
+            }}
           />
         )}
       </div>

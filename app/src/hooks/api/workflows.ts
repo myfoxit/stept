@@ -5,9 +5,13 @@ import {
   reorderSteps,
   uploadStepImage,
   getFilteredWorkflows,  // NEW import
+  listWorkflowVersions,
+  getWorkflowVersion,
+  restoreWorkflowVersion,
   type StepCreate,
   type StepUpdate,
-  type StepReorder
+  type StepReorder,
+  type WorkflowVersionRead,
 } from '@/api/workflows';
 import { getWorkflow, listWorkflows, updateWorkflow, moveWorkflow, deleteWorkflow, duplicateWorkflow } from '@/api/workflows';
 import type { ProcessRecordingSession, WorkflowRead } from '@/types/openapi';
@@ -217,6 +221,35 @@ export const useUploadStepImage = () => {
     onSuccess: (_data, { workflowId }) => {
       qc.invalidateQueries({ queryKey: ['workflow', workflowId] });
       qc.refetchQueries({ queryKey: ['workflow', workflowId] });
+    },
+  });
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VERSION HISTORY HOOKS
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const useWorkflowVersions = (workflowId: string) =>
+  useQuery<WorkflowVersionRead[], ApiError>({
+    queryKey: ['workflow', workflowId, 'versions'],
+    queryFn: () => listWorkflowVersions(workflowId),
+    enabled: !!workflowId,
+  });
+
+export const useWorkflowVersion = (workflowId: string, versionId: string | null) =>
+  useQuery<WorkflowVersionRead, ApiError>({
+    queryKey: ['workflow', workflowId, 'versions', versionId],
+    queryFn: () => getWorkflowVersion(workflowId, versionId!),
+    enabled: !!workflowId && !!versionId,
+  });
+
+export const useRestoreWorkflowVersion = (workflowId: string) => {
+  const qc = useQueryClient();
+  return useMutation<any, ApiError, string>({
+    mutationFn: (versionId: string) => restoreWorkflowVersion(workflowId, versionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflow', workflowId] });
+      qc.invalidateQueries({ queryKey: ['workflow', workflowId, 'versions'] });
     },
   });
 };

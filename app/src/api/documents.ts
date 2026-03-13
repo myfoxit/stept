@@ -288,3 +288,32 @@ export const restoreDocument = async (docId: string): Promise<DocumentRead> => {
 export const permanentDeleteDocument = async (docId: string): Promise<void> => {
   await apiClient.delete(`/documents/${docId}/permanent`);
 };
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VERSION HISTORY
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface DocumentVersionRead {
+  id: string;
+  version_number: number;
+  name: string | null;
+  byte_size: number | null;
+  created_by: string | null;
+  created_at: string;
+  content?: Record<string, any>;
+}
+
+export const listDocumentVersions = async (docId: string, limit = 50): Promise<DocumentVersionRead[]> => {
+  const { data } = await apiClient.get(`/documents/${docId}/versions`, { params: { limit } });
+  return data;
+};
+
+export const getDocumentVersion = async (docId: string, versionId: string): Promise<DocumentVersionRead> => {
+  const { data } = await apiClient.get(`/documents/${docId}/versions/${versionId}`);
+  return data;
+};
+
+export const restoreDocumentVersion = async (docId: string, versionId: string): Promise<DocumentRead> => {
+  const { data } = await apiClient.post(`/documents/${docId}/restore/${versionId}`);
+  return data;
+};
