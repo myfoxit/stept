@@ -65,7 +65,46 @@ function getClickPercent(step: PublicStep): { x: number; y: number } | null {
 }
 
 function getStepText(step: PublicStep): string {
-  return step.description || step.generated_description || step.generated_title || step.content || step.window_title || '';
+  // Use explicit description/content first
+  const explicit = step.description || step.generated_description || step.generated_title || step.content;
+  if (explicit) return explicit;
+
+  // Generate generic narration for action steps
+  const sType = step.step_type || 'screenshot';
+
+  if (step.text_typed) {
+    return `Type "${step.text_typed}"`;
+  }
+
+  if (step.key_pressed) {
+    return `Press ${step.key_pressed}`;
+  }
+
+  if (sType === 'copy') {
+    return 'Copy the selected content';
+  }
+
+  if (sType === 'paste') {
+    return 'Paste the content';
+  }
+
+  if (sType === 'done' || sType === 'complete') {
+    return "And that's it — you're done!";
+  }
+
+  if (sType === 'navigate' || sType === 'navigation') {
+    const target = step.window_title;
+    return target ? `Navigate to ${target}` : 'Navigate to the next page';
+  }
+
+  if (sType === 'scroll') {
+    return 'Scroll down the page';
+  }
+
+  // Fallback to window title or generic
+  if (step.window_title) return step.window_title;
+
+  return '';
 }
 
 /** Fetch a single TTS blob with retry logic (up to 2 retries on failure). */
@@ -107,11 +146,11 @@ async function preloadAllTts(
   const url = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
   const cache = new Map<number, Blob>();
 
-  // Collect steps that need TTS
+  // Collect steps that need TTS (all languages — OpenAI supports multilingual)
   const tasks: { idx: number; text: string }[] = [];
   for (let i = 0; i < steps.length; i++) {
     const text = getStepText(steps[i]);
-    if (text && isEnglish(text)) {
+    if (text?.trim()) {
       tasks.push({ idx: i, text });
     }
   }
@@ -287,12 +326,41 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
       });
   }, [baseUrl, steps, ttsConfig, ttsReady, ttsPreloading]);
 
-  // Start preloading as soon as ttsConfig arrives
+  // Compute a fingerprint of step texts to detect language changes
+  const stepsTextKey = React.useMemo(
+    () => steps.map((s) => getStepText(s)).join('|'),
+    [steps],
+  );
+
+  // Invalidate TTS cache and reset playback when steps content changes (e.g. language switch)
+  const prevStepsKeyRef = useRef(stepsTextKey);
   useEffect(() => {
-    if (ttsConfig) {
+    if (stepsTextKey === prevStepsKeyRef.current) return;
+    prevStepsKeyRef.current = stepsTextKey;
+
+    // Stop playback
+    setPlaying(false);
+    clearAllTimeouts();
+    cancelSpeech();
+    setCurrentIndex(0);
+    setAnimState('idle');
+    setZoomTransform('scale(1) translate(0%, 0%)');
+    setImageOpacity(1);
+
+    // Invalidate TTS cache
+    preloadAbortRef.current?.abort();
+    ttsCacheRef.current = new Map();
+    setTtsReady(false);
+    setTtsPreloading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepsTextKey]);
+
+  // Start preloading as soon as ttsConfig arrives (or after cache invalidation)
+  useEffect(() => {
+    if (ttsConfig && !ttsReady && !ttsPreloading) {
       startPreload();
     }
-  }, [ttsConfig, startPreload]);
+  }, [ttsConfig, ttsReady, ttsPreloading, startPreload]);
 
   /* ── Cleanup ── */
 
@@ -380,7 +448,7 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
   }, [cancelSpeech]);
 
   const speak = useCallback((stepIdx: number, text: string, onEnd: () => void) => {
-    if (mutedRef.current || !isEnglish(text)) {
+    if (mutedRef.current || !text.trim()) {
       onEnd();
       return;
     }
@@ -389,9 +457,13 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     cancelSpeech();
 
     if (ttsConfig?.provider === 'openai' && ttsConfig.available) {
+      // OpenAI TTS supports many languages — always use it
       speakFromCache(stepIdx, text, onEnd);
-    } else {
+    } else if (isEnglish(text)) {
+      // Browser TTS only for English (other languages sound bad)
       speakBrowser(text, onEnd);
+    } else {
+      onEnd();
     }
   }, [cancelSpeech, ttsConfig, speakFromCache, speakBrowser]);
 
@@ -414,16 +486,24 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     const clickPos = getClickPercent(s);
     const text = getStepText(s);
 
-    // For non-screenshot steps, just show and wait
+    // For non-screenshot steps or steps without images: speak text then advance
     if (sType !== 'screenshot' || !sHasImage) {
       setShowTooltip(true);
       setCursorVisible(false);
       setZoomTransform('scale(1) translate(0%, 0%)');
 
-      schedule(() => {
-        if (!playingRef.current) return;
-        advanceStep(idx);
-      }, 3000);
+      if (text) {
+        setAnimState('speaking');
+        speak(idx, text, () => {
+          if (!playingRef.current) return;
+          schedule(() => advanceStep(idx), 800);
+        });
+      } else {
+        schedule(() => {
+          if (!playingRef.current) return;
+          advanceStep(idx);
+        }, 2000);
+      }
       return;
     }
 
