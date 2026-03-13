@@ -32,7 +32,7 @@ import { FileViewer } from "@/components/FileViewer";
 import { CommentPanel } from "@/components/Comments/CommentPanel";
 import { useFolderTree } from "@/hooks/api/folders";
 import { useAuth } from "@/providers/auth-provider";
-import { ContentLanguageToggle } from "@/components/ui/content-language-toggle";
+// Translation is only on public/embed views, not the editable view
 import { VersionHistoryPanel, type VersionPreviewInfo } from "@/components/VersionHistory/VersionHistoryPanel";
 import { format } from "date-fns";
 
@@ -91,9 +91,7 @@ export default function EditorPage() {
   const [previewContent, setPreviewContent] = useState<Record<string, any> | null>(null);
   const [previewInfo, setPreviewInfo] = useState<VersionPreviewInfo | null>(null);
 
-  // Translation preview
-  const [contentLang, setContentLang] = useState("original");
-  const [contentTranslating, setContentTranslating] = useState(false);
+
 
   const [pageLayout, setPageLayout] = useState<PageLayout>("document");
   const updateLayout = useUpdateDocumentLayout(docId!);
@@ -214,12 +212,7 @@ export default function EditorPage() {
           />
         )}
 
-        <ContentLanguageToggle
-          value={contentLang}
-          onChange={setContentLang}
-          loading={contentTranslating}
-          compact
-        />
+
 
         <Button variant="outline" size="sm" onClick={() => setVersionHistoryOpen(true)}>
           <History />

@@ -53,9 +53,9 @@ import { ContextLinkPanel } from '@/components/ContextLinks/ContextLinkPanel';
 import { CommentButton } from '@/components/Comments/CommentButton';
 import { CommentPanel } from '@/components/Comments/CommentPanel';
 import { useAuth } from '@/providers/auth-provider';
-import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
+// Translation is only on public/embed views, not the editable view
 import { VersionHistoryPanel } from '@/components/VersionHistory/VersionHistoryPanel';
-import { getApiBaseUrl } from '@/lib/apiClient';
+
 
 export function WorkflowView() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -71,62 +71,14 @@ export function WorkflowView() {
   const [commentCount, setCommentCount] = React.useState(0);
 
   // Translation preview state
-  const [previewLang, setPreviewLang] = React.useState('original');
-  const [translatedSteps, setTranslatedSteps] = React.useState<Record<string, string> | null>(null);
-  const [translating, setTranslating] = React.useState(false);
+  // Translation removed from editable view — only available on public/embed views
   
   // NEW: Derive edit mode from URL
   const isEditMode = location.pathname.endsWith('/edit');
 
   const typedWorkflow = workflow as Workflow | undefined;
 
-  // Fetch translated content when language changes
-  React.useEffect(() => {
-    if (previewLang === 'original' || !workflowId) {
-      setTranslatedSteps(null);
-      return;
-    }
-    let cancelled = false;
-    setTranslating(true);
 
-    (async () => {
-      try {
-        const baseUrl = getApiBaseUrl();
-        // Collect texts to translate
-        const items: { key: string; text: string }[] = [];
-        if (typedWorkflow?.name) items.push({ key: 'name', text: typedWorkflow.name });
-        if ((typedWorkflow as any)?.summary) items.push({ key: 'summary', text: (typedWorkflow as any).summary });
-        const wfSteps = (typedWorkflow?.metadata ?? []) as WorkflowStepType[];
-        wfSteps.forEach((step, i) => {
-          if (step.description) items.push({ key: `step.${i}.description`, text: step.description });
-          if (step.content) items.push({ key: `step.${i}.content`, text: step.content });
-        });
-
-        // Translate all texts in one batch request
-        const resp = await fetch(`${baseUrl}/translation/translate-batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ items, target_language: previewLang }),
-        });
-        const results: Record<string, string> = {};
-        if (resp.ok) {
-          const data = await resp.json();
-          Object.assign(results, data.results);
-        }
-
-        if (!cancelled) {
-          setTranslatedSteps(results);
-        }
-      } catch (e) {
-        console.error('Translation failed:', e);
-      } finally {
-        if (!cancelled) setTranslating(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [previewLang, workflowId, typedWorkflow]);
 
   // Set chat context when viewing a workflow
   React.useEffect(() => {
@@ -625,12 +577,7 @@ export function WorkflowView() {
   };
 
   const renderStep = (rawStep: WorkflowStepType, index: number) => {
-    // Overlay translations if previewing
-    const step = translatedSteps ? {
-      ...rawStep,
-      description: translatedSteps[`step.${index}.description`] ?? rawStep.description,
-      content: translatedSteps[`step.${index}.content`] ?? rawStep.content,
-    } : rawStep;
+    const step = rawStep;
     const backendStepNumber = step.step_number ?? index + 1;
 
     // NEW: compute a visible step index that skips non-image variants
@@ -830,27 +777,14 @@ export function WorkflowView() {
             onUpdateIcon={handleUpdateIcon}
             iconOverride={iconOverride || undefined}
             onUpdateTitle={handleUpdateTitle}
-            translatedName={translatedSteps?.name}
           />
             </div>
             <div className="flex items-center gap-2">
-              <ContentLanguageToggle
-                value={previewLang}
-                onChange={setPreviewLang}
-                loading={translating}
-                compact
-              />
               {selectedProjectId && workflowId && (
                 <CommentButton count={commentCount} onClick={() => setCommentsOpen(true)} />
               )}
             </div>
           </div>
-          {previewLang !== 'original' && translatedSteps && (
-            <div className="rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
-              🌐 Translation preview — editing is disabled while previewing. Switch back to Original to edit.
-            </div>
-          )}
-
           {selectedProjectId && workflowId && (
             <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
           )}
