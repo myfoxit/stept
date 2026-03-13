@@ -1,4 +1,4 @@
-import { Download, Eye, Folder as FolderIcon, History, Lock, Share2 } from 'lucide-react';
+import { Download, Eye, Folder as FolderIcon, History, Lock, Share2, RotateCcw, ChevronLeft } from 'lucide-react';
 import { useParams } from "react-router-dom";
 import { OndokiEditor } from "@/components/Editor/OndokiEditor";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,8 @@ import { CommentPanel } from "@/components/Comments/CommentPanel";
 import { useFolderTree } from "@/hooks/api/folders";
 import { useAuth } from "@/providers/auth-provider";
 import { ContentLanguageToggle } from "@/components/ui/content-language-toggle";
-import { VersionHistoryPanel } from "@/components/VersionHistory/VersionHistoryPanel";
+import { VersionHistoryPanel, type VersionPreviewInfo } from "@/components/VersionHistory/VersionHistoryPanel";
+import { format } from "date-fns";
 
 // Helper to find a folder name from the tree
 function findFolderName(tree: any[], folderId: string): string | null {
@@ -85,6 +86,10 @@ export default function EditorPage() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
+
+  // Version preview state
+  const [previewContent, setPreviewContent] = useState<Record<string, any> | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<VersionPreviewInfo | null>(null);
 
   // Translation preview
   const [contentLang, setContentLang] = useState("original");
@@ -216,12 +221,10 @@ export default function EditorPage() {
           compact
         />
 
-        {!isReadOnly && (
-          <Button variant="outline" size="sm" onClick={() => setVersionHistoryOpen(true)}>
-            <History />
-            <span className=" hidden md:inline">History</span>
-          </Button>
-        )}
+        <Button variant="outline" size="sm" onClick={() => setVersionHistoryOpen(true)}>
+          <History />
+          <span className=" hidden md:inline">History</span>
+        </Button>
 
         <ExportDialog
           onExport={handleExport}
@@ -275,10 +278,46 @@ export default function EditorPage() {
           </Alert>
         </div>
       )}
+      {/* Version preview banner */}
+      {previewInfo && (
+        <div className="sticky top-0 z-40 border-b bg-amber-50 dark:bg-amber-950/40">
+          <div className="mx-auto max-w-4xl flex items-center justify-between px-4 py-2">
+            <div className="flex items-center gap-3 text-sm">
+              <History className="h-4 w-4 text-amber-600" />
+              <span>
+                Viewing <strong>Revision {previewInfo.displayNumber}</strong>
+                <span className="text-muted-foreground ml-1.5">
+                  from {format(new Date(previewInfo.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                </span>
+                {previewInfo.createdByName && (
+                  <span className="text-muted-foreground ml-1">
+                    by {previewInfo.createdByName}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setPreviewContent(null);
+                  setPreviewInfo(null);
+                }}
+              >
+                <ChevronLeft className="mr-1 h-3 w-3" />
+                Back
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={doc?.source_file_mime ? 'hidden' : undefined}>
       <OndokiEditor
         docId={docId as string}
         readOnly={isReadOnly}
+        previewContent={previewContent}
         headerSlot={(saveStatus, errorMessage) => (
           <>
             {selectedProjectId && docId && (
@@ -335,11 +374,20 @@ export default function EditorPage() {
       {docId && (
         <VersionHistoryPanel
           open={versionHistoryOpen}
-          onClose={() => setVersionHistoryOpen(false)}
+          onClose={() => {
+            setVersionHistoryOpen(false);
+            setPreviewContent(null);
+            setPreviewInfo(null);
+          }}
           docId={docId}
+          onPreview={(content, info) => {
+            setPreviewContent(content);
+            setPreviewInfo(info);
+          }}
           onRestore={() => {
-            // Force full page reload so editor re-initializes with restored content
-            // (TipTap caches content internally, query invalidation alone isn't enough)
+            setPreviewContent(null);
+            setPreviewInfo(null);
+            // Reload to re-initialize editor with restored content
             window.location.reload();
           }}
         />

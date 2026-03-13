@@ -507,12 +507,14 @@ async def api_list_versions(
     current_user: User = Depends(get_current_user),
 ):
     """List document versions (without content)."""
-    from app.models import DocumentVersion
+    from app.models import DocumentVersion, User as UserModel
+    from sqlalchemy.orm import aliased
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(404, "document not found")
     await _check_doc_access(db, doc, current_user)
     
+    Creator = aliased(UserModel)
     result = await db.execute(
         select(
             DocumentVersion.id,
@@ -521,7 +523,10 @@ async def api_list_versions(
             DocumentVersion.byte_size,
             DocumentVersion.created_by,
             DocumentVersion.created_at,
+            Creator.name.label("created_by_name"),
+            Creator.email.label("created_by_email"),
         )
+        .outerjoin(Creator, DocumentVersion.created_by == Creator.id)
         .where(DocumentVersion.document_id == doc_id)
         .order_by(DocumentVersion.version_number.desc())
         .offset(offset)
@@ -535,6 +540,7 @@ async def api_list_versions(
             "name": r.name,
             "byte_size": r.byte_size,
             "created_by": r.created_by,
+            "created_by_name": r.created_by_name or (r.created_by_email.split("@")[0] if r.created_by_email else None),
             "created_at": r.created_at,
         }
         for r in rows

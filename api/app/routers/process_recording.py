@@ -1951,6 +1951,7 @@ async def list_workflow_versions(
     current_user: User = Depends(get_current_user),
 ):
     """List workflow versions (without steps_snapshot)."""
+    from sqlalchemy.orm import aliased
     session = await db.get(ProcessRecordingSession, session_id)
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
@@ -1958,6 +1959,7 @@ async def list_workflow_versions(
     if session.project_id:
         await check_project_permission(db, current_user.id, session.project_id, ProjectRole.VIEWER)
 
+    Creator = aliased(User)
     result = await db.execute(
         select(
             WorkflowVersion.id,
@@ -1967,7 +1969,10 @@ async def list_workflow_versions(
             WorkflowVersion.created_by,
             WorkflowVersion.created_at,
             WorkflowVersion.change_summary,
+            Creator.name.label("created_by_name"),
+            Creator.email.label("created_by_email"),
         )
+        .outerjoin(Creator, WorkflowVersion.created_by == Creator.id)
         .where(WorkflowVersion.session_id == session_id)
         .order_by(WorkflowVersion.version_number.desc())
         .offset(offset)
@@ -1981,6 +1986,7 @@ async def list_workflow_versions(
             "name": r.name,
             "total_steps": r.total_steps,
             "created_by": r.created_by,
+            "created_by_name": r.created_by_name or (r.created_by_email.split("@")[0] if r.created_by_email else None),
             "created_at": r.created_at,
             "change_summary": r.change_summary,
         }

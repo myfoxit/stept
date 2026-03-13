@@ -299,6 +299,7 @@ export interface DocumentVersionRead {
   name: string | null;
   byte_size: number | null;
   created_by: string | null;
+  created_by_name: string | null;
   created_at: string;
   content?: Record<string, any>;
 }

@@ -34,9 +34,11 @@ import { AICommandPanel, AI_COMMANDS } from '@/components/Editor/Extensions/ai-c
 import { SpotlightSearch } from '@/components/spotlight/SpotlightSearch';
 
 
-export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
+export function OndokiEditor({ docId, readOnly = false, previewContent, headerSlot }: {
   docId: string;
   readOnly?: boolean;
+  /** When set, shows this content in read-only mode instead of the saved document content */
+  previewContent?: Record<string, any> | null;
   headerSlot?: (saveStatus: string, errorMessage: string | null) => React.ReactNode;
 }) {
   const { data: doc, isLoading: docLoading } = useDocument(docId);
@@ -148,11 +150,31 @@ export function OndokiEditor({ docId, readOnly = false, headerSlot }: {
 
   // Set document content when ready
   useEffect(() => {
-    if (editor && doc && !contentInitialized) {
+    if (editor && doc && !contentInitialized && !previewContent) {
       editor.commands.setContent(doc!.content, { emitUpdate: false });
       setContentInitialized(true);
     }
-  }, [editor, doc, contentInitialized]);
+  }, [editor, doc, contentInitialized, previewContent]);
+
+  // Preview mode: swap content when previewContent changes
+  const [savedContent, setSavedContent] = useState<Record<string, any> | null>(null);
+  useEffect(() => {
+    if (!editor) return;
+    if (previewContent) {
+      // Save current content before switching to preview
+      if (!savedContent) {
+        setSavedContent(editor.getJSON() as Record<string, any>);
+      }
+      editor.commands.setContent(previewContent, { emitUpdate: false });
+      editor.setEditable(false);
+    } else if (savedContent) {
+      // Restore original content when preview ends
+      editor.commands.setContent(savedContent, { emitUpdate: false });
+      editor.setEditable(!readOnly);
+      setSavedContent(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewContent, editor]);
 
   // Adopt document's stored layout
   useEffect(() => {

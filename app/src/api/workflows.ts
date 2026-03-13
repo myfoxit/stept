@@ -293,6 +293,7 @@ export interface WorkflowVersionRead {
   name: string | null;
   total_steps: number | null;
   created_by: string | null;
+  created_by_name: string | null;
   created_at: string;
   change_summary: string | null;
   steps_snapshot?: any[];

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { History, RotateCcw, Clock, FileText, Layers, AlertTriangle } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { History, RotateCcw, Clock, User, ChevronLeft } from 'lucide-react';
+import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns';
 import {
   Sheet,
   SheetContent,
@@ -8,21 +8,55 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useDocumentVersions, useRestoreDocumentVersion } from '@/hooks/api/documents';
-import { useWorkflowVersions, useRestoreWorkflowVersion } from '@/hooks/api/workflows';
+import { useDocumentVersions, useDocumentVersion, useRestoreDocumentVersion } from '@/hooks/api/documents';
+import { useWorkflowVersions, useWorkflowVersion, useRestoreWorkflowVersion } from '@/hooks/api/workflows';
 import type { DocumentVersionRead } from '@/api/documents';
 import type { WorkflowVersionRead } from '@/api/workflows';
+
+// Shared type for both version kinds
+type AnyVersion = DocumentVersionRead | WorkflowVersionRead;
 
 interface VersionHistoryPanelProps {
   open: boolean;
   onClose: () => void;
   docId?: string;
   workflowId?: string;
+  /** Called with version content when user clicks a version (for live preview) */
+  onPreview?: (content: Record<string, any> | null, versionInfo: VersionPreviewInfo | null) => void;
+  /** Called after a successful restore */
   onRestore?: () => void;
+}
+
+export interface VersionPreviewInfo {
+  id: string;
+  displayNumber: number;
+  createdAt: string;
+  createdByName: string | null;
+}
+
+function formatVersionDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  if (isToday(date)) return `Today, ${format(date, 'h:mm a')}`;
+  if (isYesterday(date)) return `Yesterday, ${format(date, 'h:mm a')}`;
+  return format(date, 'MMM d, yyyy · h:mm a');
+}
+
+/** Group versions by date label */
+function groupByDate(versions: AnyVersion[]): { label: string; versions: AnyVersion[] }[] {
+  const groups: Map<string, AnyVersion[]> = new Map();
+  for (const v of versions) {
+    const date = new Date(v.created_at);
+    let label: string;
+    if (isToday(date)) label = 'Today';
+    else if (isYesterday(date)) label = 'Yesterday';
+    else label = format(date, 'MMMM d, yyyy');
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push(v);
+  }
+  return Array.from(groups.entries()).map(([label, versions]) => ({ label, versions }));
 }
 
 export function VersionHistoryPanel({
@@ -30,30 +64,46 @@ export function VersionHistoryPanel({
   onClose,
   docId,
   workflowId,
+  onPreview,
   onRestore,
 }: VersionHistoryPanelProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const isDocument = !!docId;
 
-  // Document version queries
+  // Queries
   const docVersions = useDocumentVersions(docId || '');
+  const docVersion = useDocumentVersion(docId || '', selectedVersionId);
   const docRestore = useRestoreDocumentVersion(docId || '');
 
-  // Workflow version queries
   const wfVersions = useWorkflowVersions(workflowId || '');
+  const wfVersion = useWorkflowVersion(workflowId || '', selectedVersionId);
   const wfRestore = useRestoreWorkflowVersion(workflowId || '');
 
-  const versions = isDocument
-    ? (docVersions.data as (DocumentVersionRead | WorkflowVersionRead)[] | undefined)
-    : (wfVersions.data as (DocumentVersionRead | WorkflowVersionRead)[] | undefined);
+  const versions = (isDocument ? docVersions.data : wfVersions.data) as AnyVersion[] | undefined;
   const isLoading = isDocument ? docVersions.isLoading : wfVersions.isLoading;
   const isRestoring = isDocument ? docRestore.isPending : wfRestore.isPending;
 
-  const selectedVersion = versions?.find((v) => v.id === selectedVersionId);
+  // When a version's content finishes loading, push it to the parent for preview
+  const fetchedVersion = isDocument ? docVersion.data : wfVersion.data;
+  useEffect(() => {
+    if (!fetchedVersion || !selectedVersionId || !onPreview) return;
+    const totalVersions = versions?.length ?? 0;
+    const index = versions?.findIndex((v) => v.id === selectedVersionId) ?? -1;
+    const displayNumber = index >= 0 ? totalVersions - index : 0;
+    const v = fetchedVersion as any;
+    onPreview(
+      v.content ?? v.steps_snapshot ?? null,
+      {
+        id: selectedVersionId,
+        displayNumber,
+        createdAt: v.created_at,
+        createdByName: v.created_by_name ?? null,
+      },
+    );
+  }, [fetchedVersion, selectedVersionId]);
 
-  // Refetch versions when the panel opens
+  // Refetch list when panel opens
   useEffect(() => {
     if (open) {
       if (isDocument) docVersions.refetch();
@@ -62,203 +112,215 @@ export function VersionHistoryPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Clear selection when panel closes
+  // Clear selection + preview when panel closes
   useEffect(() => {
     if (!open) {
       setSelectedVersionId(null);
-      setConfirmingId(null);
+      onPreview?.(null, null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handleRestore = (versionId: string) => {
+  const handleSelect = (versionId: string) => {
+    if (versionId === selectedVersionId) {
+      // Deselect → back to current
+      setSelectedVersionId(null);
+      onPreview?.(null, null);
+    } else {
+      setSelectedVersionId(versionId);
+      // Content will be pushed via the useEffect above once fetched
+    }
+  };
+
+  const handleRestore = () => {
+    if (!selectedVersionId) return;
     const mutation = isDocument ? docRestore : wfRestore;
-    mutation.mutate(versionId, {
+    mutation.mutate(selectedVersionId, {
       onSuccess: () => {
-        setConfirmingId(null);
         setSelectedVersionId(null);
+        onPreview?.(null, null);
         onRestore?.();
         onClose();
-      },
-      onError: () => {
-        setConfirmingId(null);
       },
     });
   };
 
-  const handleClose = () => {
+  const handleBackToCurrent = () => {
     setSelectedVersionId(null);
-    onClose();
+    onPreview?.(null, null);
   };
 
-  // Sequential display number: versions are sorted newest-first from the API,
-  // so the first item is the most recent snapshot. We show them as
-  // "Revision N" counting down from total, so the oldest is #1.
   const totalVersions = versions?.length ?? 0;
+  const groups = versions ? groupByDate(versions) : [];
+
+  // Find display info for selected version
+  const selectedIndex = versions?.findIndex((v) => v.id === selectedVersionId) ?? -1;
+  const selectedDisplayNumber = selectedIndex >= 0 ? totalVersions - selectedIndex : 0;
+  const selectedVersionData = versions?.find((v) => v.id === selectedVersionId);
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={(o) => !o && handleClose()}>
-        <SheetContent className="flex w-[380px] flex-col sm:w-[420px]">
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="flex w-[360px] flex-col p-0 sm:w-[400px] gap-0">
+        {/* Header */}
+        <div className="px-4 pt-4 pb-3">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Version History
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <History className="h-4 w-4" />
+              Version history
             </SheetTitle>
           </SheetHeader>
+        </div>
 
-          <div className="mt-4 flex-1 overflow-hidden">
-            {/* Current version indicator */}
-            <div className="mb-3 flex items-center gap-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2.5">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                Current version
-              </span>
-              <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70 ml-auto">
-                Live
-              </span>
+        {/* Preview banner when a version is selected */}
+        {selectedVersionId && selectedVersionData && (
+          <div className="border-y bg-muted/30 px-4 py-2.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <span className="font-medium">Revision {selectedDisplayNumber}</span>
+                <span className="text-muted-foreground ml-1.5">
+                  · {formatVersionDate(selectedVersionData.created_at)}
+                </span>
+              </div>
             </div>
+            {(selectedVersionData as any).created_by_name && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="h-3 w-3" />
+                {(selectedVersionData as any).created_by_name}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={handleBackToCurrent}
+              >
+                <ChevronLeft className="mr-1 h-3 w-3" />
+                Back to current
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={handleRestore}
+                disabled={isRestoring}
+              >
+                <RotateCcw className="mr-1 h-3 w-3" />
+                {isRestoring ? 'Restoring…' : 'Restore this version'}
+              </Button>
+            </div>
+          </div>
+        )}
 
-            <Separator className="mb-3" />
+        <Separator />
 
-            {isLoading ? (
-              <div className="space-y-3 px-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="space-y-2 rounded-md border p-3">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-48" />
+        {/* Version list */}
+        <div className="flex-1 overflow-hidden">
+          {isLoading ? (
+            <div className="space-y-4 p-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                </div>
+              ))}
+            </div>
+          ) : !versions || versions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center px-4">
+              <History className="h-10 w-10 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No versions yet</p>
+              <p className="text-xs text-muted-foreground/60">
+                Versions are saved automatically as you edit
+              </p>
+            </div>
+          ) : (
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-4">
+                {/* Current version pill */}
+                <button
+                  onClick={handleBackToCurrent}
+                  className={`w-full rounded-lg px-3 py-2.5 text-left transition-all border ${
+                    !selectedVersionId
+                      ? 'border-primary/40 bg-primary/5'
+                      : 'border-transparent hover:bg-muted/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${!selectedVersionId ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`} />
+                    <span className={`text-sm font-medium ${!selectedVersionId ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      Current version
+                    </span>
+                  </div>
+                </button>
+
+                {/* Grouped version list */}
+                {groups.map((group) => (
+                  <div key={group.label}>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">
+                      {group.label}
+                    </p>
+                    <div className="space-y-0.5">
+                      {group.versions.map((version) => {
+                        const idx = versions.indexOf(version);
+                        const displayNumber = totalVersions - idx;
+                        const isSelected = selectedVersionId === version.id;
+                        const isFetching = isSelected && (isDocument ? docVersion.isFetching : wfVersion.isFetching);
+                        const wfV = version as WorkflowVersionRead;
+                        const createdDate = new Date(version.created_at);
+
+                        return (
+                          <button
+                            key={version.id}
+                            onClick={() => handleSelect(version.id)}
+                            className={`w-full rounded-lg px-3 py-2 text-left transition-all border ${
+                              isSelected
+                                ? 'border-primary/40 bg-primary/5'
+                                : 'border-transparent hover:bg-muted/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {isFetching ? (
+                                  <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                ) : (
+                                  <div className={`h-2 w-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+                                )}
+                                <span className="text-sm font-medium">
+                                  Revision {displayNumber}
+                                </span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {format(createdDate, 'h:mm a')}
+                              </span>
+                            </div>
+
+                            {/* User name */}
+                            {(version as any).created_by_name && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 ml-4">
+                                <User className="h-3 w-3" />
+                                {(version as any).created_by_name}
+                              </div>
+                            )}
+
+                            {/* Workflow-specific: step count + summary */}
+                            {!isDocument && wfV.total_steps != null && (
+                              <div className="text-xs text-muted-foreground mt-1 ml-4">
+                                {wfV.total_steps} steps
+                                {wfV.change_summary && (
+                                  <span className="ml-1.5">· {wfV.change_summary}</span>
+                                )}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
-            ) : !versions || versions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                <History className="h-10 w-10 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  No version history yet
-                </p>
-                <p className="text-xs text-muted-foreground/60">
-                  Versions are created automatically when you edit
-                </p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[calc(100vh-280px)]">
-                <div className="space-y-1.5 pr-3">
-                  {versions.map((version, index) => {
-                    const isSelected = selectedVersionId === version.id;
-                    const wfVersion = version as WorkflowVersionRead;
-                    const displayNumber = totalVersions - index;
-                    const createdDate = new Date(version.created_at);
-                    return (
-                      <div
-                        key={version.id}
-                        className={`rounded-md border transition-all ${
-                          isSelected
-                            ? 'border-primary bg-primary/5 shadow-sm'
-                            : 'border-transparent hover:border-border hover:bg-muted/40'
-                        }`}
-                      >
-                        <button
-                          onClick={() =>
-                            setSelectedVersionId(
-                              isSelected ? null : version.id
-                            )
-                          }
-                          className="w-full px-3 py-2.5 text-left"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              {isDocument ? (
-                                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                              ) : (
-                                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                              <span className="text-sm font-medium">
-                                Revision {displayNumber}
-                              </span>
-                            </div>
-                            {!isDocument && wfVersion.total_steps != null && (
-                              <Badge variant="outline" className="text-xs">
-                                {wfVersion.total_steps} steps
-                              </Badge>
-                            )}
-                            {isDocument && (version as DocumentVersionRead).byte_size != null && (
-                              <span className="text-xs text-muted-foreground">
-                                {formatBytes((version as DocumentVersionRead).byte_size!)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span title={format(createdDate, 'PPpp')}>
-                              {formatDistanceToNow(createdDate, { addSuffix: true })}
-                            </span>
-                          </div>
-                          {!isDocument && wfVersion.change_summary && (
-                            <p className="mt-1.5 text-xs text-muted-foreground/80 italic">
-                              {wfVersion.change_summary}
-                            </p>
-                          )}
-                        </button>
-
-                        {/* Inline restore flow when selected */}
-                        {isSelected && (
-                          <div className="px-3 pb-2.5 space-y-2">
-                            {confirmingId === version.id ? (
-                              <>
-                                <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-2 text-xs text-amber-800 dark:text-amber-200">
-                                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                                  <span>Your current content will be saved first. You can switch back later.</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="flex-1"
-                                    onClick={() => setConfirmingId(null)}
-                                    disabled={isRestoring}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="flex-1"
-                                    onClick={() => handleRestore(version.id)}
-                                    disabled={isRestoring}
-                                  >
-                                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                                    {isRestoring ? 'Restoring…' : 'Confirm'}
-                                  </Button>
-                                </div>
-                              </>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => setConfirmingId(version.id)}
-                                disabled={isRestoring}
-                              >
-                                <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                                Restore this version
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-    </>
+            </ScrollArea>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
