@@ -136,7 +136,9 @@ class LocalStorageBackend(StorageBackend):
         if os.path.isdir(prefix):
             shutil.rmtree(prefix, ignore_errors=True)
 
-    async def resolve_local_path(self, session_path: str, stored_relative_path: str) -> Optional[str]:
+    async def resolve_local_path(self, session_path: Optional[str], stored_relative_path: str) -> Optional[str]:
+        if not session_path:
+            return None
         session_id = os.path.basename(session_path)
         actual_session_dir = os.path.join(self.base_dir, session_id)
         return os.path.join(actual_session_dir, stored_relative_path)
