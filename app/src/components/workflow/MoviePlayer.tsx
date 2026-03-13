@@ -107,36 +107,28 @@ function getStepText(step: PublicStep): string {
   return '';
 }
 
-/** Fetch a single TTS blob with retry logic (up to 2 retries on failure). */
+/**
+ * Fetch a single TTS blob from the API. No retries — caller handles failures.
+ */
 async function fetchTtsBlob(
   url: string,
   text: string,
-  signal: AbortSignal,
+  signal?: AbortSignal,
 ): Promise<Blob> {
-  const maxRetries = 2;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-        signal,
-      });
-      if (!r.ok) throw new Error(`TTS ${r.status}`);
-      return await r.blob();
-    } catch (err) {
-      if (signal.aborted) throw err;
-      if (attempt === maxRetries) throw err;
-      // Wait 1-2 seconds before retrying
-      await new Promise((resolve) => setTimeout(resolve, 1000 + attempt * 1000));
-    }
-  }
-  throw new Error('unreachable');
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+    signal,
+  });
+  if (!r.ok) throw new Error(`TTS ${r.status}`);
+  return await r.blob();
 }
 
 /**
- * Preload all TTS audio blobs with concurrency limit and spacing.
- * Returns a Map<stepIndex, Blob>.
+ * Preload TTS audio for all steps. Uses simple sequential-batched approach:
+ * process `concurrency` steps at a time, wait for batch to complete, next batch.
+ * Every step that succeeds is cached; failures are logged but don't block.
  */
 async function preloadAllTts(
   baseUrl: string,
@@ -146,7 +138,7 @@ async function preloadAllTts(
   const url = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
   const cache = new Map<number, Blob>();
 
-  // Collect steps that need TTS (all languages — OpenAI supports multilingual)
+  // Collect steps that need TTS
   const tasks: { idx: number; text: string }[] = [];
   for (let i = 0; i < steps.length; i++) {
     const text = getStepText(steps[i]);
@@ -157,33 +149,21 @@ async function preloadAllTts(
 
   if (tasks.length === 0) return cache;
 
-  // Process with concurrency limit of 3, 200ms spacing between starts
-  const concurrency = 3;
-  let running = 0;
-  let taskIdx = 0;
-
-  await new Promise<void>((resolve, reject) => {
-    function startNext() {
-      if (signal.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
-      if (taskIdx >= tasks.length && running === 0) { resolve(); return; }
-
-      while (running < concurrency && taskIdx < tasks.length) {
-        const task = tasks[taskIdx++];
-        running++;
-
-        // Stagger starts by 200ms per task
-        const delay = (taskIdx - 1) * 200;
-        setTimeout(() => {
-          if (signal.aborted) { running--; startNext(); return; }
-          fetchTtsBlob(url, task.text, signal)
-            .then((blob) => { cache.set(task.idx, blob); })
-            .catch(() => { /* preload failure is not fatal — step will fall back */ })
-            .finally(() => { running--; startNext(); });
-        }, delay);
+  // Process in batches of 3
+  const batchSize = 3;
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    if (signal.aborted) break;
+    const batch = tasks.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map((task) => fetchTtsBlob(url, task.text, signal).then((blob) => ({ idx: task.idx, blob }))),
+    );
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        cache.set(result.value.idx, result.value.blob);
       }
+      // Failures: step will be fetched live at speak-time
     }
-    startNext();
-  });
+  }
 
   return cache;
 }
@@ -393,40 +373,46 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
 
   /* ── TTS ── */
 
-  const speakFromCache = useCallback((stepIdx: number, text: string, onEnd: () => void) => {
-    const blob = ttsCacheRef.current.get(stepIdx);
-    if (!blob) {
-      // Preload failed for this step — fall back to browser TTS
-      if (isEnglish(text)) {
-        speakBrowser(text, onEnd);
-      } else {
-        onEnd();
-      }
-      return;
-    }
+  /** Play an audio blob and call onEnd when done. */
+  const playBlob = useCallback((blob: Blob, onEnd: () => void) => {
     const objectUrl = URL.createObjectURL(blob);
     const audio = new Audio(objectUrl);
     audio.playbackRate = speedRef.current;
     audioRef.current = audio;
-    audio.onended = () => {
+    const cleanup = () => {
       URL.revokeObjectURL(objectUrl);
       audioRef.current = null;
-      onEnd();
     };
-    audio.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      audioRef.current = null;
-      onEnd();
-    };
-    audio.play().catch(() => {
-      URL.revokeObjectURL(objectUrl);
-      audioRef.current = null;
-      onEnd();
-    });
+    audio.onended = () => { cleanup(); onEnd(); };
+    audio.onerror = () => { cleanup(); onEnd(); };
+    audio.play().catch(() => { cleanup(); onEnd(); });
   }, []);
 
+  /** Speak using OpenAI TTS: try cache first, fetch live on miss. */
+  const speakOpenAI = useCallback((stepIdx: number, text: string, onEnd: () => void) => {
+    const cached = ttsCacheRef.current.get(stepIdx);
+    if (cached) {
+      playBlob(cached, onEnd);
+      return;
+    }
+
+    // Cache miss — fetch live (don't fall back to browser speech)
+    const ttsUrl = `${baseUrl.replace('/api/v1', '')}/api/v1/tts/speak`;
+    fetchTtsBlob(ttsUrl, text)
+      .then((blob) => {
+        // Store in cache for potential replay
+        ttsCacheRef.current.set(stepIdx, blob);
+        playBlob(blob, onEnd);
+      })
+      .catch(() => {
+        // OpenAI completely failed — skip narration, don't use browser voice
+        onEnd();
+      });
+  }, [baseUrl, playBlob]);
+
+  /** Speak using browser Web Speech API (only when OpenAI is not configured). */
   const speakBrowser = useCallback((text: string, onEnd: () => void) => {
-    if (typeof speechSynthesis === 'undefined') {
+    if (typeof speechSynthesis === 'undefined' || !isEnglish(text)) {
       onEnd();
       return;
     }
@@ -451,25 +437,26 @@ export function MoviePlayer({ steps, files, token, compact }: MoviePlayerProps) 
     speechSynthesis.speak(utterance);
   }, [cancelSpeech]);
 
+  /**
+   * Main speak function. Routes to the correct TTS backend:
+   * - OpenAI configured → always use OpenAI (cache or live fetch)
+   * - Browser fallback → only when OpenAI is NOT configured at all
+   * Never mix the two.
+   */
   const speak = useCallback((stepIdx: number, text: string, onEnd: () => void) => {
     if (mutedRef.current || !text.trim()) {
       onEnd();
       return;
     }
 
-    // Cancel any currently playing audio before starting new
     cancelSpeech();
 
     if (ttsConfig?.provider === 'openai' && ttsConfig.available) {
-      // OpenAI TTS supports many languages — always use it
-      speakFromCache(stepIdx, text, onEnd);
-    } else if (isEnglish(text)) {
-      // Browser TTS only for English (other languages sound bad)
-      speakBrowser(text, onEnd);
+      speakOpenAI(stepIdx, text, onEnd);
     } else {
-      onEnd();
+      speakBrowser(text, onEnd);
     }
-  }, [cancelSpeech, ttsConfig, speakFromCache, speakBrowser]);
+  }, [cancelSpeech, ttsConfig, speakOpenAI, speakBrowser]);
 
   /* ── Schedule with timeout ── */
 
