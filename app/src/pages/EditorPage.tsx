@@ -1,4 +1,4 @@
-import { Download, Eye, Folder as FolderIcon, History, Lock, Share2, RotateCcw, ChevronLeft } from 'lucide-react';
+import { Download, Eye, Folder as FolderIcon, History, Lock, Share2 } from 'lucide-react';
 import { useParams } from "react-router-dom";
 import { OndokiEditor } from "@/components/Editor/OndokiEditor";
 import { Button } from "@/components/ui/button";
@@ -183,7 +183,7 @@ export default function EditorPage() {
   };
 
   return (
-    <div>
+    <div className="flex h-screen flex-col">
       <SiteHeader name={doc?.name || "Editor"} breadcrumbs={breadcrumbs}>
         {isReadOnly && (
           <Badge variant="secondary" className="gap-1 text-xs">
@@ -245,153 +245,146 @@ export default function EditorPage() {
           />
         )}
       </SiteHeader>
-      {doc?.source_file_mime && (
-        <FileViewer
-          docId={docId!}
-          mime={doc.source_file_mime}
-          fileName={doc.source_file_name}
-        />
-      )}
-      {isLockedByOther && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <Alert
-            variant="destructive"
-            className="flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <Lock className="h-4 w-4" />
-              <AlertDescription>
-                {lockStatus?.locked_by_name || "Someone"} is currently editing
-                this document.
-              </AlertDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                acquireLock.mutate(true);
-              }}
-              className="ml-4 shrink-0"
-            >
-              Take over
-            </Button>
-          </Alert>
-        </div>
-      )}
-      {/* Version preview banner */}
-      {previewInfo && (
-        <div className="sticky top-0 z-40 border-b bg-amber-50 dark:bg-amber-950/40">
-          <div className="mx-auto max-w-4xl flex items-center justify-between px-4 py-2">
-            <div className="flex items-center gap-3 text-sm">
-              <History className="h-4 w-4 text-amber-600" />
-              <span>
-                Viewing <strong>Revision {previewInfo.displayNumber}</strong>
-                <span className="text-muted-foreground ml-1.5">
-                  from {format(new Date(previewInfo.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                </span>
-                {previewInfo.createdByName && (
-                  <span className="text-muted-foreground ml-1">
-                    by {previewInfo.createdByName}
-                  </span>
-                )}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs"
-                onClick={() => {
-                  setPreviewContent(null);
-                  setPreviewInfo(null);
-                }}
+
+      {/* Main content + version panel side by side */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main content area */}
+        <div className="flex-1 overflow-y-auto">
+          {doc?.source_file_mime && (
+            <FileViewer
+              docId={docId!}
+              mime={doc.source_file_mime}
+              fileName={doc.source_file_name}
+            />
+          )}
+          {isLockedByOther && (
+            <div className="mx-auto max-w-4xl px-4 pt-4">
+              <Alert
+                variant="destructive"
+                className="flex items-center justify-between"
               >
-                <ChevronLeft className="mr-1 h-3 w-3" />
-                Back
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className={doc?.source_file_mime ? 'hidden' : undefined}>
-      <OndokiEditor
-        docId={docId as string}
-        readOnly={isReadOnly}
-        previewContent={previewContent}
-        headerSlot={(saveStatus, errorMessage) => (
-          <>
-            {selectedProjectId && docId && (
-              <ContextLinkPanel
-                projectId={selectedProjectId}
-                resourceType="document"
-                resourceId={docId}
-              />
-            )}
-            <div className="flex items-center gap-2 text-xs mt-2">
-              {folderName && (
-                <span className="inline-flex items-center gap-1 rounded bg-muted/60 px-2 py-0.5 text-muted-foreground font-medium">
-                  <FolderIcon className="size-3" strokeWidth={1.5} />
-                  {folderName}
-                </span>
-              )}
-              {saveStatus === "saving" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground animate-pulse">
-                  Saving...
-                </span>
-              )}
-              {saveStatus === "saved" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-green-600 font-medium">
-                  ✓ Saved
-                </span>
-              )}
-              {(saveStatus === "error" ||
-                saveStatus === "validation-error") && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-red-500 font-medium"
-                  title={errorMessage ?? undefined}
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  <AlertDescription>
+                    {lockStatus?.locked_by_name || "Someone"} is currently editing
+                    this document.
+                  </AlertDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    acquireLock.mutate(true);
+                  }}
+                  className="ml-4 shrink-0"
                 >
-                  {errorMessage ?? "Error"}
-                </span>
-              )}
+                  Take over
+                </Button>
+              </Alert>
             </div>
-          </>
+          )}
+          {/* Version preview banner */}
+          {previewInfo && (
+            <div className="sticky top-0 z-40 border-b bg-amber-50/80 dark:bg-amber-950/40 backdrop-blur-sm">
+              <div className="mx-auto max-w-4xl flex items-center justify-between px-4 py-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <History className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>
+                    Viewing <strong>Revision {previewInfo.displayNumber}</strong>
+                    <span className="text-muted-foreground ml-1">
+                      · {format(new Date(previewInfo.createdAt), "MMM d, h:mm a")}
+                    </span>
+                    {previewInfo.createdByName && (
+                      <span className="text-muted-foreground">
+                        {" "}by {previewInfo.createdByName}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className={doc?.source_file_mime ? 'hidden' : undefined}>
+            <OndokiEditor
+              docId={docId as string}
+              readOnly={isReadOnly}
+              previewContent={previewContent}
+              headerSlot={(saveStatus, errorMessage) => (
+                <>
+                  {selectedProjectId && docId && (
+                    <ContextLinkPanel
+                      projectId={selectedProjectId}
+                      resourceType="document"
+                      resourceId={docId}
+                    />
+                  )}
+                  <div className="flex items-center gap-2 text-xs mt-2">
+                    {folderName && (
+                      <span className="inline-flex items-center gap-1 rounded bg-muted/60 px-2 py-0.5 text-muted-foreground font-medium">
+                        <FolderIcon className="size-3" strokeWidth={1.5} />
+                        {folderName}
+                      </span>
+                    )}
+                    {!previewContent && saveStatus === "saving" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground animate-pulse">
+                        Saving...
+                      </span>
+                    )}
+                    {!previewContent && saveStatus === "saved" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-green-600 font-medium">
+                        ✓ Saved
+                      </span>
+                    )}
+                    {!previewContent && (saveStatus === "error" ||
+                      saveStatus === "validation-error") && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-red-500 font-medium"
+                        title={errorMessage ?? undefined}
+                      >
+                        {errorMessage ?? "Error"}
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            />
+          </div>
+
+          {selectedProjectId && docId && user && (
+            <CommentPanel
+              open={commentsOpen}
+              onOpenChange={setCommentsOpen}
+              projectId={selectedProjectId}
+              resourceType="document"
+              resourceId={docId}
+              currentUserId={user.id}
+              onCountChange={setCommentCount}
+            />
+          )}
+        </div>
+
+        {/* Version history panel — right sidebar, no overlay */}
+        {docId && (
+          <VersionHistoryPanel
+            open={versionHistoryOpen}
+            onClose={() => {
+              setVersionHistoryOpen(false);
+              setPreviewContent(null);
+              setPreviewInfo(null);
+            }}
+            docId={docId}
+            onPreview={(content, info) => {
+              setPreviewContent(content);
+              setPreviewInfo(info);
+            }}
+            onRestore={() => {
+              setPreviewContent(null);
+              setPreviewInfo(null);
+              window.location.reload();
+            }}
+          />
         )}
-      />
       </div>
-
-      {selectedProjectId && docId && user && (
-        <CommentPanel
-          open={commentsOpen}
-          onOpenChange={setCommentsOpen}
-          projectId={selectedProjectId}
-          resourceType="document"
-          resourceId={docId}
-          currentUserId={user.id}
-          onCountChange={setCommentCount}
-        />
-      )}
-
-      {docId && (
-        <VersionHistoryPanel
-          open={versionHistoryOpen}
-          onClose={() => {
-            setVersionHistoryOpen(false);
-            setPreviewContent(null);
-            setPreviewInfo(null);
-          }}
-          docId={docId}
-          onPreview={(content, info) => {
-            setPreviewContent(content);
-            setPreviewInfo(info);
-          }}
-          onRestore={() => {
-            setPreviewContent(null);
-            setPreviewInfo(null);
-            // Reload to re-initialize editor with restored content
-            window.location.reload();
-          }}
-        />
-      )}
     </div>
   );
 }

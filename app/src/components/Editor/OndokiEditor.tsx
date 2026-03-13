@@ -157,21 +157,24 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
   }, [editor, doc, contentInitialized, previewContent]);
 
   // Preview mode: swap content when previewContent changes
-  const [savedContent, setSavedContent] = useState<Record<string, any> | null>(null);
+  const savedContentRef = React.useRef<Record<string, any> | null>(null);
+  const isPreviewingRef = React.useRef(false);
   useEffect(() => {
     if (!editor) return;
     if (previewContent) {
-      // Save current content before switching to preview
-      if (!savedContent) {
-        setSavedContent(editor.getJSON() as Record<string, any>);
+      // Save current content before first preview switch
+      if (!isPreviewingRef.current) {
+        savedContentRef.current = editor.getJSON() as Record<string, any>;
+        isPreviewingRef.current = true;
       }
       editor.commands.setContent(previewContent, { emitUpdate: false });
       editor.setEditable(false);
-    } else if (savedContent) {
+    } else if (isPreviewingRef.current && savedContentRef.current) {
       // Restore original content when preview ends
-      editor.commands.setContent(savedContent, { emitUpdate: false });
+      editor.commands.setContent(savedContentRef.current, { emitUpdate: false });
       editor.setEditable(!readOnly);
-      setSavedContent(null);
+      savedContentRef.current = null;
+      isPreviewingRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContent, editor]);
