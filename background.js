@@ -46,6 +46,8 @@ let state = {
 
 // Active guide state for sidepanel sync
 let activeGuideState = null; // { guide, currentIndex, tabId }
+let healthBatch = []; // Staleness detection: collects GUIDE_STEP_HEALTH events during replay
+let healthBatchWorkflowId = null; // workflowId for the current health batch
 
 function notifyGuideStateUpdate() {
   // Send guide state to all extension views (sidepanel)
@@ -1610,6 +1612,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case 'START_GUIDE': {
         try {
+          // Staleness detection: reset health batch for new guide session
+          healthBatch = [];
+          healthBatchWorkflowId = null;
+
           const guide = message.guide;
           const startIndex = message.startIndex || 0;
           const targetStep = guide.steps?.[startIndex];
@@ -1699,6 +1705,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'GUIDE_STEP_HEALTH': {
+        // Staleness detection: collect step health data during guide replay
+        if (!healthBatchWorkflowId && message.workflowId) {
+          healthBatchWorkflowId = message.workflowId;
+        }
+        healthBatch.push({
+          stepNumber: message.stepNumber,
+          elementFound: message.elementFound,
+          finderMethod: message.finderMethod,
+          finderConfidence: message.finderConfidence,
+          expectedUrl: message.expectedUrl,
+          actualUrl: message.actualUrl,
+          urlMatched: message.urlMatched,
+          timestamp: message.timestamp,
+        });
+        sendResponse({ success: true });
+        break;
+      }
+
       case 'GUIDE_STEP_CHANGED': {
         if (activeGuideState) {
           activeGuideState.currentIndex = message.currentIndex;
@@ -1710,6 +1735,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case 'GUIDE_STOPPED': {
+        // Staleness detection: flush health batch to backend (fire-and-forget)
+        if (healthBatch.length > 0) {
+          const batch = [...healthBatch];
+          const workflowId = healthBatchWorkflowId || activeGuideState?.guide?.workflow_id || activeGuideState?.guide?.workflowId || activeGuideState?.guide?.id;
+          healthBatch = [];
+          healthBatchWorkflowId = null;
+          if (workflowId) {
+            (async () => {
+              try {
+                const API_BASE_URL = await getApiBaseUrl();
+                await authedFetch(`${API_BASE_URL}/workflows/${encodeURIComponent(workflowId)}/health-check`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ steps: batch, source: 'guide_replay' }),
+                });
+              } catch (e) {
+                debugLog('Health check POST failed (non-fatal):', e.message);
+              }
+            })();
+          }
+        }
         activeGuideState = null;
         notifyGuideStateUpdate();
         sendResponse({ success: true });

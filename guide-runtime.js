@@ -675,6 +675,28 @@
 
       this.currentResult = result;
 
+      // ── Staleness Detection: report step health ──
+      try {
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_HEALTH',
+          workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+          stepNumber: index,
+          elementFound: !!result,
+          finderMethod: result?.method || null,
+          finderConfidence: result?.confidence || 0,
+          expectedUrl: step.expected_url || step.url || null,
+          actualUrl: window.location.href,
+          urlMatched: !(step.expected_url || step.url) || (() => {
+            try {
+              const exp = new URL(step.expected_url || step.url);
+              const act = new URL(window.location.href);
+              return exp.pathname === act.pathname;
+            } catch { return false; }
+          })(),
+          timestamp: Date.now(),
+        }).catch(() => {});
+      } catch (_) { /* never break guide playback */ }
+
       // Determine step status for sidepanel
       let stepStatus = 'active';
       if (!result) stepStatus = 'notfound';
