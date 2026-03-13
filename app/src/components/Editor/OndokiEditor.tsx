@@ -55,6 +55,10 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
     return document.documentElement.getAttribute('data-page-layout') || 'document';
   });
 
+  // Preview mode refs (declared early so save() can check them)
+  const savedContentRef = React.useRef<Record<string, any> | null>(null);
+  const isPreviewingRef = React.useRef(false);
+
   // Reset initialization when docId changes
   useEffect(() => {
     if (docId !== currentDocId) {
@@ -77,6 +81,8 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
   const save = useCallback(
     (content: unknown): Promise<any> => {
       if (!isInitialized) return Promise.resolve();
+      // Never save while previewing a version
+      if (isPreviewingRef.current) return Promise.resolve();
       return new Promise((resolve, reject) => {
         saveDocument.mutate(
           { name: title, content, page_layout: layout || 'document', version: docVersion },
@@ -157,8 +163,6 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
   }, [editor, doc, contentInitialized, previewContent]);
 
   // Preview mode: swap content when previewContent changes
-  const savedContentRef = React.useRef<Record<string, any> | null>(null);
-  const isPreviewingRef = React.useRef(false);
   useEffect(() => {
     if (!editor) return;
     if (previewContent) {
