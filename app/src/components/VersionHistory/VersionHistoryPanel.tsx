@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { History, RotateCcw, Clock } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { History, RotateCcw, Clock, FileText, Layers } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 import {
   Sheet,
   SheetContent,
@@ -14,7 +14,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -63,6 +62,20 @@ export function VersionHistoryPanel({
 
   const selectedVersion = versions?.find((v) => v.id === selectedVersionId);
 
+  // Refetch versions when the panel opens
+  useEffect(() => {
+    if (open) {
+      if (isDocument) docVersions.refetch();
+      else wfVersions.refetch();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Clear selection when panel closes
+  useEffect(() => {
+    if (!open) setSelectedVersionId(null);
+  }, [open]);
+
   const handleRestore = () => {
     if (!selectedVersionId) return;
     const mutation = isDocument ? docRestore : wfRestore;
@@ -73,6 +86,9 @@ export function VersionHistoryPanel({
         onRestore?.();
         onClose();
       },
+      onError: () => {
+        setConfirmOpen(false);
+      },
     });
   };
 
@@ -80,6 +96,11 @@ export function VersionHistoryPanel({
     setSelectedVersionId(null);
     onClose();
   };
+
+  // Sequential display number: versions are sorted newest-first from the API,
+  // so the first item is the most recent snapshot. We show them as
+  // "Revision N" counting down from total, so the oldest is #1.
+  const totalVersions = versions?.length ?? 0;
 
   return (
     <>
@@ -94,12 +115,13 @@ export function VersionHistoryPanel({
 
           <div className="mt-4 flex-1 overflow-hidden">
             {/* Current version indicator */}
-            <div className="mb-3 flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
-              <Badge variant="secondary" className="text-xs">
-                Current
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Live version
+            <div className="mb-3 flex items-center gap-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2.5">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                Current version
+              </span>
+              <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70 ml-auto">
+                Live
               </span>
             </div>
 
@@ -108,9 +130,9 @@ export function VersionHistoryPanel({
             {isLoading ? (
               <div className="space-y-3 px-1">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-40" />
+                  <div key={i} className="space-y-2 rounded-md border p-3">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
                   </div>
                 ))}
               </div>
@@ -126,89 +148,103 @@ export function VersionHistoryPanel({
               </div>
             ) : (
               <ScrollArea className="h-[calc(100vh-280px)]">
-                <div className="space-y-1 pr-3">
-                  {versions.map((version) => {
+                <div className="space-y-1.5 pr-3">
+                  {versions.map((version, index) => {
                     const isSelected = selectedVersionId === version.id;
                     const wfVersion = version as WorkflowVersionRead;
+                    const displayNumber = totalVersions - index;
+                    const createdDate = new Date(version.created_at);
                     return (
-                      <button
+                      <div
                         key={version.id}
-                        onClick={() =>
-                          setSelectedVersionId(
-                            isSelected ? null : version.id
-                          )
-                        }
-                        className={`w-full rounded-md px-3 py-2.5 text-left transition-colors ${
+                        className={`rounded-md border transition-all ${
                           isSelected
-                            ? 'bg-primary/10 ring-1 ring-primary/30'
-                            : 'hover:bg-muted/50'
+                            ? 'border-primary bg-primary/5 shadow-sm'
+                            : 'border-transparent hover:border-border hover:bg-muted/40'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            Version {version.version_number}
-                          </span>
-                          {!isDocument && wfVersion.total_steps != null && (
-                            <Badge variant="outline" className="text-xs">
-                              {wfVersion.total_steps} steps
-                            </Badge>
-                          )}
-                          {isDocument && (version as DocumentVersionRead).byte_size != null && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatBytes((version as DocumentVersionRead).byte_size!)}
+                        <button
+                          onClick={() =>
+                            setSelectedVersionId(
+                              isSelected ? null : version.id
+                            )
+                          }
+                          className="w-full px-3 py-2.5 text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {isDocument ? (
+                                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                              <span className="text-sm font-medium">
+                                Revision {displayNumber}
+                              </span>
+                            </div>
+                            {!isDocument && wfVersion.total_steps != null && (
+                              <Badge variant="outline" className="text-xs">
+                                {wfVersion.total_steps} steps
+                              </Badge>
+                            )}
+                            {isDocument && (version as DocumentVersionRead).byte_size != null && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatBytes((version as DocumentVersionRead).byte_size!)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span title={format(createdDate, 'PPpp')}>
+                              {formatDistanceToNow(createdDate, { addSuffix: true })}
                             </span>
+                          </div>
+                          {!isDocument && wfVersion.change_summary && (
+                            <p className="mt-1.5 text-xs text-muted-foreground/80 italic">
+                              {wfVersion.change_summary}
+                            </p>
                           )}
-                        </div>
-                        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {formatDistanceToNow(new Date(version.created_at), {
-                            addSuffix: true,
-                          })}
-                        </div>
-                        {!isDocument && wfVersion.change_summary && (
-                          <p className="mt-1 text-xs text-muted-foreground/80">
-                            {wfVersion.change_summary}
-                          </p>
+                        </button>
+
+                        {/* Inline restore button when selected */}
+                        {isSelected && (
+                          <div className="px-3 pb-2.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setConfirmOpen(true)}
+                              disabled={isRestoring}
+                            >
+                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                              Restore this version
+                            </Button>
+                          </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
               </ScrollArea>
             )}
           </div>
-
-          {/* Restore button */}
-          {selectedVersionId && selectedVersion && (
-            <div className="border-t pt-3">
-              <Button
-                className="w-full"
-                onClick={() => setConfirmOpen(true)}
-                disabled={isRestoring}
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Restore version {selectedVersion.version_number}
-              </Button>
-            </div>
-          )}
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmOpen} onOpenChange={(o) => { if (!isRestoring) setConfirmOpen(o); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Restore version?</AlertDialogTitle>
+            <AlertDialogTitle>Restore this version?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will save your current version and restore to version{' '}
-              {selectedVersion?.version_number}. You can always switch back
-              later.
+              Your current content will be saved as a new version before restoring.
+              You can always switch back later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestore} disabled={isRestoring}>
+            <Button onClick={handleRestore} disabled={isRestoring}>
               {isRestoring ? 'Restoring…' : 'Restore'}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

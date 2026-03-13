@@ -338,7 +338,8 @@ export default function EditorPage() {
           onClose={() => setVersionHistoryOpen(false)}
           docId={docId}
           onRestore={() => {
-            // Refetch the document after restore
+            // Force full page reload so editor re-initializes with restored content
+            // (TipTap caches content internally, query invalidation alone isn't enough)
             window.location.reload();
           }}
         />
