@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, RotateCcw, Clock, FileText, Layers } from 'lucide-react';
+import { History, RotateCcw, Clock, FileText, Layers, AlertTriangle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   Sheet,
@@ -12,15 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useDocumentVersions, useRestoreDocumentVersion } from '@/hooks/api/documents';
 import { useWorkflowVersions, useRestoreWorkflowVersion } from '@/hooks/api/workflows';
 import type { DocumentVersionRead } from '@/api/documents';
@@ -42,7 +33,7 @@ export function VersionHistoryPanel({
   onRestore,
 }: VersionHistoryPanelProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const isDocument = !!docId;
 
@@ -73,21 +64,23 @@ export function VersionHistoryPanel({
 
   // Clear selection when panel closes
   useEffect(() => {
-    if (!open) setSelectedVersionId(null);
+    if (!open) {
+      setSelectedVersionId(null);
+      setConfirmingId(null);
+    }
   }, [open]);
 
-  const handleRestore = () => {
-    if (!selectedVersionId) return;
+  const handleRestore = (versionId: string) => {
     const mutation = isDocument ? docRestore : wfRestore;
-    mutation.mutate(selectedVersionId, {
+    mutation.mutate(versionId, {
       onSuccess: () => {
-        setConfirmOpen(false);
+        setConfirmingId(null);
         setSelectedVersionId(null);
         onRestore?.();
         onClose();
       },
       onError: () => {
-        setConfirmOpen(false);
+        setConfirmingId(null);
       },
     });
   };
@@ -206,19 +199,48 @@ export function VersionHistoryPanel({
                           )}
                         </button>
 
-                        {/* Inline restore button when selected */}
+                        {/* Inline restore flow when selected */}
                         {isSelected && (
-                          <div className="px-3 pb-2.5">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full"
-                              onClick={() => setConfirmOpen(true)}
-                              disabled={isRestoring}
-                            >
-                              <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                              Restore this version
-                            </Button>
+                          <div className="px-3 pb-2.5 space-y-2">
+                            {confirmingId === version.id ? (
+                              <>
+                                <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-2 text-xs text-amber-800 dark:text-amber-200">
+                                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                  <span>Your current content will be saved first. You can switch back later.</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => setConfirmingId(null)}
+                                    disabled={isRestoring}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => handleRestore(version.id)}
+                                    disabled={isRestoring}
+                                  >
+                                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                                    {isRestoring ? 'Restoring…' : 'Confirm'}
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setConfirmingId(version.id)}
+                                disabled={isRestoring}
+                              >
+                                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                                Restore this version
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -231,23 +253,6 @@ export function VersionHistoryPanel({
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={confirmOpen} onOpenChange={(o) => { if (!isRestoring) setConfirmOpen(o); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Restore this version?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Your current content will be saved as a new version before restoring.
-              You can always switch back later.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
-            <Button onClick={handleRestore} disabled={isRestoring}>
-              {isRestoring ? 'Restoring…' : 'Restore'}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
