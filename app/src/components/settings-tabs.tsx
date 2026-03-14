@@ -9,6 +9,7 @@ const tabs: { label: string; path: string; external?: boolean }[] = [
   { label: 'Privacy', path: 'settings/privacy' },
   { label: 'Integrations', path: 'settings/integrations' },
   { label: 'SSO', path: 'settings/sso' },
+  { label: 'Verification', path: 'settings/verification' },
   { label: 'Analytics', path: '/analytics' },
   { label: 'Knowledge Base', path: '/knowledge' },
   { label: 'Video \u2192 Guide', path: '/video-import' },

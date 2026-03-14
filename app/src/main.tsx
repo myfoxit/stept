@@ -34,6 +34,7 @@ import { KnowledgeBasePage } from "@/pages/knowledge-base";
 import { AuditLogPage } from "@/pages/audit-log";
 import { VideoImportPage } from "@/pages/video-import";
 import { AnalyticsDashboardPage } from "@/pages/analytics-dashboard";
+import { VerificationSettingsPage } from "@/pages/verification-settings";
 import TrashPage from "@/pages/trash";
 import NotFoundPage from "@/pages/NotFoundPage";
 import VerifyPage from "@/pages/VerifyPage";
@@ -118,6 +119,10 @@ createRoot(document.getElementById("root")!).render(
                       <Route
                         path="/analytics"
                         element={<AnalyticsDashboardPage />}
+                      />
+                      <Route
+                        path="/projects/:projectId/settings/verification"
+                        element={<VerificationSettingsPage />}
                       />
                       <Route path="/trash" element={<TrashPage />} />
                     </Route>
