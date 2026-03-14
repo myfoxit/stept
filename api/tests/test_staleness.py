@@ -444,3 +444,73 @@ class TestAlertActions:
     async def test_dismiss_not_found(self, async_client, auth_headers):
         resp = await async_client.post("/api/v1/staleness-alerts/nonexistent12345/dismiss", headers=auth_headers)
         assert resp.status_code == 404
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Business Logic — Pure Functions (no DB)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from app.services.staleness import _recency_factor, _health_status
+
+
+class TestRecencyFactor:
+
+    def test_never_verified(self):
+        assert _recency_factor(None) == 0.5
+
+    def test_just_verified(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert _recency_factor(now - timedelta(days=1)) == 1.0
+        assert _recency_factor(now - timedelta(hours=1)) == 1.0
+        assert _recency_factor(now - timedelta(days=6)) == 1.0
+
+    def test_one_week(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert _recency_factor(now - timedelta(days=10)) == 0.95
+
+    def test_two_weeks(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert _recency_factor(now - timedelta(days=20)) == 0.9
+
+    def test_one_month(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert _recency_factor(now - timedelta(days=45)) == 0.75
+
+    def test_two_months(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert _recency_factor(now - timedelta(days=75)) == 0.6
+
+    def test_three_months_plus(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert _recency_factor(now - timedelta(days=120)) == 0.4
+        assert _recency_factor(now - timedelta(days=365)) == 0.4
+
+    def test_timezone_aware_input(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        assert _recency_factor(now - timedelta(days=1)) == 1.0
+
+
+class TestHealthStatus:
+
+    def test_no_reliable_data(self):
+        assert _health_status(0.9, has_reliable=False) == "unknown"
+
+    def test_healthy(self):
+        assert _health_status(0.85, has_reliable=True) == "healthy"
+        assert _health_status(0.8, has_reliable=True) == "healthy"
+        assert _health_status(1.0, has_reliable=True) == "healthy"
+
+    def test_aging(self):
+        assert _health_status(0.7, has_reliable=True) == "aging"
+        assert _health_status(0.6, has_reliable=True) == "aging"
+
+    def test_stale(self):
+        assert _health_status(0.5, has_reliable=True) == "stale"
+        assert _health_status(0.0, has_reliable=True) == "stale"
