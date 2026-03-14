@@ -66,7 +66,7 @@ export default function LoginPage() {
                 fill="#3AB08A"
               />
             </svg>
-            ondoki
+            stept
           </a>
         </div>
         <div className="flex flex-1 items-center justify-center">

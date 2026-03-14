@@ -1,6 +1,6 @@
 import { Download, Eye, Folder as FolderIcon, History, Lock, Share2 } from 'lucide-react';
 import { useParams } from "react-router-dom";
-import { OndokiEditor } from "@/components/Editor/OndokiEditor";
+import { SteptEditor } from "@/components/Editor/SteptEditor";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import {
@@ -165,7 +165,7 @@ export default function EditorPage() {
         // Strip pagination decorations
         clone
           .querySelectorAll(
-            ".ondoki-page-break, .ondoki-first-page-header, .ondoki-pagination-gap, .tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap, [data-ondoki-pagination], [data-tiptap-pagination]",
+            ".stept-page-break, .stept-first-page-header, .stept-pagination-gap, .tiptap-page-break, .tiptap-first-page-header, .tiptap-pagination-gap, [data-stept-pagination], [data-tiptap-pagination]",
           )
           .forEach((el) => el.remove());
         // Remove pagination wrapper padding
@@ -298,7 +298,7 @@ export default function EditorPage() {
             </div>
           )}
           <div className={doc?.source_file_mime ? 'hidden' : undefined}>
-            <OndokiEditor
+            <SteptEditor
               docId={docId as string}
               readOnly={isReadOnly}
               previewContent={previewContent}

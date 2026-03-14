@@ -235,7 +235,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
               onSelect={() => {
                 onOpenChange(false);
                 // Open the browser extension recording flow
-                window.dispatchEvent(new CustomEvent('ondoki:start-browser-workflow'));
+                window.dispatchEvent(new CustomEvent('stept:start-browser-workflow'));
               }}
             >
               <Globe className="mr-2 h-4 w-4" />
@@ -246,7 +246,7 @@ export function SpotlightSearch({ open, onOpenChange, mode = 'default', onInsert
               onSelect={() => {
                 onOpenChange(false);
                 // Open the desktop recording flow
-                window.dispatchEvent(new CustomEvent('ondoki:start-desktop-workflow'));
+                window.dispatchEvent(new CustomEvent('stept:start-desktop-workflow'));
               }}
             >
               <Monitor className="mr-2 h-4 w-4" />

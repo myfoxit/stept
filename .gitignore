@@ -69,3 +69,4 @@ extension/dist-self-hosted/
 
 # Turborepo
 .turbo
+.DS_Store

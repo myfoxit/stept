@@ -18,7 +18,7 @@
 (function () {
   'use strict';
 
-  const REDACTION_ATTR = 'data-ondoki-redacted';
+  const REDACTION_ATTR = 'data-stept-redacted';
 
   // WeakMap to store original values for restoration
   const originalValues = new WeakMap();
@@ -149,7 +149,7 @@
         acceptNode: (node) => {
           if (!node.textContent || node.textContent.trim().length === 0) return NodeFilter.FILTER_REJECT;
           if (node.parentElement?.closest(`[${REDACTION_ATTR}]`)) return NodeFilter.FILTER_REJECT;
-          if (node.parentElement?.closest('[data-ondoki-exclude]')) return NodeFilter.FILTER_REJECT;
+          if (node.parentElement?.closest('[data-stept-exclude]')) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
         },
       },
@@ -238,7 +238,7 @@
       case 'images': {
         document.querySelectorAll('img').forEach((img) => {
           if (img.getAttribute(REDACTION_ATTR)) return;
-          if (img.closest('[data-ondoki-exclude]')) return;
+          if (img.closest('[data-stept-exclude]')) return;
           if (blurElement(img, 'images', 8)) count++;
         });
         break;
@@ -351,7 +351,7 @@
   });
 
   // Expose for inline use by content.js
-  window.__ondokiRedaction = {
+  window.__steptRedaction = {
     applyCategory,
     removeCategory,
     applyAllEnabled,

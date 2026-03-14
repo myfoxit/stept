@@ -10,13 +10,13 @@
 
 ```bash
 # 1. Clone and configure
-git clone https://github.com/myfoxit/ondoki-web.git /opt/ondoki
-cd /opt/ondoki
+git clone https://github.com/myfoxit/stept.git /opt/stept
+cd /opt/stept
 cp .env.example .env
 
 # 2. Generate secrets
 echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
-echo "ONDOKI_ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> .env
+echo "STEPT_ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> .env
 
 # 3. Edit .env — set at minimum:
 #    DOMAIN=app.yourdomain.com
@@ -70,7 +70,7 @@ Caddy will automatically obtain a certificate once DNS propagates (usually < 5 m
 
 ## S3 / Object Storage
 
-Ondoki supports local file storage or S3-compatible object storage.
+Stept supports local file storage or S3-compatible object storage.
 
 ### Local Storage (default)
 
@@ -82,7 +82,7 @@ Set these in `.env`:
 
 ```bash
 storage_type=s3
-S3_BUCKET=ondoki-uploads
+S3_BUCKET=stept-uploads
 S3_REGION=eu-central-1
 S3_ACCESS_KEY=your-access-key
 S3_SECRET_KEY=your-secret-key
@@ -106,7 +106,7 @@ minio:
   volumes:
     - minio-data:/data
   networks:
-    - ondoki-network
+    - stept-network
 ```
 
 Then set `S3_ENDPOINT=http://minio:9000` in your backend environment.
@@ -195,17 +195,17 @@ docker compose -f docker-compose.prod.yml exec -T db \
 
 ```bash
 # List volumes
-docker volume ls | grep ondoki
+docker volume ls | grep stept
 
 # Back up a volume
-docker run --rm -v ondoki-web_db-data:/data -v $(pwd):/backup \
+docker run --rm -v stept_db-data:/data -v $(pwd):/backup \
   alpine tar czf /backup/db-data.tar.gz -C /data .
 ```
 
 ## Updating
 
 ```bash
-cd /opt/ondoki
+cd /opt/stept
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec backend alembic upgrade head

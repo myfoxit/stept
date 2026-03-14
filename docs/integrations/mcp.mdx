@@ -5,11 +5,11 @@ description: "Expose your knowledge base to Claude, Cursor, Copilot, or any MCP-
 
 ## Overview
 
-ondoki includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets external AI agents search and read your documentation. Connect Claude Desktop, Cursor, GitHub Copilot, or any MCP-compatible tool to your ondoki knowledge base.
+stept includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that lets external AI agents search and read your documentation. Connect Claude Desktop, Cursor, GitHub Copilot, or any MCP-compatible tool to your stept knowledge base.
 
 ## How It Works
 
-The MCP server is mounted at `/mcp` on your ondoki backend and uses stateless HTTP transport via [FastMCP](https://github.com/jlowin/fastmcp). AI agents authenticate with project-scoped API keys and can list, search, and read your content.
+The MCP server is mounted at `/mcp` on your stept backend and uses stateless HTTP transport via [FastMCP](https://github.com/jlowin/fastmcp). AI agents authenticate with project-scoped API keys and can list, search, and read your content.
 
 ## Available Tools
 
@@ -30,7 +30,7 @@ The MCP server exposes these tools to connected AI agents:
 
 ### 1. Generate an API Key
 
-In the ondoki UI, go to **Project Settings → Integrations** and create a new MCP API key:
+In the stept UI, go to **Project Settings → Integrations** and create a new MCP API key:
 
 1. Click **Create API Key**
 2. Enter a name (e.g., "Claude Desktop")
@@ -49,10 +49,10 @@ The key is project-scoped — it only grants access to the project where it was 
     ```json
     {
       "mcpServers": {
-        "ondoki": {
+        "stept": {
           "url": "https://app.yourdomain.com/mcp",
           "headers": {
-            "Authorization": "Bearer ondoki_your_api_key_here"
+            "Authorization": "Bearer stept_your_api_key_here"
           }
         }
       }
@@ -65,11 +65,11 @@ The key is project-scoped — it only grants access to the project where it was 
     ```json
     {
       "mcpServers": {
-        "ondoki": {
+        "stept": {
           "type": "url",
           "url": "https://app.yourdomain.com/mcp",
           "headers": {
-            "Authorization": "Bearer ondoki_your_api_key_here"
+            "Authorization": "Bearer stept_your_api_key_here"
           }
         }
       }
@@ -82,10 +82,10 @@ The key is project-scoped — it only grants access to the project where it was 
     ```json
     {
       "mcpServers": {
-        "ondoki": {
+        "stept": {
           "url": "https://app.yourdomain.com/mcp",
           "headers": {
-            "Authorization": "Bearer ondoki_your_api_key_here"
+            "Authorization": "Bearer stept_your_api_key_here"
           }
         }
       }
@@ -96,7 +96,7 @@ The key is project-scoped — it only grants access to the project where it was 
     Alternatively, set the API key as an environment variable:
 
     ```bash
-    export ONDOKI_API_KEY=ondoki_your_api_key_here
+    export STEPT_API_KEY=stept_your_api_key_here
     ```
 
     The MCP server checks for this env var if no Authorization header is provided.
@@ -105,9 +105,9 @@ The key is project-scoped — it only grants access to the project where it was 
 
 ### 3. Verify
 
-Ask your AI agent to search your ondoki knowledge base:
+Ask your AI agent to search your stept knowledge base:
 
-> "Search ondoki for deployment workflows"
+> "Search stept for deployment workflows"
 
 The agent should use the `search_workflows` or `search_pages` tool to query your content.
 
@@ -115,8 +115,8 @@ The agent should use the `search_workflows` or `search_pages` tool to query your
 
 MCP requests are authenticated via API key:
 
-- **Header:** `Authorization: Bearer ondoki_<key>`
-- **Environment:** `ONDOKI_API_KEY=ondoki_<key>`
+- **Header:** `Authorization: Bearer stept_<key>`
+- **Environment:** `STEPT_API_KEY=stept_<key>`
 
 Keys are:
 - Project-scoped (only access content in the associated project)
@@ -147,4 +147,4 @@ All MCP access is tracked in the [audit log](/guides/sharing-publishing) with ac
 - **Claude Code** — let Claude search your internal process docs while coding
 - **Cursor** — surface relevant workflows when writing related code
 - **Custom agents** — build AI assistants that can reference your team's knowledge base
-- **RAG pipelines** — use ondoki as a retrieval source for custom AI applications
+- **RAG pipelines** — use stept as a retrieval source for custom AI applications

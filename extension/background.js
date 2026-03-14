@@ -4,7 +4,7 @@ importScripts('context.js');
 // Build configuration — change mode to 'cloud' for Chrome Web Store build
 const BUILD_CONFIG = {
   mode: 'self-hosted', // 'self-hosted' or 'cloud'
-  cloudApiUrl: 'https://app.ondoki.io/api/v1',
+  cloudApiUrl: 'https://app.stept.ai/api/v1',
   defaultApiUrl: 'http://localhost:8000/api/v1',
 };
 
@@ -15,7 +15,7 @@ const MAX_STEPS = 100;
 const DEBUG = false;
 
 function debugLog(...args) {
-  if (DEBUG) console.log('[Ondoki]', ...args);
+  if (DEBUG) console.log('[Stept]', ...args);
 }
 
 // Get API base URL from storage
@@ -229,7 +229,7 @@ chrome.storage.local.get(
         chrome.action.setBadgeText({ text: '!' });
         chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
         chrome.action.setTitle({
-          title: 'Ondoki — Please configure your API URL in settings',
+          title: 'Stept — Please configure your API URL in settings',
         });
       }
     }
@@ -847,7 +847,7 @@ async function drawClickMarker(screenshotDataUrl, clickPos, viewportSize) {
     const x = clickPos.x * scaleX;
     const y = clickPos.y * scaleY;
 
-    // Green click marker matching ondoki-web style
+    // Green click marker matching stept-web style
     const radius = 16 * scaleX;
 
     // Outer glow
@@ -1021,7 +1021,7 @@ async function beginStreamingSession() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timestamp: new Date().toISOString(),
-          client: 'OndokiChromeExtension',
+          client: 'SteptChromeExtension',
           user_id: state.currentUser?.id,
           project_id: state.selectedProjectId,
         }),
@@ -1159,7 +1159,7 @@ async function uploadCapture() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             timestamp: new Date().toISOString(),
-            client: 'OndokiChromeExtension',
+            client: 'SteptChromeExtension',
             user_id: state.currentUser?.id,
             project_id: state.selectedProjectId,
           }),

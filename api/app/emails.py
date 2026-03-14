@@ -65,7 +65,7 @@ def send_verification_email(email: str, token: str) -> bool:
         verify_token=token,
         frontend_url=frontend_url,
     )
-    return _send(email, "Verify your Ondoki account", html)
+    return _send(email, "Verify your Stept account", html)
 
 
 def send_reset_email(email: str, token: str) -> bool:
@@ -75,7 +75,7 @@ def send_reset_email(email: str, token: str) -> bool:
         reset_token=token,
         frontend_url=frontend_url,
     )
-    return _send(email, "Reset your Ondoki password", html)
+    return _send(email, "Reset your Stept password", html)
 
 
 def send_invite_email(email: str, token: str, inviter_name: str) -> bool:
@@ -86,4 +86,4 @@ def send_invite_email(email: str, token: str, inviter_name: str) -> bool:
         inviter_name=inviter_name,
         frontend_url=frontend_url,
     )
-    return _send(email, f"{inviter_name} invited you to Ondoki", html)
+    return _send(email, f"{inviter_name} invited you to Stept", html)

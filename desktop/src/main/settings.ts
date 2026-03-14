@@ -62,7 +62,7 @@ export class SettingsManager {
   constructor() {
     const storeOpts = {
       name: 'settings',
-      cwd: path.join(app.getPath('userData'), 'Ondoki'),
+      cwd: path.join(app.getPath('userData'), 'Stept'),
       defaults: { settings: defaultSettings, windowState: defaultWindowState, tokens: {} },
       encryptionKey: SettingsManager.deriveEncryptionKey(),
       fileExtension: 'json',
@@ -83,11 +83,11 @@ export class SettingsManager {
     // Use safeStorage to derive a machine-specific key when available
     // (macOS Keychain, Windows DPAPI, Linux keyring)
     if (safeStorage.isEncryptionAvailable()) {
-      const encrypted = safeStorage.encryptString('ondoki-desktop-key-seed');
+      const encrypted = safeStorage.encryptString('stept-desktop-key-seed');
       return crypto.createHash('sha256').update(encrypted).digest('hex');
     }
     // Fallback: derive from userData path (machine-specific but not secret)
-    return crypto.createHash('sha256').update(`ondoki-${app.getPath('userData')}`).digest('hex');
+    return crypto.createHash('sha256').update(`stept-${app.getPath('userData')}`).digest('hex');
   }
 
   public getSettings(): Settings { return this.store.get('settings', defaultSettings); }

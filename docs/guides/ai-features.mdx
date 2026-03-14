@@ -5,7 +5,7 @@ description: "Inline AI, context-aware chat, auto-annotation, and AI tool callin
 
 ## Overview
 
-ondoki integrates AI throughout the platform — from auto-processing workflow recordings to inline text editing to a full chat interface. All AI features are optional and require an LLM provider to be configured.
+stept integrates AI throughout the platform — from auto-processing workflow recordings to inline text editing to a full chat interface. All AI features are optional and require an LLM provider to be configured.
 
 ## Supported Providers
 
@@ -16,7 +16,7 @@ Configure your LLM in **Project Settings → AI/LLM** or via environment variabl
 | **OpenAI** | GPT-4o, GPT-4, GPT-3.5-turbo, etc. | Most commonly used |
 | **Anthropic** | Claude Opus, Sonnet, Haiku | Full function calling support |
 | **Ollama** | Llama, Mistral, any local model | Self-hosted, no API key needed |
-| **Custom** | Any OpenAI-compatible endpoint | Set `ONDOKI_LLM_BASE_URL` |
+| **Custom** | Any OpenAI-compatible endpoint | Set `STEPT_LLM_BASE_URL` |
 
 <Note>
 LLM settings configured in the UI (Project Settings) take priority over environment variables. This allows different projects to use different providers.
@@ -76,7 +76,7 @@ The chat AI has access to 16 tools:
 
 ## Auto-Processing
 
-When a workflow recording is finalized, ondoki automatically runs an AI pipeline:
+When a workflow recording is finalized, stept automatically runs an AI pipeline:
 
 <Steps>
   <Step title="Title Generation">
@@ -108,7 +108,7 @@ You can re-trigger annotation on individual steps via the **Annotate** button in
 
 ## Privacy and PII Protection
 
-ondoki supports optional PII obfuscation before data reaches AI providers:
+stept supports optional PII obfuscation before data reaches AI providers:
 
 ### SendCloak
 

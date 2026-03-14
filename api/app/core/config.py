@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["local", "staging", "production", "test"] = "local"
 
     # ── Defaults for local development ──────────────────────────
-    PROJECT_NAME: str = "SnapRow"
+    PROJECT_NAME: str = "Stept"
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
     FIRST_SUPERUSER: EmailStr = "admin@example.com"

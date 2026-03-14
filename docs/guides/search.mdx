@@ -5,7 +5,7 @@ description: "Hybrid full-text and semantic search with reciprocal rank fusion."
 
 ## Overview
 
-ondoki uses a hybrid search system that combines PostgreSQL full-text search with pgvector semantic search. Results are merged using Reciprocal Rank Fusion (RRF) and boosted by popularity and recency signals. A trigram fallback handles typos.
+stept uses a hybrid search system that combines PostgreSQL full-text search with pgvector semantic search. Results are merged using Reciprocal Rank Fusion (RRF) and boosted by popularity and recency signals. A trigram fallback handles typos.
 
 ## How It Works
 
@@ -50,7 +50,7 @@ Uses pgvector for vector similarity search:
 - **Content hashing** (SHA-256) to skip re-embedding unchanged content
 
 <Note>
-Semantic search requires an embedding model to be available. Embeddings are generated automatically when content is created or updated. If pgvector is not available, ondoki gracefully falls back to full-text search only.
+Semantic search requires an embedding model to be available. Embeddings are generated automatically when content is created or updated. If pgvector is not available, stept gracefully falls back to full-text search only.
 </Note>
 
 ## Reciprocal Rank Fusion (RRF)
@@ -76,7 +76,7 @@ After RRF fusion, additional boosts are applied:
 
 ## Trigram Fallback
 
-If full-text and semantic search return insufficient results, ondoki falls back to PostgreSQL trigram matching (`pg_trgm`). This handles:
+If full-text and semantic search return insufficient results, stept falls back to PostgreSQL trigram matching (`pg_trgm`). This handles:
 
 - Typos (e.g., "deploymnet" → "deployment")
 - Partial word matches

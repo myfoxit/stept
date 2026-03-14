@@ -4,13 +4,13 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "═══════════════════════════════════════"
-echo "  ondoki-web — Full Test Suite"
+echo "  stept — Full Test Suite"
 echo "═══════════════════════════════════════"
 echo ""
 echo "Prerequisites: make dev (Docker services running)"
 echo ""
 
-# Backend unit tests (runs inside Docker against ondoki_test)
+# Backend unit tests (runs inside Docker against stept_test)
 echo "── Backend Tests ──────────────────────"
 make test-backend
 echo ""

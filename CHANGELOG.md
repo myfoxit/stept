@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **TipTap AI Slash Commands** — `/ai write|summarize|improve|expand|simplify|translate|explain` inline in the editor
 - **RAG Semantic Search** — pgvector embeddings with TF-IDF keyword fallback
 - **5 LLM Providers** — GitHub Copilot (OAuth device flow), OpenAI, Anthropic, Ollama, Custom OpenAI-compatible
-- **Desktop Sync** — Upload recordings from the Ondoki Desktop app (.NET/WPF)
+- **Desktop Sync** — Upload recordings from the Stept Desktop app (.NET/WPF)
 - **Guide Generation** — Auto-generate step-by-step documentation from recordings
 - **LLM Setup Wizard** — 3-step frontend wizard for configuring AI providers
 - **SendCloak Integration** — Optional PII obfuscation for LLM requests

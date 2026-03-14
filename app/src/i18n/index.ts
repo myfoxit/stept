@@ -41,7 +41,7 @@ i18n
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
-      lookupLocalStorage: 'ondoki-ui-language',
+      lookupLocalStorage: 'stept-ui-language',
     },
   });
 

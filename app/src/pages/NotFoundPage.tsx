@@ -11,7 +11,7 @@ export default function NotFoundPage() {
         <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
           <GalleryVerticalEnd className="size-5" />
         </div>
-        <span className="text-xl font-semibold">ondoki</span>
+        <span className="text-xl font-semibold">stept</span>
       </a>
       <div className="space-y-2">
         <h1 className="text-6xl font-bold text-muted-foreground">404</h1>

@@ -15,14 +15,14 @@ import ProcessRecordingNode from '@/components/Editor/Nodes/ProcessRecordingNode
 import { Pages } from '@/components/Editor/Extensions/pagination'
 import { createSlashMenuExtension } from '@/components/Editor/SlashMenu'
 
-export function useOndokiEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
+export function useSteptEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   return useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: true,
     editable: !readOnly,
     editorProps: {
       attributes: {
-        class: 'ondoki-editor',
+        class: 'stept-editor',
       },
     },
     extensions: [

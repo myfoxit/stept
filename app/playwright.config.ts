@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * E2E test configuration for ondoki-web.
+ * E2E test configuration for stept.
  *
- * Tests run against a dedicated test backend (port 8001, ondoki_test DB)
+ * Tests run against a dedicated test backend (port 8001, stept_test DB)
  * and a Playwright-managed Vite dev server (port 5174).
  *
  * Run with: make test-e2e

@@ -104,7 +104,7 @@ export function McpSettingsCard({ projectId }: McpSettingsCardProps) {
     ? JSON.stringify(
         {
           mcpServers: {
-            ondoki: {
+            stept: {
               url: mcpEndpoint,
               headers: { Authorization: `Bearer ${createdKey}` },
             },

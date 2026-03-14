@@ -5,7 +5,7 @@ description: "Production deployment with Docker Compose."
 
 ## Overview
 
-ondoki ships with three Docker Compose files:
+stept ships with three Docker Compose files:
 
 | File | Purpose |
 |------|---------|
@@ -26,8 +26,8 @@ For production, use `docker-compose.prod.yml`.
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/myfoxit/ondoki-web.git
-cd ondoki-web
+git clone https://github.com/myfoxit/stept.git
+cd stept
 cp .env.example .env
 ```
 
@@ -41,17 +41,17 @@ DOMAIN=app.yourdomain.com
 
 # Security keys (generate fresh values)
 JWT_SECRET=$(openssl rand -hex 32)
-ONDOKI_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+STEPT_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
 
 # Database
-POSTGRES_USER=ondoki
+POSTGRES_USER=stept
 POSTGRES_PASSWORD=<strong-random-password>
 
 # Frontend URL
 FRONTEND_URL=https://app.yourdomain.com
 
 # CORS
-CORS_ORIGINS=https://app.yourdomain.com,ondoki://
+CORS_ORIGINS=https://app.yourdomain.com,stept://
 CORS_ORIGIN_REGEX=^https://.*\.yourdomain\.com$
 
 # Redis password
@@ -86,9 +86,9 @@ The production stack includes:
 | `db` | `pgvector/pgvector:pg16` | PostgreSQL with vector search |
 | `redis` | `redis:7-alpine` | Cache, pub/sub, task queue |
 | `gotenberg` | `gotenberg/gotenberg:8` | PDF generation |
-| `backend` | `ghcr.io/myfoxit/ondoki-web-api:latest` | FastAPI backend |
-| `media-worker` | `ghcr.io/myfoxit/ondoki-web-api:latest` | Celery worker for video processing |
-| `frontend` | `ghcr.io/myfoxit/ondoki-web-app:latest` | React SPA served via Nginx |
+| `backend` | `ghcr.io/myfoxit/stept-api:latest` | FastAPI backend |
+| `media-worker` | `ghcr.io/myfoxit/stept-api:latest` | Celery worker for video processing |
+| `frontend` | `ghcr.io/myfoxit/stept-app:latest` | React SPA served via Nginx |
 
 ### Optional Services
 
@@ -122,7 +122,7 @@ Back up the `db-data` volume regularly. It contains all your data. Also back up 
 
 ## Networking
 
-All services communicate on the `ondoki-network` bridge network. In production:
+All services communicate on the `stept-network` bridge network. In production:
 
 - Only Caddy exposes ports 80 and 443
 - PostgreSQL is **not** exposed to the host

@@ -616,7 +616,7 @@ export class ScreenshotService {
 
       const timestamp = Date.now();
       const filename = `screenshot_${timestamp}.png`;
-      const tempPath = path.join(os.tmpdir(), 'Ondoki', filename);
+      const tempPath = path.join(os.tmpdir(), 'Stept', filename);
       await fs.promises.mkdir(path.dirname(tempPath), { recursive: true });
       await fs.promises.writeFile(tempPath, screenshot);
       return tempPath;

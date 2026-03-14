@@ -1,6 +1,6 @@
 /**
- * Minimal type definitions for the Ondoki API.
- * These replace the auto-generated openapi.ts from Ondoki.
+ * Minimal type definitions for the Stept API.
+ * These replace the auto-generated openapi.ts from Stept.
  * Regenerate from the OpenAPI schema when needed.
  */
 

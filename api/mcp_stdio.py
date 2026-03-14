@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone stdio entry point for the Ondoki MCP server."""
+"""Standalone stdio entry point for the Stept MCP server."""
 import logging
 import os
 import sys

@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(*_bg_tasks, return_exceptions=True)
 
 
-app = FastAPI(title="Ondoki", lifespan=lifespan)
+app = FastAPI(title="Stept", lifespan=lifespan)
 
 # Versioned API router
 api_router = APIRouter(prefix=settings.API_V1_STR)

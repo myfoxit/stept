@@ -4,7 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <AssemblyName>window-info</AssemblyName>
-    <RootNamespace>Ondoki.Native</RootNamespace>
+    <RootNamespace>Stept.Native</RootNamespace>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <PublishTrimmed>false</PublishTrimmed>

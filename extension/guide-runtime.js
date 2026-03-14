@@ -1,5 +1,5 @@
 /**
- * Ondoki Interactive Guide Runtime
+ * Stept Interactive Guide Runtime
  * Renders a step-by-step guided overlay on the page, highlighting elements
  * with tooltips and navigation controls.
  *
@@ -9,13 +9,13 @@
   "use strict";
 
   // Allow re-injection: clean up previous instance without triggering GUIDE_STOPPED
-  if (window.__ondokiGuideRunner) {
+  if (window.__steptGuideRunner) {
     try {
-      window.__ondokiGuideRunner._replacing = true;
-      window.__ondokiGuideRunner.stop();
+      window.__steptGuideRunner._replacing = true;
+      window.__steptGuideRunner.stop();
     } catch {}
   }
-  window.__ondokiGuideLoaded = true;
+  window.__steptGuideLoaded = true;
 
   // ── CSS Zoom Compensation ─────────────────────────────────────────
 
@@ -42,7 +42,7 @@
     try {
       // Traverse shadow roots
       root.querySelectorAll("*").forEach((el) => {
-        if (el.shadowRoot && el.id !== "ondoki-guide-overlay") {
+        if (el.shadowRoot && el.id !== "stept-guide-overlay") {
           results.push(...collectSearchRoots(el.shadowRoot, depth + 1).map((r) => ({
             ...r,
             iframeOffset: results[0].iframeOffset, // same offset as parent
@@ -263,7 +263,7 @@
     // Check if it's part of our overlay
     let node = topEl;
     while (node) {
-      if (node.tagName && node.tagName.toLowerCase() === 'ondoki-guide-overlay') return null;
+      if (node.tagName && node.tagName.toLowerCase() === 'stept-guide-overlay') return null;
       node = node.parentElement;
     }
     return topEl;
@@ -600,7 +600,7 @@
     }
 
     _createHost() {
-      this.host = document.createElement("ondoki-guide-overlay");
+      this.host = document.createElement("stept-guide-overlay");
       this.shadow = this.host.attachShadow({ mode: "closed" });
 
       const style = document.createElement("style");
@@ -1368,7 +1368,7 @@
   // ── Active Runner Singleton ───────────────────────────────────────
 
   let activeRunner = null;
-  window.__ondokiGuideRunner = null;
+  window.__steptGuideRunner = null;
 
   // ── Message Handling ──────────────────────────────────────────────
 
@@ -1381,7 +1381,7 @@
         }
         const runner = new GuideRunner(message.guide);
         activeRunner = runner;
-        window.__ondokiGuideRunner = runner;
+        window.__steptGuideRunner = runner;
         if (typeof message.startIndex === "number" && message.startIndex > 0) {
           runner.start().then(() => runner.showStep(message.startIndex));
         } else {

@@ -24,8 +24,8 @@ async def test_logout_invalidates_session(async_client: AsyncClient):
         "/api/v1/auth/register",
         json={"email": "logout@test.com", "password": "Logout123!", "name": "logoutuser"},
     )
-    cookie = reg_resp.cookies.get("session_ondoki")
-    headers = {"Cookie": f"session_ondoki={cookie}"}
+    cookie = reg_resp.cookies.get("session_stept")
+    headers = {"Cookie": f"session_stept={cookie}"}
 
     # Verify session works
     me_resp = await async_client.get("/api/v1/auth/me", headers=headers)
@@ -71,7 +71,7 @@ async def test_me_without_session(async_client: AsyncClient):
 async def test_me_with_invalid_cookie(async_client: AsyncClient):
     resp = await async_client.get(
         "/api/v1/auth/me",
-        headers={"Cookie": "session_ondoki=invalid-token-value"},
+        headers={"Cookie": "session_stept=invalid-token-value"},
     )
     assert resp.status_code == 401
 
@@ -158,9 +158,9 @@ async def test_multiple_sessions(async_client: AsyncClient):
     )
     assert login1.status_code == 200, f"Login 1 failed: {login1.text}"
     # Cookie may be in response or auto-stored in client jar
-    cookie1 = login1.cookies.get("session_ondoki") or async_client.cookies.get("session_ondoki")
+    cookie1 = login1.cookies.get("session_stept") or async_client.cookies.get("session_stept")
     assert cookie1, "Login 1 should return session cookie"
-    headers1 = {"Cookie": f"session_ondoki={cookie1}"}
+    headers1 = {"Cookie": f"session_stept={cookie1}"}
     async_client.cookies.clear()
 
     # Login session 2
@@ -169,9 +169,9 @@ async def test_multiple_sessions(async_client: AsyncClient):
         json={"email": "multi@test.com", "password": "Multi123!"},
     )
     assert login2.status_code == 200, f"Login 2 failed: {login2.text}"
-    cookie2 = login2.cookies.get("session_ondoki") or async_client.cookies.get("session_ondoki")
+    cookie2 = login2.cookies.get("session_stept") or async_client.cookies.get("session_stept")
     assert cookie2, "Login 2 should return session cookie"
-    headers2 = {"Cookie": f"session_ondoki={cookie2}"}
+    headers2 = {"Cookie": f"session_stept={cookie2}"}
     async_client.cookies.clear()
 
     # Both sessions should work
@@ -198,15 +198,15 @@ async def test_logout_invalidates_only_that_session(async_client: AsyncClient):
         "/api/v1/auth/login",
         json={"email": "partial@test.com", "password": "Partial123!"},
     )
-    cookie1 = login1.cookies.get("session_ondoki")
-    headers1 = {"Cookie": f"session_ondoki={cookie1}"}
+    cookie1 = login1.cookies.get("session_stept")
+    headers1 = {"Cookie": f"session_stept={cookie1}"}
 
     login2 = await async_client.post(
         "/api/v1/auth/login",
         json={"email": "partial@test.com", "password": "Partial123!"},
     )
-    cookie2 = login2.cookies.get("session_ondoki")
-    headers2 = {"Cookie": f"session_ondoki={cookie2}"}
+    cookie2 = login2.cookies.get("session_stept")
+    headers2 = {"Cookie": f"session_stept={cookie2}"}
 
     # Logout session 1
     await async_client.post("/api/v1/auth/logout", headers=headers1)

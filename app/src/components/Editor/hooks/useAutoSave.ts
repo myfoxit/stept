@@ -8,7 +8,7 @@ const MAX_RETRIES = 5
 const MAX_BACKOFF = 30000 // 30s
 
 function getLocalStorageKey(docId: string) {
-  return `ondoki:autosave:${docId}`
+  return `stept:autosave:${docId}`
 }
 
 export interface LocalRecovery {

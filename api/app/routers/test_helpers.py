@@ -2,7 +2,7 @@
 Test seed/cleanup endpoints for E2E tests.
 
 Safety: Only registered when ENVIRONMENT=test.
-Only operates on test-specific data (e2e-test@ondoki.com).
+Only operates on test-specific data (e2e-test@stept.ai).
 """
 
 import os
@@ -16,7 +16,7 @@ from app.crud.user import create_user
 
 router = APIRouter(prefix="/test", tags=["test"])
 
-TEST_EMAIL = "e2e-test@ondoki.com"
+TEST_EMAIL = "e2e-test@stept.ai"
 TEST_PASSWORD = "TestPass123!"
 TEST_NAME = "E2E Test User"
 TEST_PROJECT_NAME = "E2E Test Project"
@@ -24,7 +24,7 @@ TEST_PROJECT_NAME = "E2E Test Project"
 
 def _assert_test_db():
     """Abort if we're not connected to the test database."""
-    if "ondoki_test" not in DATABASE_URL:
+    if "stept_test" not in DATABASE_URL:
         raise RuntimeError(
             f"REFUSING to run test endpoints against non-test database: {DATABASE_URL}"
         )

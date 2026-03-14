@@ -10,7 +10,7 @@
  * and the package is not production-grade yet.
  */
 
-const PROVIDER_STORAGE_KEY = 'ondoki_llm_provider';
+const PROVIDER_STORAGE_KEY = 'stept_llm_provider';
 
 export interface LocalProviderConfig {
   provider: string;

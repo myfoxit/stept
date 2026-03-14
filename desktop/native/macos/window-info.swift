@@ -430,7 +430,7 @@ let encoder: JSONEncoder = {
 // ---------------------------------------------------------------------------
 
 let captureDir: String = {
-    let dir = NSTemporaryDirectory() + "ondoki-captures/"
+    let dir = NSTemporaryDirectory() + "stept-captures/"
     try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
     return dir
 }()
@@ -455,7 +455,7 @@ func captureDisplayAtPoint(_ point: CGPoint) -> String? {
 }
 
 let stdoutLock = NSLock()
-let elementQueue = DispatchQueue(label: "com.ondoki.element-detection")
+let elementQueue = DispatchQueue(label: "com.stept.element-detection")
 
 func writeJSON<T: Encodable>(_ value: T) {
     if let data = try? encoder.encode(value), let json = String(data: data, encoding: .utf8) {

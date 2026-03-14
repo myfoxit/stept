@@ -86,7 +86,7 @@ export function PublicWorkflowPage() {
                 href="/"
                 className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium"
               >
-                Go to Ondoki
+                Go to Stept
               </a>
             </>
           ) : (
@@ -145,7 +145,7 @@ export function PublicWorkflowPage() {
           <p>
             Made with{' '}
             <a href="/" className="text-primary hover:underline font-medium">
-              Ondoki
+              Stept
             </a>
           </p>
         </div>

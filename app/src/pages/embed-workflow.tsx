@@ -42,7 +42,7 @@ export function EmbedWorkflowPage() {
   useEffect(() => {
     const sendHeight = () => {
       const height = document.body.scrollHeight;
-      window.parent.postMessage({ type: 'ondoki-embed-resize', height }, '*');
+      window.parent.postMessage({ type: 'stept-embed-resize', height }, '*');
     };
 
     sendHeight();
@@ -113,8 +113,8 @@ export function EmbedWorkflowPage() {
       {/* Footer */}
       <div style={styles.footer}>
         <span style={{ color: '#999', fontSize: 12 }}>Powered by </span>
-        <a href="https://ondoki.com" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>
-          Ondoki
+        <a href="https://stept.ai" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>
+          Stept
         </a>
         <span style={{ color: '#ccc', margin: '0 8px' }}>·</span>
         <a href={publicUrl} target="_blank" rel="noopener noreferrer" style={styles.footerLink}>

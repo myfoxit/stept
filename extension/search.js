@@ -1,5 +1,5 @@
 /**
- * Search API client for the Ondoki Chrome Extension.
+ * Search API client for the Stept Chrome Extension.
  * Provides search functionality against the backend API.
  */
 

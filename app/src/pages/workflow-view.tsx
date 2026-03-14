@@ -405,23 +405,23 @@ export function WorkflowView() {
         return;
       }
 
-      // Try sending to the Ondoki Chrome extension via externally_connectable
+      // Try sending to the Stept Chrome extension via externally_connectable
       // The extension ID is different for self-hosted vs Chrome Web Store builds,
       // so we try multiple discovery methods:
 
       // Method 1: Check for the extension's content script presence
-      const extensionReady = !!(window as any).__ondokiContentLoaded;
+      const extensionReady = !!(window as any).__steptContentLoaded;
 
       if (extensionReady) {
         // Extension content script is loaded — use window.postMessage relay
         window.postMessage({
-          type: 'ONDOKI_START_GUIDE',
+          type: 'STEPT_START_GUIDE',
           guide,
         }, '*');
       } else {
         // Method 2: Try known extension IDs (cloud build + dev)
         const extensionIds = [
-          (window as any).__ONDOKI_EXTENSION_ID__, // Injected by extension
+          (window as any).__STEPT_EXTENSION_ID__, // Injected by extension
           // Add your cloud extension ID here when published
         ].filter(Boolean);
 
@@ -452,7 +452,7 @@ export function WorkflowView() {
           const firstUrl = guide.steps[0]?.expected_url;
           if (firstUrl) {
             const url = new URL(firstUrl);
-            url.searchParams.set('ondoki-guide', workflowId);
+            url.searchParams.set('stept-guide', workflowId);
             window.open(url.toString(), '_blank');
           } else {
             console.warn('Guide Me: No extension detected and no step URL available');

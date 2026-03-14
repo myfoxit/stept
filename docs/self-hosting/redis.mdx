@@ -5,7 +5,7 @@ description: "Redis configuration for caching, WebSocket pub/sub, and task queue
 
 ## Overview
 
-ondoki uses **Redis 7** for three purposes:
+stept uses **Redis 7** for three purposes:
 
 1. **Caching** — session data and temporary state (DB 0)
 2. **WebSocket pub/sub** — real-time notification delivery across multiple backend instances
@@ -18,7 +18,7 @@ ondoki uses **Redis 7** for three purposes:
 ```yaml
 redis:
   image: redis:7-alpine
-  container_name: ondoki-redis
+  container_name: stept-redis
   restart: unless-stopped
 ```
 
@@ -29,7 +29,7 @@ No password required in development.
 ```yaml
 redis:
   image: redis:7-alpine
-  container_name: ondoki-redis
+  container_name: stept-redis
   restart: unless-stopped
   command: >
     redis-server
@@ -51,7 +51,7 @@ Production configuration:
 
 ## Connection Strings
 
-ondoki uses two Redis databases:
+stept uses two Redis databases:
 
 | Purpose | DB | Variable | Default |
 |---------|-----|----------|---------|

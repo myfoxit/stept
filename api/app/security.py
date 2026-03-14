@@ -13,7 +13,7 @@ from hashlib import sha256
 from enum import Enum
 from app.models import PermissionLevel
 
-SESSION_COOKIE_NAME = "session_ondoki"
+SESSION_COOKIE_NAME = "session_stept"
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

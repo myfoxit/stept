@@ -20,7 +20,7 @@ import { DragMenu } from '@/components/Editor/DragMenu';
 import { LinkBubbleMenu } from '@/components/Editor/LinkBubbleMenu';
 
 // Hooks
-import { useOndokiEditor } from '@/components/Editor/hooks/useOndokiEditor';
+import { useSteptEditor } from '@/components/Editor/hooks/useSteptEditor';
 import { useAutoSave } from '@/components/Editor/hooks/useAutoSave';
 
 
@@ -34,7 +34,7 @@ import { AICommandPanel, AI_COMMANDS } from '@/components/Editor/Extensions/ai-c
 import { SpotlightSearch } from '@/components/spotlight/SpotlightSearch';
 
 
-export function OndokiEditor({ docId, readOnly = false, previewContent, headerSlot }: {
+export function SteptEditor({ docId, readOnly = false, previewContent, headerSlot }: {
   docId: string;
   readOnly?: boolean;
   /** When set, shows this content in read-only mode instead of the saved document content */
@@ -43,7 +43,7 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
 }) {
   const { data: doc, isLoading: docLoading } = useDocument(docId);
   const saveDocument = useSaveDocument(docId);
-  const editor = useOndokiEditor({ readOnly });
+  const editor = useSteptEditor({ readOnly });
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState<string>('');
@@ -132,15 +132,15 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
         setAiCommandCoords({ x: detail.x, y: detail.y });
       }
     };
-    window.addEventListener('ondoki:ai-inline-write', handler);
-    return () => window.removeEventListener('ondoki:ai-inline-write', handler);
+    window.addEventListener('stept:ai-inline-write', handler);
+    return () => window.removeEventListener('stept:ai-inline-write', handler);
   }, []);
 
   // Listen for workflow insert events — opens spotlight in insert mode
   useEffect(() => {
     const handler = () => setWorkflowInsertMode(true);
-    window.addEventListener('ondoki:insert-workflow', handler);
-    return () => window.removeEventListener('ondoki:insert-workflow', handler);
+    window.addEventListener('stept:insert-workflow', handler);
+    return () => window.removeEventListener('stept:insert-workflow', handler);
   }, []);
 
   // Text container insert
@@ -249,10 +249,10 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
   const combinedCssVars = React.useMemo(() => ({ ...pageCssVars, ...mobileScaleVars }), [pageCssVars, mobileScaleVars]);
 
   return (
-    <div className={`ondoki-editor-wrapper layout-${layout}`} style={combinedCssVars as React.CSSProperties}>
+    <div className={`stept-editor-wrapper layout-${layout}`} style={combinedCssVars as React.CSSProperties}>
       {/* Header slot + save status */}
       {headerSlot && (
-        <div className="ondoki-page-meta">
+        <div className="stept-page-meta">
           {headerSlot(saveStatus, errorMessage)}
         </div>
       )}
@@ -282,7 +282,7 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
 
       <input
         type="text"
-        className="ondoki-page-title"
+        className="stept-page-title"
         placeholder="Untitled"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -290,7 +290,7 @@ export function OndokiEditor({ docId, readOnly = false, previewContent, headerSl
       />
 
       <EditorContext.Provider value={{ editor }}>
-        <EditorContent editor={editor} role="presentation" className="ondoki-editor-content">
+        <EditorContent editor={editor} role="presentation" className="stept-editor-content">
           <DragMenu />
           {editor && <FloatingToolbarContent editor={editor} />}
           {editor && <LinkBubbleMenu editor={editor} />}

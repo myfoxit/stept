@@ -271,7 +271,7 @@ export class RecordingService extends EventEmitter {
       this.isPaused = false;
 
       const sessionId = Date.now().toString();
-      this.screenshotFolder = path.join(os.tmpdir(), 'Ondoki', sessionId);
+      this.screenshotFolder = path.join(os.tmpdir(), 'Stept', sessionId);
       await fs.promises.mkdir(this.screenshotFolder, { recursive: true });
 
       if (captureArea && captureArea.type !== 'all-displays') {
@@ -669,7 +669,7 @@ export class RecordingService extends EventEmitter {
     const scaleFactor = event.scale || this.screenshotService.getScaleFactorAtPoint(clickPoint.x, clickPoint.y);
 
     // Skip clicks on the recording app itself — match by PID, not window title
-    // (title matching catches Chrome tabs with "Ondoki" in them)
+    // (title matching catches Chrome tabs with "Stept" in them)
     const electronPID = process.pid;
     if (event.window?.ownerPID === electronPID) {
       console.log(`[DIAG] click filtered: own PID=${electronPID} title="${windowTitle}"`);

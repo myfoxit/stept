@@ -318,7 +318,7 @@ export class CloudUploadService extends EventEmitter {
   }
 
   private saveRecordingLocally(steps: any[]): string {
-    const fallbackDir = path.join(app.getPath('userData'), 'Ondoki', 'failed-uploads');
+    const fallbackDir = path.join(app.getPath('userData'), 'Stept', 'failed-uploads');
     fs.mkdirSync(fallbackDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fallbackPath = path.join(fallbackDir, `recording-${timestamp}.json`);
@@ -336,7 +336,7 @@ export class CloudUploadService extends EventEmitter {
   ): Promise<string | null> {
     const payload: Record<string, any> = {
       timestamp: new Date().toISOString(),
-      client: 'OndokiDesktop-Electron',
+      client: 'SteptDesktop-Electron',
       user_id: userId,
       project_id: projectId,
     };

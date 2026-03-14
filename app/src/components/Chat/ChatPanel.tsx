@@ -35,8 +35,8 @@ export function ChatPanel() {
       const url = (e as CustomEvent).detail;
       if (typeof url === 'string') navigate(url);
     };
-    window.addEventListener('ondoki-navigate', handler);
-    return () => window.removeEventListener('ondoki-navigate', handler);
+    window.addEventListener('stept-navigate', handler);
+    return () => window.removeEventListener('stept-navigate', handler);
   }, [navigate]);
 
   React.useEffect(() => {

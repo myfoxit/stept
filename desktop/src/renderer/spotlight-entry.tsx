@@ -2,7 +2,7 @@ import './styles/globals.css';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { OndokiLogo } from './components/spotlight/OndokiLogo';
+import { SteptLogo } from './components/spotlight/SteptLogo';
 import { SpotlightHeader } from './components/spotlight/SpotlightHeader';
 import { SearchBar } from './components/spotlight/SearchBar';
 import { RecordingControls } from './components/spotlight/RecordingControls';
@@ -195,7 +195,7 @@ const SpotlightApp: React.FC = () => {
 
     // Recording toggle from global shortcut
     const unsubToggleRec = api.onToggleRecording?.(() => {
-      document.dispatchEvent(new CustomEvent('ondoki-toggle-recording'));
+      document.dispatchEvent(new CustomEvent('stept-toggle-recording'));
     });
 
     return () => {
@@ -378,9 +378,9 @@ const SpotlightApp: React.FC = () => {
       if (rec.isRecording) handleStopRecording();
       else doStartRecording({ type: 'all-displays' });
     };
-    document.addEventListener('ondoki-toggle-recording', handler);
+    document.addEventListener('stept-toggle-recording', handler);
     return () =>
-      document.removeEventListener('ondoki-toggle-recording', handler);
+      document.removeEventListener('stept-toggle-recording', handler);
   }, [rec.isRecording, doStartRecording, handleStopRecording]);
 
   const handleTogglePause = useCallback(async () => {
@@ -489,9 +489,9 @@ const SpotlightApp: React.FC = () => {
         {!auth.isAuthenticated ? (
           <div className="auth-gate">
             <div className="auth-gate-logo">
-              <OndokiLogo width={80} height={76} />
+              <SteptLogo width={80} height={76} />
             </div>
-            <div className="auth-gate-title">ondoki</div>
+            <div className="auth-gate-title">stept</div>
             <p className="auth-gate-desc">
               Record and search your workflows
             </p>

@@ -23,7 +23,7 @@ fi
 
 # Start API with local environment but test database
 export ENVIRONMENT=local  # Use local instead of test
-export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/snaprow_test
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/stept_test
 export TEST_MODE=true  # Flag to enable test endpoints
 
 uvicorn main:app --reload --port 8000 &

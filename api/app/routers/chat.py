@@ -182,7 +182,7 @@ def _build_system_prompt_with_tools() -> str:
         tool_descriptions.append(f"- **{t.name}**: {t.description}")
 
     return (
-        "You are Ondoki's AI assistant. You help users manage their recorded workflows, "
+        "You are Stept's AI assistant. You help users manage their recorded workflows, "
         "documents, and folders.\n\n"
         "IMPORTANT BEHAVIORS:\n"
         "- When a user asks 'how do I...', 'how to...', or any knowledge question about "

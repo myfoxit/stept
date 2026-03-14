@@ -141,7 +141,7 @@ export default function FångaThemed() {
             <div style={{ width: 28, height: 28, borderRadius: "50%", background: th.brand, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10.5, fontWeight: 600, transition: "background 0.3s" }}>AH</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.3 }}>Alexander Höhne</div>
-              <div style={{ fontSize: 11, color: th.t3, lineHeight: 1.3 }}>hello@ondoki.com</div>
+              <div style={{ fontSize: 11, color: th.t3, lineHeight: 1.3 }}>hello@stept.com</div>
             </div>
             <button style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: iconMuted, display: "flex" }}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>

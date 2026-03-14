@@ -39,7 +39,7 @@ export class ContextWatcherService extends EventEmitter {
   private restartAttempts: number = 0;
   private readonly MAX_RESTART_ATTEMPTS = 5;
 
-  private readonly IGNORE_APPS = ['electron', 'ondoki desktop', 'ondoki-desktop'];
+  private readonly IGNORE_APPS = ['electron', 'stept desktop', 'stept-desktop'];
 
   constructor() {
     super();

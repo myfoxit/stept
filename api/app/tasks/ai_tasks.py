@@ -3,7 +3,7 @@ import asyncio, logging
 logger = logging.getLogger(__name__)
 
 if celery_app:
-    @celery_app.task(bind=True, name="ondoki.process_recording")
+    @celery_app.task(bind=True, name="stept.process_recording")
     def process_recording_task(self, session_id: str):
         async def _run():
             from app.database import AsyncSessionLocal
@@ -16,7 +16,7 @@ if celery_app:
             return result
         return asyncio.run(_run())
 
-    @celery_app.task(bind=True, name="ondoki.generate_guide")
+    @celery_app.task(bind=True, name="stept.generate_guide")
     def generate_guide_task(self, session_id: str):
         async def _run():
             from app.database import AsyncSessionLocal
@@ -29,7 +29,7 @@ if celery_app:
             return {"guide_markdown": guide_md}
         return asyncio.run(_run())
 
-    @celery_app.task(bind=True, name="ondoki.process_video_import", queue="media")
+    @celery_app.task(bind=True, name="stept.process_video_import", queue="media")
     def process_video_import_task(self, session_id: str, video_path: str):
         async def _run():
             from app.database import AsyncSessionLocal
@@ -154,7 +154,7 @@ if celery_app:
 
         return asyncio.run(_run())
 
-    @celery_app.task(bind=True, name="ondoki.index_workflow")
+    @celery_app.task(bind=True, name="stept.index_workflow")
     def index_workflow_task(self, session_id: str):
         return asyncio.run(
             __import__('app.services.indexer', fromlist=['index_workflow_background']).index_workflow_background(session_id)

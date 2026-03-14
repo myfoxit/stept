@@ -68,7 +68,7 @@ export function PublicDocumentPage() {
                 href="/"
                 className="inline-flex items-center px-4 py-2 rounded-md bg-violet-600 text-white hover:bg-violet-700 text-sm font-medium"
               >
-                Go to Ondoki
+                Go to Stept
               </a>
             </>
           ) : (
@@ -97,7 +97,7 @@ export function PublicDocumentPage() {
         <div className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>
             Made with{' '}
-            <a href="/" className="text-violet-600 hover:underline font-medium">Ondoki</a>
+            <a href="/" className="text-violet-600 hover:underline font-medium">Stept</a>
           </p>
         </div>
       </div>

@@ -2,11 +2,11 @@
  * IndexedDB storage for screenshots.
  * Replaces chrome.storage.local for large binary data (screenshot data URLs).
  *
- * DB: ondoki-recordings
+ * DB: stept-recordings
  * Object store: screenshots (key: stepId)
  */
 
-const DB_NAME = 'ondoki-recordings';
+const DB_NAME = 'stept-recordings';
 const DB_VERSION = 1;
 const STORE_NAME = 'screenshots';
 
@@ -31,7 +31,7 @@ function openDB() {
     };
 
     request.onerror = (event) => {
-      console.error('[Ondoki] IndexedDB open error:', event.target.error);
+      console.error('[Stept] IndexedDB open error:', event.target.error);
       reject(event.target.error);
     };
   });
@@ -146,7 +146,7 @@ async function migrateFromChromeStorage() {
             await saveScreenshot(stepId, step.screenshotDataUrl);
             migrated++;
           } catch (e) {
-            console.error('[Ondoki] Migration failed for step', step.stepNumber, e);
+            console.error('[Stept] Migration failed for step', step.stepNumber, e);
           }
         }
       }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "ondoki",
+  "name": "stept",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -18,12 +18,12 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/myfoxit/ondoki-web"
+      "url": "https://github.com/myfoxit/stept"
     }
   ],
   "topbarCtaButton": {
     "name": "Get Started",
-    "url": "https://github.com/myfoxit/ondoki-web#quick-start"
+    "url": "https://github.com/myfoxit/stept#quick-start"
   },
   "tabs": [
     {
@@ -35,12 +35,12 @@
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/myfoxit/ondoki-web"
+      "url": "https://github.com/myfoxit/stept"
     },
     {
       "name": "Community",
       "icon": "discord",
-      "url": "https://github.com/myfoxit/ondoki-web/discussions"
+      "url": "https://github.com/myfoxit/stept/discussions"
     }
   ],
   "navigation": [
@@ -98,6 +98,6 @@
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/myfoxit/ondoki-web"
+    "github": "https://github.com/myfoxit/stept"
   }
 }

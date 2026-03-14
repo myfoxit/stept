@@ -5,8 +5,8 @@ module.exports = {
     extraResource: ['native'],
     protocols: [
       {
-        name: 'Ondoki Protocol',
-        schemes: ['ondoki']
+        name: 'Stept Protocol',
+        schemes: ['stept']
       }
     ],
     // Ignore these files/folders during packaging
@@ -24,7 +24,7 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        name: 'ondoki_desktop'
+        name: 'stept_desktop'
       },
     },
     {
@@ -36,7 +36,7 @@ module.exports = {
       config: {
         options: {
           maintainer: 'MyFoxIT',
-          homepage: 'https://github.com/myfoxit/ondoki-desktop-electron',
+          homepage: 'https://github.com/myfoxit/stept-desktop-electron',
           description: 'Cross-platform screen recording and AI guide generation tool',
         }
       },
@@ -46,7 +46,7 @@ module.exports = {
       config: {
         options: {
           maintainer: 'MyFoxIT',
-          homepage: 'https://github.com/myfoxit/ondoki-desktop-electron',
+          homepage: 'https://github.com/myfoxit/stept-desktop-electron',
           description: 'Cross-platform screen recording and AI guide generation tool',
         }
       },
@@ -71,7 +71,7 @@ module.exports = {
       config: {
         repository: {
           owner: 'myfoxit',
-          name: 'ondoki-desktop-electron'
+          name: 'stept-desktop-electron'
         }
       }
     }

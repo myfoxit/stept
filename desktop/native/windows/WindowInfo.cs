@@ -15,7 +15,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Windows.Automation;
 
-namespace Ondoki.Native
+namespace Stept.Native
 {
     #region Win32 Structs
 
@@ -270,7 +270,7 @@ namespace Ondoki.Native
     class Program
     {
         // ---- Screen capture ----
-        static string captureDir = Path.Combine(Path.GetTempPath(), "ondoki-captures");
+        static string captureDir = Path.Combine(Path.GetTempPath(), "stept-captures");
 
         static string CaptureDisplayAtPoint(int x, int y)
         {

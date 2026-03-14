@@ -208,16 +208,16 @@ describe('shouldFilterClick', () => {
       expect(shouldFilterClick('Electron', 'main window', 800, true)).toEqual({ filtered: true, reason: 'self' });
     });
 
-    it('filters Ondoki Desktop', () => {
-      expect(shouldFilterClick('Ondoki Desktop', 'Recording', 800, true)).toEqual({ filtered: true, reason: 'self' });
+    it('filters Stept Desktop', () => {
+      expect(shouldFilterClick('Stept Desktop', 'Recording', 800, true)).toEqual({ filtered: true, reason: 'self' });
     });
 
-    it('filters by window title starting with Ondoki', () => {
-      expect(shouldFilterClick('SomeApp', 'Ondoki Settings', 800, true)).toEqual({ filtered: true, reason: 'self' });
+    it('filters by window title starting with Stept', () => {
+      expect(shouldFilterClick('SomeApp', 'Stept Settings', 800, true)).toEqual({ filtered: true, reason: 'self' });
     });
 
-    it('filters window title exactly "Ondoki Desktop"', () => {
-      expect(shouldFilterClick('', 'Ondoki Desktop', 800, false)).toEqual({ filtered: true, reason: 'self' });
+    it('filters window title exactly "Stept Desktop"', () => {
+      expect(shouldFilterClick('', 'Stept Desktop', 800, false)).toEqual({ filtered: true, reason: 'self' });
     });
   });
 

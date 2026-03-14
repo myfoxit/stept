@@ -14,7 +14,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Configuration
 COMPOSE_FILE="$REPO_ROOT/docker-compose.test.yml"
-COMPOSE_PROJECT_NAME="snaprow-test"
+COMPOSE_PROJECT_NAME="stept-test"
 MAX_WAIT_TIME=120   # was 60, allow slower frontend build
 HEALTH_CHECK_INTERVAL=2
 
@@ -55,7 +55,7 @@ wait_for_services() {
         local all_healthy=true
         
         # Check database
-        if ! docker-compose -f $COMPOSE_FILE -p $COMPOSE_PROJECT_NAME exec -T test-db pg_isready -U testuser -d snaprow_test &>/dev/null; then
+        if ! docker-compose -f $COMPOSE_FILE -p $COMPOSE_PROJECT_NAME exec -T test-db pg_isready -U testuser -d stept_test &>/dev/null; then
             all_healthy=false
         fi
         

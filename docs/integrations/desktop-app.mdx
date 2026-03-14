@@ -1,17 +1,17 @@
 ---
 title: "Desktop App"
-description: "Record screen workflows with the ondoki desktop application."
+description: "Record screen workflows with the stept desktop application."
 ---
 
 ## Overview
 
-The [ondoki Desktop](https://github.com/myfoxit/ondoki-desktop) app is a Windows application built with .NET 9 / WPF. It runs in the background and captures user actions — clicks, keystrokes, window switches — as individual steps with screenshots.
+The [stept Desktop](https://github.com/myfoxit/stept-desktop) app is a Windows application built with .NET 9 / WPF. It runs in the background and captures user actions — clicks, keystrokes, window switches — as individual steps with screenshots.
 
 ## Installation
 
-1. Download the latest release from [GitHub Releases](https://github.com/myfoxit/ondoki-desktop/releases)
+1. Download the latest release from [GitHub Releases](https://github.com/myfoxit/stept-desktop/releases)
 2. Install the application
-3. Launch and connect to your ondoki server
+3. Launch and connect to your stept server
 
 ## Connecting to Your Server
 
@@ -19,10 +19,10 @@ The desktop app authenticates using OAuth 2.0 PKCE:
 
 <Steps>
   <Step title="Enter Server URL">
-    Open the desktop app and enter your ondoki server URL (e.g., `https://app.yourdomain.com`).
+    Open the desktop app and enter your stept server URL (e.g., `https://app.yourdomain.com`).
   </Step>
   <Step title="Authorize">
-    The app opens your browser to the ondoki login page. Log in with your credentials.
+    The app opens your browser to the stept login page. Log in with your credentials.
   </Step>
   <Step title="Grant Access">
     After authentication, the browser redirects back to the desktop app with an authorization code.
@@ -39,7 +39,7 @@ The PKCE flow ensures the desktop app never sees your password. Tokens are store
 1. **Start recording** — click the record button or use the keyboard shortcut
 2. **Perform your workflow** — the app captures each action as a step
 3. **Stop recording** — click stop or use the keyboard shortcut
-4. **Upload** — the recording is uploaded to your ondoki server
+4. **Upload** — the recording is uploaded to your stept server
 
 Each step captures:
 
@@ -52,7 +52,7 @@ Each step captures:
 
 ## After Upload
 
-Once uploaded, the workflow appears in your ondoki project. If an LLM is configured, ondoki automatically:
+Once uploaded, the workflow appears in your stept project. If an LLM is configured, stept automatically:
 
 - Generates a descriptive title
 - Creates a summary
@@ -72,8 +72,8 @@ The desktop app connects via WebSocket to receive real-time notifications from t
 
 - Windows 10 or later
 - .NET 9 Runtime
-- Network access to your ondoki server
+- Network access to your stept server
 
 ## Repository
 
-Source code and releases: [github.com/myfoxit/ondoki-desktop](https://github.com/myfoxit/ondoki-desktop)
+Source code and releases: [github.com/myfoxit/stept-desktop](https://github.com/myfoxit/stept-desktop)

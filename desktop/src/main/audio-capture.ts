@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
-const DEBUG_LOG = path.join(os.tmpdir(), 'ondoki-audio-debug.log');
+const DEBUG_LOG = path.join(os.tmpdir(), 'stept-audio-debug.log');
 function debugLog(msg: string): void {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try { fs.appendFileSync(DEBUG_LOG, line); } catch {}
@@ -38,7 +38,7 @@ export class AudioCaptureService extends EventEmitter {
 
   constructor() {
     super();
-    this.outputDir = path.join(os.tmpdir(), 'Ondoki', 'audio');
+    this.outputDir = path.join(os.tmpdir(), 'Stept', 'audio');
   }
 
   public getIsCapturing(): boolean {

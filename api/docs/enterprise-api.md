@@ -1,6 +1,6 @@
-# Ondoki Enterprise Search API
+# Stept Enterprise Search API
 
-Search your team's workflows and documents programmatically. Unlike other tools that only return titles, Ondoki returns **actual step-by-step content** — descriptions, actions, text typed, and keyboard shortcuts.
+Search your team's workflows and documents programmatically. Unlike other tools that only return titles, Stept returns **actual step-by-step content** — descriptions, actions, text typed, and keyboard shortcuts.
 
 ## Quick Start
 
@@ -11,18 +11,18 @@ Generate an API key from your project's settings page (requires admin role). Key
 ### 2. Make Your First Search
 
 ```bash
-curl -X POST https://app.ondoki.com/api/v1/enterprise/search \
-  -H "X-API-Key: ondoki_your_key_here" \
+curl -X POST https://app.stept.ai/api/v1/enterprise/search \
+  -H "X-API-Key: stept_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{"query": "reset password"}'
 ```
 
 ## Authentication
 
-All endpoints require an `X-API-Key` header. Keys are created in the Ondoki dashboard under **Project Settings > API Keys**.
+All endpoints require an `X-API-Key` header. Keys are created in the Stept dashboard under **Project Settings > API Keys**.
 
 ```
-X-API-Key: ondoki_abc123...
+X-API-Key: stept_abc123...
 ```
 
 Each key is scoped to one project. All search results are restricted to that project's workflows and documents.
@@ -30,7 +30,7 @@ Each key is scoped to one project. All search results are restricted to that pro
 ## Base URL
 
 ```
-https://app.ondoki.com/api/v1/enterprise
+https://app.stept.ai/api/v1/enterprise
 ```
 
 ## Endpoints
@@ -60,8 +60,8 @@ Search workflows and documents within your project.
 #### Example Request
 
 ```bash
-curl -X POST https://app.ondoki.com/api/v1/enterprise/search \
-  -H "X-API-Key: ondoki_your_key_here" \
+curl -X POST https://app.stept.ai/api/v1/enterprise/search \
+  -H "X-API-Key: stept_your_key_here" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "how to reset password",
@@ -81,8 +81,8 @@ curl -X POST https://app.ondoki.com/api/v1/enterprise/search \
       "name": "Password Reset Guide",
       "description": "How to reset your password in the admin panel",
       "type": "workflow",
-      "url": "https://app.ondoki.com/public/workflow/share_token_here",
-      "embed_url": "https://app.ondoki.com/public/workflow/share_token_here/embed",
+      "url": "https://app.stept.ai/public/workflow/share_token_here",
+      "embed_url": "https://app.stept.ai/public/workflow/share_token_here/embed",
       "author": {
         "id": "user123",
         "name": "John Doe",
@@ -131,8 +131,8 @@ List projects accessible by this API key.
 #### Example Request
 
 ```bash
-curl https://app.ondoki.com/api/v1/enterprise/projects \
-  -H "X-API-Key: ondoki_your_key_here"
+curl https://app.stept.ai/api/v1/enterprise/projects \
+  -H "X-API-Key: stept_your_key_here"
 ```
 
 #### Example Response
@@ -160,8 +160,8 @@ Basic stats for your project.
 #### Example Request
 
 ```bash
-curl https://app.ondoki.com/api/v1/enterprise/stats \
-  -H "X-API-Key: ondoki_your_key_here"
+curl https://app.stept.ai/api/v1/enterprise/stats \
+  -H "X-API-Key: stept_your_key_here"
 ```
 
 #### Example Response
@@ -183,8 +183,8 @@ curl https://app.ondoki.com/api/v1/enterprise/stats \
 ```python
 import requests
 
-API_KEY = "ondoki_your_key_here"
-BASE_URL = "https://app.ondoki.com/api/v1/enterprise"
+API_KEY = "stept_your_key_here"
+BASE_URL = "https://app.stept.ai/api/v1/enterprise"
 
 # Search workflows
 response = requests.post(
@@ -209,8 +209,8 @@ for result in data["results"]:
 ### JavaScript / Node.js
 
 ```javascript
-const API_KEY = "ondoki_your_key_here";
-const BASE_URL = "https://app.ondoki.com/api/v1/enterprise";
+const API_KEY = "stept_your_key_here";
+const BASE_URL = "https://app.stept.ai/api/v1/enterprise";
 
 // Search
 const res = await fetch(`${BASE_URL}/search`, {

@@ -78,7 +78,7 @@ export function DeviceConsentPage() {
           </div>
           <h1 className="text-xl font-semibold">Authorize Desktop App</h1>
           <p className="text-sm text-muted-foreground">
-            You&apos;re about to authorize the <strong>Ondoki Desktop</strong> app
+            You&apos;re about to authorize the <strong>Stept Desktop</strong> app
             as:
           </p>
           <p className="text-base font-medium">{email}</p>

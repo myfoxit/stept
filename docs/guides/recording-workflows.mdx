@@ -5,7 +5,7 @@ description: "Capture step-by-step workflows using the desktop app or Chrome ext
 
 ## Overview
 
-Workflow recording is ondoki's core feature. It captures each user action — clicks, keystrokes, navigation — as an individual step with a screenshot, window title, and position data. After recording, AI auto-processes the workflow to generate titles, summaries, tags, and per-step descriptions.
+Workflow recording is stept's core feature. It captures each user action — clicks, keystrokes, navigation — as an individual step with a screenshot, window title, and position data. After recording, AI auto-processes the workflow to generate titles, summaries, tags, and per-step descriptions.
 
 ## Recording Methods
 
@@ -18,7 +18,7 @@ Workflow recording is ondoki's core feature. It captures each user action — cl
   </Card>
 </CardGroup>
 
-Both methods upload recordings to ondoki via the process recording API.
+Both methods upload recordings to stept via the process recording API.
 
 ## How Recording Works
 
@@ -35,7 +35,7 @@ Both methods upload recordings to ondoki via the process recording API.
     - **Timestamp**
     - **Key pressed** or **text typed** (for keyboard actions)
   </Step>
-  <Step title="Upload to ondoki">
+  <Step title="Upload to stept">
     Steps and screenshots are uploaded to the server. Metadata is sent as JSON, screenshots as image files.
   </Step>
   <Step title="Finalize the Workflow">
@@ -45,7 +45,7 @@ Both methods upload recordings to ondoki via the process recording API.
 
 ## AI Auto-Processing
 
-When a workflow is finalized (and an LLM is configured), ondoki automatically generates:
+When a workflow is finalized (and an LLM is configured), stept automatically generates:
 
 | Generated Field | Description |
 |-----------------|-------------|

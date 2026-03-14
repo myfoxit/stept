@@ -224,7 +224,7 @@ function LinkButton({ editor }: { editor: any }) {
 // ---------------------------------------------------------------------------
 
 export function FloatingToolbar() {
-  return null; // Rendered via BubbleMenu in OndokiEditor
+  return null; // Rendered via BubbleMenu in SteptEditor
 }
 
 export function FloatingToolbarContent({ editor }: { editor: any }) {

@@ -251,14 +251,14 @@ loginBtn.addEventListener('click', async () => {
     } else {
       const errMsg = result.error || 'Unknown error';
       if (errMsg.includes('net::') || errMsg.includes('NetworkError') || errMsg.includes('Failed to fetch')) {
-        showLoginError('Cannot connect to ondoki server. Check your API URL in <span class="error-settings-link">settings</span>.');
+        showLoginError('Cannot connect to stept server. Check your API URL in <span class="error-settings-link">settings</span>.');
       } else {
         showLoginError('Login failed: ' + errMsg);
       }
     }
   } catch (error) {
     if (error.message.includes('net::') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-      showLoginError('Cannot connect to ondoki server. Check your API URL in <span class="error-settings-link">settings</span>.');
+      showLoginError('Cannot connect to stept server. Check your API URL in <span class="error-settings-link">settings</span>.');
     } else {
       showLoginError('Login failed: ' + error.message);
     }

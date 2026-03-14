@@ -23,7 +23,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 // Utilities
 // -----------------------
 
-const PAGINATION_CONTAINER_SELECTOR = '[data-ondoki-pagination]'
+const PAGINATION_CONTAINER_SELECTOR = '[data-stept-pagination]'
 
 function getRenderedPageCount(view: EditorView): number {
   const container = view.dom.querySelector(PAGINATION_CONTAINER_SELECTOR)
@@ -309,7 +309,7 @@ function injectStyles({ view, options, storage }: { view: EditorView; options: P
   })
 
   const style = document.createElement('style')
-  style.dataset.ondokiPaginationStyle = storage.uniqueId
+  style.dataset.steptPaginationStyle = storage.uniqueId
 
   const scope = `.${storage.uniqueId}`
   style.textContent = `
@@ -348,17 +348,17 @@ ${scope} .collaboration-carets__label {
   white-space: nowrap;
 }
 
-${scope} .ondoki-pagination-gap {
+${scope} .stept-pagination-gap {
   border-top: 1px solid #e5e5e5;
   border-bottom: 1px solid #e5e5e5;
 }
 
-${scope} .ondoki-page-footer::after {
+${scope} .stept-page-footer::after {
   color: #6b7280;
 }
 
-${scope} .ondoki-page-footer,
-${scope} .ondoki-page-header {
+${scope} .stept-page-footer,
+${scope} .stept-page-header {
   background-color: hsl(var(--background));
   display: flex;
   justify-content: space-between;
@@ -367,32 +367,32 @@ ${scope} .ondoki-page-header {
   padding: 0 ${cfg.margins.right}px 0 ${cfg.margins.left}px;
 }
 
-${scope} .ondoki-page-header-center,
-${scope} .ondoki-page-footer-center {
+${scope} .stept-page-header-center,
+${scope} .stept-page-footer-center {
   flex: 1;
   text-align: center;
 }
 
 ${scope} { counter-reset: page-number; }
-${scope} .ondoki-page-footer { counter-increment: page-number; }
+${scope} .stept-page-footer { counter-increment: page-number; }
 
-${scope} .ondoki-page-break:last-child .ondoki-pagination-gap { display: none; }
-${scope} .ondoki-page-break:last-child .ondoki-page-header { display: none; }
+${scope} .stept-page-break:last-child .stept-pagination-gap { display: none; }
+${scope} .stept-page-break:last-child .stept-page-header { display: none; }
 
 ${scope} p:has(br.ProseMirror-trailingBreak:only-child) {
   display: table;
   width: 100%;
 }
 
-${scope} .ondoki-page-number::before { content: counter(page-number); }
+${scope} .stept-page-number::before { content: counter(page-number); }
 
-${scope} .ondoki-first-page-header {
+${scope} .stept-first-page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 }
-${scope} .ondoki-page-header-center { flex: 1; text-align: center; }
+${scope} .stept-page-header-center { flex: 1; text-align: center; }
 
 /* Table normalization : render using CSS Grid to support colwidth */
 ${scope} table { border-collapse: collapse; width: 100%; display: contents; }
@@ -449,11 +449,11 @@ function pageDecorations({ options, isInitial = false, storage }: { options: Pag
       const pageWidth = cfg.width
 
       const container = document.createElement('div')
-      container.dataset.ondokiPagination = 'true'
+      container.dataset.steptPagination = 'true'
 
       const pageBreak = ({ firstPage = false, pageNumber = 0, totalPages = 0 }: { firstPage?: boolean; pageNumber?: number; totalPages?: number }) => {
         const wrapper = document.createElement('div')
-        wrapper.classList.add('ondoki-page-break')
+        wrapper.classList.add('stept-page-break')
 
         const page = document.createElement('div')
         page.classList.add('page')
@@ -475,14 +475,14 @@ function pageDecorations({ options, isInitial = false, storage }: { options: Pag
         breaker.style.zIndex = '2'
 
         const footer = document.createElement('div')
-        footer.classList.add('ondoki-page-footer')
+        footer.classList.add('stept-page-footer')
         footer.style.height = `${footerH + cfg.margins.bottom}px`
         footer.style.padding = `0 ${cfg.margins.right}px 0 ${cfg.margins.left}px`
         const footerHTML = typeof cfg.footer === 'function' ? cfg.footer(pageNumber, totalPages) : cfg.footer.replace('{page}', `${pageNumber}`).replace('{total}', `${totalPages}`)
         footer.innerHTML = footerHTML
 
         const gapDiv = document.createElement('div')
-        gapDiv.classList.add('ondoki-pagination-gap')
+        gapDiv.classList.add('stept-pagination-gap')
         gapDiv.style.height = `${gap}px`
         gapDiv.style.borderLeft = '1px solid'
         gapDiv.style.borderRight = '1px solid'
@@ -494,7 +494,7 @@ function pageDecorations({ options, isInitial = false, storage }: { options: Pag
         gapDiv.style.borderRightColor = '#fbfbfb'
 
         const header = document.createElement('div')
-        header.classList.add('ondoki-page-header')
+        header.classList.add('stept-page-header')
         header.style.height = `${headerH + cfg.margins.top}px`
         header.style.padding = `0 ${cfg.margins.right}px 0 ${cfg.margins.left}px`
         const headerHTML = typeof cfg.header === 'function' ? cfg.header(pageNumber + 1, totalPages) : cfg.header.replace('{page}', `${pageNumber + 1}`).replace('{total}', `${totalPages}`)
@@ -526,7 +526,7 @@ function pageDecorations({ options, isInitial = false, storage }: { options: Pag
       const count = computePageCount({ view, options, storage })
       const firstHeader = document.createElement('div')
       firstHeader.style.position = 'relative'
-      firstHeader.classList.add('ondoki-first-page-header')
+      firstHeader.classList.add('stept-first-page-header')
       firstHeader.style.height = `${cfg.headerHeight}px`
       firstHeader.style.marginTop = '-10px'
       const html = typeof cfg.header === 'function' ? cfg.header(1, count) : cfg.header.replace('{page}', '1').replace('{total}', `${count}`)
@@ -730,7 +730,7 @@ export class PageTracker {
 function newUniqueClass(): string {
   const a = Date.now().toString(36)
   const b = Math.random().toString(36).substring(2, 9)
-  return `ondoki-pages-${a}-${b}`
+  return `stept-pages-${a}-${b}`
 }
 
 // Validation helpers

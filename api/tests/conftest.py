@@ -1,9 +1,9 @@
 """
-Test fixtures for the Ondoki backend test suite.
+Test fixtures for the Stept backend test suite.
 
 Best-practice approach:
   1. Tests run inside Docker (same container as the app)
-  2. Connect to a dedicated 'ondoki_test' database (created by Makefile)
+  2. Connect to a dedicated 'stept_test' database (created by Makefile)
   3. Use alembic migrations to create schema (matches production exactly)
   4. Truncate between tests for isolation
   5. Monkey-patch app.database BEFORE importing app code
@@ -12,7 +12,7 @@ Run with:
   make test-backend         (from host — runs inside Docker)
   
 Or manually inside the container:
-  DATABASE_URL_TEST=postgresql+asyncpg://postgres:postgres@db:5432/ondoki_test \
+  DATABASE_URL_TEST=postgresql+asyncpg://postgres:postgres@db:5432/stept_test \
     python -m pytest tests/ -v
 """
 
@@ -38,14 +38,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 _TEST_DB_URL = os.environ.get(
     "DATABASE_URL_TEST",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/ondoki_test",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/stept_test",
 )
 
 # Force DATABASE_URL to test DB — must happen before app.database import
 # This overrides any value set by Docker or .env files
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ.setdefault("JWT_SECRET", "test-secret-for-ci")
-os.environ.setdefault("ONDOKI_ENCRYPTION_KEY", "dGVzdC1rZXktMzItYnl0ZXMtZm9yLWZlcm5ldC14eA==")
+os.environ.setdefault("STEPT_ENCRYPTION_KEY", "dGVzdC1rZXktMzItYnl0ZXMtZm9yLWZlcm5ldC14eA==")
 
 # Prevent dotenv from loading any .env file that might override DATABASE_URL
 os.environ["DOTENV_LOADED"] = "1"
@@ -61,11 +61,11 @@ import app.database as _db_mod  # noqa: E402 — must be after env setup
 
 # Verify the engine URL (app.database may have read the wrong DATABASE_URL)
 _actual_url = str(_db_mod.engine.url)
-if "ondoki_test" not in _actual_url:
+if "stept_test" not in _actual_url:
     # app.database grabbed the production URL — we MUST replace the engine
     import logging
     logging.getLogger(__name__).warning(
-        f"app.database.engine points to '{_actual_url}', expected ondoki_test. "
+        f"app.database.engine points to '{_actual_url}', expected stept_test. "
         "Replacing with test engine."
     )
 
@@ -231,9 +231,9 @@ async def auth_headers(async_client: AsyncClient) -> dict:
         },
     )
     assert resp.status_code == 200, f"Register failed: {resp.text}"
-    cookie = resp.cookies.get("session_ondoki")
+    cookie = resp.cookies.get("session_stept")
     assert cookie, "No session cookie returned on register"
-    return {"Cookie": f"session_ondoki={cookie}"}
+    return {"Cookie": f"session_stept={cookie}"}
 
 
 @pytest_asyncio.fixture()
@@ -248,9 +248,9 @@ async def second_auth_headers(async_client: AsyncClient) -> dict:
         },
     )
     assert resp.status_code == 200, f"Register second user failed: {resp.text}"
-    cookie = resp.cookies.get("session_ondoki")
+    cookie = resp.cookies.get("session_stept")
     assert cookie
-    return {"Cookie": f"session_ondoki={cookie}"}
+    return {"Cookie": f"session_stept={cookie}"}
 
 
 # ---------------------------------------------------------------------------

@@ -26,7 +26,7 @@ build:
 export
 
 # ─── Test config (override via env or .env) ───────────────────
-TEST_DB_NAME     ?= ondoki_test
+TEST_DB_NAME     ?= stept_test
 TEST_DB_USER     ?= $(POSTGRES_USER)
 TEST_DB_PASSWORD ?= $(POSTGRES_PASSWORD)
 TEST_DB_HOST     ?= db

@@ -5,7 +5,7 @@ description: "Running backend, frontend, and end-to-end tests."
 
 ## Overview
 
-ondoki has three test layers:
+stept has three test layers:
 
 | Layer | Tool | Directory |
 |-------|------|-----------|
@@ -36,7 +36,7 @@ python -m pytest tests/ -v
 
 The Makefile:
 
-1. Creates a `ondoki_test` database (if it doesn't exist)
+1. Creates a `stept_test` database (if it doesn't exist)
 2. Enables the `vector` extension
 3. Runs pytest inside the backend container with test-specific environment variables
 
@@ -45,8 +45,8 @@ The Makefile:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL_TEST` | *(auto-composed)* | Test database connection string |
-| `TEST_DB_NAME` | `ondoki_test` | Test database name |
-| `ONDOKI_ENCRYPTION_KEY` | Test key | Encryption key for tests |
+| `TEST_DB_NAME` | `stept_test` | Test database name |
+| `STEPT_ENCRYPTION_KEY` | Test key | Encryption key for tests |
 | `JWT_SECRET` | `test-secret` | JWT secret for tests |
 
 ### pytest Configuration
@@ -142,7 +142,7 @@ This runs:
 
 ## Test Database
 
-The test database (`ondoki_test`) is separate from the development database (`ondoki`). It uses the same PostgreSQL instance but is isolated:
+The test database (`stept_test`) is separate from the development database (`stept`). It uses the same PostgreSQL instance but is isolated:
 
 ```bash
 # Create the test database manually

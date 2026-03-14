@@ -137,7 +137,7 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
       const { from } = range;
       editor.chain().focus().deleteRange(range).run();
       const coords = editor.view.coordsAtPos(from);
-      window.dispatchEvent(new CustomEvent('ondoki:ai-inline-write', { detail: { x: coords.left, y: coords.top } }));
+      window.dispatchEvent(new CustomEvent('stept:ai-inline-write', { detail: { x: coords.left, y: coords.top } }));
     },
   },
   {
@@ -147,7 +147,7 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
     group: 'Other',
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
-      window.dispatchEvent(new CustomEvent('ondoki:insert-workflow'));
+      window.dispatchEvent(new CustomEvent('stept:insert-workflow'));
     },
   },
 ];
@@ -327,7 +327,7 @@ export function createSlashMenuExtension(config?: SlashMenuConfig) {
 
 // Convenience component for use in Editor context
 export function SlashMenu({ config }: { config?: SlashMenuConfig }) {
-  // The actual extension is added in useOndokiEditor
+  // The actual extension is added in useSteptEditor
   // This component is a no-op placeholder for future UI overlays
   return null;
 }

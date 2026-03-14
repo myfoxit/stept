@@ -1,6 +1,6 @@
 ---
 title: "Upgrades"
-description: "How to upgrade ondoki between versions."
+description: "How to upgrade stept between versions."
 ---
 
 ## Upgrade Process
@@ -11,7 +11,7 @@ description: "How to upgrade ondoki between versions."
 
     ```bash
     # Database backup
-    docker compose exec db pg_dump -U postgres -Fc ondoki > backup-$(date +%Y%m%d).dump
+    docker compose exec db pg_dump -U postgres -Fc stept > backup-$(date +%Y%m%d).dump
 
     # Save env
     cp .env .env.backup
@@ -19,7 +19,7 @@ description: "How to upgrade ondoki between versions."
   </Step>
   <Step title="Pull Latest Code">
     ```bash
-    cd ondoki-web
+    cd stept
     git pull origin master
     ```
   </Step>
@@ -78,7 +78,7 @@ docker compose -f docker-compose.prod.yml down
 
 # Restore database
 docker compose -f docker-compose.prod.yml up -d db
-docker compose exec -i db pg_restore -U postgres -d ondoki --clean < backup.dump
+docker compose exec -i db pg_restore -U postgres -d stept --clean < backup.dump
 
 # Check out previous version
 git checkout <previous-commit>

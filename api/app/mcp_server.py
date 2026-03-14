@@ -1,5 +1,5 @@
 """
-Ondoki MCP Server — exposes pages, workflows, and context links to AI agents.
+Stept MCP Server — exposes pages, workflows, and context links to AI agents.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("Ondoki", stateless_http=True)
+mcp = FastMCP("Stept", stateless_http=True)
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ async def _auth_project_id(ctx) -> str | None:
     import os
     from app.mcp_auth import validate_api_key
 
-    raw_key = os.environ.get("ONDOKI_API_KEY")
+    raw_key = os.environ.get("STEPT_API_KEY") or os.environ.get("ONDOKI_API_KEY")
 
     # Try to get from request headers if available
     if not raw_key:
@@ -420,7 +420,7 @@ async def get_context(
 # Resources
 # ---------------------------------------------------------------------------
 
-@mcp.resource("ondoki://pages/{page_id}")
+@mcp.resource("stept://pages/{page_id}")
 async def page_resource(page_id: str) -> str:
     """Page content as Markdown."""
     result = await get_page(page_id)
@@ -429,7 +429,7 @@ async def page_resource(page_id: str) -> str:
     return result.get("content_markdown", "")
 
 
-@mcp.resource("ondoki://workflows/{workflow_id}")
+@mcp.resource("stept://workflows/{workflow_id}")
 async def workflow_resource(workflow_id: str) -> str:
     """Workflow guide as Markdown."""
     result = await get_workflow(workflow_id)

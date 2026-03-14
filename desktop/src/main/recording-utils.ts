@@ -274,7 +274,7 @@ const SYSTEM_APPS = [
   'Window Server',
 ];
 
-const SELF_APPS = ['Electron', 'Ondoki Desktop'];
+const SELF_APPS = ['Electron', 'Stept Desktop'];
 
 /**
  * Should this click be filtered out?
@@ -286,7 +286,7 @@ export function shouldFilterClick(
   nativeAvailable: boolean
 ): { filtered: boolean; reason?: string } {
   // Skip clicks on the recording app itself
-  if (SELF_APPS.includes(ownerApp) || windowTitle === 'Ondoki Desktop' || windowTitle.startsWith('Ondoki')) {
+  if (SELF_APPS.includes(ownerApp) || windowTitle === 'Stept Desktop' || windowTitle.startsWith('Stept')) {
     return { filtered: true, reason: 'self' };
   }
 

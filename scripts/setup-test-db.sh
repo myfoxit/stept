@@ -2,10 +2,10 @@
 
 # Setup test database in your Docker PostgreSQL container
 
-CONTAINER_NAME="ondoki-db"
-DB_USER="ondoki"
+CONTAINER_NAME="stept-db"
+DB_USER="stept"
 DB_PASSWORD="postgres"
-TEST_DB_NAME="ondoki_test"
+TEST_DB_NAME="stept_test"
 
 echo "Creating test database in Docker container..."
 

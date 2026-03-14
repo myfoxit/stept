@@ -1,13 +1,13 @@
 {
-  "name": "ondoki-desktop-electron",
-  "productName": "Ondoki Desktop",
+  "name": "stept-desktop",
+  "productName": "Stept Desktop",
   "version": "1.0.0",
   "description": "Cross-platform screen recording and AI guide generation tool",
   "main": "lib/main/index.js",
-  "homepage": "https://github.com/myfoxit/ondoki-desktop-electron",
+  "homepage": "https://github.com/myfoxit/stept-desktop",
   "repository": {
     "type": "git",
-    "url": "https://github.com/myfoxit/ondoki-desktop-electron.git"
+    "url": "https://github.com/myfoxit/stept-desktop.git"
   },
   "author": {
     "name": "MyFoxIT",
@@ -83,8 +83,8 @@
     "ws": "^8.17.0"
   },
   "build": {
-    "appId": "com.myfoxit.ondoki-desktop",
-    "productName": "Ondoki Desktop",
+    "appId": "com.myfoxit.stept-desktop",
+    "productName": "Stept Desktop",
     "directories": {
       "output": "dist"
     },
@@ -120,9 +120,9 @@
     },
     "protocols": [
       {
-        "name": "ondoki-protocol",
+        "name": "stept-protocol",
         "schemes": [
-          "ondoki"
+          "stept"
         ]
       }
     ]

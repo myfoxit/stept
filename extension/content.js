@@ -10,14 +10,14 @@ const DOUBLE_CLICK_MS = 400;
 const DEBUG = false;
 
 function debugLog(...args) {
-  if (DEBUG) console.log('[Ondoki]', ...args);
+  if (DEBUG) console.log('[Stept]', ...args);
 }
 
 // Guard against double-injection: if already loaded, skip
-if (window.__ondokiContentLoaded) {
+if (window.__steptContentLoaded) {
   debugLog('Content script already loaded, skipping');
 } else {
-  window.__ondokiContentLoaded = true;
+  window.__steptContentLoaded = true;
 
   // ===== SMART BLUR POPUP =====
   let smartBlurElement = null;
@@ -27,8 +27,8 @@ if (window.__ondokiContentLoaded) {
     if (smartBlurElement) return;
 
     smartBlurElement = document.createElement('div');
-    smartBlurElement.id = '__ondoki-smartblur__';
-    smartBlurElement.setAttribute('data-ondoki-exclude', 'true');
+    smartBlurElement.id = '__stept-smartblur__';
+    smartBlurElement.setAttribute('data-stept-exclude', 'true');
 
     const shadow = smartBlurElement.attachShadow({ mode: 'closed' });
 
@@ -228,7 +228,7 @@ if (window.__ondokiContentLoaded) {
 
     // Build toggle rows
     const body = shadow.getElementById('sbBody');
-    const redaction = window.__ondokiRedaction;
+    const redaction = window.__steptRedaction;
 
     // Get current settings to initialize toggles
     const currentSettings = redaction ? redaction.getSettings() : {};
@@ -294,8 +294,8 @@ if (window.__ondokiContentLoaded) {
       // Pause capture first, then show popup
       sendMsg({ type: 'PAUSE_RECORDING' }).then(() => {
         // Load latest settings before creating popup
-        if (window.__ondokiRedaction) {
-          window.__ondokiRedaction.loadSettings().then(() => {
+        if (window.__steptRedaction) {
+          window.__steptRedaction.loadSettings().then(() => {
             createSmartBlurPopup();
           });
         } else {
@@ -324,8 +324,8 @@ if (window.__ondokiContentLoaded) {
     if (dockElement) return;
 
     dockElement = document.createElement('div');
-    dockElement.id = '__ondoki-dock__';
-    dockElement.setAttribute('data-ondoki-exclude', 'true');
+    dockElement.id = '__stept-dock__';
+    dockElement.setAttribute('data-stept-exclude', 'true');
 
     const shadow = dockElement.attachShadow({ mode: 'closed' });
 
@@ -801,8 +801,8 @@ function captureDomSnapshot() {
   try {
     if (typeof rrwebSnapshot === 'undefined' || !rrwebSnapshot.snapshot) return null;
     const snap = rrwebSnapshot.snapshot(document, {
-      blockClass: 'ondoki-exclude',
-      maskTextClass: 'ondoki-mask',
+      blockClass: 'stept-exclude',
+      maskTextClass: 'stept-mask',
       inlineStylesheet: false,
       recordCanvas: false,
     });

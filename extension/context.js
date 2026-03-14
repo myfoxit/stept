@@ -1,5 +1,5 @@
 /**
- * Context Link matching for the Ondoki Chrome Extension.
+ * Context Link matching for the Stept Chrome Extension.
  * Matches the current tab URL against context links configured in the web app.
  */
 

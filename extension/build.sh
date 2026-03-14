@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build script for Ondoki Chrome Extension
+# Build script for Stept Chrome Extension
 #
 # Usage:
 #   ./build.sh store        — Chrome Web Store build (hardcoded cloud URL, no API URL config)
@@ -19,7 +19,7 @@ if [[ "$MODE" != "store" && "$MODE" != "self-hosted" ]]; then
   exit 1
 fi
 
-echo "🔨 Building Ondoki extension (mode: ${MODE})..."
+echo "🔨 Building Stept extension (mode: ${MODE})..."
 
 # Clean & copy
 rm -rf "$DIST_DIR"
@@ -49,7 +49,7 @@ if [[ "$MODE" == "store" ]]; then
 import json, sys
 with open('$DIST_DIR/manifest.json') as f:
     m = json.load(f)
-m['host_permissions'] = ['https://app.ondoki.io/*', '<all_urls>']
+m['host_permissions'] = ['https://app.stept.ai/*', '<all_urls>']
 with open('$DIST_DIR/manifest.json', 'w') as f:
     json.dump(m, f, indent=2)
 " 2>/dev/null || echo "   ⚠️  Could not patch manifest host_permissions (python3 missing)"

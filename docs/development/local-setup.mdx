@@ -1,6 +1,6 @@
 ---
 title: "Local Setup"
-description: "Set up the ondoki development environment."
+description: "Set up the stept development environment."
 ---
 
 ## Prerequisites
@@ -15,8 +15,8 @@ description: "Set up the ondoki development environment."
 The fastest way to get started:
 
 ```bash
-git clone https://github.com/myfoxit/ondoki-web.git
-cd ondoki-web
+git clone https://github.com/myfoxit/stept.git
+cd stept
 cp .env.example .env
 ```
 
@@ -24,7 +24,7 @@ Edit `.env` and set the required secrets:
 
 ```bash
 JWT_SECRET=dev-secret-change-in-production
-ONDOKI_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+STEPT_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
 ```
 
 Start the development stack:
@@ -85,10 +85,10 @@ pip install -r requirements.txt
 Set environment variables:
 
 ```bash
-export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ondoki"
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/stept"
 export REDIS_URL="redis://localhost:6379/0"
 export JWT_SECRET="dev-secret"
-export ONDOKI_ENCRYPTION_KEY="your-fernet-key"
+export STEPT_ENCRYPTION_KEY="your-fernet-key"
 export GOTENBERG_URL="http://localhost:3000"
 ```
 

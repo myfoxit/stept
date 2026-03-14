@@ -49,7 +49,7 @@ import { toast } from "sonner";
 const data = {
   user: {
     name: "Alexander Höhne",
-    email: "hello@ondoki.com",
+    email: "hello@stept.ai",
     avatar: "/profile.png",
   },
   navMain: [
@@ -77,7 +77,7 @@ const data = {
     },
     {
       title: "Get Help",
-      url: "https://docs.ondoki.com",
+      url: "https://docs.stept.ai",
       icon: HelpCircle,
     },
   ],
@@ -183,7 +183,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   className="text-base font-extrabold"
                   style={{ letterSpacing: "-0.04em" }}
                 >
-                  Ondoki
+                  Stept
                 </span>
               </Link>
             </SidebarMenuButton>

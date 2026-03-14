@@ -211,7 +211,7 @@
   .auth-gate-logo {
     margin-bottom: 20px;
   }
-  .auth-gate-logo .ondoki-logo {
+  .auth-gate-logo .stept-logo {
     width: 80px;
     height: 76px;
     filter: drop-shadow(0 8px 24px rgba(62, 175, 138, 0.25));
@@ -272,7 +272,7 @@
     gap: 6px;
     flex-shrink: 0;
   }
-  .header-logo .ondoki-logo {
+  .header-logo .stept-logo {
     width: 24px;
     height: 23px;
   }
@@ -958,8 +958,8 @@
     line-height: 16px;
   }
 
-  /* ===== ONDOKI LOGO ===== */
-  .ondoki-logo {
+  /* ===== STEPT LOGO ===== */
+  .stept-logo {
     color: var(--accent);
   }
 

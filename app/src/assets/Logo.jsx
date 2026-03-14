@@ -1,4 +1,4 @@
-export const OndokiLogo = ({ className }) => (
+export const SteptLogo = ({ className }) => (
   <svg 
     viewBox="0 0 256 256" 
     fill="none" 

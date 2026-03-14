@@ -14,7 +14,7 @@ const tabs: { label: string; path: string; external?: boolean }[] = [
   { label: 'Knowledge Base', path: '/knowledge' },
   { label: 'Video \u2192 Guide', path: '/video-import' },
   { label: 'Audit Log', path: '/audit' },
-  { label: 'Documentation', path: 'https://docs.ondoki.app', external: true },
+  { label: 'Documentation', path: 'https://docs.stept.ai', external: true },
 ];
 
 export function SettingsTabs() {

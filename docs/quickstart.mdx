@@ -1,6 +1,6 @@
 ---
 title: "Quick Start"
-description: "Get ondoki running in 5 minutes with Docker Compose."
+description: "Get stept running in 5 minutes with Docker Compose."
 ---
 
 ## Prerequisites
@@ -11,8 +11,8 @@ description: "Get ondoki running in 5 minutes with Docker Compose."
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/myfoxit/ondoki-web.git
-cd ondoki-web
+git clone https://github.com/myfoxit/stept.git
+cd stept
 ```
 
 ## 2. Configure Environment
@@ -30,7 +30,7 @@ openssl rand -hex 32
 
 # Encryption key for API keys at rest
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Paste the output as ONDOKI_ENCRYPTION_KEY in .env
+# Paste the output as STEPT_ENCRYPTION_KEY in .env
 ```
 
 Edit `.env` and set at minimum:
@@ -38,7 +38,7 @@ Edit `.env` and set at minimum:
 | Variable | Value |
 |----------|-------|
 | `JWT_SECRET` | Output from `openssl rand -hex 32` |
-| `ONDOKI_ENCRYPTION_KEY` | Output from the Fernet key generator |
+| `STEPT_ENCRYPTION_KEY` | Output from the Fernet key generator |
 | `POSTGRES_PASSWORD` | A strong password (change from the default) |
 
 ## 3. Start the Stack
@@ -55,7 +55,7 @@ This starts:
 - **Celery media worker** (video/audio processing)
 - **React frontend** (web UI)
 
-## 4. Open ondoki
+## 4. Open stept
 
 | Service | URL |
 |---------|-----|
@@ -77,7 +77,7 @@ Navigate to **Project Settings → AI/LLM** and enter your API key:
 AI enables: inline editor commands, context-aware chat, auto-annotation of workflow steps, and auto-generation of titles/summaries/tags.
 
 <Note>
-AI features are optional. ondoki works fully without an LLM configured — you just won't have AI-powered features like auto-annotation and chat.
+AI features are optional. stept works fully without an LLM configured — you just won't have AI-powered features like auto-annotation and chat.
 </Note>
 
 ## What's Next?
@@ -93,6 +93,6 @@ AI features are optional. ondoki works fully without an LLM configured — you j
     Production deployment with Caddy, HTTPS, and proper security.
   </Card>
   <Card title="MCP Integration" icon="plug" href="/integrations/mcp">
-    Connect ondoki to Claude, Cursor, or other AI agents.
+    Connect stept to Claude, Cursor, or other AI agents.
   </Card>
 </CardGroup>

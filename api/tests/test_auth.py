@@ -24,7 +24,7 @@ async def test_register_new_user(async_client: AsyncClient):
     assert data["email"] == "new@example.com"
     assert "id" in data
     # Should set session cookie
-    assert "session_ondoki" in resp.cookies
+    assert "session_stept" in resp.cookies
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_login_valid_credentials(async_client: AsyncClient):
         json={"email": "login@example.com", "password": "Pass1234!"},
     )
     assert resp.status_code == 200
-    assert "session_ondoki" in resp.cookies
+    assert "session_stept" in resp.cookies
     data = resp.json()
     assert data["email"] == "login@example.com"
 

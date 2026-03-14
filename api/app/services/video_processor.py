@@ -229,7 +229,7 @@ class VideoProcessor:
             os.makedirs(self.output_dir, exist_ok=True)
             return await self._run_pipeline(self.output_dir)
         else:
-            with tempfile.TemporaryDirectory(prefix="ondoki_video_") as tmpdir:
+            with tempfile.TemporaryDirectory(prefix="stept_video_") as tmpdir:
                 return await self._run_pipeline(tmpdir)
 
     async def _run_pipeline(self, workdir: str) -> dict:

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, Settings } from 'lucide-react';
-import { OndokiLogo } from './OndokiLogo';
+import { SteptLogo } from './SteptLogo';
 import type { AuthState } from './types';
 
 interface SpotlightHeaderProps {
@@ -17,8 +17,8 @@ export const SpotlightHeader: React.FC<SpotlightHeaderProps> = ({
   <div className="spotlight-header">
     {/* Logo */}
     <div className="header-logo">
-      <OndokiLogo />
-      <span className="header-brand-text">ondoki</span>
+      <SteptLogo />
+      <span className="header-brand-text">stept</span>
     </div>
 
     {/* Project selector */}

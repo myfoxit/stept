@@ -21,7 +21,7 @@ const SPOTLIGHT_PATH = path.join(__dirname, '..', 'renderer', 'spotlight.html');
 const SETTINGS_PATH = path.join(__dirname, '..', 'renderer', 'settings.html');
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 
-class OndokiApp {
+class SteptApp {
   private spotlightWindow: BrowserWindow | null = null;
   private settingsWindow: BrowserWindow | null = null;
   private countdownWindow: BrowserWindow | null = null;
@@ -395,7 +395,7 @@ class OndokiApp {
     this.settingsWindow = new BrowserWindow({
       width: 480,
       height: 520,
-      title: 'Ondoki Settings',
+      title: 'Stept Settings',
       icon: windowIcon,
       resizable: false,
       minimizable: false,
@@ -757,7 +757,7 @@ class OndokiApp {
     app.on('second-instance', (event, commandLine) => {
       this.showSpotlightWindow();
       const protocolUrl = commandLine.find((arg) =>
-        arg.startsWith('ondoki://'),
+        arg.startsWith('stept://'),
       );
       if (protocolUrl) this.handleProtocolUrl(protocolUrl);
     });
@@ -769,12 +769,12 @@ class OndokiApp {
   private registerProtocol(): void {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
-        app.setAsDefaultProtocolClient('ondoki', process.execPath, [
+        app.setAsDefaultProtocolClient('stept', process.execPath, [
           path.resolve(process.argv[1]),
         ]);
       }
     } else {
-      app.setAsDefaultProtocolClient('ondoki');
+      app.setAsDefaultProtocolClient('stept');
     }
     app.on('open-url', (event, url) => {
       event.preventDefault();
@@ -823,7 +823,7 @@ class OndokiApp {
     this.recordingTrayIcon = recIcon;
 
     this.tray = new Tray(trayIcon);
-    this.tray.setToolTip('Ondoki');
+    this.tray.setToolTip('Stept');
     this.tray.on('click', () => this.showSpotlightWindow());
     this.updateTrayMenu();
 
@@ -840,7 +840,7 @@ class OndokiApp {
 
     const template: Electron.MenuItemConstructorOptions[] = [
       {
-        label: 'Open Ondoki',
+        label: 'Open Stept',
         accelerator:
           process.platform === 'darwin'
             ? 'Cmd+Shift+Space'
@@ -887,14 +887,14 @@ class OndokiApp {
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private handleStartupProtocol(): void {
-    const protocolUrl = process.argv.find((arg) => arg.startsWith('ondoki://'));
+    const protocolUrl = process.argv.find((arg) => arg.startsWith('stept://'));
     if (protocolUrl)
       setTimeout(() => this.handleProtocolUrl(protocolUrl), 1000);
   }
 
   private async handleProtocolUrl(url: string): Promise<void> {
     console.log('Handling protocol URL:', url);
-    if (url.startsWith('ondoki://auth/callback')) {
+    if (url.startsWith('stept://auth/callback')) {
       try {
         const success = await this.authService.handleCallback(url);
         if (
@@ -913,8 +913,8 @@ class OndokiApp {
   }
 }
 
-const ondokiApp = new OndokiApp();
-ondokiApp.initialize().catch(console.error);
+const steptApp = new SteptApp();
+steptApp.initialize().catch(console.error);
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);

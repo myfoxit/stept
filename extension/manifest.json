@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Ondoki Process Recorder",
+  "name": "Stept Process Recorder",
   "version": "1.0.1",
-  "description": "Record browser process steps with screenshots — powered by Ondoki",
+  "description": "Record browser process steps with screenshots — powered by Stept",
   "permissions": [
     "tabs",
     "activeTab",
@@ -14,7 +14,7 @@
   ],
   "host_permissions": [
     "http://localhost:8000/*",
-    "https://app.ondoki.com/*",
+    "https://app.stept.ai/*",
     "<all_urls>"
   ],
   "background": {

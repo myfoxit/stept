@@ -1,7 +1,7 @@
 services:
   caddy:
     image: caddy:2-alpine
-    container_name: ondoki-caddy
+    container_name: stept-caddy
     restart: unless-stopped
     ports:
       - "80:80"

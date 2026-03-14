@@ -1,5 +1,5 @@
 import React from 'react';
-import { OndokiLogo } from './OndokiLogo';
+import { SteptLogo } from './SteptLogo';
 import type { SpotMode } from './types';
 
 interface FooterProps {
@@ -28,8 +28,8 @@ export const Footer: React.FC<FooterProps> = ({ mode }) => (
       </span>
     </div>
     <div className="footer-brand">
-      <OndokiLogo width={12} height={11} />
-      <span className="footer-brand-text">ondoki</span>
+      <SteptLogo width={12} height={11} />
+      <span className="footer-brand-text">stept</span>
     </div>
   </div>
 );

@@ -1,5 +1,5 @@
 """
-Git export service — one-way push of Ondoki pages to a Git repository.
+Git export service — one-way push of Stept pages to a Git repository.
 
 Supports GitHub, GitLab, and Bitbucket via their REST APIs.
 """
@@ -328,7 +328,7 @@ async def export_to_git(db: AsyncSession, config: GitSyncConfig) -> dict:
         path_map = await _build_folder_path_map(db, project_id)
 
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        message = f"Export from Ondoki - {timestamp}"
+        message = f"Export from Stept - {timestamp}"
         exported = 0
 
         for doc in documents:

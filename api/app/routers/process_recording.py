@@ -449,7 +449,7 @@ async def finalize_upload_session(
         
         # Auto-index CLI sessions into RAG pipeline
         session = await db.get(ProcessRecordingSession, session_id)
-        if session and session.client_name == "ondoki-cli":
+        if session and session.client_name == "stept-cli":
             import asyncio
             from app.services.indexer import index_workflow_background
             asyncio.create_task(index_workflow_background(session_id))
@@ -481,7 +481,7 @@ async def upload_cli_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upload a full CLI terminal session JSON (from ondoki-cli).
+    """Upload a full CLI terminal session JSON (from stept-cli).
     
     Stores the complete session file (with event stream for replay)
     as an attachment on the recording session.
@@ -525,7 +525,7 @@ async def upload_cli_session(
         if session_data.get("title") and not session.name:
             session.name = session_data["title"]
         if not session.client_name or session.client_name == "ProcessRecorder":
-            session.client_name = "ondoki-cli"
+            session.client_name = "stept-cli"
         if session_data.get("ssh_target"):
             session.name = session.name or f"SSH: {session_data['ssh_target']}"
         if session_data.get("summary"):

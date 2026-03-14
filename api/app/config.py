@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", os.getenv("SR_SMTP_PORT", "1025")))
     SMTP_USER: str = os.getenv("SMTP_USER", os.getenv("SR_SMTP_USER", ""))
     SMTP_PASS: str = os.getenv("SMTP_PASS", os.getenv("SR_SMTP_PASS", ""))
-    SMTP_FROM: str = os.getenv("SMTP_FROM", os.getenv("SR_FROM_EMAIL", "noreply@ondoki.com"))
+    SMTP_FROM: str = os.getenv("SMTP_FROM", os.getenv("SR_FROM_EMAIL", "noreply@stept.ai"))
     SMTP_USE_TLS: bool = True  # computed in __init__
     SMTP_USE_SSL: bool = False  # computed in __init__
 
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     STORAGE_AZURE_CONNECTION_STRING: str = os.getenv("STORAGE_AZURE_CONNECTION_STRING", "")
     
     # CORS
-    BACKEND_CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "http://localhost:5173,ondoki://").split(",")
+    BACKEND_CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "http://localhost:5173,stept://").split(",")
     
     # Frontend URL
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")

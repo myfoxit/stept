@@ -377,7 +377,7 @@ function renderInline(text: string): React.ReactNode {
             onClick={(e) => {
               e.preventDefault();
               // Use React Router navigation without full page reload
-              window.dispatchEvent(new CustomEvent('ondoki-navigate', { detail: url }));
+              window.dispatchEvent(new CustomEvent('stept-navigate', { detail: url }));
             }}
           >
             {linkText}

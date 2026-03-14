@@ -5,20 +5,20 @@ description: "REST API reference with key endpoints."
 
 ## Overview
 
-ondoki exposes a REST API at `/api/v1/` built with FastAPI. Interactive documentation is available when the server is running:
+stept exposes a REST API at `/api/v1/` built with FastAPI. Interactive documentation is available when the server is running:
 
 - **Swagger UI:** `http://your-server:8000/docs`
 - **OpenAPI JSON:** `http://your-server:8000/openapi.json`
 
 ## Authentication
 
-Most API endpoints require authentication. ondoki supports three auth methods:
+Most API endpoints require authentication. stept supports three auth methods:
 
 | Method | Use Case | Header |
 |--------|----------|--------|
 | **Session cookie** | Web browser (set via `/auth/login`) | Automatic (cookie) |
 | **Bearer token** | Desktop app, CLI | `Authorization: Bearer <access_token>` |
-| **API key** | MCP server, external integrations | `Authorization: Bearer ondoki_<key>` |
+| **API key** | MCP server, external integrations | `Authorization: Bearer stept_<key>` |
 
 ### Login
 

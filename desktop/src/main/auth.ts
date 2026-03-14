@@ -31,7 +31,7 @@ interface TokenResponse {
 }
 
 export class AuthService extends EventEmitter {
-  private static readonly REDIRECT_URI = 'ondoki://auth/callback';
+  private static readonly REDIRECT_URI = 'stept://auth/callback';
 
   private accessToken?: string;
   private refreshToken?: string;

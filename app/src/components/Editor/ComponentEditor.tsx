@@ -105,7 +105,7 @@ interface BlockInstance {
 }
 
 const DEFAULT_BLOCKS: BlockInstance[] = [
-  { id: uuid(), type: "hero", props: { title: "Welcome to Ondoki" } },
+  { id: uuid(), type: "hero", props: { title: "Welcome to Stept" } },
   {
     id: uuid(),
     type: "grid",

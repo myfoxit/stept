@@ -1,18 +1,18 @@
 ---
 title: "Environment Variables"
-description: "Complete reference for all ondoki configuration variables."
+description: "Complete reference for all stept configuration variables."
 ---
 
 ## Overview
 
-All ondoki configuration is done via environment variables. Copy `.env.example` to `.env` and customize for your deployment.
+All stept configuration is done via environment variables. Copy `.env.example` to `.env` and customize for your deployment.
 
 ## Core
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `ENVIRONMENT` | — | `local` | Environment mode: `local`, `staging`, `production`, `test` |
-| `DOMAIN` | Production | `localhost` | Domain for Caddy HTTPS (e.g., `app.ondoki.com`) |
+| `DOMAIN` | Production | `localhost` | Domain for Caddy HTTPS (e.g., `app.stept.ai`) |
 
 ## Database
 
@@ -20,7 +20,7 @@ All ondoki configuration is done via environment variables. Copy `.env.example` 
 |----------|----------|---------|-------------|
 | `POSTGRES_USER` | Yes | `postgres` | PostgreSQL username |
 | `POSTGRES_PASSWORD` | Yes | `postgres` | PostgreSQL password |
-| `POSTGRES_DB` | — | `ondoki` | Database name |
+| `POSTGRES_DB` | — | `stept` | Database name |
 | `DATABASE_URL` | — | *(auto-composed)* | Full async connection string. Format: `postgresql+asyncpg://user:pass@host:5432/db` |
 
 ## Security
@@ -28,7 +28,7 @@ All ondoki configuration is done via environment variables. Copy `.env.example` 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `JWT_SECRET` | **Yes** | — | JWT signing key. Generate: `openssl rand -hex 32` |
-| `ONDOKI_ENCRYPTION_KEY` | **Yes** | — | Fernet key for encrypting API keys at rest. Generate: `make generate-key` |
+| `STEPT_ENCRYPTION_KEY` | **Yes** | — | Fernet key for encrypting API keys at rest. Generate: `make generate-key` |
 
 <Warning>
 Never reuse these keys across environments. If you lose the encryption key, MCP API keys stored in the database cannot be decrypted and must be regenerated.
@@ -53,8 +53,8 @@ Never reuse these keys across environments. If you lose the encryption key, MCP 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `FRONTEND_URL` | Production | `http://localhost:5173` | Frontend URL for CORS, email links, OAuth callbacks |
-| `CORS_ORIGINS` | Production | `http://localhost:5173,ondoki://` | Comma-separated allowed origins |
-| `CORS_ORIGIN_REGEX` | — | — | Regex pattern for CORS origin matching (e.g., `^https://.*\.ondoki\.com$`) |
+| `CORS_ORIGINS` | Production | `http://localhost:5173,stept://` | Comma-separated allowed origins |
+| `CORS_ORIGIN_REGEX` | — | — | Regex pattern for CORS origin matching (e.g., `^https://.*\.stept\.com$`) |
 | `ALLOWED_ORIGINS` | — | — | Additional allowed origins for CSRF checks (comma-separated) |
 
 ## Services
@@ -71,7 +71,7 @@ Never reuse these keys across environments. If you lose the encryption key, MCP 
 | `SR_SMTP_PORT` | — | `587` | SMTP port |
 | `SR_SMTP_USER` | — | — | SMTP username |
 | `SR_SMTP_PASS` | — | — | SMTP password |
-| `SR_FROM_EMAIL` | — | `noreply@ondoki.com` | Sender email address |
+| `SR_FROM_EMAIL` | — | `noreply@stept.ai` | Sender email address |
 
 <Note>
 Email is used for account verification and password reset. When `SR_SMTP_HOST` is empty, email features are disabled and users are auto-verified on registration.
@@ -79,7 +79,7 @@ Email is used for account verification and password reset. When `SR_SMTP_HOST` i
 
 ## Storage
 
-Ondoki supports four storage backends. All file operations (workflow screenshots, uploads, exports) go through a unified abstraction — switch backends with a single env var.
+Stept supports four storage backends. All file operations (workflow screenshots, uploads, exports) go through a unified abstraction — switch backends with a single env var.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -171,10 +171,10 @@ LLM settings can also be configured from the **Project Settings → AI/LLM** pag
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ONDOKI_LLM_PROVIDER` | — | — | LLM provider: `openai`, `anthropic`, `ollama`, `copilot`, `custom` |
-| `ONDOKI_LLM_API_KEY` | — | — | API key for the chosen provider |
-| `ONDOKI_LLM_MODEL` | — | — | Model name (e.g., `gpt-4o`, `claude-sonnet-4-20250514`) |
-| `ONDOKI_LLM_BASE_URL` | — | — | Base URL (required for `ollama` and `custom` providers) |
+| `STEPT_LLM_PROVIDER` | — | — | LLM provider: `openai`, `anthropic`, `ollama`, `copilot`, `custom` |
+| `STEPT_LLM_API_KEY` | — | — | API key for the chosen provider |
+| `STEPT_LLM_MODEL` | — | — | Model name (e.g., `gpt-4o`, `claude-sonnet-4-20250514`) |
+| `STEPT_LLM_BASE_URL` | — | — | Base URL (required for `ollama` and `custom` providers) |
 
 ## PII Protection (SendCloak)
 
@@ -209,7 +209,7 @@ When `SENDCLOAK_ENABLED=true` but SendCloak is unreachable, AI features graceful
 |----------|----------|---------|-------------|
 | `OPENAI_API_KEY` | — | — | API key for Whisper transcription |
 | `WHISPER_MODEL` | — | `base` | Whisper model size: `base`, `small`, `medium`, `large` |
-| `ONDOKI_UPLOAD_DIR` | — | `/data/uploads/videos` | Video upload directory (media worker) |
+| `STEPT_UPLOAD_DIR` | — | `/data/uploads/videos` | Video upload directory (media worker) |
 
 ## Generating Secrets
 

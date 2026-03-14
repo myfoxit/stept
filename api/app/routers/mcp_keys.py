@@ -85,7 +85,7 @@ async def create_mcp_key(
 ):
     await _check_admin(project_id, current_user, db)
 
-    raw_key = "ondoki_" + secrets.token_urlsafe(32)
+    raw_key = "stept_" + secrets.token_urlsafe(32)
     key_hash = hash_api_key(raw_key)
     key_prefix = raw_key[:12]
 

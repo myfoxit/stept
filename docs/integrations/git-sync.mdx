@@ -5,7 +5,7 @@ description: "Export documents to GitHub, GitLab, or Bitbucket as Markdown."
 
 ## Overview
 
-Git Sync exports your ondoki documents to a Git repository as Markdown files. It's a one-way sync — changes in ondoki are pushed to Git, but changes in Git are not pulled back.
+Git Sync exports your stept documents to a Git repository as Markdown files. It's a one-way sync — changes in stept are pushed to Git, but changes in Git are not pulled back.
 
 ## Supported Providers
 
@@ -37,7 +37,7 @@ Git Sync exports your ondoki documents to a Git repository as Markdown files. It
   </Tab>
 </Tabs>
 
-### 2. Configure in ondoki
+### 2. Configure in stept
 
 Navigate to **Project Settings → Integrations** or use the API:
 
@@ -81,7 +81,7 @@ Each document is exported as a Markdown file:
 
 - **File name:** derived from the document name
 - **Content:** TipTap JSON converted to standard Markdown
-- **Location:** follows the folder hierarchy from ondoki
+- **Location:** follows the folder hierarchy from stept
 
 ## Configuration Management
 
@@ -94,7 +94,7 @@ Each document is exported as a Markdown file:
 
 ## Security
 
-- Access tokens are **encrypted at rest** using the `ONDOKI_ENCRYPTION_KEY` Fernet key
+- Access tokens are **encrypted at rest** using the `STEPT_ENCRYPTION_KEY` Fernet key
 - Tokens are never returned in API responses after initial storage
 - The token is decrypted only when performing a Git operation
 
@@ -110,6 +110,6 @@ The configuration tracks the last sync:
 
 ## Limitations
 
-- **One-way only** — ondoki → Git. Changes made directly in the Git repo are not synced back.
+- **One-way only** — stept → Git. Changes made directly in the Git repo are not synced back.
 - **Manual trigger** — exports must be triggered manually (no automatic sync on document save).
 - **Documents only** — workflows are not exported via Git Sync (use PDF/Markdown export instead).
