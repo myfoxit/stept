@@ -607,7 +607,7 @@ async def test_verification_config(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Test the verification config (stub — Playwright worker not yet implemented)."""
+    """Test the verification config by launching Playwright, logging in, and verifying redirect."""
     await _verify_project_access(db, project_id, user)
 
     result = await db.execute(
@@ -621,11 +621,127 @@ async def test_verification_config(
     if not vc.encrypted_email or not vc.encrypted_password:
         return {"success": False, "message": "Credentials not configured."}
 
-    # Stub: Playwright worker will implement actual test in Phase 2b
-    return {
-        "success": False,
-        "message": "Playwright verification worker not yet deployed. Connection test will be available once the worker is running.",
-    }
+    from app.services.crypto import decrypt
+
+    email = decrypt(vc.encrypted_email)
+    password = decrypt(vc.encrypted_password)
+
+    if not email or not password:
+        return {"success": False, "message": "Could not decrypt credentials. Please re-save them."}
+
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        return {"success": False, "message": "Playwright is not installed on the server."}
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                viewport={"width": 1280, "height": 720},
+                ignore_https_errors=True,
+            )
+            page = await context.new_page()
+
+            # Navigate to login URL
+            await page.goto(vc.login_url, wait_until="networkidle", timeout=30000)
+            login_page_url = page.url
+
+            # Use configured selectors or auto-detect
+            email_sel = vc.email_selector or 'input[type="email"], input[name="email"], input[name="username"], input#email, input#username'
+            password_sel = vc.password_selector or 'input[type="password"], input[name="password"], input#password'
+            submit_sel = vc.submit_selector or 'button[type="submit"], input[type="submit"], button:has-text("Log in"), button:has-text("Sign in")'
+
+            # Auto-detect form fields and report what was found
+            detected = {}
+
+            email_field = await page.query_selector(email_sel)
+            if not email_field:
+                await browser.close()
+                return {
+                    "success": False,
+                    "message": f"Email/username field not found. Tried: {email_sel}",
+                    "page_url": login_page_url,
+                }
+            detected["email_field"] = True
+
+            password_field = await page.query_selector(password_sel)
+            if not password_field:
+                await browser.close()
+                return {
+                    "success": False,
+                    "message": f"Password field not found. Tried: {password_sel}",
+                    "page_url": login_page_url,
+                }
+            detected["password_field"] = True
+
+            submit_btn = await page.query_selector(submit_sel)
+            detected["submit_button"] = submit_btn is not None
+
+            # Fill and submit
+            await email_field.fill(email)
+            await password_field.fill(password)
+
+            if submit_btn:
+                await submit_btn.click()
+            else:
+                await password_field.press("Enter")
+
+            # Wait for navigation / post-login
+            wait_ms = vc.post_login_wait_ms or 2000
+            await page.wait_for_timeout(wait_ms)
+
+            post_login_url = page.url
+
+            # Check if URL changed (indicates successful redirect)
+            url_changed = post_login_url != login_page_url
+
+            # Check for common error indicators
+            error_selectors = [
+                '.error', '.alert-danger', '.alert-error',
+                '[role="alert"]', '.login-error', '.form-error',
+            ]
+            has_error = False
+            for es in error_selectors:
+                err_el = await page.query_selector(es)
+                if err_el:
+                    err_text = await err_el.text_content()
+                    if err_text and err_text.strip():
+                        has_error = True
+                        break
+
+            await browser.close()
+
+            if has_error:
+                return {
+                    "success": False,
+                    "message": "Login appeared to fail — error message detected on page.",
+                    "page_url": post_login_url,
+                    "detected_fields": detected,
+                }
+
+            if url_changed:
+                return {
+                    "success": True,
+                    "message": "Login successful — redirected after authentication.",
+                    "login_url": login_page_url,
+                    "redirect_url": post_login_url,
+                    "detected_fields": detected,
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Login may have failed — URL did not change after submission. Check credentials or selectors.",
+                    "page_url": post_login_url,
+                    "detected_fields": detected,
+                }
+
+    except Exception as e:
+        logger.error("Test connection failed: %s", e)
+        return {
+            "success": False,
+            "message": f"Connection test error: {str(e)[:200]}",
+        }
 
 
 # ── 5. Manual Verification Run ──────────────────────────────────────────────
