@@ -1,0 +1,854 @@
+// Native macOS window info + input hooks helper
+// Compile: swiftc -O -o window-info window-info.swift -framework AppKit -framework CoreGraphics -framework ApplicationServices
+// Usage: window-info mouse          → returns mouse position + window under cursor + element info
+//        window-info windows        → returns all visible windows
+//        window-info point <x> <y>  → returns window/element at point
+//        window-info serve          → persistent JSON-RPC mode via stdin/stdout
+//        window-info hooks          → stream input events (click/key/scroll) as JSON lines
+//        window-info watch          → stream window-change events as JSON lines
+// Output: JSON to stdout
+
+import AppKit
+import CoreGraphics
+import Foundation
+
+// MARK: - Data types
+
+struct Point: Codable {
+    let x: Double
+    let y: Double
+}
+
+struct Rect: Codable {
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+}
+
+struct DisplayInfo: Codable {
+    let id: UInt32
+    let bounds: Rect
+    let scaleFactor: Double
+    let isPrimary: Bool
+}
+
+struct WindowResult: Codable {
+    let handle: Int
+    let title: String
+    let ownerName: String
+    let ownerPID: Int
+    let bounds: Rect
+    let isVisible: Bool
+    let layer: Int
+}
+
+struct ElementInfo: Codable {
+    let role: String
+    let title: String
+    let value: String
+    let description: String
+    let subrole: String
+    let roleDescription: String
+    let placeholder: String
+    let help: String
+    let domId: String
+    let confidence: String  // "high" or "low"
+}
+
+struct ElementSupplement: Codable {
+    let type = "element"
+    let timestamp: Int64
+    let element: ElementInfo?
+}
+
+struct MouseResult: Codable {
+    let mousePosition: Point
+    let mousePositionFlipped: Point
+    let display: DisplayInfo
+    let scaleFactor: Double
+    let window: WindowResult?
+    let element: ElementInfo?
+}
+
+struct WindowsResult: Codable {
+    let windows: [WindowResult]
+    let displays: [DisplayInfo]
+}
+
+// MARK: - JSON-RPC types for serve mode
+
+struct ServeRequest: Codable {
+    let id: Int
+    let cmd: String
+    let args: [String: Double]?
+}
+
+// MARK: - Hook event types
+
+struct HookClickEvent: Codable {
+    let type = "click"
+    let x: Double
+    let y: Double
+    let button: Int
+    let window: WindowResult?
+    let element: ElementInfo?
+    let scale: Double
+    let timestamp: Int64
+    let screenshotPath: String?
+}
+
+struct HookKeyEvent: Codable {
+    let type = "key"
+    let keycode: Int
+    let modifiers: [String]
+    let window: WindowResult?
+    let timestamp: Int64
+}
+
+struct HookScrollEvent: Codable {
+    let type = "scroll"
+    let x: Double
+    let y: Double
+    let deltaX: Double
+    let deltaY: Double
+    let window: WindowResult?
+    let timestamp: Int64
+}
+
+struct HookReadyEvent: Codable {
+    let type = "ready"
+    let platform = "darwin"
+    let coordSpace = "logical"
+}
+
+// MARK: - Helpers
+
+func getDisplays() -> [DisplayInfo] {
+    let maxDisplays: UInt32 = 16
+    var displayIDs = [CGDirectDisplayID](repeating: 0, count: Int(maxDisplays))
+    var displayCount: UInt32 = 0
+    CGGetActiveDisplayList(maxDisplays, &displayIDs, &displayCount)
+    
+    let primaryID = CGMainDisplayID()
+    
+    return (0..<Int(displayCount)).map { i in
+        let id = displayIDs[i]
+        let bounds = CGDisplayBounds(id)
+        let nsScreen = NSScreen.screens.first { screen in
+            let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32
+            return screenNumber == id
+        }
+        let scale = nsScreen?.backingScaleFactor ?? 1.0
+        
+        return DisplayInfo(
+            id: id,
+            bounds: Rect(x: bounds.origin.x, y: bounds.origin.y, width: bounds.size.width, height: bounds.size.height),
+            scaleFactor: scale,
+            isPrimary: id == primaryID
+        )
+    }
+}
+
+func getWindowList() -> [WindowResult] {
+    guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+        return []
+    }
+    
+    return windowList.compactMap { info in
+        guard let windowID = info[kCGWindowNumber as String] as? Int,
+              let layer = info[kCGWindowLayer as String] as? Int,
+              let boundsDict = info[kCGWindowBounds as String] as? [String: Double],
+              let bx = boundsDict["X"], let by = boundsDict["Y"],
+              let bw = boundsDict["Width"], let bh = boundsDict["Height"],
+              bw > 0, bh > 0 else {
+            return nil
+        }
+        
+        let title = info[kCGWindowName as String] as? String ?? ""
+        let ownerName = info[kCGWindowOwnerName as String] as? String ?? ""
+        let ownerPID = info[kCGWindowOwnerPID as String] as? Int ?? 0
+        let isOnScreen = info[kCGWindowIsOnscreen as String] as? Bool ?? false
+        
+        if layer != 0 { return nil }
+        if ownerName == "Window Server" { return nil }
+        if bw < 50 || bh < 50 { return nil }
+        
+        return WindowResult(
+            handle: windowID,
+            title: title.isEmpty ? ownerName : title,
+            ownerName: ownerName,
+            ownerPID: ownerPID,
+            bounds: Rect(x: bx, y: by, width: bw, height: bh),
+            isVisible: isOnScreen,
+            layer: layer
+        )
+    }
+}
+
+func getWindowAtPoint(_ point: CGPoint) -> WindowResult? {
+    let windows = getWindowList()
+    for w in windows {
+        let b = w.bounds
+        if point.x >= b.x && point.x < b.x + b.width &&
+           point.y >= b.y && point.y < b.y + b.height {
+            return w
+        }
+    }
+    return nil
+}
+
+// Roles that typically carry meaningful text for UI actions
+let actionableRoles: Set<String> = [
+    "AXButton", "AXLink", "AXMenuItem", "AXTab",
+    "AXPopUpButton", "AXCheckBox", "AXRadioButton",
+    "AXMenuBarItem", "AXImage", "AXCell", "AXRow",
+]
+
+let fieldRoles: Set<String> = [
+    "AXTextField", "AXTextArea", "AXComboBox",
+    "AXSearchField", "AXSecureTextField",
+]
+
+let textRoles: Set<String> = [
+    "AXStaticText", "AXHeading",
+]
+
+let genericRoles: Set<String> = [
+    "AXGroup", "AXScrollArea", "AXWebArea", "AXSplitGroup",
+    "AXSplitter", "AXLayoutArea", "AXLayoutItem", "",
+]
+
+func axAttr(_ el: AXUIElement, _ name: String) -> String {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, name as CFString, &value)
+    return (value as? String) ?? ""
+}
+
+func axValue(_ el: AXUIElement) -> String {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &value)
+    if let str = value as? String {
+        return String(str.prefix(200))
+    }
+    return ""
+}
+
+func axChildren(_ el: AXUIElement) -> [AXUIElement] {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, kAXChildrenAttribute as CFString, &value)
+    return (value as? [AXUIElement]) ?? []
+}
+
+func axParent(_ el: AXUIElement) -> AXUIElement? {
+    var value: AnyObject?
+    AXUIElementCopyAttributeValue(el, kAXParentAttribute as CFString, &value)
+    return value as! AXUIElement?
+}
+
+/// Check if an element has meaningful identifying text
+func hasMeaningfulText(_ el: AXUIElement) -> Bool {
+    let title = axAttr(el, kAXTitleAttribute)
+    if !title.isEmpty { return true }
+    let desc = axAttr(el, kAXDescriptionAttribute)
+    if !desc.isEmpty { return true }
+    let role = axAttr(el, kAXRoleAttribute)
+    if actionableRoles.contains(role) {
+        let val = axValue(el)
+        if !val.isEmpty { return true }
+    }
+    return false
+}
+
+/// Drill down into children to find the deepest meaningful element.
+/// For single-child containers, keep descending. For multiple children,
+/// prefer actionable roles with meaningful text.
+func drillDown(_ el: AXUIElement, depth: Int) -> AXUIElement {
+    if depth > 15 { return el }
+    let children = axChildren(el)
+    if children.isEmpty { return el }
+
+    if children.count == 1 {
+        // Single child — keep going deeper
+        return drillDown(children[0], depth: depth + 1)
+    }
+
+    // Multiple children — prefer actionable ones with text
+    for child in children {
+        let role = axAttr(child, kAXRoleAttribute)
+        if actionableRoles.contains(role) && hasMeaningfulText(child) {
+            return drillDown(child, depth: depth + 1)
+        }
+    }
+    // No actionable child with text — try any child with text
+    for child in children {
+        if hasMeaningfulText(child) {
+            return drillDown(child, depth: depth + 1)
+        }
+    }
+    // Nothing better found — return current element
+    return el
+}
+
+/// Walk up parent chain to find nearest ancestor with meaningful text
+func walkUp(_ el: AXUIElement, maxLevels: Int) -> AXUIElement? {
+    var current = el
+    for _ in 0..<maxLevels {
+        guard let parent = axParent(current) else { return nil }
+        if hasMeaningfulText(parent) { return parent }
+        current = parent
+    }
+    return nil
+}
+
+func buildElementInfo(_ el: AXUIElement, confidence: String = "high") -> ElementInfo {
+    return ElementInfo(
+        role: axAttr(el, kAXRoleAttribute),
+        title: axAttr(el, kAXTitleAttribute),
+        value: axValue(el),
+        description: axAttr(el, kAXDescriptionAttribute),
+        subrole: axAttr(el, kAXSubroleAttribute),
+        roleDescription: axAttr(el, kAXRoleDescriptionAttribute),
+        placeholder: axAttr(el, kAXPlaceholderValueAttribute),
+        help: axAttr(el, kAXHelpAttribute),
+        domId: axAttr(el, "AXDOMIdentifier"),
+        confidence: confidence
+    )
+}
+
+// Cache of PIDs where we've already enabled enhanced accessibility
+var enhancedAccessibilityPIDs = Set<Int>()
+
+func ensureEnhancedAccessibility(_ app: AXUIElement, pid: Int) {
+    if enhancedAccessibilityPIDs.contains(pid) { return }
+    // Tell the app to expose its full accessibility tree (required for Chrome, Electron, etc.)
+    AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, true as CFTypeRef)
+    enhancedAccessibilityPIDs.insert(pid)
+}
+
+/// Walk up to find nearest actionable ancestor
+func walkUpForActionable(_ el: AXUIElement, maxLevels: Int) -> AXUIElement? {
+    var current = el
+    for _ in 0..<maxLevels {
+        guard let parent = axParent(current) else { return nil }
+        let role = axAttr(parent, kAXRoleAttribute)
+        if role == "AXWindow" || role == "AXApplication" { return nil }
+        if actionableRoles.contains(role) && hasMeaningfulText(parent) {
+            return parent
+        }
+        if fieldRoles.contains(role) {
+            return parent
+        }
+        current = parent
+    }
+    return nil
+}
+
+func getElementAtPoint(_ point: CGPoint, pid: Int) -> ElementInfo? {
+    let app = AXUIElementCreateApplication(pid_t(pid))
+    ensureEnhancedAccessibility(app, pid: pid)
+
+    var element: AXUIElement?
+    let err = AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element)
+    guard err == .success, let hitElement = element else {
+        return nil
+    }
+
+    let hitRole = axAttr(hitElement, kAXRoleAttribute)
+
+    // 1. Hit element is actionable (button, link, tab, etc.) → use it directly
+    if actionableRoles.contains(hitRole) && hasMeaningfulText(hitElement) {
+        return buildElementInfo(hitElement, confidence: "high")
+    }
+
+    // 2. Hit element is a field (text field, combo box, etc.) → use it directly
+    if fieldRoles.contains(hitRole) {
+        return buildElementInfo(hitElement, confidence: "high")
+    }
+
+    // 3. Hit element is text (static text, heading) → user clicked ON this text, trust it
+    if textRoles.contains(hitRole) {
+        let title = axAttr(hitElement, kAXTitleAttribute)
+        let val = axValue(hitElement)
+        if !title.isEmpty || !val.isEmpty {
+            // But also check: is there an actionable parent very close (1-2 levels)?
+            // e.g. text inside a button — prefer the button
+            if let actionableParent = walkUpForActionable(hitElement, maxLevels: 2) {
+                return buildElementInfo(actionableParent, confidence: "high")
+            }
+            return buildElementInfo(hitElement, confidence: "high")
+        }
+    }
+
+    // 4. Hit element is generic (group, scroll area, etc.) → walk up for actionable ancestor
+    if let actionableAncestor = walkUpForActionable(hitElement, maxLevels: 8) {
+        return buildElementInfo(actionableAncestor, confidence: "high")
+    }
+
+    // 5. Walk up for ANY ancestor with meaningful text (low confidence)
+    if let textAncestor = walkUp(hitElement, maxLevels: 8) {
+        return buildElementInfo(textAncestor, confidence: "low")
+    }
+
+    // 6. Try drilling down from hit element for actionable children
+    let deepest = drillDown(hitElement, depth: 0)
+    if hasMeaningfulText(deepest) && deepest as AnyObject !== hitElement as AnyObject {
+        let deepRole = axAttr(deepest, kAXRoleAttribute)
+        let conf = (actionableRoles.contains(deepRole) || fieldRoles.contains(deepRole) || textRoles.contains(deepRole)) ? "high" : "low"
+        return buildElementInfo(deepest, confidence: conf)
+    }
+
+    // 7. Fallback: return hit element info (low confidence)
+    return buildElementInfo(hitElement, confidence: "low")
+}
+
+func getDisplayForPoint(_ point: CGPoint) -> DisplayInfo {
+    let displays = getDisplays()
+    for d in displays {
+        if point.x >= d.bounds.x && point.x < d.bounds.x + d.bounds.width &&
+           point.y >= d.bounds.y && point.y < d.bounds.y + d.bounds.height {
+            return d
+        }
+    }
+    return displays.first ?? DisplayInfo(id: 0, bounds: Rect(x: 0, y: 0, width: 1920, height: 1080), scaleFactor: 1.0, isPrimary: true)
+}
+
+func getScaleForPoint(_ point: CGPoint) -> Double {
+    return getDisplayForPoint(point).scaleFactor
+}
+
+// MARK: - JSON output helpers
+
+let encoder: JSONEncoder = {
+    let e = JSONEncoder()
+    e.outputFormatting = .sortedKeys
+    return e
+}()
+
+// ---------------------------------------------------------------------------
+// Synchronous screenshot capture at click time
+// ---------------------------------------------------------------------------
+
+let captureDir: String = {
+    let dir = NSTemporaryDirectory() + "ondoki-captures/"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    return dir
+}()
+
+func captureDisplayAtPoint(_ point: CGPoint) -> String? {
+    // Find which display contains this point
+    var displayID: CGDirectDisplayID = 0
+    var count: UInt32 = 0
+    CGGetDisplaysWithPoint(point, 1, &displayID, &count)
+    if count == 0 { displayID = CGMainDisplayID() }
+    
+    // Synchronous capture — ~3-5ms, runs BEFORE event reaches target app
+    guard let image = CGDisplayCreateImage(displayID) else { return nil }
+    
+    let path = captureDir + "cap_\(Int64(Date().timeIntervalSince1970 * 1000)).png"
+    let url = URL(fileURLWithPath: path)
+    guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return nil }
+    CGImageDestinationAddImage(dest, image, nil)
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    
+    return path
+}
+
+let stdoutLock = NSLock()
+let elementQueue = DispatchQueue(label: "com.ondoki.element-detection")
+
+func writeJSON<T: Encodable>(_ value: T) {
+    if let data = try? encoder.encode(value), let json = String(data: data, encoding: .utf8) {
+        stdoutLock.lock()
+        print(json)
+        fflush(stdout)
+        stdoutLock.unlock()
+    }
+}
+
+// MARK: - Commands (return JSON Data)
+
+func buildMouseResult() -> Data? {
+    let mouseLocation = NSEvent.mouseLocation
+    let screenHeight = NSScreen.main?.frame.height ?? 1080
+    let flippedY = screenHeight - mouseLocation.y
+    let screenPoint = CGPoint(x: mouseLocation.x, y: flippedY)
+    
+    let display = getDisplayForPoint(screenPoint)
+    let window = getWindowAtPoint(screenPoint)
+    
+    var element: ElementInfo? = nil
+    if let w = window {
+        element = getElementAtPoint(screenPoint, pid: w.ownerPID)
+    }
+    
+    let result = MouseResult(
+        mousePosition: Point(x: mouseLocation.x, y: mouseLocation.y),
+        mousePositionFlipped: Point(x: screenPoint.x, y: screenPoint.y),
+        display: display,
+        scaleFactor: display.scaleFactor,
+        window: window,
+        element: element
+    )
+    
+    return try? encoder.encode(result)
+}
+
+func buildWindowsResult() -> Data? {
+    let result = WindowsResult(
+        windows: getWindowList(),
+        displays: getDisplays()
+    )
+    return try? encoder.encode(result)
+}
+
+func buildPointResult(x: Double, y: Double) -> Data? {
+    let point = CGPoint(x: x, y: y)
+    let display = getDisplayForPoint(point)
+    let window = getWindowAtPoint(point)
+    
+    var element: ElementInfo? = nil
+    if let w = window {
+        element = getElementAtPoint(point, pid: w.ownerPID)
+    }
+    
+    let result = MouseResult(
+        mousePosition: Point(x: x, y: y),
+        mousePositionFlipped: Point(x: x, y: y),
+        display: display,
+        scaleFactor: display.scaleFactor,
+        window: window,
+        element: element
+    )
+    
+    return try? encoder.encode(result)
+}
+
+// MARK: - Serve mode (persistent JSON-RPC via stdin/stdout)
+
+func handleServe() {
+    setbuf(stdout, nil)
+    
+    while let line = readLine(strippingNewline: true) {
+        guard !line.isEmpty else { continue }
+        
+        guard let lineData = line.data(using: .utf8),
+              let request = try? JSONDecoder().decode(ServeRequest.self, from: lineData) else {
+            let errJson = "{\"id\":0,\"error\":\"invalid JSON\"}\n"
+            fputs(errJson, stdout)
+            fflush(stdout)
+            continue
+        }
+        
+        let requestId = request.id
+        var resultData: Data? = nil
+        var errorMsg: String? = nil
+        
+        switch request.cmd {
+        case "mouse":
+            resultData = buildMouseResult()
+        case "windows":
+            resultData = buildWindowsResult()
+        case "point":
+            if let args = request.args, let x = args["x"], let y = args["y"] {
+                resultData = buildPointResult(x: x, y: y)
+            } else {
+                errorMsg = "point requires args.x and args.y"
+            }
+        default:
+            errorMsg = "unknown command: \(request.cmd)"
+        }
+        
+        var response: String
+        if let err = errorMsg {
+            let escaped = err.replacingOccurrences(of: "\"", with: "\\\"")
+            response = "{\"id\":\(requestId),\"error\":\"\(escaped)\"}"
+        } else if let data = resultData, let resultJson = String(data: data, encoding: .utf8) {
+            response = "{\"id\":\(requestId),\"result\":\(resultJson)}"
+        } else {
+            response = "{\"id\":\(requestId),\"result\":null}"
+        }
+        
+        print(response)
+        fflush(stdout)
+    }
+}
+
+// MARK: - Hooks mode (CGEventTap — stream input events)
+
+// Global ref so we can re-enable the tap if it gets disabled
+var globalEventTap: CFMachPort?
+
+func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+    // Re-enable tap if it got disabled (system disables after timeout)
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        if let tap = globalEventTap {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+        return Unmanaged.passRetained(event)
+    }
+    
+    let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+    let location = event.location // CGPoint in Quartz coords (top-left origin, logical)
+    
+    switch type {
+    case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+        let button: Int
+        switch type {
+        case .leftMouseDown: button = 1
+        case .rightMouseDown: button = 2
+        default: button = 3
+        }
+        
+        let point = CGPoint(x: location.x, y: location.y)
+        
+        // Capture screenshot SYNCHRONOUSLY before event reaches target app
+        let screenshotPath = captureDisplayAtPoint(point)
+        
+        let window = getWindowAtPoint(point)
+        let scale = getScaleForPoint(point)
+        
+        // Emit click immediately WITHOUT element (keeps event tap fast, prevents ghost screenshots)
+        let clickEvent = HookClickEvent(
+            x: location.x,
+            y: location.y,
+            button: button,
+            window: window,
+            element: nil,
+            scale: scale,
+            timestamp: timestamp,
+            screenshotPath: screenshotPath
+        )
+        writeJSON(clickEvent)
+        
+        // Element detection runs async on background queue — arrives as separate "element" event
+        if let w = window {
+            let clickTimestamp = timestamp
+            let clickPoint = point
+            let clickPid = w.ownerPID
+            elementQueue.async {
+                let element = getElementAtPoint(clickPoint, pid: clickPid)
+                let supplement = ElementSupplement(timestamp: clickTimestamp, element: element)
+                writeJSON(supplement)
+            }
+        }
+        
+    case .keyDown:
+        let keycode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+        var modifiers: [String] = []
+        if flags.contains(.maskControl) { modifiers.append("ctrl") }
+        if flags.contains(.maskAlternate) { modifiers.append("alt") }
+        if flags.contains(.maskShift) { modifiers.append("shift") }
+        if flags.contains(.maskCommand) { modifiers.append("meta") }
+        
+        // Get foreground window for keyboard events
+        let mouseLocation = NSEvent.mouseLocation
+        let screenHeight = NSScreen.main?.frame.height ?? 1080
+        let flippedY = screenHeight - mouseLocation.y
+        let foregroundWindow = getWindowAtPoint(CGPoint(x: mouseLocation.x, y: flippedY))
+        
+        let keyEvent = HookKeyEvent(
+            keycode: keycode,
+            modifiers: modifiers,
+            window: foregroundWindow,
+            timestamp: timestamp
+        )
+        writeJSON(keyEvent)
+        
+    case .scrollWheel:
+        let deltaY = event.getDoubleValueField(.scrollWheelEventDeltaAxis1)
+        let deltaX = event.getDoubleValueField(.scrollWheelEventDeltaAxis2)
+        
+        let point = CGPoint(x: location.x, y: location.y)
+        let window = getWindowAtPoint(point)
+        
+        let scrollEvent = HookScrollEvent(
+            x: location.x,
+            y: location.y,
+            deltaX: deltaX,
+            deltaY: deltaY,
+            window: window,
+            timestamp: timestamp
+        )
+        writeJSON(scrollEvent)
+        
+    default:
+        break
+    }
+    
+    return Unmanaged.passRetained(event)
+}
+
+func handleHooks() {
+    setbuf(stdout, nil)
+    
+    // Events we want to capture
+    let eventMask: CGEventMask = (
+        (1 << CGEventType.leftMouseDown.rawValue) |
+        (1 << CGEventType.rightMouseDown.rawValue) |
+        (1 << CGEventType.otherMouseDown.rawValue) |
+        (1 << CGEventType.keyDown.rawValue) |
+        (1 << CGEventType.scrollWheel.rawValue)
+    )
+    
+    guard let eventTap = CGEvent.tapCreate(
+        tap: .cgSessionEventTap,
+        place: .headInsertEventTap,
+        options: .defaultTap,  // Active tap: callback runs BEFORE event reaches target app
+        eventsOfInterest: eventMask,
+        callback: eventTapCallback,
+        userInfo: nil
+    ) else {
+        fputs("{\"type\":\"error\",\"message\":\"Failed to create event tap. Grant accessibility permissions in System Preferences.\"}\n", stderr)
+        exit(1)
+    }
+    
+    globalEventTap = eventTap
+    
+    let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+    CGEvent.tapEnable(tap: eventTap, enable: true)
+    
+    // Send ready message
+    writeJSON(HookReadyEvent())
+    
+    // Run forever
+    CFRunLoopRun()
+}
+
+// MARK: - Watch mode (stream window-change events)
+
+struct WatchChangeEvent: Codable {
+    let type = "change"
+    let app: String
+    let title: String
+    let pid: Int
+}
+
+struct WatchReadyEvent: Codable {
+    let type = "ready"
+}
+
+func handleWatch() {
+    setbuf(stdout, nil)
+
+    let selfPID = ProcessInfo.processInfo.processIdentifier
+
+    var lastApp = ""
+    var lastTitle = ""
+
+    func emitCurrentApp(_ app: NSRunningApplication) {
+        let name = app.localizedName ?? ""
+        let pid = Int(app.processIdentifier)
+
+        // Skip self and empty app names
+        if name.isEmpty || app.processIdentifier == selfPID { return }
+
+        // Get window title via accessibility API
+        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        var titleValue: AnyObject?
+        var windowTitle = ""
+        var focusedWindow: AXUIElement?
+        AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &titleValue)
+        if let win = titleValue {
+            focusedWindow = (win as! AXUIElement)
+            var winTitle: AnyObject?
+            AXUIElementCopyAttributeValue(focusedWindow!, kAXTitleAttribute as CFString, &winTitle)
+            windowTitle = (winTitle as? String) ?? ""
+        }
+
+        // Dedup: only emit when app or title changes
+        if name == lastApp && windowTitle == lastTitle { return }
+        lastApp = name
+        lastTitle = windowTitle
+
+        writeJSON(WatchChangeEvent(app: name, title: windowTitle, pid: pid))
+    }
+
+    // Emit ready
+    writeJSON(WatchReadyEvent())
+
+    // Emit initial state
+    if let frontApp = NSWorkspace.shared.frontmostApplication {
+        emitCurrentApp(frontApp)
+    }
+
+    // Observe app activation
+    NSWorkspace.shared.notificationCenter.addObserver(
+        forName: NSWorkspace.didActivateApplicationNotification,
+        object: nil,
+        queue: nil
+    ) { notification in
+        if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+            emitCurrentApp(app)
+        }
+    }
+
+    // Run forever
+    RunLoop.current.run()
+}
+
+// MARK: - CLI Commands
+
+func handleMouse() {
+    if let data = buildMouseResult() {
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
+           let prettyStr = String(data: pretty, encoding: .utf8) {
+            print(prettyStr)
+        }
+    }
+}
+
+func handleWindowsCmd() {
+    if let data = buildWindowsResult() {
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
+           let prettyStr = String(data: pretty, encoding: .utf8) {
+            print(prettyStr)
+        }
+    }
+}
+
+func handlePointQuery(x: Double, y: Double) {
+    if let data = buildPointResult(x: x, y: y) {
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys),
+           let prettyStr = String(data: pretty, encoding: .utf8) {
+            print(prettyStr)
+        }
+    }
+}
+
+// MARK: - Main
+
+let args = CommandLine.arguments
+
+if args.count < 2 {
+    fputs("Usage: window-info mouse|windows|point <x> <y>|serve|hooks|watch\n", stderr)
+    exit(1)
+}
+
+switch args[1] {
+case "mouse":
+    handleMouse()
+case "windows":
+    handleWindowsCmd()
+case "point":
+    if args.count >= 4, let x = Double(args[2]), let y = Double(args[3]) {
+        handlePointQuery(x: x, y: y)
+    } else {
+        fputs("Usage: window-info point <x> <y>\n", stderr)
+        exit(1)
+    }
+case "serve":
+    handleServe()
+case "hooks":
+    handleHooks()
+case "watch":
+    handleWatch()
+default:
+    fputs("Unknown command: \(args[1])\n", stderr)
+    exit(1)
+}
