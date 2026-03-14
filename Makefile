@@ -84,7 +84,7 @@ test-e2e: test-db
 
 # Frontend tests (local, no Docker needed)
 test-frontend:
-	cd app && npx jest --passWithNoTests
+	cd app && pnpm install --frozen-lockfile && pnpm test
 
 # ─── Lint ─────────────────────────────────────────────────────
 lint:
