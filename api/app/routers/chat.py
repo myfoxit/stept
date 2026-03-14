@@ -644,7 +644,7 @@ async def get_usage(
 ):
     from datetime import datetime, timedelta, timezone
     from sqlalchemy import func as sqlfunc
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     query = select(
         sqlfunc.sum(LLMUsage.input_tokens).label("total_input"),
         sqlfunc.sum(LLMUsage.output_tokens).label("total_output"),

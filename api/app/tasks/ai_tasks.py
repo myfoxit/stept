@@ -107,7 +107,7 @@ if celery_app:
                             session_id=session_id,
                             step_number=step_num,
                             step_type="screenshot",
-                            timestamp=datetime.now(timezone.utc),
+                            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
                             action_type="video_frame",
                             generated_title=step_data.get("title"),
                             generated_description=step_data.get("description"),

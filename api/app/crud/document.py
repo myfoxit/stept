@@ -335,7 +335,7 @@ async def delete_document(db: AsyncSession, doc_id: str) -> None:
     if not doc:
         raise ValueError("document not found")
     
-    doc.deleted_at = datetime.now(timezone.utc)
+    doc.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
     logger.info(f"Soft-deleted document {doc_id}")
 

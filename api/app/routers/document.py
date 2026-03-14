@@ -248,7 +248,7 @@ async def api_update_document(
     # --- Document locking check ---
     if doc.locked_by and doc.locked_by != current_user.id:
         from datetime import datetime, timedelta, timezone
-        lock_expired = doc.locked_at and (datetime.now(timezone.utc) - doc.locked_at.replace(tzinfo=None)) > timedelta(minutes=30)
+        lock_expired = doc.locked_at and (datetime.now(timezone.utc).replace(tzinfo=None) - doc.locked_at.replace(tzinfo=None)) > timedelta(minutes=30)
         if not lock_expired:
             raise HTTPException(423, detail="Document is locked by another user")
 
@@ -278,7 +278,7 @@ async def api_update_document(
         if last_ver and last_ver.created_at:
             from datetime import timezone
             last_time = last_ver.created_at.replace(tzinfo=None) if last_ver.created_at.tzinfo else last_ver.created_at
-            if (datetime.now(timezone.utc) - last_time).total_seconds() < 30:
+            if (datetime.now(timezone.utc).replace(tzinfo=None) - last_time).total_seconds() < 30:
                 should_version = False
         
         if should_version:
@@ -397,7 +397,7 @@ def _is_lock_expired(doc) -> bool:
     from datetime import datetime, timedelta
     lock_time = doc.locked_at.replace(tzinfo=None) if doc.locked_at.tzinfo else doc.locked_at
     from datetime import timezone
-    return (datetime.now(timezone.utc) - lock_time) > timedelta(minutes=LOCK_TIMEOUT_MINUTES)
+    return (datetime.now(timezone.utc).replace(tzinfo=None) - lock_time) > timedelta(minutes=LOCK_TIMEOUT_MINUTES)
 
 
 @router.get("/{doc_id}/lock")
@@ -446,7 +446,7 @@ async def api_acquire_lock(
 
     # Already locked by current user — refresh
     if doc.locked_by == current_user.id:
-        doc.locked_at = datetime.now(timezone.utc)
+        doc.locked_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
         return {"locked": True, "locked_by": current_user.id, "locked_at": doc.locked_at}
 
@@ -464,7 +464,7 @@ async def api_acquire_lock(
 
     # Acquire lock
     doc.locked_by = current_user.id
-    doc.locked_at = datetime.now(timezone.utc)
+    doc.locked_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
     return {"locked": True, "locked_by": current_user.id, "locked_at": doc.locked_at}
 

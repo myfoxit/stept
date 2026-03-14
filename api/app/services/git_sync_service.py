@@ -327,7 +327,7 @@ async def export_to_git(db: AsyncSession, config: GitSyncConfig) -> dict:
         # Build folder path map
         path_map = await _build_folder_path_map(db, project_id)
 
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M UTC")
         message = f"Export from Stept - {timestamp}"
         exported = 0
 
@@ -350,7 +350,7 @@ async def export_to_git(db: AsyncSession, config: GitSyncConfig) -> dict:
             await provider.create_or_update_file(file_path, md, message, sha=sha)
             exported += 1
 
-        config.last_sync_at = datetime.now(timezone.utc)
+        config.last_sync_at = datetime.now(timezone.utc).replace(tzinfo=None)
         config.last_sync_status = "success"
         config.last_sync_error = None
         await db.commit()

@@ -139,7 +139,7 @@ async def upload_metadata(
     
     # Update session totals
     session.total_steps = len(metadata)
-    session.updated_at = datetime.now(timezone.utc)
+    session.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Auto-set session name/title from AI-generated step titles (only if AI enabled)
     if ai_enabled:
@@ -224,7 +224,7 @@ async def save_uploaded_file(
             existing_file.file_path = stored_relative_path
             existing_file.file_size = len(file_content)
             existing_file.mime_type = mime_type
-            existing_file.uploaded_at = datetime.now(timezone.utc)
+            existing_file.uploaded_at = datetime.now(timezone.utc).replace(tzinfo=None)
             file_record = existing_file
         else:
             # If not replacement but file exists, raise error with clear message
@@ -275,7 +275,7 @@ async def finalize_session(
         session.name = f"Workflow: {first_step.window_title or 'Untitled'}"
     
     session.status = "completed"
-    session.finalized_at = datetime.now(timezone.utc)
+    session.finalized_at = datetime.now(timezone.utc).replace(tzinfo=None)
     session.total_files = total_files
     
     await db.commit()
@@ -453,7 +453,7 @@ async def delete_workflow(db: AsyncSession, session_id: str) -> None:
         raise ValueError("Workflow not found")
     
     from datetime import datetime
-    session.deleted_at = datetime.now(timezone.utc)
+    session.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
 
@@ -555,7 +555,7 @@ async def duplicate_workflow(
     
     new_session.total_steps = original.total_steps
     new_session.status = "completed"
-    new_session.finalized_at = datetime.now(timezone.utc)
+    new_session.finalized_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     await db.commit()
     await db.refresh(new_session)
@@ -742,7 +742,7 @@ async def create_step(
         session_id=session_id,
         step_number=position,
         step_type=normalized_type,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
         description=description,
         content=content,
         action_type="manual" if normalized_type != "screenshot" else None,
@@ -753,7 +753,7 @@ async def create_step(
     session = await db.get(ProcessRecordingSession, session_id)
     if session:
         session.total_steps = (session.total_steps or 0) + 1
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.commit()
     await db.refresh(new_step)
@@ -787,7 +787,7 @@ async def update_step(
     if window_title is not None:
         step.window_title = window_title
     
-    step.updated_at = datetime.now(timezone.utc)
+    step.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     await db.commit()
     await db.refresh(step)
@@ -870,7 +870,7 @@ async def delete_step(
     session = await db.get(ProcessRecordingSession, session_id)
     if session and session.total_steps:
         session.total_steps = session.total_steps - 1
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     await db.commit()
 
@@ -931,7 +931,7 @@ async def reorder_steps(
     # Update session timestamp
     session = await db.get(ProcessRecordingSession, session_id)
     if session:
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     await db.commit()
 

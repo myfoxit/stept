@@ -1001,7 +1001,7 @@ def _recency_boost(updated_at: datetime | None) -> float:
     """Recency boost: 0.5 + 0.5 * exp(-days_old / 30)."""
     if not updated_at:
         return 0.5
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
     days_old = max(0, (now - updated_at).total_seconds() / 86400)
@@ -1475,7 +1475,7 @@ async def record_workflow_view(
     view_count = getattr(session, "view_count", None)
     if view_count is not None:
         session.view_count = (session.view_count or 0) + 1
-        session.last_viewed_at = datetime.now(timezone.utc)
+        session.last_viewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     else:
         # Column doesn't exist yet (migration not run)
         pass

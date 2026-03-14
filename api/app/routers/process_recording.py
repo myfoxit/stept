@@ -54,7 +54,7 @@ async def _maybe_create_workflow_version(
 
     if last_ver and last_ver.created_at:
         last_time = last_ver.created_at.replace(tzinfo=None) if last_ver.created_at.tzinfo else last_ver.created_at
-        if (datetime.now(timezone.utc) - last_time).total_seconds() < 60:
+        if (datetime.now(timezone.utc).replace(tzinfo=None) - last_time).total_seconds() < 60:
             return False
 
     # Load current steps
@@ -2105,7 +2105,7 @@ async def restore_workflow_version(
             session_id=session_id,
             step_number=step_data.get("step_number", 1),
             step_type=step_data.get("step_type"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             action_type=step_data.get("action_type"),
             window_title=step_data.get("window_title"),
             description=step_data.get("description"),

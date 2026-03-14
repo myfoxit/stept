@@ -82,7 +82,7 @@ async def transition_job(
     if increment_attempt:
         job.attempts += 1
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if to_state == "running":
         job.started_at = now
     elif to_state in ("succeeded", "failed"):

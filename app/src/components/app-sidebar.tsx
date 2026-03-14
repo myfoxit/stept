@@ -135,56 +135,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5 mb-2"
             >
-              <Link to="#">
-                <svg
-                  style={{ width: "38px", height: "36px" }}
-                  width="38"
-                  height="36"
-                  viewBox="0 0 38 36"
-                >
-                  <rect
-                    x="0"
-                    y="4"
-                    width="32"
-                    height="32"
-                    rx="9"
-                    fill="#3AB08A"
-                  />
-                  <rect
-                    x="7"
-                    y="11"
-                    width="10"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <rect
-                    x="7"
-                    y="17.5"
-                    width="18"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <rect
-                    x="7"
-                    y="24"
-                    width="14"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <path
-                    d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#3AB08A"
-                  />
-                </svg>
+              <Link to="#" className="flex items-center gap-0 !no-underline">
                 <span
-                  className="text-base font-extrabold"
-                  style={{ letterSpacing: "-0.04em" }}
+                  className="text-[1.25rem] font-extrabold tracking-wide text-foreground"
+                  style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "0.04em" }}
                 >
-                  Stept
+                  STEPT
                 </span>
+                <span
+                  className="inline-block w-[2px] h-[1.15rem] bg-foreground ml-[2px] animate-blink"
+                  aria-hidden="true"
+                />
               </Link>
             </SidebarMenuButton>
             <div className="flex items-center gap-0.5 ml-auto">

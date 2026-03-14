@@ -563,7 +563,7 @@ async def index_knowledge_source(source_id: str, db: AsyncSession) -> int:
 
     # Update last_indexed_at
     from datetime import datetime, timezone
-    source.last_indexed_at = datetime.now(timezone.utc)
+    source.last_indexed_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.flush()
     logger.info("Indexed %d embeddings for knowledge source %s", count, source_id)

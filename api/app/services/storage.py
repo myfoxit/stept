@@ -402,7 +402,7 @@ class AzureBlobStorageBackend(StorageBackend):
             blob_name=key,
             account_key=self._service.credential.account_key,
             permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+            expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=expires_in),
         )
         return f"{self._container.url}/{key}?{sas_token}"
 
