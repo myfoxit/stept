@@ -22,7 +22,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/myfoxit/ondoki-web
+  IMAGE_PREFIX: ghcr.io/myfoxit/stept-web
 
 jobs:
   build-and-push:
@@ -112,7 +112,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: "docker-compose.prod.yml,Caddyfile"
-          target: ${{ secrets.DEPLOY_PATH || '/opt/ondoki' }}
+          target: ${{ secrets.DEPLOY_PATH || '/opt/stept' }}
           overwrite: true
 
       - name: Deploy via SSH
@@ -127,7 +127,7 @@ jobs:
           envs: IMAGE_TAG,ENABLE_MEDIA_WORKER
           script: |
             set -euo pipefail
-            DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/ondoki' }}"
+            DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/stept' }}"
             cd "$DEPLOY_DIR"
 
             echo "=== Deploying $IMAGE_TAG (media_worker=$ENABLE_MEDIA_WORKER) ==="
@@ -142,7 +142,7 @@ jobs:
             DOMAIN=${{ secrets.DOMAIN }}
             POSTGRES_USER=${{ secrets.POSTGRES_USER }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=ondoki
+            POSTGRES_DB=stept
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             ONDOKI_ENCRYPTION_KEY=${{ secrets.ONDOKI_ENCRYPTION_KEY }}

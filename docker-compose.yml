@@ -1,12 +1,12 @@
 services:
   db:
     image: pgvector/pgvector:pg16
-    container_name: ondoki-db
+    container_name: stept-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-ondoki}
+      POSTGRES_DB: ${POSTGRES_DB:-stept}
     # ports: exposed only in docker-compose.dev.yml for local dev tools
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -16,31 +16,31 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ondoki-network
+      - stept-network
 
 
   redis:
     image: redis:7-alpine
-    container_name: ondoki-redis
+    container_name: stept-redis
     restart: unless-stopped
     networks:
-      - ondoki-network
+      - stept-network
 
  
   gotenberg:
     image: gotenberg/gotenberg:8
-    container_name: ondoki-gotenberg
+    container_name: stept-gotenberg
     restart: unless-stopped
     environment:
       - GOTENBERG_API_TIMEOUT=300s
       - GOTENBERG_CHROMIUM_ALLOW_FILE_ACCESS_FROM_FILES=true
     networks:
-      - ondoki-network
+      - stept-network
 
 
   backend:
     build: ./api
-    container_name: ondoki-backend
+    container_name: stept-backend
     restart: unless-stopped
     depends_on:
       db:
@@ -49,7 +49,7 @@ services:
         condition: service_started
     environment:
     
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stept}
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
@@ -82,7 +82,7 @@ services:
       SMTP_PORT: "${SMTP_PORT:-587}"
       SMTP_USER: "${SMTP_USER:-}"
       SMTP_PASS: "${SMTP_PASS:-}"
-      SMTP_FROM: "${SMTP_FROM:-noreply@ondoki.com}"
+      SMTP_FROM: "${SMTP_FROM:-noreply@stept.ai}"
       # Frontend URL (for email links)
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5173}"
       # TTS (Text-to-Speech)
@@ -96,20 +96,20 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - ondoki-network
+      - stept-network
 
 
 
   frontend:
     build: ./app
-    container_name: ondoki-frontend
+    container_name: stept-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
       - "80:80" 
     networks:
-      - ondoki-network
+      - stept-network
 
   # ── Video Worker — processes video imports (optional) ──────────────
   # Enable:  docker compose --profile video up -d
@@ -117,7 +117,7 @@ services:
     build:
       context: .
       dockerfile: video-worker/Dockerfile
-    container_name: ondoki-media-worker
+    container_name: stept-media-worker
     profiles: ["video"]
     restart: unless-stopped
     command: celery -A app.tasks worker --loglevel=info --queues=media --concurrency=1
@@ -127,7 +127,7 @@ services:
       redis:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stept}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -138,7 +138,7 @@ services:
     volumes:
       - video-uploads:/data/uploads/videos
     networks:
-      - ondoki-network
+      - stept-network
 
   # ── SendCloak — PII obfuscation for AI requests (optional) ──────────
   # Enable:  docker compose --profile privacy up -d
@@ -147,7 +147,7 @@ services:
   #   docker compose --profile privacy --profile presidio up -d
   sendcloak:
     image: ghcr.io/myfoxit/sendcloak:latest
-    container_name: ondoki-sendcloak
+    container_name: stept-sendcloak
     profiles: ["privacy"]
     command: ["api", "--port", "9090", "--bind", "0.0.0.0"]
     environment:
@@ -160,7 +160,7 @@ services:
     volumes:
       - sendcloak-data:/root/.sendcloak
     networks:
-      - ondoki-network
+      - stept-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/v1/health"]
@@ -172,14 +172,14 @@ services:
   # Enable:  docker compose --profile privacy --profile presidio up -d
   presidio:
     image: mcr.microsoft.com/presidio-analyzer:latest
-    container_name: ondoki-presidio
+    container_name: stept-presidio
     profiles: ["presidio"]
     environment:
       DEFAULT_LANGUAGE: "${PRESIDIO_LANGUAGE:-en}"
     ports:
       - "5002:3000"
     networks:
-      - ondoki-network
+      - stept-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
@@ -194,5 +194,5 @@ volumes:
   video-uploads:
 
 networks:
-  ondoki-network:
+  stept-network:
     driver: bridge

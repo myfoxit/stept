@@ -58,13 +58,13 @@ services:
     build:
       context: .
       dockerfile: video-worker/Dockerfile
-    container_name: ondoki-media-worker-dev
+    container_name: stept-media-worker-dev
     command: celery -A app.tasks worker --loglevel=info --queues=media --concurrency=1
     volumes:
       - ./api:/app
       - video-uploads:/data/uploads/videos
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ondoki}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stept}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -76,7 +76,7 @@ services:
       - db
       - redis
     networks:
-      - ondoki-network
+      - stept-network
 
 volumes:
   recordings-storage:

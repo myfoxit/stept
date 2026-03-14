@@ -1,6 +1,6 @@
 # docker-compose.test.yml — E2E test overlay
 #
-# Runs a separate backend on port 8001 connected to the ondoki_test database.
+# Runs a separate backend on port 8001 connected to the stept_test database.
 # NEVER shares a database with the dev/production backend.
 #
 # Usage: make test-e2e (handles everything automatically)
@@ -14,7 +14,7 @@ services:
     ports:
       - "8001:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ondoki}:${POSTGRES_PASSWORD:-postgres}@db:5432/ondoki_test
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stept}:${POSTGRES_PASSWORD:-postgres}@db:5432/stept_test
       ENVIRONMENT: test
       JWT_SECRET: ${JWT_SECRET:-test-secret-for-e2e-only}
       ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-test-key-for-testing-only-32bytes}
@@ -23,6 +23,6 @@ services:
       - db
       - redis
     networks:
-      - ondoki-network
+      - stept-network
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     working_dir: /app

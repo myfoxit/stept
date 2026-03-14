@@ -12,20 +12,20 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     networks:
-      - ondoki-network
+      - stept-network
     depends_on:
       - frontend
       - backend
 
   db:
     image: pgvector/pgvector:pg16
-    container_name: ondoki-db
+    container_name: stept-db
     restart: unless-stopped
     # No exposed ports in production — only accessible within Docker network
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-ondoki}
+      POSTGRES_DB: ${POSTGRES_DB:-stept}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -34,11 +34,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ondoki-network
+      - stept-network
 
   redis:
     image: redis:7-alpine
-    container_name: ondoki-redis
+    container_name: stept-redis
     restart: unless-stopped
     command: >
       redis-server
@@ -51,11 +51,11 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - ondoki-network
+      - stept-network
 
   gotenberg:
     image: gotenberg/gotenberg:8
-    container_name: ondoki-gotenberg
+    container_name: stept-gotenberg
     restart: unless-stopped
     environment:
       - GOTENBERG_API_TIMEOUT=300s
@@ -66,11 +66,11 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - ondoki-network
+      - stept-network
 
   backend:
-    image: ghcr.io/myfoxit/ondoki-web-api:latest
-    container_name: ondoki-backend
+    image: ghcr.io/myfoxit/stept-api:latest
+    container_name: stept-backend
     restart: unless-stopped
     depends_on:
       db:
@@ -78,7 +78,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ondoki}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stept}
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
       ENVIRONMENT: production
@@ -96,7 +96,7 @@ services:
       SR_SMTP_PORT: ${SR_SMTP_PORT:-587}
       SR_SMTP_USER: ${SR_SMTP_USER:-}
       SR_SMTP_PASS: ${SR_SMTP_PASS:-}
-      SR_FROM_EMAIL: ${SR_FROM_EMAIL:-noreply@ondoki.com}
+      SR_FROM_EMAIL: ${SR_FROM_EMAIL:-noreply@stept.ai}
       # Storage
       STORAGE_BACKEND: "${STORAGE_BACKEND:-local}"
       LOCAL_STORAGE_PATH: "${LOCAL_STORAGE_PATH:-/app/storage/recordings}"
@@ -119,11 +119,11 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - ondoki-network
+      - stept-network
 
   media-worker:
-    image: ghcr.io/myfoxit/ondoki-web-media-worker:latest
-    container_name: ondoki-media-worker
+    image: ghcr.io/myfoxit/stept-media-worker:latest
+    container_name: stept-media-worker
     restart: unless-stopped
     command: celery -A app.tasks worker --loglevel=info --queues=celery,media --concurrency=1
     depends_on:
@@ -132,7 +132,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ondoki}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stept}
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-}@redis:6379/1
@@ -152,22 +152,22 @@ services:
     volumes:
       - file-storage:/app/storage
     networks:
-      - ondoki-network
+      - stept-network
 
   frontend:
-    image: ghcr.io/myfoxit/ondoki-web-app:latest
-    container_name: ondoki-frontend
+    image: ghcr.io/myfoxit/stept-app:latest
+    container_name: stept-frontend
     restart: unless-stopped
     depends_on:
       - backend
     networks:
-      - ondoki-network
+      - stept-network
 
   # ── SendCloak — PII obfuscation (optional) ──────────────────────────
   # Enable: docker compose --profile privacy -f docker-compose.prod.yml up -d
   sendcloak:
     image: ghcr.io/myfoxit/sendcloak:latest
-    container_name: ondoki-sendcloak
+    container_name: stept-sendcloak
     profiles: ["privacy"]
     command: ["api", "--port", "9090", "--bind", "0.0.0.0"]
     environment:
@@ -175,7 +175,7 @@ services:
       SENDCLOAK_LOG_LEVEL: info
       SENDCLOAK_PRESIDIO_URL: "http://presidio:3000"
     networks:
-      - ondoki-network
+      - stept-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/v1/health"]
@@ -185,12 +185,12 @@ services:
 
   presidio:
     image: mcr.microsoft.com/presidio-analyzer:latest
-    container_name: ondoki-presidio
+    container_name: stept-presidio
     profiles: ["presidio"]
     environment:
       DEFAULT_LANGUAGE: "${PRESIDIO_LANGUAGE:-en}"
     networks:
-      - ondoki-network
+      - stept-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
@@ -206,5 +206,5 @@ volumes:
   uploads:
 
 networks:
-  ondoki-network:
+  stept-network:
     driver: bridge

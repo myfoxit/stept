@@ -1,4 +1,4 @@
-# Contributing to Ondoki
+# Contributing to Stept
 
 Thanks for your interest in contributing! Here's how to get started.
 
@@ -13,8 +13,8 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ```bash
 # Clone the repo
-git clone https://github.com/myfoxit/ondoki-web.git
-cd ondoki-web
+git clone https://github.com/myfoxit/stept-web.git
+cd stept-web
 
 # Copy environment config
 cp .env.example .env

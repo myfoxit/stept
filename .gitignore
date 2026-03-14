@@ -51,3 +51,21 @@ app/dist/
 *.egg-info/
 app/.pnpm-store
 app/playwright/
+# pnpm store (never commit)
+.pnpm-store
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Desktop
+desktop/out/
+desktop/lib/
+
+# Extension
+extension/dist-store/
+extension/dist-self-hosted/
+
+# Turborepo
+.turbo
