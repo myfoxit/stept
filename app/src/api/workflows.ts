@@ -129,7 +129,7 @@ export async function uploadStepImage(
   formData.append('replace', replace.toString()); 
 
   // Debug logging
-  if (import.meta.env.DEV) {
+  if (process.env.NODE_ENV === 'development') {
     console.log('Uploading image:', {
       workflowId,
       stepNumber,

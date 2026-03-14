@@ -15,6 +15,7 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|scss|sass)$': '<rootDir>/src/__mocks__/styleMock.ts',
   },
+
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
