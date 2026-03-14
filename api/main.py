@@ -29,7 +29,25 @@ async def lifespan(app: FastAPI):
         await load_persisted_token()
     except Exception:
         pass  # Not critical — user can re-authenticate
+
+    # Startup: launch verification scheduler + worker as background tasks
+    import asyncio
+    _bg_tasks = []
+    try:
+        from app.services.verification_scheduler import verification_scheduler_loop
+        from app.services.playwright_worker import verification_worker_loop
+        _bg_tasks.append(asyncio.create_task(verification_scheduler_loop()))
+        _bg_tasks.append(asyncio.create_task(verification_worker_loop()))
+    except Exception:
+        pass  # Playwright may not be installed — verification features disabled
+
     yield
+
+    # Shutdown: cancel background tasks
+    for task in _bg_tasks:
+        task.cancel()
+    if _bg_tasks:
+        await asyncio.gather(*_bg_tasks, return_exceptions=True)
 
 
 app = FastAPI(title="Ondoki", lifespan=lifespan)
