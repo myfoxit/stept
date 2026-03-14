@@ -94,7 +94,7 @@ async def _create_workflow_with_steps(
             session_id=wf_id,
             step_number=i,
             step_type="click",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             action_type="click",
         )
         db.add(step)
@@ -524,7 +524,7 @@ class TestProjectHealth:
             db, test_project["id"], test_user_id, name="Deleted WF",
             health_status="stale", health_score=0.2,
         )
-        wf.deleted_at = datetime.now(timezone.utc)
+        wf.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
 
         resp = await async_client.get(
@@ -959,7 +959,7 @@ class TestCancelJob:
             workflow_ids=["dummy"],
             trigger="manual",
             status="completed",
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         db.add(job)
         await db.commit()
@@ -1415,7 +1415,7 @@ class TestUpdateStepReliability:
                 check_source="test",
                 element_found=found,
                 status="passed" if found else "failed",
-                checked_at=datetime.now(timezone.utc) + timedelta(seconds=i),
+                checked_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=i),
             )
             db.add(check)
             await db.flush()
@@ -1456,7 +1456,7 @@ class TestUpdateStepReliability:
                 check_source="test",
                 element_found=found,
                 status="passed" if found else "failed",
-                checked_at=datetime.now(timezone.utc) + timedelta(seconds=i),
+                checked_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=i),
             )
             db.add(check)
             await db.flush()
@@ -1484,7 +1484,7 @@ class TestUpdateStepReliability:
                 check_source="test",
                 element_found=True,
                 status="passed",
-                checked_at=datetime.now(timezone.utc) + timedelta(seconds=i),
+                checked_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=i),
             )
             db.add(check)
             await db.flush()
