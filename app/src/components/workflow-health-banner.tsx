@@ -3,10 +3,13 @@ import { AlertTriangle, X } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { VerificationProgress } from '@/components/verification-progress';
+import { useRunVerification } from '@/hooks/use-staleness';
 import type { WorkflowHealth, StepHealth } from '@/hooks/use-staleness';
 
 interface WorkflowHealthBannerProps {
   health: WorkflowHealth;
+  workflowId?: string;
   className?: string;
 }
 
@@ -26,9 +29,12 @@ function formatRelative(dateStr: string | null): string {
 
 export function WorkflowHealthBanner({
   health,
+  workflowId,
   className,
 }: WorkflowHealthBannerProps) {
   const [dismissed, setDismissed] = React.useState(false);
+  const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
+  const runVerification = useRunVerification();
 
   // Don't show banner if healthy or unknown, or if dismissed
   if (
@@ -90,18 +96,42 @@ export function WorkflowHealthBanner({
             ))}
           </ul>
         )}
-        <div className="mt-3 flex items-center gap-2">
-          <Button size="sm" variant="outline" disabled title="Coming in Phase 2">
-            Verify Now
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setDismissed(true)}
-          >
-            Dismiss
-          </Button>
-        </div>
+        {activeJobId && (
+          <div className="mt-3">
+            <VerificationProgress
+              jobId={activeJobId}
+              onDone={() => setActiveJobId(null)}
+            />
+          </div>
+        )}
+        {!activeJobId && (
+          <div className="mt-3 flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={runVerification.isPending}
+              onClick={async () => {
+                try {
+                  const result = await runVerification.mutateAsync({
+                    workflow_id: workflowId,
+                  });
+                  setActiveJobId(result.job_id);
+                } catch {
+                  // error handled by mutation
+                }
+              }}
+            >
+              {runVerification.isPending ? 'Starting…' : 'Verify Now'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDismissed(true)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
       </AlertDescription>
     </Alert>
   );

@@ -7,6 +7,8 @@ import {
   Search,
   Monitor,
 } from 'lucide-react';
+import { ProjectHealthCard } from '@/components/project-health-card';
+import { useProjectHealth } from '@/hooks/use-staleness';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +41,7 @@ export function AnalyticsDashboardPage() {
   const { data: stale } = useStaleResources(pid);
   const { data: queries } = useQueryLog(pid);
   const { data: gaps } = useKnowledgeGaps(pid);
+  const { data: projectHealth } = useProjectHealth(pid || undefined);
 
   return (
     <SettingsLayout title="Analytics" description="Track document access, search queries, and knowledge gaps.">
@@ -58,6 +61,11 @@ export function AnalyticsDashboardPage() {
             ))}
           </div>
         </div>
+
+        {/* Documentation Health card */}
+        {projectHealth && (
+          <ProjectHealthCard health={projectHealth} projectId={pid} />
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Top accessed */}

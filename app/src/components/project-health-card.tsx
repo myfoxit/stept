@@ -11,10 +11,13 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HealthDot } from '@/components/health-dot';
+import { VerificationProgress } from '@/components/verification-progress';
+import { useRunVerification } from '@/hooks/use-staleness';
 import type { ProjectHealth } from '@/hooks/use-staleness';
 
 interface ProjectHealthCardProps {
   health: ProjectHealth;
+  projectId?: string;
   className?: string;
 }
 
@@ -67,9 +70,25 @@ function HealthBar({
 
 export function ProjectHealthCard({
   health,
+  projectId,
   className,
 }: ProjectHealthCardProps) {
   const { total_workflows, healthy, aging, stale, unknown, coverage, stale_workflows } = health;
+  const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
+  const runVerification = useRunVerification();
+
+  const handleVerify = async (filter: 'all' | 'stale') => {
+    if (!projectId) return;
+    try {
+      const result = await runVerification.mutateAsync({
+        project_id: projectId,
+        filter,
+      });
+      setActiveJobId(result.job_id);
+    } catch {
+      // error handled by mutation
+    }
+  };
 
   return (
     <Card className={className}>
@@ -84,13 +103,38 @@ export function ProjectHealthCard({
           {coverage != null ? `${Math.round(coverage * 100)}%` : 'N/A'}
         </CardDescription>
         <CardAction>
-          <Button size="sm" variant="outline" disabled title="Coming in Phase 2">
-            Verify All
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={runVerification.isPending || !!activeJobId}
+              onClick={() => handleVerify('all')}
+            >
+              Verify All
+            </Button>
+            {stale > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={runVerification.isPending || !!activeJobId}
+                onClick={() => handleVerify('stale')}
+              >
+                Verify Stale
+              </Button>
+            )}
+          </div>
         </CardAction>
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Active verification job */}
+        {activeJobId && (
+          <VerificationProgress
+            jobId={activeJobId}
+            onDone={() => setActiveJobId(null)}
+          />
+        )}
+
         {/* Health distribution bar */}
         <HealthBar
           healthy={healthy}

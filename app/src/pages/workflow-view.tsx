@@ -57,7 +57,9 @@ import { useAuth } from '@/providers/auth-provider';
 import { VersionHistoryPanel } from '@/components/VersionHistory/VersionHistoryPanel';
 import { WorkflowHealthBanner } from '@/components/workflow-health-banner';
 import { StepHealthBadge } from '@/components/step-health-badge';
+import { StepHealthDetail } from '@/components/step-health-detail';
 import { useWorkflowHealth } from '@/hooks/use-staleness';
+import type { StepHealth } from '@/hooks/use-staleness';
 
 
 export function WorkflowView() {
@@ -73,6 +75,11 @@ export function WorkflowView() {
   // Comments state
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [commentCount, setCommentCount] = React.useState(0);
+
+  // Step health detail panel state
+  const [stepDetailOpen, setStepDetailOpen] = React.useState(false);
+  const [selectedStepHealth, setSelectedStepHealth] = React.useState<StepHealth | null>(null);
+  const [selectedStepNumber, setSelectedStepNumber] = React.useState(0);
 
   // Translation preview state
   // Translation removed from editable view — only available on public/embed views
@@ -729,17 +736,27 @@ export function WorkflowView() {
           isEditMode={isEditMode}
           onAnnotationUpdate={handleAnnotationUpdate}
         />
-        {workflowHealth && (
-          <div className="flex justify-center">
-            <div className="w-full max-w-3xl px-4 -mt-3">
-              <StepHealthBadge
-                stepHealth={workflowHealth.steps.find(
-                  (s) => s.step_number === backendStepNumber,
-                )}
-              />
+        {workflowHealth && (() => {
+          const sh = workflowHealth.steps.find(
+            (s) => s.step_number === backendStepNumber,
+          );
+          return sh ? (
+            <div className="flex justify-center">
+              <div
+                className={`w-full max-w-3xl px-4 -mt-3 ${sh.status === 'failed' ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (sh.status === 'failed') {
+                    setSelectedStepHealth(sh);
+                    setSelectedStepNumber(backendStepNumber);
+                    setStepDetailOpen(true);
+                  }
+                }}
+              >
+                <StepHealthBadge stepHealth={sh} />
+              </div>
             </div>
-          </div>
-        )}
+          ) : null;
+        })()}
       </div>
     );
   };
@@ -805,7 +822,7 @@ export function WorkflowView() {
           )}
 
           {workflowHealth && (
-            <WorkflowHealthBanner health={workflowHealth} />
+            <WorkflowHealthBanner health={workflowHealth} workflowId={workflowId} />
           )}
 
           {aiEnabled && (
@@ -905,6 +922,13 @@ export function WorkflowView() {
             }}
           />
         )}
+
+        <StepHealthDetail
+          open={stepDetailOpen}
+          onOpenChange={setStepDetailOpen}
+          stepHealth={selectedStepHealth}
+          stepNumber={selectedStepNumber}
+        />
       </div>
     </div>
   );
