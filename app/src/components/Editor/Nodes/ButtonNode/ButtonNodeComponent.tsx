@@ -44,7 +44,7 @@ export const ButtonNodeComponent = ({
         className="h-10 rounded-md shadow"
         onClick={() => {
           /* mock action handler */
-          console.log(`Run action: ${action}`);
+          if (import.meta.env.DEV) console.log(`Run action: ${action}`);
         }}
       >
         {label}

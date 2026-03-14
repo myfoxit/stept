@@ -39,7 +39,7 @@ if celery_app:
             from app.services.llm import load_db_config
             from app.utils import gen_suffix
             from pathlib import Path
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             # Load LLM config from DB (normally done at FastAPI startup, but worker needs it too)
             # Must dispose engine after to avoid asyncpg event loop mismatch between tasks
@@ -107,7 +107,7 @@ if celery_app:
                             session_id=session_id,
                             step_number=step_num,
                             step_type="screenshot",
-                            timestamp=datetime.utcnow(),
+                            timestamp=datetime.now(timezone.utc),
                             action_type="video_frame",
                             generated_title=step_data.get("title"),
                             generated_description=step_data.get("description"),

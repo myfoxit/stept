@@ -20,22 +20,22 @@ When SMTP is not configured, email features are disabled and users are auto-veri
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SR_SMTP_HOST` | *(empty)* | SMTP server hostname. Leave empty to disable email |
-| `SR_SMTP_PORT` | `587` | SMTP port (587 for STARTTLS, 465 for SSL) |
-| `SR_SMTP_USER` | — | SMTP authentication username |
-| `SR_SMTP_PASS` | — | SMTP authentication password |
-| `SR_FROM_EMAIL` | `noreply@stept.ai` | Sender email address |
+| `SMTP_HOST` | *(empty)* | SMTP server hostname. Leave empty to disable email |
+| `SMTP_PORT` | `587` | SMTP port (587 for STARTTLS, 465 for SSL) |
+| `SMTP_USER` | — | SMTP authentication username |
+| `SMTP_PASS` | — | SMTP authentication password |
+| `SMTP_FROM` | `noreply@stept.ai` | Sender email address |
 
 ## Example Configuration
 
 ### Gmail
 
 ```bash
-SR_SMTP_HOST=smtp.gmail.com
-SR_SMTP_PORT=587
-SR_SMTP_USER=your-email@gmail.com
-SR_SMTP_PASS=your-app-password
-SR_FROM_EMAIL=your-email@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM=your-email@gmail.com
 ```
 
 <Note>
@@ -45,26 +45,26 @@ Gmail requires an [App Password](https://support.google.com/accounts/answer/1858
 ### Amazon SES
 
 ```bash
-SR_SMTP_HOST=email-smtp.us-east-1.amazonaws.com
-SR_SMTP_PORT=587
-SR_SMTP_USER=your-ses-smtp-username
-SR_SMTP_PASS=your-ses-smtp-password
-SR_FROM_EMAIL=noreply@yourdomain.com
+SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+SMTP_PORT=587
+SMTP_USER=your-ses-smtp-username
+SMTP_PASS=your-ses-smtp-password
+SMTP_FROM=noreply@yourdomain.com
 ```
 
 ### Resend
 
 ```bash
-SR_SMTP_HOST=smtp.resend.com
-SR_SMTP_PORT=587
-SR_SMTP_USER=resend
-SR_SMTP_PASS=re_your_api_key
-SR_FROM_EMAIL=noreply@yourdomain.com
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_USER=resend
+SMTP_PASS=re_your_api_key
+SMTP_FROM=noreply@yourdomain.com
 ```
 
 ## Disabling Email
 
-To disable email entirely, leave `SR_SMTP_HOST` empty (the default). When disabled:
+To disable email entirely, leave `SMTP_HOST` empty (the default). When disabled:
 
 - Users are automatically verified on registration
 - Password reset is not available (users must contact an admin)

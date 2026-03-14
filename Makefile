@@ -32,7 +32,7 @@ TEST_DB_PASSWORD ?= $(POSTGRES_PASSWORD)
 TEST_DB_HOST     ?= db
 TEST_DB_PORT     ?= 5432
 DATABASE_URL_TEST ?= postgresql+asyncpg://$(TEST_DB_USER):$(TEST_DB_PASSWORD)@$(TEST_DB_HOST):$(TEST_DB_PORT)/$(TEST_DB_NAME)
-TEST_ENCRYPTION_KEY ?= $(or $(ONDOKI_ENCRYPTION_KEY),test-key-for-testing-only-32bytes)
+TEST_ENCRYPTION_KEY ?= $(or $(STEPT_ENCRYPTION_KEY),test-key-for-testing-only-32bytes)
 TEST_JWT_SECRET ?= $(or $(JWT_SECRET),test-secret)
 
 # ─── Tests ────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ test: test-backend test-frontend
 test-backend: test-db
 	$(COMPOSE_DEV) exec \
 		-e DATABASE_URL_TEST=$(DATABASE_URL_TEST) \
-		-e ONDOKI_ENCRYPTION_KEY=$(TEST_ENCRYPTION_KEY) \
+		-e STEPT_ENCRYPTION_KEY=$(TEST_ENCRYPTION_KEY) \
 		-e JWT_SECRET=$(TEST_JWT_SECRET) \
 		backend python -m pytest tests/ -v --tb=short
 

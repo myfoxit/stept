@@ -15,7 +15,7 @@ from app.models import User, ProjectRole, Project
 import secrets
 import json
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
@@ -190,7 +190,7 @@ async def api_create_invite_link(
         "role": request.role,
         "email": request.email.lower().strip(),
         "invited_by": current_user.id,
-        "expires_at": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         "token": secrets.token_urlsafe(32)
     }
     
@@ -244,7 +244,7 @@ async def api_join_project_with_token(
         
         # Check expiration
         expires_at = datetime.fromisoformat(invite_data["expires_at"])
-        if datetime.utcnow() > expires_at:
+        if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(status_code=400, detail="Invite link has expired")
         
         # Validate email matches the invited email

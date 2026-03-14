@@ -49,13 +49,13 @@ async def _close_db(session, gen):
 async def _auth_project_id(ctx) -> str | None:
     """
     Extract the API key from the MCP request headers and return the project_id.
-    For stdio transport, uses ONDOKI_API_KEY env var.
+    For stdio transport, uses STEPT_API_KEY env var.
     Returns None if auth fails.
     """
     import os
     from app.mcp_auth import validate_api_key
 
-    raw_key = os.environ.get("STEPT_API_KEY") or os.environ.get("ONDOKI_API_KEY")
+    raw_key = os.environ.get("STEPT_API_KEY")
 
     # Try to get from request headers if available
     if not raw_key:

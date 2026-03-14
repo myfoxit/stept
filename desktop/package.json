@@ -4,14 +4,14 @@
   "version": "1.0.0",
   "description": "Cross-platform screen recording and AI guide generation tool",
   "main": "lib/main/index.js",
-  "homepage": "https://github.com/myfoxit/stept-desktop",
+  "homepage": "https://github.com/myfoxit/stept",
   "repository": {
     "type": "git",
-    "url": "https://github.com/myfoxit/stept-desktop.git"
+    "url": "https://github.com/myfoxit/stept.git"
   },
   "author": {
-    "name": "MyFoxIT",
-    "email": "contact@myfoxit.com"
+    "name": "Stept",
+    "email": "hello@stept.ai"
   },
   "license": "MIT",
   "scripts": {
@@ -83,7 +83,7 @@
     "ws": "^8.17.0"
   },
   "build": {
-    "appId": "com.myfoxit.stept-desktop",
+    "appId": "ai.stept.desktop",
     "productName": "Stept Desktop",
     "directories": {
       "output": "dist"

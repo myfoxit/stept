@@ -22,7 +22,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/myfoxit/stept-web
+  IMAGE_PREFIX: ghcr.io/myfoxit/stept
 
 jobs:
   build-and-push:
@@ -145,16 +145,16 @@ jobs:
             POSTGRES_DB=stept
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
-            ONDOKI_ENCRYPTION_KEY=${{ secrets.ONDOKI_ENCRYPTION_KEY }}
+            STEPT_ENCRYPTION_KEY=${{ secrets.STEPT_ENCRYPTION_KEY }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             WHISPER_MODEL=base
-            SR_SMTP_HOST=${{ secrets.SR_SMTP_HOST }}
-            SR_SMTP_PORT=${{ secrets.SR_SMTP_PORT }}
-            SR_SMTP_USER=${{ secrets.SR_SMTP_USER }}
-            SR_SMTP_PASS=${{ secrets.SR_SMTP_PASS }}
-            SR_FROM_EMAIL=${{ secrets.SR_FROM_EMAIL }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASS=${{ secrets.SMTP_PASS }}
+            SMTP_FROM=${{ secrets.SMTP_FROM }}
             ENVEOF
             fi
 

@@ -4,9 +4,12 @@ Utility functions for exporting workflows to various formats.
 import io
 import base64
 import os
+import logging
 import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # Gotenberg configuration
 GOTENBERG_URL = os.getenv("GOTENBERG_URL", "http://gotenberg:3000")
@@ -26,7 +29,7 @@ async def get_step_image_bytes(storage_path: str, file_path: str, storage_type: 
         if data:
             return data
     except Exception as e:
-        print(f"[Export] Error reading image via backend ({storage_type}): {e}")
+        logger.debug(f"[Export] Error reading image via backend ({storage_type}): {e}")
     return None
 
 
@@ -34,7 +37,7 @@ async def get_step_image_base64(storage_path: str, file_path: str, storage_type:
     """Get base64 encoded image for embedding in exports."""
     data = await get_step_image_bytes(storage_path, file_path, storage_type)
     if data:
-        print(f"[Export] Read image, size: {len(data)} bytes")
+        logger.debug(f"[Export] Read image, size: {len(data)} bytes")
         return base64.b64encode(data).decode("utf-8")
     return None
 
@@ -173,8 +176,8 @@ async def generate_html(
     ]
     
     # Debug: log available files
-    print(f"[PDF Export] Storage path: {storage_path}")
-    print(f"[PDF Export] Files dict: {files}")
+    logger.debug(f"[PDF Export] Storage path: {storage_path}")
+    logger.debug(f"[PDF Export] Files dict: {files}")
     
     visible_index = 0
     for step in sorted(steps, key=lambda s: s.get("step_number", 0)):
@@ -203,7 +206,7 @@ async def generate_html(
             # Add image
             if step_number in files:
                 file_path = files[step_number]
-                print(f"[PDF Export] Step {step_number} has file: {file_path}")
+                logger.debug(f"[PDF Export] Step {step_number} has file: {file_path}")
                 
                 if embed_images:
                     img_b64 = await get_step_image_base64(storage_path, file_path, storage_type)
@@ -215,7 +218,7 @@ async def generate_html(
                     img_url = f"{image_base_url}/session/{workflow['id']}/image/{step_number}"
                     html_parts.append(f"    <img src='{img_url}' alt='Step {visible_index}'>")
             else:
-                print(f"[PDF Export] Step {step_number} has no file in files dict")
+                logger.debug(f"[PDF Export] Step {step_number} has no file in files dict")
             
             # Additional details
             if step.get("text_typed"):
@@ -551,8 +554,8 @@ async def generate_docx(
     doc.add_paragraph()
     
     # Debug logging
-    print(f"[DOCX Export] Storage path: {storage_path}")
-    print(f"[DOCX Export] Files dict: {files}")
+    logger.debug(f"[DOCX Export] Storage path: {storage_path}")
+    logger.debug(f"[DOCX Export] Files dict: {files}")
     
     # Steps
     visible_index = 0
@@ -582,7 +585,7 @@ async def generate_docx(
             # Add image
             if step_number in files:
                 file_path = files[step_number]
-                print(f"[DOCX Export] Step {step_number} has file: {file_path}")
+                logger.debug(f"[DOCX Export] Step {step_number} has file: {file_path}")
                 
                 # Read image via storage backend (works with S3, GCS, Azure, local)
                 img_data = await get_step_image_bytes(storage_path, file_path, storage_type)
@@ -593,15 +596,15 @@ async def generate_docx(
                         doc.add_picture(img_stream, width=Inches(6))
                         last_paragraph = doc.paragraphs[-1]
                         last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        print(f"[DOCX Export] Added image for step {step_number}, size: {len(img_data)} bytes")
+                        logger.debug(f"[DOCX Export] Added image for step {step_number}, size: {len(img_data)} bytes")
                     except Exception as e:
-                        print(f"[DOCX Export] Error adding image: {e}")
+                        logger.debug(f"[DOCX Export] Error adding image: {e}")
                         doc.add_paragraph(f"[Image could not be loaded: {e}]")
                 else:
-                    print(f"[DOCX Export] Image not found for step {step_number}")
+                    logger.debug(f"[DOCX Export] Image not found for step {step_number}")
                     doc.add_paragraph(f"[Image not available: {file_path}]")
             else:
-                print(f"[DOCX Export] Step {step_number} has no file in files dict")
+                logger.debug(f"[DOCX Export] Step {step_number} has no file in files dict")
             
             # Additional details
             if step.get("text_typed"):

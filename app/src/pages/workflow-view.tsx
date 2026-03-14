@@ -428,19 +428,21 @@ export function WorkflowView() {
         let sent = false;
         for (const extId of extensionIds) {
           try {
-            await new Promise<void>((resolve, reject) => {
-              chrome.runtime.sendMessage(extId, { type: 'START_GUIDE', guide }, (response: any) => {
-                if (chrome.runtime.lastError) {
-                  reject(chrome.runtime.lastError);
-                } else if (response?.success) {
-                  resolve();
-                } else {
-                  reject(new Error(response?.error || 'Unknown error'));
-                }
+            if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+              await new Promise<void>((resolve, reject) => {
+                chrome.runtime.sendMessage(extId, { type: 'START_GUIDE', guide }, (response: any) => {
+                  if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                  } else if (response?.success) {
+                    resolve();
+                  } else {
+                    reject(new Error(response?.error || 'Unknown error'));
+                  }
+                });
               });
-            });
-            sent = true;
-            break;
+              sent = true;
+              break;
+            }
           } catch {
             continue;
           }
@@ -470,18 +472,17 @@ export function WorkflowView() {
 
   // Add missing handler functions
   const handleDuplicateStep = async (stepNumber: number) => {
-    console.log('Duplicate step:', stepNumber);
+    if (import.meta.env.DEV) console.log('Duplicate step:', stepNumber);
     // TODO: Implement step duplication
   };
 
   const handleCopyLinkToStep = (stepNumber: number) => {
     const url = `${window.location.origin}/workflow/${workflowId}#step-${stepNumber}`;
     navigator.clipboard.writeText(url);
-    console.log('Link copied to clipboard');
   };
 
   const handleUpdateGuideLink = (stepNumber: number) => {
-    console.log('Update guide link for step:', stepNumber);
+    if (import.meta.env.DEV) console.log('Update guide link for step:', stepNumber);
     // TODO: Implement guide link update
   };
 

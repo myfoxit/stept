@@ -6,7 +6,7 @@ from sqlalchemy import select
 from typing import Optional, List
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import io
 
 from app.database import get_session as get_db
@@ -54,7 +54,7 @@ async def _maybe_create_workflow_version(
 
     if last_ver and last_ver.created_at:
         last_time = last_ver.created_at.replace(tzinfo=None) if last_ver.created_at.tzinfo else last_ver.created_at
-        if (datetime.utcnow() - last_time).total_seconds() < 60:
+        if (datetime.now(timezone.utc) - last_time).total_seconds() < 60:
             return False
 
     # Load current steps
@@ -234,7 +234,7 @@ async def create_upload_session(
     session = await create_session(
         db=db,
         user_id=current_user.id,
-        client_name=session_data.client or "ProcessRecorder",
+        client_name=session_data.client or "SteptRecorder",
         project_id=session_data.project_id,
         folder_id=session_data.folder_id,
         name=session_data.name,
@@ -524,7 +524,7 @@ async def upload_cli_session(
         # Update session metadata with CLI info
         if session_data.get("title") and not session.name:
             session.name = session_data["title"]
-        if not session.client_name or session.client_name == "ProcessRecorder":
+        if not session.client_name or session.client_name in ("ProcessRecorder", "SteptRecorder"):
             session.client_name = "stept-cli"
         if session_data.get("ssh_target"):
             session.name = session.name or f"SSH: {session_data['ssh_target']}"
@@ -630,7 +630,7 @@ async def get_image(
     if access["type"] == "local":
         local_path = access["path"]
         if not os.path.exists(local_path):
-            print(f"DEBUG: Docker is looking for image at: {local_path}")
+            logger.debug(f"Docker is looking for image at: {local_path}")
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Image file not found at {local_path}")
         return FileResponse(
             local_path,
@@ -1180,10 +1180,10 @@ async def export_workflow_pdf(
                         step[field] = lookup[k]
 
     # Debug logging
-    print(f"[PDF Export] Session ID: {session_id}")
-    print(f"[PDF Export] Storage path: {session.storage_path}")
-    print(f"[PDF Export] Storage type: {session.storage_type}")
-    print(f"[PDF Export] Files: {[(f.step_number, f.file_path, f.filename) for f in session.files]}")
+    logger.debug(f"[PDF Export] Session ID: {session_id}")
+    logger.debug(f"[PDF Export] Storage path: {session.storage_path}")
+    logger.debug(f"[PDF Export] Storage type: {session.storage_type}")
+    logger.debug(f"[PDF Export] Files: {[(f.step_number, f.file_path, f.filename) for f in session.files]}")
     
     try:
         # Try Gotenberg first (async)
@@ -1195,7 +1195,7 @@ async def export_workflow_pdf(
             storage_type=session.storage_type,
         )
     except Exception as gotenberg_error:
-        print(f"[PDF Export] Gotenberg error: {gotenberg_error}")
+        logger.debug(f"[PDF Export] Gotenberg error: {gotenberg_error}")
         # Fall back to reportlab if Gotenberg fails
         try:
             pdf_bytes = _generate_pdf_reportlab(
@@ -2105,7 +2105,7 @@ async def restore_workflow_version(
             session_id=session_id,
             step_number=step_data.get("step_number", 1),
             step_type=step_data.get("step_type"),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             action_type=step_data.get("action_type"),
             window_title=step_data.get("window_title"),
             description=step_data.get("description"),

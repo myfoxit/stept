@@ -2,7 +2,7 @@
 Symmetric encryption for sensitive config values (e.g. API keys).
 
 Uses Fernet (AES-128-CBC + HMAC-SHA256) from the `cryptography` package.
-Key is read from the STEPT_ENCRYPTION_KEY env var (ONDOKI_ENCRYPTION_KEY also supported).  If the var is not set
+Key is read from the STEPT_ENCRYPTION_KEY env var.  If the var is not set
 a random key is generated automatically (suitable for local dev only) and a
 warning is emitted.
 """
@@ -30,7 +30,7 @@ def _get_key() -> bytes:
     if _ENCRYPTION_KEY is not None:
         return _ENCRYPTION_KEY
 
-    raw = os.environ.get("STEPT_ENCRYPTION_KEY") or os.environ.get("ONDOKI_ENCRYPTION_KEY")
+    raw = os.environ.get("STEPT_ENCRYPTION_KEY")
     if raw:
         _ENCRYPTION_KEY = raw.encode()
     else:

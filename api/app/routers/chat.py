@@ -642,9 +642,9 @@ async def get_usage(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from sqlalchemy import func as sqlfunc
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
     query = select(
         sqlfunc.sum(LLMUsage.input_tokens).label("total_input"),
         sqlfunc.sum(LLMUsage.output_tokens).label("total_output"),

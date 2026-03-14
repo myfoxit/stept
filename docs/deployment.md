@@ -116,11 +116,11 @@ Then set `S3_ENDPOINT=http://minio:9000` in your backend environment.
 Email is used for account verification and password reset. Configure in `.env`:
 
 ```bash
-SR_SMTP_HOST=smtp.mailgun.org    # or smtp.gmail.com, smtp.sendgrid.net, etc.
-SR_SMTP_PORT=587
-SR_SMTP_USER=your-smtp-user
-SR_SMTP_PASS=your-smtp-password
-SR_FROM_EMAIL=noreply@yourdomain.com
+SMTP_HOST=smtp.mailgun.org    # or smtp.gmail.com, smtp.sendgrid.net, etc.
+SMTP_PORT=587
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_FROM=noreply@yourdomain.com
 ```
 
 ### Popular SMTP Providers

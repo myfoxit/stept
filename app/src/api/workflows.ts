@@ -129,12 +129,14 @@ export async function uploadStepImage(
   formData.append('replace', replace.toString()); 
 
   // Debug logging
-  console.log('Uploading image:', {
-    workflowId,
-    stepNumber,
-    replace,
-    fileName: file.name,
-  });
+  if (import.meta.env.DEV) {
+    console.log('Uploading image:', {
+      workflowId,
+      stepNumber,
+      replace,
+      fileName: file.name,
+    });
+  }
 
   // Get the base URL using shared function
   const apiBaseUrl = getApiBaseUrl();

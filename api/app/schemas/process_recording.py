@@ -24,7 +24,7 @@ class StepType(str, Enum):
 
 class SessionCreate(BaseModel):
     timestamp: datetime
-    client: Optional[str] = "ProcessRecorder"
+    client: Optional[str] = "SteptRecorder"
     project_id: Optional[str] = None
     user_id: Optional[str] = None
     folder_id: Optional[str] = None  # NEW: Support folder_id

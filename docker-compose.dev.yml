@@ -19,10 +19,10 @@ services:
       GOTENBERG_URL: http://gotenberg:3000
       LOCAL_STORAGE_PATH: /app/storage/recordings
       WATCHFILES_FORCE_POLLING: "false"
-      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-exX5o2vhMgT48Eho4ShGcD-vx_iKKZQMBGgOfw7dhRM=}
+      STEPT_ENCRYPTION_KEY: ${STEPT_ENCRYPTION_KEY:-CHANGE_ME_generate_with_python_fernet}
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      ONDOKI_UPLOAD_DIR: /data/uploads/videos
+      STEPT_UPLOAD_DIR: /data/uploads/videos
     ports:
       - "8000:8000"
     depends_on:
@@ -68,10 +68,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-exX5o2vhMgT48Eho4ShGcD-vx_iKKZQMBGgOfw7dhRM=}
+      STEPT_ENCRYPTION_KEY: ${STEPT_ENCRYPTION_KEY:-CHANGE_ME_generate_with_python_fernet}
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       WHISPER_MODEL: "${WHISPER_MODEL:-whisper-1}"
-      ONDOKI_UPLOAD_DIR: /data/uploads/videos
+      STEPT_UPLOAD_DIR: /data/uploads/videos
     depends_on:
       - db
       - redis

@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models import MediaProcessingJob
 from app.utils import gen_suffix
@@ -82,7 +82,7 @@ async def transition_job(
     if increment_attempt:
         job.attempts += 1
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if to_state == "running":
         job.started_at = now
     elif to_state in ("succeeded", "failed"):

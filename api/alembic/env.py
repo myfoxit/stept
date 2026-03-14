@@ -27,14 +27,14 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-DYNAMIC_TABLE_RE = re.compile(r"^sr_[A-Za-z0-9]{5}_")
+DYNAMIC_TABLE_RE = re.compile(r"^st_[A-Za-z0-9]{5}_")
 
 # -------------------------------------------------------------------------
 # Tell Alembic which DB objects to keep or skip
 # -------------------------------------------------------------------------
 def include_object(obj, name, type_, reflected, compare_to):
     """
-    Skip tenant-specific runtime tables (sr_XXXXX_…).
+    Skip tenant-specific runtime tables (st_XXXXX_…).
     Keep everything else (tables, indexes, FKs, etc.).
     """
     if type_ == "table" and reflected and DYNAMIC_TABLE_RE.match(name):

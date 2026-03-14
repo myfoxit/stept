@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         # Use top level .env file (one level above ./backend/)
         env_file="../.env",
         env_ignore_empty=True,
-        extra="ignore",
+        extra="allow",
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = ""
@@ -64,14 +64,14 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
-    FIRST_SUPERUSER_PASSWORD: str = "changethis"
+    FIRST_SUPERUSER_PASSWORD: str = ""
 
     @model_validator(mode="after")
     def _validate_secrets(self) -> "Settings":
         if self.ENVIRONMENT == "production":
-            if self.FIRST_SUPERUSER_PASSWORD == "changethis":
+            if not self.FIRST_SUPERUSER_PASSWORD or self.FIRST_SUPERUSER_PASSWORD == "changethis":
                 raise ValueError(
-                    "FIRST_SUPERUSER_PASSWORD must be changed from default in production! "
+                    "FIRST_SUPERUSER_PASSWORD must be set to a strong value in production! "
                     "Set the FIRST_SUPERUSER_PASSWORD environment variable."
                 )
         return self
@@ -147,6 +147,55 @@ class Settings(BaseSettings):
     # ── SendCloak PII obfuscation ──────────────────────────────
     SENDCLOAK_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
     SENDCLOAK_URL: str = "http://sendcloak:9090"
+
+    # ── JWT (from legacy config) ────────────────────────────────
+    JWT_SECRET: str = ""
+    JWT_ALGORITHM: str = "HS256"
+
+    # ── Database (from legacy config) ───────────────────────────
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db")
+    use_postgres: str = os.getenv("use_postgres", "TRUE")
+    database_url_test: str = os.getenv("database_url_test", "postgresql+asyncpg://postgres:postgres@localhost:5432/test_db")
+
+    # ── OAuth — Google ──────────────────────────────────────────
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+
+    # ── OAuth — GitHub ──────────────────────────────────────────
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+
+    # ── Storage ─────────────────────────────────────────────────
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", os.getenv("STORAGE_TYPE", os.getenv("storage_type", "local")))
+    LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", os.getenv("local_storage_path", "./storage/recordings"))
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
+
+    # S3-compatible storage
+    S3_BUCKET: str = ""
+    S3_REGION: str = ""
+    S3_ENDPOINT_URL: str = ""
+    S3_PREFIX: str = "uploads"
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
+    S3_FORCE_PATH_STYLE: bool = False
+
+    # GCS storage
+    STORAGE_GCS_BUCKET: str = ""
+    STORAGE_GCS_CREDENTIALS_FILE: str = ""
+
+    # Azure Blob storage
+    STORAGE_AZURE_CONTAINER: str = ""
+    STORAGE_AZURE_CONNECTION_STRING: str = ""
+
+    # ── Frontend / Redis ────────────────────────────────────────
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+    # ── Legacy SMTP aliases (from legacy config) ────────────────
+    SMTP_PASS: Optional[str] = None
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "noreply@stept.ai")
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
 
 
 

@@ -67,14 +67,14 @@ Never reuse these keys across environments. If you lose the encryption key, MCP 
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SR_SMTP_HOST` | — | *(empty)* | SMTP host. Leave empty to disable email |
-| `SR_SMTP_PORT` | — | `587` | SMTP port |
-| `SR_SMTP_USER` | — | — | SMTP username |
-| `SR_SMTP_PASS` | — | — | SMTP password |
-| `SR_FROM_EMAIL` | — | `noreply@stept.ai` | Sender email address |
+| `SMTP_HOST` | — | *(empty)* | SMTP host. Leave empty to disable email |
+| `SMTP_PORT` | — | `587` | SMTP port |
+| `SMTP_USER` | — | — | SMTP username |
+| `SMTP_PASS` | — | — | SMTP password |
+| `SMTP_FROM` | — | `noreply@stept.ai` | Sender email address |
 
 <Note>
-Email is used for account verification and password reset. When `SR_SMTP_HOST` is empty, email features are disabled and users are auto-verified on registration.
+Email is used for account verification and password reset. When `SMTP_HOST` is empty, email features are disabled and users are auto-verified on registration.
 </Note>
 
 ## Storage

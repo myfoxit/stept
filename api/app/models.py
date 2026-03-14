@@ -270,7 +270,7 @@ class ProcessRecordingSession(Base):
     
     id = Column(String(16), primary_key=True, default=gen_suffix)
     user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
-    client_name = Column(String, nullable=False, default="ProcessRecorder")
+    client_name = Column(String, nullable=False, default="SteptRecorder")
     status = Column(String, nullable=False, default="uploading")  # uploading, completed, failed
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

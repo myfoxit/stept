@@ -144,7 +144,7 @@ export function VersionHistoryPanel({
           <History className="h-4 w-4" />
           Version history
         </h3>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Close version history" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>

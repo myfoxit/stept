@@ -51,9 +51,16 @@ class SsoConfigRead(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _require_admin(user: User = Depends(get_current_user)) -> User:
+async def _require_admin(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
     """For now, only the first registered user (lowest id) is admin."""
-    # Simple admin check — extend later with a proper role system
+    first_user_id = await db.scalar(
+        select(User.id).order_by(User.id).limit(1)
+    )
+    if user.id != first_user_id:
+        raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
 

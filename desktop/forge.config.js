@@ -35,8 +35,8 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          maintainer: 'MyFoxIT',
-          homepage: 'https://github.com/myfoxit/stept-desktop-electron',
+          maintainer: 'Stept',
+          homepage: 'https://github.com/myfoxit/stept',
           description: 'Cross-platform screen recording and AI guide generation tool',
         }
       },
@@ -45,8 +45,8 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {
         options: {
-          maintainer: 'MyFoxIT',
-          homepage: 'https://github.com/myfoxit/stept-desktop-electron',
+          maintainer: 'Stept',
+          homepage: 'https://github.com/myfoxit/stept',
           description: 'Cross-platform screen recording and AI guide generation tool',
         }
       },
@@ -71,7 +71,7 @@ module.exports = {
       config: {
         repository: {
           owner: 'myfoxit',
-          name: 'stept-desktop-electron'
+          name: 'stept'
         }
       }
     }

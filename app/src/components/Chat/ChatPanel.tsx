@@ -91,6 +91,7 @@ export function ChatPanel() {
                 onClick={clearMessages}
                 disabled={messages.length === 0}
                 title="Clear chat"
+                aria-label="Clear chat"
                 className="h-7 w-7"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -99,6 +100,7 @@ export function ChatPanel() {
                 variant="ghost"
                 size="icon"
                 onClick={closePanel}
+                aria-label="Close chat"
                 className="h-7 w-7"
               >
                 <X className="h-3.5 w-3.5" />

@@ -1475,7 +1475,7 @@ async def record_workflow_view(
     view_count = getattr(session, "view_count", None)
     if view_count is not None:
         session.view_count = (session.view_count or 0) + 1
-        session.last_viewed_at = datetime.utcnow()
+        session.last_viewed_at = datetime.now(timezone.utc)
     else:
         # Column doesn't exist yet (migration not run)
         pass

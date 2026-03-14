@@ -247,8 +247,8 @@ async def api_update_document(
 
     # --- Document locking check ---
     if doc.locked_by and doc.locked_by != current_user.id:
-        from datetime import datetime, timedelta
-        lock_expired = doc.locked_at and (datetime.utcnow() - doc.locked_at.replace(tzinfo=None)) > timedelta(minutes=30)
+        from datetime import datetime, timedelta, timezone
+        lock_expired = doc.locked_at and (datetime.now(timezone.utc) - doc.locked_at.replace(tzinfo=None)) > timedelta(minutes=30)
         if not lock_expired:
             raise HTTPException(423, detail="Document is locked by another user")
 
@@ -278,7 +278,7 @@ async def api_update_document(
         if last_ver and last_ver.created_at:
             from datetime import timezone
             last_time = last_ver.created_at.replace(tzinfo=None) if last_ver.created_at.tzinfo else last_ver.created_at
-            if (datetime.utcnow() - last_time).total_seconds() < 30:
+            if (datetime.now(timezone.utc) - last_time).total_seconds() < 30:
                 should_version = False
         
         if should_version:
@@ -396,7 +396,8 @@ def _is_lock_expired(doc) -> bool:
         return True
     from datetime import datetime, timedelta
     lock_time = doc.locked_at.replace(tzinfo=None) if doc.locked_at.tzinfo else doc.locked_at
-    return (datetime.utcnow() - lock_time) > timedelta(minutes=LOCK_TIMEOUT_MINUTES)
+    from datetime import timezone
+    return (datetime.now(timezone.utc) - lock_time) > timedelta(minutes=LOCK_TIMEOUT_MINUTES)
 
 
 @router.get("/{doc_id}/lock")
@@ -441,9 +442,11 @@ async def api_acquire_lock(
         raise HTTPException(404, "document not found")
     await _check_doc_access(db, doc, current_user, ProjectRole.EDITOR)
 
+    from datetime import timezone
+
     # Already locked by current user — refresh
     if doc.locked_by == current_user.id:
-        doc.locked_at = datetime.utcnow()
+        doc.locked_at = datetime.now(timezone.utc)
         await db.commit()
         return {"locked": True, "locked_by": current_user.id, "locked_at": doc.locked_at}
 
@@ -461,7 +464,7 @@ async def api_acquire_lock(
 
     # Acquire lock
     doc.locked_by = current_user.id
-    doc.locked_at = datetime.utcnow()
+    doc.locked_at = datetime.now(timezone.utc)
     await db.commit()
     return {"locked": True, "locked_by": current_user.id, "locked_at": doc.locked_at}
 

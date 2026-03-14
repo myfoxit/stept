@@ -13,8 +13,8 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ```bash
 # Clone the repo
-git clone https://github.com/myfoxit/stept-web.git
-cd stept-web
+git clone https://github.com/myfoxit/stept.git
+cd stept
 
 # Copy environment config
 cp .env.example .env
@@ -27,7 +27,7 @@ make dev
 ```
 
 The app will be available at:
-- **Frontend**: http://localhost:3000
+- **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 

@@ -228,7 +228,7 @@ export function ShareExportModal({
                         className="flex-1 text-xs font-mono bg-muted/50"
                         onClick={(e) => (e.target as HTMLInputElement).select()}
                       />
-                      <Button variant="outline" size="icon" onClick={() => handleCopy(publicUrl)}>
+                      <Button variant="outline" size="icon" aria-label="Copy public link" onClick={() => handleCopy(publicUrl)}>
                         {copied ? (
                           <Check className="h-4 w-4 text-green-500" />
                         ) : (
@@ -296,7 +296,7 @@ export function ShareExportModal({
                               <SelectItem value="edit">Can edit</SelectItem>
                             </SelectContent>
                           </Select>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => remove(user.id)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" aria-label="Remove user" onClick={() => remove(user.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>

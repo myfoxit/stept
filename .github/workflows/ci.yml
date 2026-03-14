@@ -51,7 +51,7 @@ jobs:
         env:
           DATABASE_URL_TEST: postgresql+asyncpg://postgres:postgres@localhost:5432/stept_test
           JWT_SECRET: ci-test-secret
-          ONDOKI_ENCRYPTION_KEY: ci-test-key-must-be-32-bytes-pad
+          STEPT_ENCRYPTION_KEY: ci-test-key-must-be-32-bytes-pad
           ENVIRONMENT: test
 
   test-frontend:
@@ -114,11 +114,11 @@ jobs:
         with:
           context: ./api
           push: true
-          tags: ghcr.io/myfoxit/stept-web-api:latest
+          tags: ghcr.io/myfoxit/stept-api:latest
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
           context: ./app
           push: true
-          tags: ghcr.io/myfoxit/stept-web-app:latest
+          tags: ghcr.io/myfoxit/stept-app:latest

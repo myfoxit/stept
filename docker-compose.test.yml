@@ -17,7 +17,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stept}:${POSTGRES_PASSWORD:-postgres}@db:5432/stept_test
       ENVIRONMENT: test
       JWT_SECRET: ${JWT_SECRET:-test-secret-for-e2e-only}
-      ONDOKI_ENCRYPTION_KEY: ${ONDOKI_ENCRYPTION_KEY:-test-key-for-testing-only-32bytes}
+      STEPT_ENCRYPTION_KEY: ${STEPT_ENCRYPTION_KEY:-test-key-for-testing-only-32bytes}
       REDIS_URL: redis://redis:6379/1
     depends_on:
       - db

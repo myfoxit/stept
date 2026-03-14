@@ -575,7 +575,7 @@ async def device_info(
     return {
         "authenticated": True,
         "user_email": current_user.email,
-        "device_name": "ProcessRecorder Desktop"
+        "device_name": "Stept Desktop"
     }
 
 @router.post("/token")
@@ -631,7 +631,7 @@ async def token(
             user_id=user_id,
             token_hash=refresh_token_hash,
             client_name="desktop",
-            expires_at=dt.datetime.utcnow() + dt.timedelta(days=30),
+            expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=30),
         )
         db.add(refresh_token_obj)
         await db.commit()
@@ -663,7 +663,7 @@ async def token(
             raise HTTPException(status_code=401, detail="Invalid refresh token")
         
         # Check expiry
-        if refresh_obj.expires_at and dt.datetime.utcnow() > refresh_obj.expires_at:
+        if refresh_obj.expires_at and dt.datetime.now(dt.timezone.utc) > refresh_obj.expires_at:
             refresh_obj.revoked = True
             await db.commit()
             raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -717,7 +717,7 @@ async def refresh_access_token(
     if not refresh_obj:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     
-    if refresh_obj.expires_at and dt.datetime.utcnow() > refresh_obj.expires_at:
+    if refresh_obj.expires_at and dt.datetime.now(dt.timezone.utc) > refresh_obj.expires_at:
         refresh_obj.revoked = True
         await db.commit()
         raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -935,8 +935,8 @@ async def test_delete_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    # Hard guard: never allow in production
-    if os.getenv("ENVIRONMENT") == "production":
+    # Hard guard: only allow in test environment
+    if os.getenv("ENVIRONMENT") != "test":
         raise HTTPException(status_code=403, detail="FORBIDDEN")
     host = request.url.hostname
     is_local = host in {"localhost", "127.0.0.1"}
