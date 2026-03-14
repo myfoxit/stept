@@ -46,6 +46,7 @@ _TEST_DB_URL = os.environ.get(
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ.setdefault("JWT_SECRET", "test-secret-for-ci")
 os.environ.setdefault("ONDOKI_ENCRYPTION_KEY", "dGVzdC1rZXktMzItYnl0ZXMtZm9yLWZlcm5ldC14eA==")
+os.environ["ENVIRONMENT"] = "test"
 
 # Prevent dotenv from loading any .env file that might override DATABASE_URL
 os.environ["DOTENV_LOADED"] = "1"
