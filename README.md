@@ -33,21 +33,27 @@
 | | Feature | Description |
 |---|---|---|
 | 🎬 | **Workflow Recording** | Capture user actions from the [desktop app](https://github.com/myfoxit/ondoki-desktop) or [Chrome extension](https://github.com/myfoxit/ondoki-chrome-extension). Each step records a screenshot, click position, window title, and description. |
+| 🎯 | **Interactive Guides** | Turn recorded workflows into interactive walkthroughs. The Chrome extension overlays step-by-step highlights directly on the target page using a 6-level element finder cascade (CSS selector → data-testid → ARIA role → tag+text → XPath → parent chain). Shadow DOM isolation prevents style conflicts. |
+| 📹 | **Video-to-Guide** | Upload video files (MP4, MOV, AVI, MKV, WEBM) up to 2 GB. Async pipeline extracts key frames, transcribes audio via Whisper, and generates step-by-step workflow guides automatically. |
+| 🩺 | **Staleness Detection** | Automatic documentation health monitoring. Four triggers: passive replay feedback (when users run guides), scheduled Playwright verification (headless browser checks on a cron), manual re-run (single or batch), and heuristic age decay. Per-step reliability tracking filters noise from always-broken selectors. Optional LLM verification explains *why* elements changed (e.g. "button renamed to Save Draft"). Health scores (🟢🟡🔴) shown in sidebar, workflow headers, and a project health dashboard. |
 | 📝 | **Rich Document Editor** | TipTap-based block editor with slash commands, drag-and-drop, images, code blocks, tables, and multiple page layouts (full, document, A4, letter). |
+| 🕰️ | **Version History** | Google Docs-style version history for documents and workflows. Auto-versioning with configurable throttle, side-by-side preview, and one-click restore. |
 | 🤖 | **AI-Powered Features** | Inline AI commands (write, summarize, improve, expand, simplify, translate, explain), context-aware chat with function calling, auto-annotation of workflow steps, automatic title/summary/tag generation. |
 | 🔍 | **Hybrid Search** | Full-text search (PostgreSQL tsvector) + semantic vector search (pgvector embeddings) combined via RRF ranking. Trigram fallback for typo tolerance. |
 | 📚 | **Knowledge Base** | Upload PDFs, DOCX, TXT, and Markdown files. Content is extracted, embedded, and searchable alongside documents and workflows. |
 | 🔗 | **Context Links** | Map URL patterns, app names, or window titles to workflows/documents. Regex and exact matching with priority scoring. |
-| 📹 | **Video Import** | Upload video files (MP4, MOV, AVI, MKV, WEBM) up to 2 GB. Async pipeline extracts frames, transcribes audio, and generates step-by-step guides. |
+| 🌍 | **Translation** | On-the-fly translation of documents and workflows for public/embed/export views. Powered by configurable LLM provider. |
+| 🔊 | **Text-to-Speech** | Movie-mode playback of workflows with TTS narration. Supports Web Speech API (free) or OpenAI TTS (natural voices). Generic narration for action steps (click, type, navigate, scroll). Configurable via `TTS_PROVIDER`. |
+| 🖼️ | **Workflow Embeds** | Embed interactive workflows in any website via iframe. Multiple display modes (slides, movie, scroll) configured in a share modal and set via URL parameter. |
 | 👥 | **Team Collaboration** | Projects with hierarchical roles (Viewer → Member → Editor → Admin → Owner), per-resource sharing, threaded comments with resolution tracking. |
 | 🌐 | **Public Sharing** | Generate share tokens for public read-only access to documents and workflows — no login required. |
-| 📊 | **Analytics Dashboard** | Top-accessed resources, usage by channel (web, MCP, API), stale content detection, search query analysis, knowledge gap identification. |
+| 📊 | **Analytics Dashboard** | Top-accessed resources, usage by channel (web, MCP, API), documentation health overview, search query analysis, knowledge gap identification. |
 | 📋 | **Audit Log** | SOC2/GDPR-ready logging of all actions (view, create, edit, delete, share, export, login, MCP access). Filterable and CSV-exportable. |
-| 🔌 | **MCP Server** | Expose your knowledge base to Claude, Cursor, Copilot, or any MCP-compatible AI agent. Project-scoped API keys. |
+| 🔌 | **MCP Server** | Expose your knowledge base to Claude, Cursor, Copilot, or any MCP-compatible AI agent. Project-scoped API keys with SHA-256 hashing. Full step content returned (not just metadata). |
 | 📤 | **Git Sync** | One-way export of documents to GitHub, GitLab, or Bitbucket as Markdown files. Configurable branch and directory. |
 | 📄 | **Export** | PDF (via Gotenberg), HTML, Markdown, DOCX export for documents and workflows. |
 | 🔒 | **Privacy Controls** | Private documents/folders/workflows, optional PII obfuscation via SendCloak + Presidio before data reaches AI providers. |
-| 🔑 | **Authentication** | Email/password with session cookies, OAuth 2.0 PKCE flow for desktop clients, API keys for MCP. |
+| 🔑 | **Authentication** | Email/password with session cookies, Google OAuth, GitHub OAuth, Enterprise SSO (OIDC), OAuth 2.0 PKCE flow for desktop clients, API keys for MCP. |
 
 ---
 
@@ -60,10 +66,11 @@
 | **Database** | PostgreSQL 16 + pgvector |
 | **Cache / Queue** | Redis 7, Celery |
 | **PDF Export** | Gotenberg 8 |
+| **Verification** | Playwright (headless Chromium for staleness detection) |
 | **Reverse Proxy** | Caddy 2 (automatic HTTPS) |
 | **Privacy** | SendCloak + Presidio (optional) |
-| **Desktop App** | .NET 9 / WPF ([ondoki-desktop](https://github.com/myfoxit/ondoki-desktop)) |
-| **Chrome Extension** | [ondoki-chrome-extension](https://github.com/myfoxit/ondoki-chrome-extension) |
+| **Desktop App** | Electron ([ondoki-desktop-electron](https://github.com/myfoxit/ondoki-desktop-electron)) |
+| **Chrome Extension** | [ondoki-plugin-chrome](https://github.com/myfoxit/ondoki-plugin-chrome) |
 
 ---
 
@@ -284,8 +291,8 @@ ondoki-web/
 
 | App | Description | Repository |
 |-----|-------------|------------|
-| **ondoki Desktop** | Windows app (.NET 9 / WPF) for recording screen workflows with step capture | [ondoki-desktop](https://github.com/myfoxit/ondoki-desktop) |
-| **ondoki Chrome Extension** | Browser extension for capturing web-based workflows | [ondoki-chrome-extension](https://github.com/myfoxit/ondoki-chrome-extension) |
+| **ondoki Desktop** | Cross-platform desktop app (Electron) for recording screen workflows with step capture | [ondoki-desktop-electron](https://github.com/myfoxit/ondoki-desktop-electron) |
+| **ondoki Chrome Extension** | Browser extension for capturing web workflows and running interactive guides with staleness detection | [ondoki-plugin-chrome](https://github.com/myfoxit/ondoki-plugin-chrome) |
 
 ---
 
