@@ -23,10 +23,15 @@ export default async function globalSetup(_config: FullConfig) {
 
   await page.goto(`${appUrl}/login`);
 
+  // Identifier-first login: submit email, then password appears
   const emailInput = page.locator('input[type="email"]');
   await emailInput.waitFor({ state: 'visible', timeout: 15000 });
   await emailInput.fill(testData.email);
-  await page.locator('input[type="password"]').fill(testData.password);
+  await page.locator('button[type="submit"]').click();
+
+  const passwordInput = page.locator('input[type="password"]');
+  await passwordInput.waitFor({ state: 'visible', timeout: 15000 });
+  await passwordInput.fill(testData.password);
   await page.locator('button[type="submit"]').click();
 
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 });
