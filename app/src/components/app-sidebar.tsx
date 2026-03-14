@@ -1,8 +1,19 @@
 "use client";
 
-import { Check, ChevronDown, Eye, HelpCircle, MoreVertical, Pencil, Plus, Search, Settings, Trash2, Users } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  HelpCircle,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+  Users,
+} from "lucide-react";
 import * as React from "react";
-
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -137,13 +148,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <Link to="#" className="flex items-center gap-0 !no-underline">
                 <span
-                  className="text-[1.25rem] font-extrabold tracking-wide text-foreground"
-                  style={{ fontFamily: "'Manrope', sans-serif", letterSpacing: "0.04em" }}
+                  className="text-[1.25rem] tracking-wide text-foreground ml-[10px]"
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    letterSpacing: "0.04em",
+                  }}
                 >
-                  STEPT
+                  Stept
                 </span>
                 <span
-                  className="inline-block w-[2px] h-[1.15rem] bg-foreground ml-[2px] animate-blink"
+                  className="inline-block w-[2px] h-[1.15rem] bg-primary ml-[2px]"
                   aria-hidden="true"
                 />
               </Link>

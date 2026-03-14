@@ -1,7 +1,7 @@
-import { type BrowserContext, type Page } from '@playwright/test';
+import { type BrowserContext, type Page } from "@playwright/test";
 
 /**
- * ExtensionDriver controls the Ondoki Chrome extension during E2E tests.
+ * ExtensionDriver controls the Stept Chrome extension during E2E tests.
  *
  * It communicates with the background service worker to start/stop recording
  * and retrieve captured steps. For Manifest V3, we use the service worker
@@ -20,21 +20,23 @@ export class ExtensionDriver {
     // Wait for service worker to appear
     let sw = this.context.serviceWorkers()[0];
     if (!sw) {
-      sw = await this.context.waitForEvent('serviceworker');
+      sw = await this.context.waitForEvent("serviceworker");
     }
 
     // Extract extension ID from service worker URL: chrome-extension://<id>/background.js
     const swUrl = sw.url();
     const match = swUrl.match(/chrome-extension:\/\/([^/]+)\//);
     if (!match) {
-      throw new Error(`Cannot extract extension ID from service worker URL: ${swUrl}`);
+      throw new Error(
+        `Cannot extract extension ID from service worker URL: ${swUrl}`,
+      );
     }
     this.extensionId = match[1];
   }
 
   /** Get the extension ID */
   getExtensionId(): string {
-    if (!this.extensionId) throw new Error('ExtensionDriver not initialized');
+    if (!this.extensionId) throw new Error("ExtensionDriver not initialized");
     return this.extensionId;
   }
 
@@ -42,13 +44,17 @@ export class ExtensionDriver {
    * Start recording by sending START_RECORDING to the background service worker.
    * We do this by evaluating chrome.runtime.sendMessage in a page context.
    */
-  async startRecording(page: Page, projectId = 'test-project'): Promise<void> {
+  async startRecording(page: Page, projectId = "test-project"): Promise<void> {
     await page.evaluate(
       ({ extId, projId }) => {
         return new Promise<void>((resolve) => {
-          chrome.runtime.sendMessage(extId, { type: 'START_RECORDING', projectId: projId }, () => {
-            resolve();
-          });
+          chrome.runtime.sendMessage(
+            extId,
+            { type: "START_RECORDING", projectId: projId },
+            () => {
+              resolve();
+            },
+          );
         });
       },
       { extId: this.extensionId, projId: projectId },
@@ -64,7 +70,7 @@ export class ExtensionDriver {
     await page.evaluate(
       ({ extId }) => {
         return new Promise<void>((resolve) => {
-          chrome.runtime.sendMessage(extId, { type: 'STOP_RECORDING' }, () => {
+          chrome.runtime.sendMessage(extId, { type: "STOP_RECORDING" }, () => {
             resolve();
           });
         });
@@ -82,9 +88,13 @@ export class ExtensionDriver {
     const result = await page.evaluate(
       ({ extId }) => {
         return new Promise<any>((resolve) => {
-          chrome.runtime.sendMessage(extId, { type: 'GET_STEPS' }, (response: any) => {
-            resolve(response);
-          });
+          chrome.runtime.sendMessage(
+            extId,
+            { type: "GET_STEPS" },
+            (response: any) => {
+              resolve(response);
+            },
+          );
         });
       },
       { extId: this.extensionId },
@@ -95,7 +105,11 @@ export class ExtensionDriver {
   /**
    * Wait until the extension has recorded at least `count` steps, or timeout.
    */
-  async waitForSteps(page: Page, count: number, timeoutMs = 10_000): Promise<any[]> {
+  async waitForSteps(
+    page: Page,
+    count: number,
+    timeoutMs = 10_000,
+  ): Promise<any[]> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const steps = await this.getRecordedSteps(page);
@@ -113,7 +127,7 @@ export class ExtensionDriver {
     await page.evaluate(
       ({ extId }) => {
         return new Promise<void>((resolve) => {
-          chrome.runtime.sendMessage(extId, { type: 'CLEAR_STEPS' }, () => {
+          chrome.runtime.sendMessage(extId, { type: "CLEAR_STEPS" }, () => {
             resolve();
           });
         });
@@ -129,9 +143,13 @@ export class ExtensionDriver {
     return page.evaluate(
       ({ extId }) => {
         return new Promise<any>((resolve) => {
-          chrome.runtime.sendMessage(extId, { type: 'GET_STATE' }, (response: any) => {
-            resolve(response);
-          });
+          chrome.runtime.sendMessage(
+            extId,
+            { type: "GET_STATE" },
+            (response: any) => {
+              resolve(response);
+            },
+          );
         });
       },
       { extId: this.extensionId },

@@ -27,8 +27,8 @@ export
 
 # ─── Test config (override via env or .env) ───────────────────
 TEST_DB_NAME     ?= stept_test
-TEST_DB_USER     ?= $(POSTGRES_USER)
-TEST_DB_PASSWORD ?= $(POSTGRES_PASSWORD)
+TEST_DB_USER     ?= $(or $(POSTGRES_USER),postgres)
+TEST_DB_PASSWORD ?= $(or $(POSTGRES_PASSWORD),postgres)
 TEST_DB_HOST     ?= db
 TEST_DB_PORT     ?= 5432
 DATABASE_URL_TEST ?= postgresql+asyncpg://$(TEST_DB_USER):$(TEST_DB_PASSWORD)@$(TEST_DB_HOST):$(TEST_DB_PORT)/$(TEST_DB_NAME)

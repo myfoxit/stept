@@ -1002,8 +1002,8 @@ def _recency_boost(updated_at: datetime | None) -> float:
     if not updated_at:
         return 0.5
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if updated_at.tzinfo is None:
-        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    if updated_at.tzinfo is not None:
+        updated_at = updated_at.replace(tzinfo=None)
     days_old = max(0, (now - updated_at).total_seconds() / 86400)
     return 0.5 + 0.5 * math.exp(-days_old / 30)
 

@@ -4,10 +4,6 @@
 @import "./styles/_variables.scss";
 @import "./styles/_keyframe-animations.scss";
 
-@utility animate-blink {
-  animation: blink 1s step-end infinite;
-}
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
