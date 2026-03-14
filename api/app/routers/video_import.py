@@ -16,7 +16,7 @@ from app.utils import gen_suffix
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-UPLOAD_DIR = os.getenv("STEPT_UPLOAD_DIR", os.getenv("ONDOKI_UPLOAD_DIR", "/data/uploads/videos")
+UPLOAD_DIR = os.getenv("STEPT_UPLOAD_DIR", os.getenv("ONDOKI_UPLOAD_DIR", "/data/uploads/videos"))
 MAX_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 
