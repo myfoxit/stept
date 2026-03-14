@@ -1,0 +1,44 @@
+{
+  "workflow": "dynamic-content-load-and-interact",
+  "page": "dynamic-content.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "id": "load-posts",
+        "testId": "load-posts-btn",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["load posts", "button"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "testId": "like-btn-1",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["like"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "id": "load-comments",
+        "testId": "load-comments-btn",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["load comments", "button"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 0,
+    "order_strict": true
+  }
+}

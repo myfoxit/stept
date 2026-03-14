@@ -1,0 +1,53 @@
+{
+  "workflow": "modal-dialog-interaction",
+  "page": "modal-dialog.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "id": "open-modal",
+        "testId": "open-modal-btn",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["add new item", "button"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "id": "item-name",
+        "testId": "item-name-input",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["item name", "field"]
+    },
+    {
+      "action_type": "Type",
+      "element": {
+        "tagName": "input",
+        "id": "item-name"
+      },
+      "text_typed": "Test Item"
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "id": "save-modal",
+        "testId": "save-btn",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["save", "button"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 0,
+    "order_strict": true
+  }
+}

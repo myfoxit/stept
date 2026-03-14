@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modal Dialog - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    h1 { font-size: 24px; color: #1a1a1a; margin-bottom: 16px; }
+    .trigger-btn {
+      padding: 12px 24px;
+      background: #3ab08a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .trigger-btn:hover { background: #2c8368; }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      width: 480px;
+      max-width: 90vw;
+      overflow: hidden;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid #eee;
+    }
+    .modal-header h2 { font-size: 18px; color: #1a1a1a; }
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: #f5f5f5;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .close-btn:hover { background: #eee; color: #333; }
+    .modal-body { padding: 24px; }
+    .modal-body .form-group { margin-bottom: 16px; }
+    .modal-body label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .modal-body input, .modal-body textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .modal-body textarea { resize: vertical; height: 80px; }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 16px 24px;
+      border-top: 1px solid #eee;
+    }
+    .cancel-btn {
+      padding: 8px 16px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .save-btn {
+      padding: 8px 16px;
+      background: #3ab08a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .save-btn:hover { background: #2c8368; }
+    .saved-msg {
+      display: none;
+      margin-top: 16px;
+      padding: 12px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 8px;
+      color: #065f46;
+      font-size: 14px;
+    }
+    .saved-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+  <h1>Project Settings</h1>
+  <button class="trigger-btn" id="open-modal" data-testid="open-modal-btn">Add New Item</button>
+
+  <div class="modal-backdrop" id="modal-backdrop" data-testid="modal-backdrop">
+    <div class="modal" role="dialog" aria-label="Add New Item" data-testid="modal">
+      <div class="modal-header">
+        <h2>Add New Item</h2>
+        <button class="close-btn" id="close-modal" data-testid="close-modal-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="item-name">Item Name</label>
+          <input type="text" id="item-name" name="item-name" placeholder="Enter item name" data-testid="item-name-input" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="item-desc">Description</label>
+          <textarea id="item-desc" name="item-desc" placeholder="Enter description" data-testid="item-desc-input"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="cancel-btn" id="cancel-modal" data-testid="cancel-btn">Cancel</button>
+        <button class="save-btn" id="save-modal" data-testid="save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="saved-msg" id="saved-msg" data-testid="saved-message">✓ Item saved successfully!</div>
+
+  <script>
+    const backdrop = document.getElementById('modal-backdrop');
+    document.getElementById('open-modal').addEventListener('click', () => {
+      backdrop.classList.add('open');
+    });
+    document.getElementById('close-modal').addEventListener('click', () => {
+      backdrop.classList.remove('open');
+    });
+    document.getElementById('cancel-modal').addEventListener('click', () => {
+      backdrop.classList.remove('open');
+    });
+    document.getElementById('save-modal').addEventListener('click', () => {
+      backdrop.classList.remove('open');
+      document.getElementById('saved-msg').classList.add('visible');
+    });
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) backdrop.classList.remove('open');
+    });
+  </script>
+</body>
+</html>

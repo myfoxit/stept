@@ -1,0 +1,57 @@
+{
+  "workflow": "basic-form-login",
+  "page": "basic-form.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "id": "username",
+        "type": "text",
+        "has_selector": true,
+        "has_xpath": true,
+        "testId": "username-input"
+      },
+      "has_url": true,
+      "description_contains": ["username", "field"]
+    },
+    {
+      "action_type": "Type",
+      "element": {
+        "tagName": "input",
+        "id": "username"
+      },
+      "text_typed": "testuser"
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "id": "password",
+        "type": "password",
+        "has_selector": true,
+        "has_xpath": true
+      },
+      "has_url": true,
+      "description_contains": ["password", "field"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "type": "submit",
+        "has_selector": true,
+        "has_xpath": true,
+        "testId": "submit-btn"
+      },
+      "has_url": true,
+      "description_contains": ["sign in", "button"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 0,
+    "order_strict": true
+  }
+}

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      padding: 40px;
+      width: 400px;
+    }
+    .login-card h1 {
+      font-size: 24px;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    .login-card p {
+      color: #666;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #3ab08a;
+      box-shadow: 0 0 0 3px rgba(58,176,138,0.1);
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: #3ab08a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+    .submit-btn:hover { background: #2c8368; }
+    .success-message {
+      display: none;
+      padding: 12px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 8px;
+      color: #065f46;
+      font-size: 14px;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .success-message.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card" data-testid="login-card">
+    <h1>Welcome Back</h1>
+    <p>Sign in to your account</p>
+    <form id="login-form" data-testid="login-form">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Enter your username"
+          data-testid="username-input"
+          autocomplete="off"
+        >
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="Enter your password"
+          data-testid="password-input"
+          autocomplete="off"
+        >
+      </div>
+      <button type="submit" class="submit-btn" data-testid="submit-btn">Sign In</button>
+    </form>
+    <div id="success-msg" class="success-message" data-testid="success-message">
+      ✓ Login successful! Welcome, <span id="welcome-name"></span>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      document.getElementById('welcome-name').textContent = username;
+      document.getElementById('success-msg').classList.add('visible');
+    });
+  </script>
+</body>
+</html>

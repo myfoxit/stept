@@ -1,0 +1,42 @@
+{
+  "workflow": "shadow-dom-interactions",
+  "page": "shadow-dom.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["save"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "has_selector": true
+      },
+      "has_url": true
+    },
+    {
+      "action_type": "Type",
+      "text_typed": "test query"
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["search"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 4,
+    "missing_steps_allowed": 1,
+    "order_strict": true
+  }
+}

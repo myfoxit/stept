@@ -1,0 +1,61 @@
+{
+  "workflow": "multi-step-wizard-setup",
+  "page": "multi-step-wizard.html",
+  "steps": [
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "text",
+        "has_title": true
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "type",
+      "text_contains": "john"
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "text",
+        "has_title": true
+      },
+      "has_window_info": true
+    },
+    {
+      "action_type": "type",
+      "text_contains": "@"
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "button",
+        "title_contains": "next"
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "radio"
+      },
+      "has_window_info": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "button",
+        "title_contains": "next"
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    }
+  ],
+  "tolerance": {
+    "extra_steps_allowed": 5,
+    "missing_steps_allowed": 2,
+    "order_strict": false
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "workflow": "wizard-complete-flow",
+  "page": "multi-step-wizard.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "id": "full-name",
+        "testId": "full-name-input",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["full name", "field"]
+    },
+    {
+      "action_type": "Type",
+      "element": {
+        "tagName": "input",
+        "id": "full-name"
+      },
+      "text_typed": "Jane Doe"
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "id": "email",
+        "testId": "email-input",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["email", "field"]
+    },
+    {
+      "action_type": "Type",
+      "element": {
+        "tagName": "input",
+        "id": "email"
+      },
+      "text_typed": "jane@example.com"
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "testId": "btn-next",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["next", "button"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "type": "checkbox",
+        "testId": "notif-sms"
+      },
+      "has_url": true,
+      "description_contains": ["sms"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "input",
+        "type": "radio",
+        "testId": "theme-dark"
+      },
+      "has_url": true,
+      "description_contains": ["dark"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "testId": "btn-next",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["next", "button"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "testId": "btn-next",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["submit", "button"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 4,
+    "missing_steps_allowed": 1,
+    "order_strict": true
+  }
+}

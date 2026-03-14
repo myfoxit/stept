@@ -1,0 +1,40 @@
+{
+  "workflow": "dropdown-menu-selection",
+  "page": "dropdown-menu.html",
+  "steps": [
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "combobox"
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "option"
+      },
+      "has_window_info": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "combobox"
+      },
+      "has_window_info": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "option"
+      },
+      "has_window_info": true
+    }
+  ],
+  "tolerance": {
+    "extra_steps_allowed": 4,
+    "missing_steps_allowed": 2,
+    "order_strict": false
+  }
+}

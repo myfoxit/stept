@@ -1,0 +1,42 @@
+{
+  "workflow": "spa-navigation-flow",
+  "page": "spa-navigation.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "a",
+        "testId": "nav-about",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["about"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "a",
+        "testId": "nav-contact",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["contact"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "a",
+        "testId": "nav-home",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["home"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 4,
+    "missing_steps_allowed": 0,
+    "order_strict": true
+  }
+}

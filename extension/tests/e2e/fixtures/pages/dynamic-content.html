@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Content - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    h1 { font-size: 24px; color: #1a1a1a; margin-bottom: 24px; }
+    .actions { display: flex; gap: 12px; margin-bottom: 24px; }
+    .load-btn {
+      padding: 12px 24px;
+      background: #3ab08a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .load-btn:hover { background: #2c8368; }
+    .load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .spinner {
+      display: none;
+      padding: 16px;
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+    .spinner.visible { display: block; }
+    .content-area {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .card h3 { font-size: 16px; color: #1a1a1a; margin-bottom: 8px; }
+    .card p { font-size: 14px; color: #666; margin-bottom: 12px; }
+    .card-btn {
+      padding: 8px 16px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .card-btn:hover { background: #eee; }
+    .card-btn.liked { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .load-more-btn {
+      padding: 10px 20px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      align-self: center;
+    }
+    .load-more-btn:hover { background: #f5f5f5; }
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Feed</h1>
+
+  <div class="actions">
+    <button class="load-btn" id="load-posts" data-testid="load-posts-btn">Load Posts</button>
+    <button class="load-btn" id="load-comments" data-testid="load-comments-btn" disabled>Load Comments</button>
+  </div>
+
+  <div class="spinner" id="spinner" data-testid="spinner">Loading...</div>
+
+  <div class="content-area" id="content-area" data-testid="content-area">
+    <div class="empty-state" data-testid="empty-state">Click "Load Posts" to fetch content</div>
+  </div>
+
+  <script>
+    const posts = [
+      { id: 1, title: 'Getting Started with Ondoki', body: 'Learn how to record your first workflow step by step.' },
+      { id: 2, title: 'Advanced Recording Tips', body: 'Master element capture, smart blur, and multi-tab recording.' },
+      { id: 3, title: 'Sharing Workflows', body: 'Export and share your recorded workflows with your team.' },
+    ];
+
+    const comments = [
+      { id: 1, postId: 1, author: 'Alice', text: 'This was super helpful, thanks!' },
+      { id: 2, postId: 1, author: 'Bob', text: 'Great tutorial.' },
+      { id: 3, postId: 2, author: 'Carol', text: 'The smart blur feature is amazing.' },
+    ];
+
+    let postsLoaded = false;
+
+    document.getElementById('load-posts').addEventListener('click', () => {
+      if (postsLoaded) return;
+      const btn = document.getElementById('load-posts');
+      btn.disabled = true;
+      const spinner = document.getElementById('spinner');
+      spinner.classList.add('visible');
+
+      // Simulate network delay
+      setTimeout(() => {
+        spinner.classList.remove('visible');
+        const area = document.getElementById('content-area');
+        area.innerHTML = '';
+
+        posts.forEach(post => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.dataset.testid = 'post-' + post.id;
+          card.innerHTML = `
+            <h3>${post.title}</h3>
+            <p>${post.body}</p>
+            <div style="display:flex;gap:8px;">
+              <button class="card-btn like-btn" data-testid="like-btn-${post.id}" data-post="${post.id}">👍 Like</button>
+              <button class="card-btn" data-testid="share-btn-${post.id}" data-post="${post.id}">📤 Share</button>
+            </div>
+            <div class="comments-area" id="comments-${post.id}" style="margin-top:12px;"></div>
+          `;
+          area.appendChild(card);
+        });
+
+        // Wire up like buttons
+        area.querySelectorAll('.like-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            btn.classList.toggle('liked');
+            btn.textContent = btn.classList.contains('liked') ? '👍 Liked' : '👍 Like';
+          });
+        });
+
+        postsLoaded = true;
+        document.getElementById('load-comments').disabled = false;
+      }, 500);
+    });
+
+    document.getElementById('load-comments').addEventListener('click', () => {
+      const spinner = document.getElementById('spinner');
+      spinner.classList.add('visible');
+
+      setTimeout(() => {
+        spinner.classList.remove('visible');
+
+        comments.forEach(comment => {
+          const area = document.getElementById('comments-' + comment.postId);
+          if (!area) return;
+          const div = document.createElement('div');
+          div.style.cssText = 'padding:8px 0;border-top:1px solid #f0f0f0;font-size:13px;';
+          div.dataset.testid = 'comment-' + comment.id;
+          div.innerHTML = `<strong>${comment.author}:</strong> ${comment.text}`;
+          area.appendChild(div);
+        });
+
+        document.getElementById('load-comments').disabled = true;
+      }, 500);
+    });
+  </script>
+</body>
+</html>

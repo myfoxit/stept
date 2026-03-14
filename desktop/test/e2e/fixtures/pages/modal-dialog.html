@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modal Dialog - Confirmation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .page-content { text-align: center; }
+    h1 { font-size: 28px; color: #1a1a2e; margin-bottom: 12px; }
+    p { color: #6e6e82; margin-bottom: 24px; }
+    .trigger-btn {
+      padding: 12px 28px; background: #e14d2a; color: #fff; border: none;
+      border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .trigger-btn:hover { background: #c73e1d; }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      align-items: center; justify-content: center; z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #fff; border-radius: 12px; padding: 28px; width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15); text-align: left;
+    }
+    .modal h2 { font-size: 18px; color: #1a1a2e; margin-bottom: 8px; }
+    .modal p { font-size: 14px; color: #6e6e82; margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+    .modal-actions button {
+      padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+    }
+    .btn-cancel { background: #e8e8f0; color: #1a1a2e; }
+    .btn-cancel:hover { background: #d4d4de; }
+    .btn-confirm { background: #e14d2a; color: #fff; }
+    .btn-confirm:hover { background: #c73e1d; }
+    .result { display: none; margin-top: 20px; padding: 12px; border-radius: 8px; font-weight: 500; text-align: center; }
+    .result.confirmed { background: #e6f9f0; color: #1a7a5a; }
+    .result.cancelled { background: #fef3cd; color: #856404; }
+  </style>
+</head>
+<body>
+  <div class="page-content">
+    <h1>Account Settings</h1>
+    <p>Manage your account preferences</p>
+    <button class="trigger-btn" id="deleteBtn" onclick="showModal()">Delete Account</button>
+    <div class="result confirmed" id="confirmedResult">Account deletion confirmed.</div>
+    <div class="result cancelled" id="cancelledResult">Account deletion cancelled.</div>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" role="dialog" aria-labelledby="modalTitle">
+      <h2 id="modalTitle">Delete Account?</h2>
+      <p>This action cannot be undone. All your data will be permanently removed.</p>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="cancelBtn" onclick="closeModal('cancel')">Cancel</button>
+        <button class="btn-confirm" id="confirmBtn" onclick="closeModal('confirm')">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showModal() {
+      document.getElementById('modalOverlay').classList.add('active');
+    }
+    function closeModal(action) {
+      document.getElementById('modalOverlay').classList.remove('active');
+      if (action === 'confirm') {
+        document.getElementById('confirmedResult').style.display = 'block';
+        document.getElementById('cancelledResult').style.display = 'none';
+      } else {
+        document.getElementById('cancelledResult').style.display = 'block';
+        document.getElementById('confirmedResult').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadow DOM - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    h1 { font-size: 24px; color: #1a1a1a; margin-bottom: 24px; }
+    p.intro { color: #666; margin-bottom: 24px; font-size: 14px; }
+    .components { display: flex; flex-direction: column; gap: 24px; }
+    .result {
+      margin-top: 24px;
+      padding: 16px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      font-size: 14px;
+      color: #333;
+    }
+    .result strong { color: #1a1a1a; }
+  </style>
+</head>
+<body>
+  <h1>Web Components Test</h1>
+  <p class="intro">These components use Shadow DOM for encapsulation.</p>
+
+  <div class="components">
+    <custom-button data-testid="custom-button-component"></custom-button>
+    <custom-input data-testid="custom-input-component"></custom-input>
+    <custom-toggle data-testid="custom-toggle-component"></custom-toggle>
+  </div>
+
+  <div class="result" id="result" data-testid="result">
+    <strong>Events:</strong> <span id="event-log">None yet</span>
+  </div>
+
+  <script>
+    const events = [];
+    function logEvent(text) {
+      events.push(text);
+      document.getElementById('event-log').textContent = events.join(' → ');
+    }
+
+    // Custom Button component
+    class CustomButton extends HTMLElement {
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <style>
+            :host {
+              display: block;
+              background: white;
+              border-radius: 12px;
+              padding: 24px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            h3 { font-size: 16px; margin-bottom: 12px; color: #1a1a1a; }
+            .btn-group { display: flex; gap: 8px; }
+            button {
+              padding: 10px 20px;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.15s;
+            }
+            .primary { background: #3ab08a; color: white; }
+            .primary:hover { background: #2c8368; }
+            .secondary { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+            .secondary:hover { background: #eee; }
+            .danger { background: #fee2e2; color: #dc2626; }
+            .danger:hover { background: #fecaca; }
+          </style>
+          <h3>Action Buttons</h3>
+          <div class="btn-group">
+            <button class="primary" data-testid="shadow-btn-save">Save</button>
+            <button class="secondary" data-testid="shadow-btn-cancel">Cancel</button>
+            <button class="danger" data-testid="shadow-btn-delete">Delete</button>
+          </div>
+        `;
+        shadow.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            logEvent('Button: ' + btn.textContent);
+          });
+        });
+      }
+    }
+    customElements.define('custom-button', CustomButton);
+
+    // Custom Input component
+    class CustomInput extends HTMLElement {
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <style>
+            :host {
+              display: block;
+              background: white;
+              border-radius: 12px;
+              padding: 24px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            h3 { font-size: 16px; margin-bottom: 12px; color: #1a1a1a; }
+            .form-row { display: flex; gap: 12px; align-items: flex-end; }
+            label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
+            input {
+              padding: 10px 14px;
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              font-size: 14px;
+              flex: 1;
+            }
+            input:focus { outline: none; border-color: #3ab08a; }
+            button {
+              padding: 10px 20px;
+              background: #3ab08a;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 600;
+              cursor: pointer;
+              white-space: nowrap;
+            }
+          </style>
+          <h3>Search Component</h3>
+          <div class="form-row">
+            <div style="flex:1">
+              <label for="shadow-search">Search</label>
+              <input type="text" id="shadow-search" placeholder="Type to search..." data-testid="shadow-search-input" autocomplete="off">
+            </div>
+            <button data-testid="shadow-search-btn">Search</button>
+          </div>
+        `;
+        const input = shadow.querySelector('input');
+        const btn = shadow.querySelector('button');
+        btn.addEventListener('click', () => {
+          logEvent('Search: ' + input.value);
+        });
+      }
+    }
+    customElements.define('custom-input', CustomInput);
+
+    // Custom Toggle component
+    class CustomToggle extends HTMLElement {
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <style>
+            :host {
+              display: block;
+              background: white;
+              border-radius: 12px;
+              padding: 24px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            h3 { font-size: 16px; margin-bottom: 12px; color: #1a1a1a; }
+            .toggle-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 8px 0;
+            }
+            .toggle-label { font-size: 14px; color: #333; }
+            .toggle {
+              width: 44px;
+              height: 24px;
+              background: #ddd;
+              border-radius: 12px;
+              position: relative;
+              cursor: pointer;
+              transition: background 0.2s;
+            }
+            .toggle.on { background: #3ab08a; }
+            .toggle::after {
+              content: '';
+              position: absolute;
+              width: 20px;
+              height: 20px;
+              background: white;
+              border-radius: 50%;
+              top: 2px;
+              left: 2px;
+              transition: transform 0.2s;
+            }
+            .toggle.on::after { transform: translateX(20px); }
+          </style>
+          <h3>Settings</h3>
+          <div class="toggle-row">
+            <span class="toggle-label">Dark Mode</span>
+            <div class="toggle" data-testid="shadow-toggle-dark" role="switch" aria-label="Dark Mode"></div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Notifications</span>
+            <div class="toggle on" data-testid="shadow-toggle-notif" role="switch" aria-label="Notifications"></div>
+          </div>
+        `;
+        shadow.querySelectorAll('.toggle').forEach(toggle => {
+          toggle.addEventListener('click', () => {
+            toggle.classList.toggle('on');
+            const label = toggle.closest('.toggle-row').querySelector('.toggle-label').textContent;
+            logEvent(label + ': ' + (toggle.classList.contains('on') ? 'On' : 'Off'));
+          });
+        });
+      }
+    }
+    customElements.define('custom-toggle', CustomToggle);
+  </script>
+</body>
+</html>

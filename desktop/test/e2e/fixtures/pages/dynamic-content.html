@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Content - Task Manager</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .container { width: 480px; }
+    h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: #6e6e82; margin-bottom: 20px; }
+    .add-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .add-row input {
+      flex: 1; padding: 10px 14px; border: 1.5px solid #d4d4de; border-radius: 8px;
+      font-size: 14px; outline: none;
+    }
+    .add-row input:focus { border-color: #3ab08a; }
+    .add-btn {
+      padding: 10px 20px; background: #3ab08a; color: #fff; border: none;
+      border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .add-btn:hover { background: #2f9a78; }
+    .task-list { list-style: none; }
+    .task-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      background: #fff; border-radius: 8px; margin-bottom: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04); transition: all 0.2s;
+    }
+    .task-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .task-item.done { opacity: 0.6; }
+    .task-item.done .task-text { text-decoration: line-through; }
+    .task-check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d4d4de; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .task-check.checked { background: #3ab08a; border-color: #3ab08a; color: #fff; font-size: 11px; }
+    .task-text { flex: 1; font-size: 14px; color: #1a1a2e; }
+    .task-delete { background: none; border: none; color: #e14d2a; cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: 4px; }
+    .task-delete:hover { background: #fef0ec; }
+    .empty-state { text-align: center; padding: 32px; color: #a0a0b2; font-size: 14px; }
+    .counter { font-size: 13px; color: #6e6e82; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Task Manager</h1>
+    <p class="subtitle">Track your to-do items</p>
+
+    <div class="add-row">
+      <input type="text" id="taskInput" placeholder="Add a new task..." autocomplete="off"
+        onkeydown="if(event.key==='Enter')addTask()">
+      <button class="add-btn" id="addTaskBtn" onclick="addTask()">Add</button>
+    </div>
+
+    <div class="counter" id="counter">0 tasks</div>
+    <ul class="task-list" id="taskList">
+      <li class="empty-state" id="emptyState">No tasks yet. Add one above!</li>
+    </ul>
+  </div>
+
+  <script>
+    let tasks = [];
+    let nextId = 1;
+
+    function addTask() {
+      const input = document.getElementById('taskInput');
+      const text = input.value.trim();
+      if (!text) return;
+      tasks.push({ id: nextId++, text, done: false });
+      input.value = '';
+      render();
+    }
+
+    function toggleTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) task.done = !task.done;
+      render();
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById('taskList');
+      const counter = document.getElementById('counter');
+      const done = tasks.filter(t => t.done).length;
+      counter.textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''} (${done} completed)`;
+
+      if (tasks.length === 0) {
+        list.innerHTML = '<li class="empty-state">No tasks yet. Add one above!</li>';
+        return;
+      }
+
+      list.innerHTML = tasks.map(t => `
+        <li class="task-item ${t.done ? 'done' : ''}">
+          <div class="task-check ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})" role="checkbox" aria-checked="${t.done}">
+            ${t.done ? '✓' : ''}
+          </div>
+          <span class="task-text">${t.text}</span>
+          <button class="task-delete" onclick="deleteTask(${t.id})" aria-label="Delete task">×</button>
+        </li>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

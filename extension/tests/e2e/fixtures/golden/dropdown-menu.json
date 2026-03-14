@@ -1,0 +1,32 @@
+{
+  "workflow": "dropdown-select-status",
+  "page": "dropdown-menu.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "id": "status-trigger",
+        "testId": "status-trigger",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["select status"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "testId": "status-completed",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["completed"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 0,
+    "order_strict": true
+  }
+}

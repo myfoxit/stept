@@ -1,0 +1,27 @@
+{
+  "workflow": "modal-dialog-confirmation",
+  "page": "modal-dialog.html",
+  "steps": [
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "button",
+        "title_contains": "delete"
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "button"
+      },
+      "has_window_info": true
+    }
+  ],
+  "tolerance": {
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 1,
+    "order_strict": false
+  }
+}

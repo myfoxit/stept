@@ -1,0 +1,42 @@
+{
+  "workflow": "table-sort-and-action",
+  "page": "complex-table.html",
+  "steps": [
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "th",
+        "testId": "sort-name",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["name"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "testId": "edit-0",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["edit"]
+    },
+    {
+      "action_type": "Left Click",
+      "element": {
+        "tagName": "button",
+        "testId": "page-2",
+        "has_selector": true
+      },
+      "has_url": true,
+      "description_contains": ["2"]
+    }
+  ],
+  "tolerance": {
+    "position_pct": 5,
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 0,
+    "order_strict": true
+  }
+}

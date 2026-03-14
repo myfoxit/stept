@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPA App - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+    }
+    nav {
+      background: #1a1a1a;
+      padding: 0 24px;
+      display: flex;
+      gap: 0;
+    }
+    nav a {
+      color: #999;
+      text-decoration: none;
+      padding: 16px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    nav a:hover { color: white; }
+    nav a.active { color: white; border-bottom: 2px solid #3ab08a; }
+    .page-content {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+    .page-content h1 { font-size: 28px; color: #1a1a1a; margin-bottom: 16px; }
+    .page-content p { color: #666; line-height: 1.6; margin-bottom: 16px; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .card h3 { font-size: 16px; margin-bottom: 8px; color: #1a1a1a; }
+    .card p { font-size: 14px; color: #666; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <nav data-testid="nav">
+    <a href="#" data-page="home" class="active" data-testid="nav-home">Home</a>
+    <a href="#" data-page="about" data-testid="nav-about">About</a>
+    <a href="#" data-page="contact" data-testid="nav-contact">Contact</a>
+  </nav>
+
+  <div class="page-content">
+    <div id="page-home" data-testid="page-home">
+      <h1>Dashboard</h1>
+      <p>Welcome to the dashboard. This is a single-page application test.</p>
+      <div class="card">
+        <h3>Recent Activity</h3>
+        <p>You have 3 new notifications and 2 pending tasks.</p>
+      </div>
+      <div class="card">
+        <h3>Quick Stats</h3>
+        <p>Total workflows: 42 | Active recordings: 3</p>
+      </div>
+    </div>
+
+    <div id="page-about" class="hidden" data-testid="page-about">
+      <h1>About Us</h1>
+      <p>This is the about page, loaded via client-side navigation using the History API.</p>
+      <div class="card">
+        <h3>Our Mission</h3>
+        <p>Making workflow documentation effortless and accurate.</p>
+      </div>
+    </div>
+
+    <div id="page-contact" class="hidden" data-testid="page-contact">
+      <h1>Contact</h1>
+      <p>Get in touch with our team.</p>
+      <div class="card">
+        <h3>Email</h3>
+        <p>support@example.com</p>
+      </div>
+      <div class="card">
+        <h3>Phone</h3>
+        <p>+1 (555) 123-4567</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pages = ['home', 'about', 'contact'];
+    const navLinks = document.querySelectorAll('nav a');
+
+    function showPage(pageName) {
+      pages.forEach(p => {
+        document.getElementById('page-' + p).classList.toggle('hidden', p !== pageName);
+      });
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.dataset.page === pageName);
+      });
+      // Use pushState for client-side routing
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('page', pageName);
+      history.pushState({ page: pageName }, '', newUrl.toString());
+      document.title = pageName.charAt(0).toUpperCase() + pageName.slice(1) + ' - SPA App';
+    }
+
+    navLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        showPage(link.dataset.page);
+      });
+    });
+
+    window.addEventListener('popstate', (e) => {
+      if (e.state?.page) showPage(e.state.page);
+    });
+  </script>
+</body>
+</html>

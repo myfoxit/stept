@@ -1,0 +1,45 @@
+{
+  "workflow": "basic-form-login",
+  "page": "basic-form.html",
+  "steps": [
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "text",
+        "has_title": true
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "type",
+      "text_contains": "test"
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "text",
+        "has_title": true
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "type"
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "button",
+        "title_contains": "sign"
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    }
+  ],
+  "tolerance": {
+    "extra_steps_allowed": 3,
+    "missing_steps_allowed": 1,
+    "order_strict": false
+  }
+}

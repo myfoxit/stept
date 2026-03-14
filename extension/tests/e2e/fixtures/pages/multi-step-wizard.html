@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Step Wizard - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      padding: 40px;
+    }
+    .wizard {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      width: 560px;
+      overflow: hidden;
+    }
+    .wizard-progress {
+      display: flex;
+      background: #fafafa;
+      border-bottom: 1px solid #eee;
+    }
+    .step-indicator {
+      flex: 1;
+      padding: 16px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #999;
+      position: relative;
+    }
+    .step-indicator.active { color: #3ab08a; }
+    .step-indicator.completed { color: #065f46; }
+    .step-indicator .step-num {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ddd;
+      color: white;
+      line-height: 24px;
+      font-size: 12px;
+      margin-right: 6px;
+    }
+    .step-indicator.active .step-num { background: #3ab08a; }
+    .step-indicator.completed .step-num { background: #065f46; }
+    .wizard-body { padding: 32px; }
+    .wizard-step { display: none; }
+    .wizard-step.active { display: block; }
+    .wizard-step h2 { font-size: 20px; color: #1a1a1a; margin-bottom: 8px; }
+    .wizard-step p { color: #666; font-size: 14px; margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #3ab08a;
+    }
+    .checkbox-group, .radio-group { display: flex; flex-direction: column; gap: 8px; }
+    .checkbox-group label, .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 400;
+      cursor: pointer;
+    }
+    .checkbox-group input, .radio-group input { width: auto; }
+    .wizard-footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px 32px;
+      border-top: 1px solid #eee;
+    }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-back { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+    .btn-back:hover { background: #eee; }
+    .btn-next { background: #3ab08a; color: white; }
+    .btn-next:hover { background: #2c8368; }
+    .btn-submit { background: #1a1a1a; color: white; }
+    .btn-submit:hover { background: #333; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .review-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .review-item strong { color: #333; }
+    .review-item span { color: #666; }
+    .success-panel {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+    .success-panel.visible { display: block; }
+    .success-panel .icon { font-size: 48px; margin-bottom: 16px; }
+    .success-panel h2 { color: #065f46; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wizard" data-testid="wizard">
+    <div class="wizard-progress" data-testid="wizard-progress">
+      <div class="step-indicator active" id="indicator-1" data-testid="step-indicator-1">
+        <span class="step-num">1</span> Personal Info
+      </div>
+      <div class="step-indicator" id="indicator-2" data-testid="step-indicator-2">
+        <span class="step-num">2</span> Preferences
+      </div>
+      <div class="step-indicator" id="indicator-3" data-testid="step-indicator-3">
+        <span class="step-num">3</span> Review
+      </div>
+    </div>
+
+    <div class="wizard-body">
+      <!-- Step 1: Personal Info -->
+      <div class="wizard-step active" id="step-1" data-testid="step-1">
+        <h2>Personal Information</h2>
+        <p>Tell us about yourself</p>
+        <div class="form-group">
+          <label for="full-name">Full Name</label>
+          <input type="text" id="full-name" name="full-name" placeholder="John Doe" data-testid="full-name-input" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" placeholder="john@example.com" data-testid="email-input" autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Step 2: Preferences -->
+      <div class="wizard-step" id="step-2" data-testid="step-2">
+        <h2>Preferences</h2>
+        <p>Customize your experience</p>
+        <div class="form-group">
+          <label>Notifications</label>
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" name="notif" value="email-notif" data-testid="notif-email" checked> Email notifications
+            </label>
+            <label>
+              <input type="checkbox" name="notif" value="sms-notif" data-testid="notif-sms"> SMS notifications
+            </label>
+            <label>
+              <input type="checkbox" name="notif" value="push-notif" data-testid="notif-push"> Push notifications
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Theme</label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="theme" value="light" data-testid="theme-light" checked> Light
+            </label>
+            <label>
+              <input type="radio" name="theme" value="dark" data-testid="theme-dark"> Dark
+            </label>
+            <label>
+              <input type="radio" name="theme" value="auto" data-testid="theme-auto"> Auto
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="language">Language</label>
+          <select id="language" name="language" data-testid="language-select">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Step 3: Review -->
+      <div class="wizard-step" id="step-3" data-testid="step-3">
+        <h2>Review & Submit</h2>
+        <p>Please review your information</p>
+        <div id="review-content" data-testid="review-content"></div>
+      </div>
+
+      <!-- Success -->
+      <div class="success-panel" id="success-panel" data-testid="success-panel">
+        <div class="icon">🎉</div>
+        <h2>All Done!</h2>
+        <p>Your preferences have been saved successfully.</p>
+      </div>
+    </div>
+
+    <div class="wizard-footer" id="wizard-footer" data-testid="wizard-footer">
+      <button class="btn btn-back" id="btn-back" data-testid="btn-back" disabled>Back</button>
+      <button class="btn btn-next" id="btn-next" data-testid="btn-next">Next</button>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 3;
+
+    function updateWizard() {
+      // Show/hide steps
+      for (let i = 1; i <= totalSteps; i++) {
+        document.getElementById('step-' + i).classList.toggle('active', i === currentStep);
+        const indicator = document.getElementById('indicator-' + i);
+        indicator.classList.remove('active', 'completed');
+        if (i === currentStep) indicator.classList.add('active');
+        else if (i < currentStep) indicator.classList.add('completed');
+      }
+
+      // Update buttons
+      const backBtn = document.getElementById('btn-back');
+      const nextBtn = document.getElementById('btn-next');
+      backBtn.disabled = currentStep === 1;
+
+      if (currentStep === totalSteps) {
+        nextBtn.textContent = 'Submit';
+        nextBtn.className = 'btn btn-submit';
+        buildReview();
+      } else {
+        nextBtn.textContent = 'Next';
+        nextBtn.className = 'btn btn-next';
+      }
+    }
+
+    function buildReview() {
+      const name = document.getElementById('full-name').value || '(empty)';
+      const email = document.getElementById('email').value || '(empty)';
+      const notifications = Array.from(document.querySelectorAll('[name=notif]:checked'))
+        .map(cb => cb.parentElement.textContent.trim()).join(', ') || 'None';
+      const theme = document.querySelector('[name=theme]:checked')?.parentElement.textContent.trim() || 'Light';
+      const language = document.getElementById('language').selectedOptions[0]?.textContent || 'English';
+
+      document.getElementById('review-content').innerHTML = `
+        <div class="review-item"><strong>Name:</strong> <span>${name}</span></div>
+        <div class="review-item"><strong>Email:</strong> <span>${email}</span></div>
+        <div class="review-item"><strong>Notifications:</strong> <span>${notifications}</span></div>
+        <div class="review-item"><strong>Theme:</strong> <span>${theme}</span></div>
+        <div class="review-item"><strong>Language:</strong> <span>${language}</span></div>
+      `;
+    }
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (currentStep < totalSteps) {
+        currentStep++;
+        updateWizard();
+      } else {
+        // Submit
+        document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+        document.getElementById('success-panel').classList.add('visible');
+        document.getElementById('wizard-footer').style.display = 'none';
+      }
+    });
+
+    document.getElementById('btn-back').addEventListener('click', () => {
+      if (currentStep > 1) {
+        currentStep--;
+        updateWizard();
+      }
+    });
+
+    updateWizard();
+  </script>
+</body>
+</html>

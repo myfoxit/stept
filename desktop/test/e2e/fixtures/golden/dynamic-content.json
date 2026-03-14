@@ -1,0 +1,40 @@
+{
+  "workflow": "dynamic-content-task-manager",
+  "page": "dynamic-content.html",
+  "steps": [
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "text",
+        "has_title": true
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "type",
+      "text_contains": "task"
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "button",
+        "title_contains": "add"
+      },
+      "has_window_info": true,
+      "has_screenshot": true
+    },
+    {
+      "action_type": "click",
+      "element": {
+        "role_contains": "checkbox"
+      },
+      "has_window_info": true
+    }
+  ],
+  "tolerance": {
+    "extra_steps_allowed": 4,
+    "missing_steps_allowed": 1,
+    "order_strict": false
+  }
+}

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Table - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    h1 { font-size: 24px; color: #1a1a1a; margin-bottom: 24px; }
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: #fafafa;
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { background: #f0f0f0; }
+    th .sort-icon { margin-left: 4px; font-size: 10px; color: #999; }
+    th.sorted .sort-icon { color: #3ab08a; }
+    td {
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #333;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    tr:hover td { background: #fafafa; }
+    .actions-cell { display: flex; gap: 8px; }
+    .action-btn {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+    .action-btn.edit:hover { border-color: #3ab08a; color: #3ab08a; }
+    .action-btn.delete:hover { border-color: #dc2626; color: #dc2626; }
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-top: 1px solid #eee;
+      font-size: 13px;
+      color: #666;
+    }
+    .pagination-btns { display: flex; gap: 4px; }
+    .page-btn {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .page-btn.active { background: #3ab08a; color: white; border-color: #3ab08a; }
+    .page-btn:hover:not(.active) { background: #f5f5f5; }
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-active { background: #ecfdf5; color: #065f46; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+    .toast {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      background: #1a1a1a;
+      color: white;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 1000;
+    }
+    .toast.visible { display: block; }
+  </style>
+</head>
+<body>
+  <h1>Users</h1>
+  <div class="table-container" data-testid="data-table">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name" data-testid="sort-name">Name <span class="sort-icon">↕</span></th>
+          <th data-sort="email" data-testid="sort-email">Email <span class="sort-icon">↕</span></th>
+          <th data-sort="role" data-testid="sort-role">Role <span class="sort-icon">↕</span></th>
+          <th data-sort="status" data-testid="sort-status">Status <span class="sort-icon">↕</span></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="table-body" data-testid="table-body"></tbody>
+    </table>
+    <div class="pagination" data-testid="pagination">
+      <span id="page-info">Showing 1-5 of 15</span>
+      <div class="pagination-btns">
+        <button class="page-btn" data-page="1" data-testid="page-1">1</button>
+        <button class="page-btn" data-page="2" data-testid="page-2">2</button>
+        <button class="page-btn" data-page="3" data-testid="page-3">3</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" data-testid="toast"></div>
+
+  <script>
+    const data = [
+      { name: 'Alice Johnson', email: 'alice@example.com', role: 'Admin', status: 'active' },
+      { name: 'Bob Smith', email: 'bob@example.com', role: 'Editor', status: 'active' },
+      { name: 'Carol White', email: 'carol@example.com', role: 'Viewer', status: 'pending' },
+      { name: 'David Brown', email: 'david@example.com', role: 'Editor', status: 'inactive' },
+      { name: 'Eva Davis', email: 'eva@example.com', role: 'Admin', status: 'active' },
+      { name: 'Frank Miller', email: 'frank@example.com', role: 'Viewer', status: 'pending' },
+      { name: 'Grace Lee', email: 'grace@example.com', role: 'Editor', status: 'active' },
+      { name: 'Henry Wilson', email: 'henry@example.com', role: 'Viewer', status: 'inactive' },
+      { name: 'Iris Chen', email: 'iris@example.com', role: 'Admin', status: 'active' },
+      { name: 'Jack Taylor', email: 'jack@example.com', role: 'Editor', status: 'pending' },
+      { name: 'Karen Adams', email: 'karen@example.com', role: 'Viewer', status: 'active' },
+      { name: 'Leo Martin', email: 'leo@example.com', role: 'Editor', status: 'active' },
+      { name: 'Mia Garcia', email: 'mia@example.com', role: 'Admin', status: 'pending' },
+      { name: 'Noah Robinson', email: 'noah@example.com', role: 'Viewer', status: 'inactive' },
+      { name: 'Olivia Clark', email: 'olivia@example.com', role: 'Editor', status: 'active' },
+    ];
+
+    const PAGE_SIZE = 5;
+    let currentPage = 1;
+    let sortField = null;
+    let sortDir = 'asc';
+
+    function render() {
+      let sorted = [...data];
+      if (sortField) {
+        sorted.sort((a, b) => {
+          const va = a[sortField].toLowerCase();
+          const vb = b[sortField].toLowerCase();
+          return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+      }
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageData = sorted.slice(start, start + PAGE_SIZE);
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = pageData.map((row, i) => `
+        <tr data-testid="row-${start + i}">
+          <td>${row.name}</td>
+          <td>${row.email}</td>
+          <td>${row.role}</td>
+          <td><span class="status-badge status-${row.status}">${row.status}</span></td>
+          <td>
+            <div class="actions-cell">
+              <button class="action-btn edit" data-action="edit" data-name="${row.name}" data-testid="edit-${start + i}" aria-label="Edit ${row.name}">Edit</button>
+              <button class="action-btn delete" data-action="delete" data-name="${row.name}" data-testid="delete-${start + i}" aria-label="Delete ${row.name}">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('page-info').textContent =
+        `Showing ${start + 1}-${Math.min(start + PAGE_SIZE, data.length)} of ${data.length}`;
+
+      document.querySelectorAll('.page-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.page) === currentPage);
+      });
+
+      // Wire action buttons
+      tbody.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          showToast(`${btn.dataset.action === 'edit' ? 'Editing' : 'Deleting'} ${btn.dataset.name}`);
+        });
+      });
+    }
+
+    // Sort
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const field = th.dataset.sort;
+        if (sortField === field) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortField = field;
+          sortDir = 'asc';
+        }
+        document.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
+        th.classList.add('sorted');
+        th.querySelector('.sort-icon').textContent = sortDir === 'asc' ? '↑' : '↓';
+        render();
+      });
+    });
+
+    // Pagination
+    document.querySelectorAll('.page-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentPage = parseInt(btn.dataset.page);
+        render();
+      });
+    });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('visible');
+      setTimeout(() => toast.classList.remove('visible'), 2000);
+    }
+
+    render();
+  </script>
+</body>
+</html>

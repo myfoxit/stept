@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dropdown Menu - Ondoki Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    h1 { font-size: 24px; color: #1a1a1a; margin-bottom: 24px; }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .dropdown-container { position: relative; }
+    .dropdown-trigger {
+      padding: 10px 16px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 160px;
+      justify-content: space-between;
+    }
+    .dropdown-trigger:hover { border-color: #3ab08a; }
+    .dropdown-trigger .arrow { font-size: 10px; color: #999; }
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 4px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      min-width: 200px;
+      z-index: 100;
+      overflow: hidden;
+    }
+    .dropdown-menu.open { display: block; }
+    .dropdown-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s;
+    }
+    .dropdown-item:hover { background: #f5f5f5; }
+    .dropdown-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .dropdown-item.selected { background: #ecfdf5; color: #065f46; font-weight: 600; }
+    .dropdown-divider { height: 1px; background: #eee; margin: 4px 0; }
+    .selected-display {
+      margin-top: 24px;
+      padding: 16px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .selected-display strong { color: #1a1a1a; }
+  </style>
+</head>
+<body>
+  <h1>Project Actions</h1>
+
+  <div class="toolbar">
+    <div class="dropdown-container" data-testid="status-dropdown">
+      <button class="dropdown-trigger" id="status-trigger" data-testid="status-trigger" aria-haspopup="true" aria-expanded="false">
+        <span id="status-label">Select Status</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="dropdown-menu" id="status-menu" role="menu" data-testid="status-menu">
+        <div class="dropdown-item" role="menuitem" data-value="active" data-testid="status-active">
+          <span class="icon">🟢</span> Active
+        </div>
+        <div class="dropdown-item" role="menuitem" data-value="paused" data-testid="status-paused">
+          <span class="icon">⏸️</span> Paused
+        </div>
+        <div class="dropdown-item" role="menuitem" data-value="completed" data-testid="status-completed">
+          <span class="icon">✅</span> Completed
+        </div>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-item" role="menuitem" data-value="archived" data-testid="status-archived">
+          <span class="icon">📦</span> Archived
+        </div>
+      </div>
+    </div>
+
+    <div class="dropdown-container" data-testid="actions-dropdown">
+      <button class="dropdown-trigger" id="actions-trigger" data-testid="actions-trigger" aria-haspopup="true" aria-expanded="false">
+        <span>Actions</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="dropdown-menu" id="actions-menu" role="menu" data-testid="actions-menu">
+        <div class="dropdown-item" role="menuitem" data-value="edit" data-testid="action-edit">
+          <span class="icon">✏️</span> Edit
+        </div>
+        <div class="dropdown-item" role="menuitem" data-value="duplicate" data-testid="action-duplicate">
+          <span class="icon">📋</span> Duplicate
+        </div>
+        <div class="dropdown-item" role="menuitem" data-value="export" data-testid="action-export">
+          <span class="icon">📤</span> Export
+        </div>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-item" role="menuitem" data-value="delete" data-testid="action-delete" style="color: #dc2626;">
+          <span class="icon">🗑️</span> Delete
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="selected-display" id="selected-display" data-testid="selected-display">
+    <strong>Selected:</strong> <span id="selected-value">None</span>
+  </div>
+
+  <script>
+    function setupDropdown(triggerId, menuId) {
+      const trigger = document.getElementById(triggerId);
+      const menu = document.getElementById(menuId);
+
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close other menus
+        document.querySelectorAll('.dropdown-menu.open').forEach(m => {
+          if (m !== menu) m.classList.remove('open');
+        });
+        const isOpen = menu.classList.toggle('open');
+        trigger.setAttribute('aria-expanded', isOpen);
+      });
+
+      menu.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const value = item.dataset.value;
+          const text = item.textContent.trim();
+          document.getElementById('selected-value').textContent = text;
+
+          // Mark selected
+          menu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+          item.classList.add('selected');
+
+          // Update label for status dropdown
+          if (triggerId === 'status-trigger') {
+            document.getElementById('status-label').textContent = text;
+          }
+
+          menu.classList.remove('open');
+          trigger.setAttribute('aria-expanded', 'false');
+        });
+      });
+    }
+
+    setupDropdown('status-trigger', 'status-menu');
+    setupDropdown('actions-trigger', 'actions-menu');
+
+    // Close on outside click
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+    });
+  </script>
+</body>
+</html>
