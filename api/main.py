@@ -31,17 +31,15 @@ async def lifespan(app: FastAPI):
         pass  # Not critical — user can re-authenticate
 
     # Startup: launch verification scheduler + worker as background tasks
-    # Skip in test environment to avoid DB connection conflicts
     import asyncio
     _bg_tasks = []
-    if settings.ENVIRONMENT != "test" and os.environ.get("PYTEST_CURRENT_TEST") is None:
-        try:
-            from app.services.verification_scheduler import verification_scheduler_loop
-            from app.services.playwright_worker import verification_worker_loop
-            _bg_tasks.append(asyncio.create_task(verification_scheduler_loop()))
-            _bg_tasks.append(asyncio.create_task(verification_worker_loop()))
-        except Exception:
-            pass  # Playwright may not be installed — verification features disabled
+    try:
+        from app.services.verification_scheduler import verification_scheduler_loop
+        from app.services.playwright_worker import verification_worker_loop
+        _bg_tasks.append(asyncio.create_task(verification_scheduler_loop()))
+        _bg_tasks.append(asyncio.create_task(verification_worker_loop()))
+    except Exception:
+        pass  # Playwright may not be installed — verification features disabled
 
     yield
 
