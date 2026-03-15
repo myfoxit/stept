@@ -614,17 +614,12 @@
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
-      // Hide persistent elements instead of removing them
-      if (this._highlight) this._highlight.style.display = "none";
-      if (this._tooltip) this._tooltip.style.display = "none";
-      if (this._notFoundPanel) {
-        this._notFoundPanel.remove();
-        this._notFoundPanel = null;
-      }
-      if (this._intermediatePanel) {
-        this._intermediatePanel.remove();
-        this._intermediatePanel = null;
-      }
+      // Remove all overlay elements to prevent artifacts across navigations
+      if (this._highlight) { this._highlight.remove(); this._highlight = null; }
+      if (this._tooltip) { this._tooltip.remove(); this._tooltip = null; }
+      if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
+      if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
+      if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
     }
 
     async showStep(index) {
@@ -639,6 +634,22 @@
 
       const step = this.steps[index];
       const actionType = (step.action_type || '').toLowerCase();
+
+      // Navigate / new-tab steps have no element to highlight — auto-advance
+      const isNavigateStep = actionType === 'navigate';
+      if (isNavigateStep) {
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: index,
+          totalSteps: this.steps.length,
+          stepStatus: 'completed',
+        }).catch(() => {});
+        // Small delay so the sidepanel can update, then advance
+        await new Promise((r) => setTimeout(r, 300));
+        if (this._stepSeq !== seq) return;
+        this.showStep(index + 1);
+        return;
+      }
 
       // Hover steps can't be guided — treat as roadblock
       const isHoverStep = actionType.includes('hover') || actionType.includes('mouseover');
