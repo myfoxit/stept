@@ -2016,9 +2016,18 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (activeGuideState && activeGuideState.tabId === details.tabId && activeGuideState.guide) {
     const step = activeGuideState.guide.steps?.[activeGuideState.currentIndex];
     if (step) {
-      // Check if the navigated URL matches a step's expected URL (or just re-inject)
       try {
         await new Promise(r => setTimeout(r, 1000)); // wait for page to settle
+        // Try to tell existing guide to jump to the right step (no restart)
+        try {
+          const resp = await chrome.tabs.sendMessage(details.tabId, {
+            type: 'GUIDE_GOTO', stepIndex: activeGuideState.currentIndex,
+          });
+          if (resp && resp.success) {
+            debugLog('Guide already running, sent GOTO');
+            return; // guide handled it, don't re-inject
+          }
+        } catch {} // no listener — need full inject
         await _injectGuideNow(details.tabId, activeGuideState.guide, activeGuideState.currentIndex);
       } catch (e) {
         debugLog('Guide re-inject on navigation failed:', e);

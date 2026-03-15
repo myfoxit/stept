@@ -1418,6 +1418,14 @@
       } catch (e) {
         sendResponse({ success: false, error: e.message });
       }
+    } else if (message.type === "GUIDE_GOTO") {
+      // Lightweight step jump — don't restart the runner
+      if (activeRunner && typeof message.stepIndex === "number") {
+        activeRunner.showStep(message.stepIndex);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false });
+      }
     } else if (message.type === "STOP_GUIDE") {
       if (activeRunner) activeRunner.stop();
       sendResponse({ success: true });
