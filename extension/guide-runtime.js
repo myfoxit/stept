@@ -1329,6 +1329,21 @@
         element.parentElement.addEventListener(eventType, this._parentClickHandler, { once: true });
         this._clickParent = element.parentElement;
       }
+
+      // Keyboard shortcuts for step advancement (Tango pattern):
+      // Enter on input fields, Tab, or Ctrl/Cmd+E
+      this._keyHandler = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          advance();
+        } else if (e.key === 'Tab') {
+          advance();
+        } else if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+          advance();
+        }
+      };
+      document.addEventListener('keydown', this._keyHandler, { capture: true });
     }
 
     _removeClickHandler() {
@@ -1342,6 +1357,10 @@
         this._clickParent.removeEventListener(eventType, this._parentClickHandler);
         this._parentClickHandler = null;
         this._clickParent = null;
+      }
+      if (this._keyHandler) {
+        document.removeEventListener('keydown', this._keyHandler, { capture: true });
+        this._keyHandler = null;
       }
       this._clickEventType = null;
     }
