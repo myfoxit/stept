@@ -631,7 +631,7 @@ async def token(
             user_id=user_id,
             token_hash=refresh_token_hash,
             client_name="desktop",
-            expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=30),
+            expires_at=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) + dt.timedelta(days=30),
         )
         db.add(refresh_token_obj)
         await db.commit()
@@ -663,7 +663,7 @@ async def token(
             raise HTTPException(status_code=401, detail="Invalid refresh token")
         
         # Check expiry
-        if refresh_obj.expires_at and dt.datetime.now(dt.timezone.utc) > refresh_obj.expires_at:
+        if refresh_obj.expires_at and dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) > refresh_obj.expires_at:
             refresh_obj.revoked = True
             await db.commit()
             raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -717,7 +717,7 @@ async def refresh_access_token(
     if not refresh_obj:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     
-    if refresh_obj.expires_at and dt.datetime.now(dt.timezone.utc) > refresh_obj.expires_at:
+    if refresh_obj.expires_at and dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) > refresh_obj.expires_at:
         refresh_obj.revoked = True
         await db.commit()
         raise HTTPException(status_code=401, detail="Refresh token expired")
