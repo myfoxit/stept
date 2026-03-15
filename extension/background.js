@@ -1986,22 +1986,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!state.isRecording || state.isPaused) return;
 
-  // Suppress site-triggered new tabs (target=_blank from a click).
-  // User-initiated new tabs (Ctrl+T, toolbar button) won't have a recent user action
-  // because the click happened on browser chrome, not on a page element we track.
-  const now = Date.now();
-  if (now - lastUserActionTime < NAVIGATION_SUPPRESS_WINDOW) {
-    debugLog('Suppressing new tab step (caused by recent user action, likely target=_blank)');
-  } else {
-    addStep({
-      actionType: 'Navigate',
-      pageTitle: 'New Tab',
-      description: 'Open new tab',
-      url: tab.url || 'chrome://newtab',
-      windowSize: { width: 0, height: 0 },
-      viewportSize: { width: 0, height: 0 },
-    });
-  }
+  // Never record "Open new tab" — it adds no value to guides and causes
+  // problems in interactive replay (no element to highlight, no screenshot).
+  // The subsequent Navigate step captures where the user actually went.
 
   // Inject content script into new tab once it loads
   if (tab.id) {
