@@ -2017,7 +2017,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
     const step = activeGuideState.guide.steps?.[activeGuideState.currentIndex];
     if (step) {
       try {
-        await new Promise(r => setTimeout(r, 1000)); // wait for page to settle
+        await new Promise(r => setTimeout(r, 300)); // brief wait for DOM hydration
         // Try to tell existing guide to jump to the right step (no restart)
         try {
           const resp = await chrome.tabs.sendMessage(details.tabId, {
