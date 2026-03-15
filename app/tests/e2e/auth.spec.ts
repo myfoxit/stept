@@ -8,7 +8,6 @@ test.describe('Authentication', () => {
     // Should redirect to login
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
     await expect(page.locator('input[type="email"]')).toBeVisible();
-    await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
   });
 
@@ -16,7 +15,12 @@ test.describe('Authentication', () => {
     await page.context().clearCookies();
     await page.goto('/login');
 
+    // Step 1: email
     await page.fill('input[type="email"]', testData.email);
+    await page.click('button[type="submit"]');
+
+    // Step 2: password
+    await page.locator('input[type="password"]').waitFor({ state: 'visible', timeout: 10000 });
     await page.fill('input[type="password"]', testData.password);
     await page.click('button[type="submit"]');
 
@@ -28,7 +32,12 @@ test.describe('Authentication', () => {
     await page.context().clearCookies();
     await page.goto('/login');
 
+    // Step 1: email
     await page.fill('input[type="email"]', 'wrong@test.com');
+    await page.click('button[type="submit"]');
+
+    // Step 2: password
+    await page.locator('input[type="password"]').waitFor({ state: 'visible', timeout: 10000 });
     await page.fill('input[type="password"]', 'WrongPassword!');
     await page.click('button[type="submit"]');
 

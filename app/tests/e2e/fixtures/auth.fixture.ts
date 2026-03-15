@@ -35,11 +35,16 @@ export const test = base.extend<AuthFixtures>({
     await page.goto(`${appUrl}/login`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    // Wait for the form to be interactive
+    // Identifier-first login: step 1 — email, step 2 — password
     const emailInput = page.locator('input[type="email"]');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
     await emailInput.fill(data.email);
-    await page.locator('input[type="password"]').fill(data.password);
+    await page.locator('button[type="submit"]').click();
+
+    // Wait for password step to appear
+    const passwordInput = page.locator('input[type="password"]');
+    await passwordInput.waitFor({ state: 'visible', timeout: 10000 });
+    await passwordInput.fill(data.password);
     await page.locator('button[type="submit"]').click();
 
     // Wait for redirect away from login
