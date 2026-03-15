@@ -1359,9 +1359,8 @@
       };
 
       if (actionType.includes('type')) {
-        // Watch for value changes on input/textarea
+        // Watch for value changes on input/textarea via input, change, and paste
         const onInput = () => {
-          // Show subtle completion indicator then auto-advance
           if (this._tooltip) {
             const indicator = this._tooltip.querySelector('.guide-completion-indicator');
             if (!indicator) {
@@ -1375,8 +1374,16 @@
           clearTimeout(this._completionTimeout);
           this._completionTimeout = setTimeout(advance, 1500);
         };
-        element.addEventListener('input', onInput);
-        this._completionCleanup = () => element.removeEventListener('input', onInput);
+        const ac = new AbortController();
+        const opts = { capture: true, signal: ac.signal };
+        element.addEventListener('input', onInput, opts);
+        element.addEventListener('change', onInput, opts);
+        element.addEventListener('paste', onInput, opts);
+        // Also listen on document for events that bubble (covers iframes)
+        document.addEventListener('input', (e) => {
+          if (e.target === element || element.contains(e.target)) onInput();
+        }, opts);
+        this._completionCleanup = () => ac.abort();
       } else if (actionType.includes('click')) {
         // Watch for element removal from DOM after click (e.g. dropdown closing)
         if (element.parentElement) {
