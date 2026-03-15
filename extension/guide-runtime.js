@@ -1242,7 +1242,8 @@
       if (!isClickStep) return;
 
       const nextIndex = this.currentIndex + 1;
-      const isLinkClick = element.tagName === 'A' || element.closest('a');
+      const isLinkClick = element.tagName === 'A' || !!element.closest('a');
+      const isOption = element.tagName === 'OPTION' || element.role === 'option';
 
       const advance = () => {
         this._removeClickHandler();
@@ -1259,17 +1260,24 @@
           stepStatus: 'active',
         }).catch(() => {});
 
-        // For link clicks that navigate away, don't try to show the next step
-        // locally — the page will unload and background will re-inject.
-        if (isLinkClick) return;
+        // For link/option clicks that may navigate away, don't try to show
+        // the next step locally — the page will unload and background
+        // will re-inject.
+        if (isLinkClick || isOption) return;
 
         setTimeout(() => this.showStep(nextIndex), 400);
       };
 
-      // Handler directly on the target element (clicks in the cutout go to the page element)
+      // For links and options: fire on pointerdown (before navigation starts).
+      // For everything else: fire on click (after the action completes).
+      // This is Tango's approach to avoiding the race condition where the page
+      // navigates before the step is marked complete.
+      const eventType = (isLinkClick || isOption) ? "pointerdown" : "click";
+
       this._clickHandler = (e) => advance();
-      element.addEventListener("click", this._clickHandler, { once: true });
+      element.addEventListener(eventType, this._clickHandler, { once: true });
       this._clickElement = element;
+      this._clickEventType = eventType;
 
       // Also listen on parent in case the exact element gets replaced (SPAs)
       if (element.parentElement) {
@@ -1278,22 +1286,24 @@
             advance();
           }
         };
-        element.parentElement.addEventListener("click", this._parentClickHandler, { once: true });
+        element.parentElement.addEventListener(eventType, this._parentClickHandler, { once: true });
         this._clickParent = element.parentElement;
       }
     }
 
     _removeClickHandler() {
+      const eventType = this._clickEventType || "click";
       if (this._clickHandler && this._clickElement) {
-        this._clickElement.removeEventListener("click", this._clickHandler);
+        this._clickElement.removeEventListener(eventType, this._clickHandler);
         this._clickHandler = null;
         this._clickElement = null;
       }
       if (this._parentClickHandler && this._clickParent) {
-        this._clickParent.removeEventListener("click", this._parentClickHandler);
+        this._clickParent.removeEventListener(eventType, this._parentClickHandler);
         this._parentClickHandler = null;
         this._clickParent = null;
       }
+      this._clickEventType = null;
     }
 
     // Feature 5: Completion detection via MutationObserver and event listeners
