@@ -8,13 +8,23 @@
 (function () {
   "use strict";
 
-  // Allow re-injection: clean up previous instance without triggering GUIDE_STOPPED
-  if (window.__steptGuideRunner) {
-    try {
-      window.__steptGuideRunner._replacing = true;
-      window.__steptGuideRunner.stop();
-    } catch {}
-  }
+  // Deduplication: kill any previous instance via custom event (Tango pattern).
+  // More reliable than checking window properties since the previous script
+  // context may have been garbage collected.
+  const DEDUP_EVENT = "stept_guide_remove_" + chrome.runtime.id;
+  const cleanup = () => {
+    document.removeEventListener(DEDUP_EVENT, cleanup);
+    if (window.__steptGuideRunner) {
+      try {
+        window.__steptGuideRunner._replacing = true;
+        window.__steptGuideRunner.stop();
+      } catch {}
+    }
+  };
+  // Fire event to kill previous instance
+  document.dispatchEvent(new CustomEvent(DEDUP_EVENT));
+  // Listen for future instances
+  document.addEventListener(DEDUP_EVENT, cleanup);
   window.__steptGuideLoaded = true;
 
   // ── CSS Zoom Compensation ─────────────────────────────────────────
@@ -579,9 +589,18 @@
     }
 
     stop() {
+      this._stopElementPolling();
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
+      if (this._inertObserver) {
+        this._inertObserver.disconnect();
+        this._inertObserver = null;
+      }
+      if (this._zoomObserver) {
+        this._zoomObserver.disconnect();
+        this._zoomObserver = null;
+      }
       if (this.host) {
         this.host.remove();
         this.host = null;
@@ -608,9 +627,32 @@
       this.shadow.appendChild(style);
 
       document.documentElement.appendChild(this.host);
+
+      // Protect overlay from being made inert by the page (modals/dialogs
+      // often set inert on everything outside themselves).
+      this._inertObserver = new MutationObserver(() => {
+        if (this.host && this.host.hasAttribute("inert")) {
+          this.host.removeAttribute("inert");
+        }
+      });
+      this._inertObserver.observe(this.host, { attributes: true, attributeFilter: ["inert"] });
+
+      // Zoom compensation: counteract page zoom so our overlay stays pixel-perfect.
+      const updateZoom = () => {
+        if (!this.host || this.host.parentElement !== document.documentElement) return;
+        const bodyZoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+        const htmlZoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+        const totalZoom = bodyZoom * htmlZoom;
+        this.host.style.zoom = totalZoom === 1 ? "" : String(1 / totalZoom);
+      };
+      updateZoom();
+      this._zoomObserver = new MutationObserver(updateZoom);
+      this._zoomObserver.observe(document.body, { attributes: true, attributeFilter: ["style", "class"] });
+      this._zoomObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
     }
 
     _clearOverlay() {
+      this._stopElementPolling();
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
@@ -620,6 +662,129 @@
       if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
       if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
       if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
+    }
+
+    _stopElementPolling() {
+      if (this._pollInterval) {
+        clearInterval(this._pollInterval);
+        this._pollInterval = null;
+      }
+    }
+
+    _startElementPolling(step, seq, urlMismatch) {
+      this._stopElementPolling();
+      let tickCount = 0;
+      const POLL_MS = 100;
+      const TIMEOUT_TICKS = 30;  // 3 seconds before showing roadblock
+      let lastStatus = null;     // track to avoid redundant re-renders
+      let healthReported = false;
+
+      const poll = async () => {
+        if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
+
+        const result = await findGuideElement(step);
+
+        if (this._stepSeq !== seq) return; // another showStep started
+
+        if (result) {
+          tickCount = 0;  // reset on success
+          this.currentResult = result;
+
+          // Report health once on first find
+          if (!healthReported) {
+            healthReported = true;
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: true,
+                finderMethod: result.method || null,
+                finderConfidence: result.confidence || 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: true,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+          }
+
+          // Check intermediate action
+          const intermediateAncestor = needsIntermediateAction(result.element);
+          if (intermediateAncestor) {
+            if (lastStatus !== 'intermediate') {
+              lastStatus = 'intermediate';
+              this._stopElementPolling();
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_CHANGED',
+                currentIndex: this.currentIndex,
+                totalSteps: this.steps.length,
+                stepStatus: 'intermediate',
+              }).catch(() => {});
+              this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
+            }
+            return;
+          }
+
+          if (lastStatus !== 'found') {
+            lastStatus = 'found';
+            // Clear any previous not-found UI
+            if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
+
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'active',
+            }).catch(() => {});
+
+            const obstructor = isObstructed(result.element);
+            this._scrollToElement(result);
+            await new Promise((r) => setTimeout(r, 80));
+            if (this._stepSeq !== seq) return;
+            this._renderOverlay(step, result, urlMismatch, obstructor);
+            this._startPositionTracking(step, result);
+            this._setupClickAdvance(result.element, step);
+            this._setupCompletionDetection(result.element, step);
+            // Stop polling once element is found and handlers are set up
+            this._stopElementPolling();
+          }
+        } else {
+          tickCount++;
+          // Only show not-found after timeout threshold
+          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'notfound') {
+            lastStatus = 'notfound';
+            // Report health
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: false,
+                finderMethod: null,
+                finderConfidence: 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: false,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'notfound',
+            }).catch(() => {});
+            this._renderNotFound(step, urlMismatch);
+            // Keep polling even after showing not-found — element may appear later
+          }
+        }
+      };
+
+      // Immediate first poll, then every 100ms
+      poll();
+      this._pollInterval = setInterval(poll, POLL_MS);
     }
 
     async showStep(index) {
@@ -674,78 +839,18 @@
         } catch {}
       }
 
-      // Find element with retry (more attempts, longer waits for freshly loaded pages)
-      let result = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        if (this._stepSeq !== seq) return; // another showStep started, abort
-        result = await findGuideElement(step);
-        if (result) break;
-        await new Promise((r) => setTimeout(r, attempt < 2 ? 800 : 1500));
-      }
-      if (this._stepSeq !== seq) return; // abort if superseded
-
-      this.currentResult = result;
-
-      // ── Staleness Detection: report step health ──
-      try {
-        chrome.runtime.sendMessage({
-          type: 'GUIDE_STEP_HEALTH',
-          workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-          stepNumber: index,
-          elementFound: !!result,
-          finderMethod: result?.method || null,
-          finderConfidence: result?.confidence || 0,
-          expectedUrl: step.expected_url || step.url || null,
-          actualUrl: window.location.href,
-          urlMatched: !(step.expected_url || step.url) || (() => {
-            try {
-              const exp = new URL(step.expected_url || step.url);
-              const act = new URL(window.location.href);
-              return exp.pathname === act.pathname;
-            } catch { return false; }
-          })(),
-          timestamp: Date.now(),
-        }).catch(() => {});
-      } catch (_) { /* never break guide playback */ }
-
-      // Determine step status for sidepanel
-      let stepStatus = 'active';
-      if (!result) stepStatus = 'notfound';
-
-      // Notify background of step change
+      // Notify sidepanel we're searching
       chrome.runtime.sendMessage({
         type: 'GUIDE_STEP_CHANGED',
         currentIndex: index,
         totalSteps: this.steps.length,
-        stepStatus,
+        stepStatus: 'active',
       }).catch(() => {});
 
-      if (result) {
-        // Feature 8: Check if element needs intermediate action (hidden ancestor)
-        const intermediateAncestor = needsIntermediateAction(result.element);
-        if (intermediateAncestor) {
-          chrome.runtime.sendMessage({
-            type: 'GUIDE_STEP_CHANGED',
-            currentIndex: index,
-            totalSteps: this.steps.length,
-            stepStatus: 'intermediate',
-          }).catch(() => {});
-          this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
-          return;
-        }
-
-        // Feature 3: Check if element is obstructed
-        const obstructor = isObstructed(result.element);
-
-        this._scrollToElement(result);
-        await new Promise((r) => setTimeout(r, 100)); // wait for scroll
-        this._renderOverlay(step, result, urlMismatch, obstructor);
-        this._startPositionTracking(step, result);
-        this._setupClickAdvance(result.element, step);
-        this._setupCompletionDetection(result.element, step);
-      } else {
-        this._renderNotFound(step, urlMismatch);
-      }
+      // Continuous polling for element (like Tango's 100ms Automatix pattern).
+      // Instead of 5 retries with long waits, poll every 100ms and show
+      // roadblock only after 30 ticks (3s). Element positions update in real-time.
+      this._startElementPolling(step, seq, urlMismatch);
     }
 
     _scrollToElement(result) {
@@ -1177,7 +1282,8 @@
       if (!isClickStep) return;
 
       const nextIndex = this.currentIndex + 1;
-      const isLinkClick = element.tagName === 'A' || element.closest('a');
+      const isLinkClick = element.tagName === 'A' || !!element.closest('a');
+      const isOption = element.tagName === 'OPTION' || element.role === 'option';
 
       const advance = () => {
         this._removeClickHandler();
@@ -1194,17 +1300,24 @@
           stepStatus: 'active',
         }).catch(() => {});
 
-        // For link clicks that navigate away, don't try to show the next step
-        // locally — the page will unload and background will re-inject.
-        if (isLinkClick) return;
+        // For link/option clicks that may navigate away, don't try to show
+        // the next step locally — the page will unload and background
+        // will re-inject.
+        if (isLinkClick || isOption) return;
 
         setTimeout(() => this.showStep(nextIndex), 400);
       };
 
-      // Handler directly on the target element (clicks in the cutout go to the page element)
+      // For links and options: fire on pointerdown (before navigation starts).
+      // For everything else: fire on click (after the action completes).
+      // This is Tango's approach to avoiding the race condition where the page
+      // navigates before the step is marked complete.
+      const eventType = (isLinkClick || isOption) ? "pointerdown" : "click";
+
       this._clickHandler = (e) => advance();
-      element.addEventListener("click", this._clickHandler, { once: true });
+      element.addEventListener(eventType, this._clickHandler, { once: true });
       this._clickElement = element;
+      this._clickEventType = eventType;
 
       // Also listen on parent in case the exact element gets replaced (SPAs)
       if (element.parentElement) {
@@ -1213,22 +1326,43 @@
             advance();
           }
         };
-        element.parentElement.addEventListener("click", this._parentClickHandler, { once: true });
+        element.parentElement.addEventListener(eventType, this._parentClickHandler, { once: true });
         this._clickParent = element.parentElement;
       }
+
+      // Keyboard shortcuts for step advancement (Tango pattern):
+      // Enter on input fields, Tab, or Ctrl/Cmd+E
+      this._keyHandler = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          advance();
+        } else if (e.key === 'Tab') {
+          advance();
+        } else if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+          advance();
+        }
+      };
+      document.addEventListener('keydown', this._keyHandler, { capture: true });
     }
 
     _removeClickHandler() {
+      const eventType = this._clickEventType || "click";
       if (this._clickHandler && this._clickElement) {
-        this._clickElement.removeEventListener("click", this._clickHandler);
+        this._clickElement.removeEventListener(eventType, this._clickHandler);
         this._clickHandler = null;
         this._clickElement = null;
       }
       if (this._parentClickHandler && this._clickParent) {
-        this._clickParent.removeEventListener("click", this._parentClickHandler);
+        this._clickParent.removeEventListener(eventType, this._parentClickHandler);
         this._parentClickHandler = null;
         this._clickParent = null;
       }
+      if (this._keyHandler) {
+        document.removeEventListener('keydown', this._keyHandler, { capture: true });
+        this._keyHandler = null;
+      }
+      this._clickEventType = null;
     }
 
     // Feature 5: Completion detection via MutationObserver and event listeners
@@ -1244,9 +1378,8 @@
       };
 
       if (actionType.includes('type')) {
-        // Watch for value changes on input/textarea
+        // Watch for value changes on input/textarea via input, change, and paste
         const onInput = () => {
-          // Show subtle completion indicator then auto-advance
           if (this._tooltip) {
             const indicator = this._tooltip.querySelector('.guide-completion-indicator');
             if (!indicator) {
@@ -1260,8 +1393,16 @@
           clearTimeout(this._completionTimeout);
           this._completionTimeout = setTimeout(advance, 1500);
         };
-        element.addEventListener('input', onInput);
-        this._completionCleanup = () => element.removeEventListener('input', onInput);
+        const ac = new AbortController();
+        const opts = { capture: true, signal: ac.signal };
+        element.addEventListener('input', onInput, opts);
+        element.addEventListener('change', onInput, opts);
+        element.addEventListener('paste', onInput, opts);
+        // Also listen on document for events that bubble (covers iframes)
+        document.addEventListener('input', (e) => {
+          if (e.target === element || element.contains(e.target)) onInput();
+        }, opts);
+        this._completionCleanup = () => ac.abort();
       } else if (actionType.includes('click')) {
         // Watch for element removal from DOM after click (e.g. dropdown closing)
         if (element.parentElement) {
