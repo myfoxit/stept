@@ -833,11 +833,25 @@ async function renderGuideSteps(guide, currentIndex, stepStatus) {
   if (!guide || !guide.steps || !guide.steps.length) {
     panel.style.display = 'none';
     recentWorkflows.style.display = '';
+    // Restore hidden siblings
+    for (const el of panel.parentElement.children) {
+      if (el !== panel && el.dataset.hiddenByGuide) {
+        el.style.display = '';
+        delete el.dataset.hiddenByGuide;
+      }
+    }
     return;
   }
 
   panel.style.display = '';
   recentWorkflows.style.display = 'none';
+  // Hide all sibling elements so guide takes over the full panel
+  for (const el of panel.parentElement.children) {
+    if (el !== panel && el.style.display !== 'none') {
+      el.dataset.hiddenByGuide = '1';
+      el.style.display = 'none';
+    }
+  }
 
   // Set guide title
   if (titleEl) {
@@ -1016,6 +1030,15 @@ async function _loadStepImage(container, step, index) {
 function hideGuideSteps() {
   const panel = document.getElementById('guideStepsPanel');
   const recentWorkflows = document.getElementById('recentWorkflows');
+  // Restore siblings hidden by guide
+  if (panel.parentElement) {
+    for (const el of panel.parentElement.children) {
+      if (el !== panel && el.dataset.hiddenByGuide) {
+        el.style.display = '';
+        delete el.dataset.hiddenByGuide;
+      }
+    }
+  }
   panel.style.display = 'none';
   recentWorkflows.style.display = '';
   activeGuideData = null;
