@@ -579,6 +579,7 @@
     }
 
     stop() {
+      this._stopElementPolling();
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
@@ -611,6 +612,7 @@
     }
 
     _clearOverlay() {
+      this._stopElementPolling();
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
@@ -620,6 +622,129 @@
       if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
       if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
       if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
+    }
+
+    _stopElementPolling() {
+      if (this._pollInterval) {
+        clearInterval(this._pollInterval);
+        this._pollInterval = null;
+      }
+    }
+
+    _startElementPolling(step, seq, urlMismatch) {
+      this._stopElementPolling();
+      let tickCount = 0;
+      const POLL_MS = 100;
+      const TIMEOUT_TICKS = 30;  // 3 seconds before showing roadblock
+      let lastStatus = null;     // track to avoid redundant re-renders
+      let healthReported = false;
+
+      const poll = async () => {
+        if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
+
+        const result = await findGuideElement(step);
+
+        if (this._stepSeq !== seq) return; // another showStep started
+
+        if (result) {
+          tickCount = 0;  // reset on success
+          this.currentResult = result;
+
+          // Report health once on first find
+          if (!healthReported) {
+            healthReported = true;
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: true,
+                finderMethod: result.method || null,
+                finderConfidence: result.confidence || 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: true,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+          }
+
+          // Check intermediate action
+          const intermediateAncestor = needsIntermediateAction(result.element);
+          if (intermediateAncestor) {
+            if (lastStatus !== 'intermediate') {
+              lastStatus = 'intermediate';
+              this._stopElementPolling();
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_CHANGED',
+                currentIndex: this.currentIndex,
+                totalSteps: this.steps.length,
+                stepStatus: 'intermediate',
+              }).catch(() => {});
+              this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
+            }
+            return;
+          }
+
+          if (lastStatus !== 'found') {
+            lastStatus = 'found';
+            // Clear any previous not-found UI
+            if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
+
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'active',
+            }).catch(() => {});
+
+            const obstructor = isObstructed(result.element);
+            this._scrollToElement(result);
+            await new Promise((r) => setTimeout(r, 80));
+            if (this._stepSeq !== seq) return;
+            this._renderOverlay(step, result, urlMismatch, obstructor);
+            this._startPositionTracking(step, result);
+            this._setupClickAdvance(result.element, step);
+            this._setupCompletionDetection(result.element, step);
+            // Stop polling once element is found and handlers are set up
+            this._stopElementPolling();
+          }
+        } else {
+          tickCount++;
+          // Only show not-found after timeout threshold
+          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'notfound') {
+            lastStatus = 'notfound';
+            // Report health
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: false,
+                finderMethod: null,
+                finderConfidence: 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: false,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'notfound',
+            }).catch(() => {});
+            this._renderNotFound(step, urlMismatch);
+            // Keep polling even after showing not-found — element may appear later
+          }
+        }
+      };
+
+      // Immediate first poll, then every 100ms
+      poll();
+      this._pollInterval = setInterval(poll, POLL_MS);
     }
 
     async showStep(index) {
@@ -674,78 +799,18 @@
         } catch {}
       }
 
-      // Find element with retry (more attempts, longer waits for freshly loaded pages)
-      let result = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        if (this._stepSeq !== seq) return; // another showStep started, abort
-        result = await findGuideElement(step);
-        if (result) break;
-        await new Promise((r) => setTimeout(r, attempt < 2 ? 800 : 1500));
-      }
-      if (this._stepSeq !== seq) return; // abort if superseded
-
-      this.currentResult = result;
-
-      // ── Staleness Detection: report step health ──
-      try {
-        chrome.runtime.sendMessage({
-          type: 'GUIDE_STEP_HEALTH',
-          workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-          stepNumber: index,
-          elementFound: !!result,
-          finderMethod: result?.method || null,
-          finderConfidence: result?.confidence || 0,
-          expectedUrl: step.expected_url || step.url || null,
-          actualUrl: window.location.href,
-          urlMatched: !(step.expected_url || step.url) || (() => {
-            try {
-              const exp = new URL(step.expected_url || step.url);
-              const act = new URL(window.location.href);
-              return exp.pathname === act.pathname;
-            } catch { return false; }
-          })(),
-          timestamp: Date.now(),
-        }).catch(() => {});
-      } catch (_) { /* never break guide playback */ }
-
-      // Determine step status for sidepanel
-      let stepStatus = 'active';
-      if (!result) stepStatus = 'notfound';
-
-      // Notify background of step change
+      // Notify sidepanel we're searching
       chrome.runtime.sendMessage({
         type: 'GUIDE_STEP_CHANGED',
         currentIndex: index,
         totalSteps: this.steps.length,
-        stepStatus,
+        stepStatus: 'active',
       }).catch(() => {});
 
-      if (result) {
-        // Feature 8: Check if element needs intermediate action (hidden ancestor)
-        const intermediateAncestor = needsIntermediateAction(result.element);
-        if (intermediateAncestor) {
-          chrome.runtime.sendMessage({
-            type: 'GUIDE_STEP_CHANGED',
-            currentIndex: index,
-            totalSteps: this.steps.length,
-            stepStatus: 'intermediate',
-          }).catch(() => {});
-          this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
-          return;
-        }
-
-        // Feature 3: Check if element is obstructed
-        const obstructor = isObstructed(result.element);
-
-        this._scrollToElement(result);
-        await new Promise((r) => setTimeout(r, 100)); // wait for scroll
-        this._renderOverlay(step, result, urlMismatch, obstructor);
-        this._startPositionTracking(step, result);
-        this._setupClickAdvance(result.element, step);
-        this._setupCompletionDetection(result.element, step);
-      } else {
-        this._renderNotFound(step, urlMismatch);
-      }
+      // Continuous polling for element (like Tango's 100ms Automatix pattern).
+      // Instead of 5 retries with long waits, poll every 100ms and show
+      // roadblock only after 30 ticks (3s). Element positions update in real-time.
+      this._startElementPolling(step, seq, urlMismatch);
     }
 
     _scrollToElement(result) {
