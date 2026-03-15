@@ -8,13 +8,23 @@
 (function () {
   "use strict";
 
-  // Allow re-injection: clean up previous instance without triggering GUIDE_STOPPED
-  if (window.__steptGuideRunner) {
-    try {
-      window.__steptGuideRunner._replacing = true;
-      window.__steptGuideRunner.stop();
-    } catch {}
-  }
+  // Deduplication: kill any previous instance via custom event (Tango pattern).
+  // More reliable than checking window properties since the previous script
+  // context may have been garbage collected.
+  const DEDUP_EVENT = "stept_guide_remove_" + chrome.runtime.id;
+  const cleanup = () => {
+    document.removeEventListener(DEDUP_EVENT, cleanup);
+    if (window.__steptGuideRunner) {
+      try {
+        window.__steptGuideRunner._replacing = true;
+        window.__steptGuideRunner.stop();
+      } catch {}
+    }
+  };
+  // Fire event to kill previous instance
+  document.dispatchEvent(new CustomEvent(DEDUP_EVENT));
+  // Listen for future instances
+  document.addEventListener(DEDUP_EVENT, cleanup);
   window.__steptGuideLoaded = true;
 
   // ── CSS Zoom Compensation ─────────────────────────────────────────
