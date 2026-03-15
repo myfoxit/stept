@@ -1340,6 +1340,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case 'CLICK_EVENT': {
+        markUserAction();
         // Extract domSnapshot before addStep (too large for step storage)
         const domSnapshot = message.data?.domSnapshot;
         delete message.data.domSnapshot;
@@ -1353,6 +1354,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case 'TYPE_EVENT':
+        // Enter/Tab can trigger navigations (form submits, link activation)
+        if (message.data?.actionType === 'Key' && /Enter|Tab/.test(message.data.description || '')) {
+          markUserAction();
+        }
         await addStep(message.data);
         sendResponse({ success: true });
         break;
@@ -1871,6 +1876,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Unified page tracking — covers tab switches and navigations, deduplicates
 let lastTrackedPage = { tabId: null, url: null, time: 0 };
 
+// Track the last user-initiated action (click, Enter, address bar navigation)
+// so we can suppress ALL navigations caused by it — including redirect chains
+// and site-triggered new tabs (target=_blank).
+let lastUserActionTime = 0;
+const NAVIGATION_SUPPRESS_WINDOW = 5000; // 5s — covers multi-hop redirects and slow page loads
+
+function markUserAction() {
+  lastUserActionTime = Date.now();
+}
+
 async function trackPageChange(tabId, reason) {
   if (!state.isRecording || state.isPaused) return;
 
@@ -1892,19 +1907,11 @@ async function trackPageChange(tabId, reason) {
       return;
     lastTrackedPage = { tabId, url: tab.url, time: now };
 
-    // Suppress navigate step if the last step was a click or Enter within 3s
-    // (the navigation was caused by that action, recording it is redundant)
-    if (state.steps.length > 0) {
-      const lastStep = state.steps[state.steps.length - 1];
-      const lastStepAge = now - new Date(lastStep.timestamp).getTime();
-      const wasUserAction =
-        lastStep.actionType?.includes('Click') ||
-        (lastStep.actionType === 'Key' &&
-          lastStep.description?.includes('Enter'));
-      if (wasUserAction && lastStepAge < 3000) {
-        debugLog('Suppressing navigate step (caused by recent user action)');
-        return;
-      }
+    // Suppress navigate step if a user action (click/Enter) happened recently.
+    // This catches the entire redirect chain, not just the first hop.
+    if (now - lastUserActionTime < NAVIGATION_SUPPRESS_WINDOW) {
+      debugLog('Suppressing navigate step (caused by recent user action)');
+      return;
     }
 
     await addStep({
@@ -1979,14 +1986,22 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!state.isRecording || state.isPaused) return;
 
-  addStep({
-    actionType: 'Navigate',
-    pageTitle: 'New Tab',
-    description: 'Open new tab',
-    url: tab.url || 'chrome://newtab',
-    windowSize: { width: 0, height: 0 },
-    viewportSize: { width: 0, height: 0 },
-  });
+  // Suppress site-triggered new tabs (target=_blank from a click).
+  // User-initiated new tabs (Ctrl+T, toolbar button) won't have a recent user action
+  // because the click happened on browser chrome, not on a page element we track.
+  const now = Date.now();
+  if (now - lastUserActionTime < NAVIGATION_SUPPRESS_WINDOW) {
+    debugLog('Suppressing new tab step (caused by recent user action, likely target=_blank)');
+  } else {
+    addStep({
+      actionType: 'Navigate',
+      pageTitle: 'New Tab',
+      description: 'Open new tab',
+      url: tab.url || 'chrome://newtab',
+      windowSize: { width: 0, height: 0 },
+      viewportSize: { width: 0, height: 0 },
+    });
+  }
 
   // Inject content script into new tab once it loads
   if (tab.id) {
