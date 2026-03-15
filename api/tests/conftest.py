@@ -172,6 +172,8 @@ async def _clean_tables():
             if t.name in existing_tables
         )
         if table_names:
+            # Disable FK checks to avoid deadlocks from complex relationships
+            await conn.execute(text("SET CONSTRAINTS ALL DEFERRED"))
             await conn.execute(text(f"TRUNCATE TABLE {table_names} CASCADE"))
     yield
 
