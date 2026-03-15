@@ -49,9 +49,6 @@ export function TableCellViewer<T extends Record<string, any>>({
     const { id, ...dataWithoutId } = formState as any;
     toast.success('Row updated');
     // Call the mutation with tableId, rowId and the updated payload
-    console.log(formState);
-
-    
     updateRowMutation.mutate(
       {
         tableId: tableId,

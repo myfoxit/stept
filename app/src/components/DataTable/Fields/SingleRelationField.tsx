@@ -24,8 +24,6 @@ export function SingleRelationField<Row extends { id: string; name?: string }>(
   const { relations_table_id, relation_id } = column;
   const [open, setOpen] = useState(false);
 
-  console.log(value);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>

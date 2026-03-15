@@ -78,16 +78,10 @@ export function LookupSettings({
     return relCol?.relations_table_id;
   }, [relationColumns, selectedRelationColumnId]);
 
-  console.log("Selected relation table ID:", selectedRelationTableId);
-
   // 4) Load columns from the related table with a separate hook call
-  // The key here is to ensure we're using the correct table ID and it's properly differentiated
   const { data: targetColumns = [], isLoading: targetColumnsLoading } = useColumns(
     selectedRelationTableId || undefined
   );
-
-  console.log('Target columns:', targetColumns);
-  console.log('Target columns loading:', targetColumnsLoading);
 
   const [lookupColumnId, setLookupColumnId] = React.useState<string | undefined>(undefined);
 

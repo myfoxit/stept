@@ -54,7 +54,6 @@ export function getDynamicColumns<T extends Record<string, any>>(
 
   // Exclude 'id' from dynamic columns, since it's shown in the first static column
   const keys = allKeys.filter((k) => k !== 'id');
-  console.log(keys);
 
   return [
     {
@@ -140,7 +139,7 @@ export function getDynamicColumns<T extends Record<string, any>>(
                   column={columnMeta!}
                   value={safeJsonParse(value) as { id: string; name?: string } | null}
                   leftItemId={row.original.id}
-                  onChange={(_row) => console.log('updated')}
+                  onChange={() => {}}
                 />
               );
             }
@@ -153,7 +152,7 @@ export function getDynamicColumns<T extends Record<string, any>>(
                   value={value as string}
                   rowId={row.original.id}
                   commitMode="immediate"
-                  onChange={(opt) => console.log('new value', opt)}
+                  onChange={() => {}}
                 />
               );
 
@@ -176,7 +175,7 @@ export function getDynamicColumns<T extends Record<string, any>>(
                   value={value as string}
                   rowId={row.original.id}
                   commitMode="immediate"
-                  onChange={(opt) => console.log('new value', opt)}
+                  onChange={() => {}}
                 />
               );
             case 'lookup':
@@ -190,9 +189,30 @@ export function getDynamicColumns<T extends Record<string, any>>(
                   column={columnMeta!}
                   value={safeJsonParse(value) as { id: string; name?: string }[] ?? []}
                   leftItemId={row.original.id}
-                  onChange={(_row) => console.log('updated')}
+                  onChange={() => {}}
                 />
               );
+            }
+            case 'checkbox': {
+              const checked = value === true || value === 'true' || value === 't';
+              return (
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={checked}
+                    aria-label="Toggle checkbox"
+                    className="cursor-pointer"
+                  />
+                </div>
+              );
+            }
+            case 'date': {
+              if (!value) return <span className="text-muted-foreground">-</span>;
+              try {
+                const d = new Date(value as string);
+                return <span>{d.toLocaleDateString()}</span>;
+              } catch {
+                return <span>{String(value)}</span>;
+              }
             }
             // `single_line_text` (or no ui_type) falls through to default:
             case 'long_text':
@@ -224,6 +244,7 @@ export function getDynamicColumns<T extends Record<string, any>>(
           'formula',
           'rollup',
           'long_text', // Add to excluded types for spreadsheet mode
+          'checkbox',
         ];
         const isExcluded = excludedTypes.includes(uiType || '');
 

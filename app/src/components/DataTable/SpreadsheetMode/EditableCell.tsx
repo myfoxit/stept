@@ -52,19 +52,6 @@ export function EditableCell({
     editingCell?.row === globalRowIndex && editingCell?.col === colIndex;
   const isNewRow = lastAddedRowIndex === globalRowIndex;
 
-  // TEMP: debug logs
-  React.useEffect(() => {
-    if (isEditing) {
-      console.log('EditableCell editing', {
-        globalRowIndex,
-        renderBaseIndex,
-        rowIndex,
-        maxVisibleRowIndex,
-        totalRows,
-      });
-    }
-  }, [isEditing, globalRowIndex, renderBaseIndex, rowIndex, maxVisibleRowIndex, totalRows]);
-
   React.useEffect(() => {
     setEditValue(value);
   }, [value]);
@@ -162,13 +149,6 @@ export function EditableCell({
         const nextRow = globalRowIndex + 1;
         const atBottomWindow = nextRow > maxVisibleRowIndex;
 
-        console.log('Enter nav', {
-          globalRowIndex,
-          nextRow,
-          maxVisibleRowIndex,
-          atBottomWindow,
-        });
-
         if (atBottomWindow) {
           // We are at / beyond the last row: trigger row creation
           goPastEndAndAddRow?.({ fromRow: globalRowIndex, col: colIndex });
@@ -180,13 +160,6 @@ export function EditableCell({
       if (nav === 'right') {
         const nextCol = colIndex + 1;
         const atBottomWindow = globalRowIndex >= maxVisibleRowIndex;
-
-        console.log('Tab nav', {
-          globalRowIndex,
-          nextCol,
-          maxVisibleRowIndex,
-          atBottomWindow,
-        });
 
         if (atBottomWindow && nextCol > colIndex) {
           // Tab on last column & last row: create new row, jump to first data column

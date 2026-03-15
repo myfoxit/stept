@@ -74,12 +74,6 @@ export function SpreadsheetProvider({
 
   const goPastEndAndAddRow = React.useCallback(
     (opts: { fromRow: number; col: number }) => {
-      console.log('goPastEndAndAddRow called', {
-        opts,
-        totalRows,
-        hasOnAddRow: !!onAddRow,
-      });
-
       if (!onAddRow) return;
 
       const { col } = opts;

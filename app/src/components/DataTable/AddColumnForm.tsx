@@ -141,7 +141,6 @@ export function AddColumnForm({
       }
     } else if (type === 'decimal') {
       try {
-        console.log('Adding decimal column with scale:', cfg?.scale);
         await addColumnMutation.mutateAsync({
           table_id: tableId,
           name: fieldName,

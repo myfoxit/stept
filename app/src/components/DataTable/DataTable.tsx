@@ -550,7 +550,8 @@ export function DataTable({
             onClose={() => setShowImportDialog(false)}
             onImportComplete={() => {
               setShowImportDialog(false);
-              window.location.reload();
+              dataWindow.invalidate();
+              queryClient.invalidateQueries({ queryKey: ['columns'] });
             }}
           />
         )}

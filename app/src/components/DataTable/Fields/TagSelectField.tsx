@@ -59,9 +59,6 @@ function OptionPicker({
     );
   }
 
-  console.log('Options:', options);
-
-
   return (
     <Command className="w-full">
       <CommandInput placeholder="Search options..." />
