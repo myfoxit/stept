@@ -157,6 +157,10 @@ api_router.include_router(transcription.router, prefix="/transcription", tags=["
 api_router.include_router(video_import.router, prefix="/video-import", tags=["video-import"])
 api_router.include_router(staleness.router, tags=["staleness"])
 
+# Datatable feature (ported from SnapRow with security fixes)
+from app.routers.datatable import router as datatable_router
+api_router.include_router(datatable_router, prefix="/datatable", tags=["datatable"])
+
 
 # Mount the versioned router on the main app
 app.include_router(api_router)

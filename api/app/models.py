@@ -58,6 +58,15 @@ class ProjectRole(enum.Enum):
             return cls.VIEWER
 
 # New: Permission levels for resource access
+class ColumnType(enum.Enum):
+    PHYSICAL = "physical"
+    VIRTUAL  = "virtual"
+
+class TableType(enum.Enum):
+    USER  = "user"
+    JOIN  = "join"
+    OTHER = "other"
+
 class PermissionLevel(enum.Enum):
     VIEW = "view"
     COMMENT = "comment"
@@ -949,4 +958,168 @@ class StalenessAlert(Base):
     __table_args__ = (
         Index("ix_alert_project", "project_id", "resolved", "dismissed"),
         Index("ix_alert_workflow", "workflow_id"),
+    )
+
+
+# ── Datatable Models (ported from SnapRow) ─────────────────────────────────
+
+class TableMeta(Base):
+    __tablename__ = "table_meta"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    name = Column(String, index=True)
+    physical_name = Column(String, unique=True)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"))
+    project = relationship("Project", backref="tables")
+    table_type = Column(
+        SQLEnum(TableType, name="table_type_enum", values_callable=enum_values,
+                validate_strings=True, create_constraint=True, native_enum=False),
+        nullable=False, server_default=text("'user'"),
+    )
+    has_order_column = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
+
+class ColumnMeta(Base):
+    __tablename__ = "column_meta"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"))
+    display_name = Column(String)
+    name = Column(String)
+    ui_type = Column(String)
+    fk_type = Column(String)
+    relations_table_id = Column(String(16), nullable=True, default=None)
+    column_type = Column(
+        SQLEnum(ColumnType, name="column_type_enum", values_callable=enum_values,
+                validate_strings=True, create_constraint=True, native_enum=False),
+        nullable=False, server_default=text("'physical'"),
+    )
+    sr__order = Column(Integer, nullable=False, default=1000, server_default=text("1000"))
+    default_value = Column(JSON, nullable=True, default=None)
+    settings = Column(JSON, nullable=True, default=None)
+    table = relationship("TableMeta", backref="columns")
+
+
+class FieldMeta(Base):
+    __tablename__ = "field_meta"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"))
+    row_id = Integer()
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"))
+    value = Column(Text)
+
+
+class RelationMeta(Base):
+    __tablename__ = "relation_meta"
+    id = Column(String, primary_key=True, index=True)
+    left_table_id = Column(String, ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False)
+    right_table_id = Column(String, ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False)
+    relation_type = Column(String, nullable=False)
+    fk_name = Column(String, nullable=True)
+    display_name = Column(String, nullable=True)
+    join_table_id = Column(String, ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=True)
+    left_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=True)
+    right_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=True)
+    left_table = relationship("TableMeta", foreign_keys=[left_table_id], backref="outgoing_relations")
+    right_table = relationship("TableMeta", foreign_keys=[right_table_id], backref="incoming_relations")
+    join_table = relationship("TableMeta", foreign_keys=[join_table_id], backref="relation_join_table")
+    left_column = relationship("ColumnMeta", foreign_keys=[left_column_id], backref="outgoing_column_relations")
+    right_column = relationship("ColumnMeta", foreign_keys=[right_column_id], backref="incoming_column_relations")
+
+
+class SelectOption(Base):
+    __tablename__ = "select_options"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    column = relationship("ColumnMeta", backref="select_options")
+    name = Column(String, nullable=False)
+    color = Column(String, nullable=True)
+    order = Column(Integer, default=0)
+
+
+class LookUpColumn(Base):
+    __tablename__ = "lookup_columns"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    relation_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    lookup_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+
+
+class Formulas(Base):
+    __tablename__ = "formulas"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"))
+    formula = Column(Text, nullable=False)
+    formula_raw = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    column = relationship("ColumnMeta", backref="formulas")
+
+
+class Rollup(Base):
+    __tablename__ = "rollups"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False, unique=True)
+    relation_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    rollup_column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="SET NULL"), nullable=True)
+    aggregate_func = Column(String, nullable=False, server_default=text("'count'"))
+    precision = Column(Integer, nullable=True)
+    show_thousands_sep = Column(Boolean, nullable=False, server_default=text("false"))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    column = relationship("ColumnMeta", backref="rollup", foreign_keys=[column_id], uselist=False)
+
+
+class Filter(Base):
+    __tablename__ = "filters"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    name = Column(String, nullable=False)
+    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    operation = Column(String, nullable=False)
+    value = Column(Text, nullable=True)
+    is_reusable = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    table = relationship("TableMeta", backref="filters")
+    user = relationship("User", backref="filters")
+    column = relationship("ColumnMeta", backref="filters")
+    __table_args__ = (
+        UniqueConstraint('table_id', 'user_id', 'column_id', 'operation', 'value', name='_filter_unique'),
+    )
+
+
+class Sort(Base):
+    __tablename__ = "sorts"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    direction = Column(String, nullable=False, server_default=text("'asc'"))
+    priority = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    table = relationship("TableMeta", backref="sorts")
+    user = relationship("User", backref="sorts")
+    column = relationship("ColumnMeta", backref="sorts")
+    __table_args__ = (
+        UniqueConstraint('table_id', 'user_id', 'column_id', name='_sort_unique'),
+    )
+
+
+class ColumnVisibility(Base):
+    __tablename__ = "column_visibility"
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    table_id = Column(String(16), ForeignKey("table_meta.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    column_id = Column(String(16), ForeignKey("column_meta.id", ondelete="CASCADE"), nullable=False)
+    is_visible = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    table = relationship("TableMeta", backref="column_visibility")
+    user = relationship("User", backref="column_visibility")
+    column = relationship("ColumnMeta", backref="column_visibility")
+    __table_args__ = (
+        UniqueConstraint('table_id', 'user_id', 'column_id', name='_column_visibility_unique'),
     )
