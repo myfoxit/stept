@@ -1313,7 +1313,7 @@ body {
 }
 .guide-steps-list {
   display: flex; flex-direction: column; gap: 0;
-  max-height: calc(100vh - 200px); overflow-y: auto; padding-bottom: 120px;
+  max-height: calc(100vh - 200px); overflow-y: auto; padding-bottom: 8px;
 }
 
 /* Vertical stepper: each step item */
@@ -1341,7 +1341,7 @@ body {
 
 /* Right column: step content */
 .guide-stepper-content {
-  flex: 1; padding-bottom: 16px; min-width: 0; overflow: hidden;
+  flex: 1; padding-bottom: 16px; min-width: 0;
 }
 .guide-stepper-instruction {
   font-size: 13px; color: #202124; font-weight: 500; line-height: 1.4; padding-top: 2px;
