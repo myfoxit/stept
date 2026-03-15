@@ -1341,7 +1341,7 @@ body {
 
 /* Right column: step content */
 .guide-stepper-content {
-  flex: 1; padding-bottom: 16px; min-width: 0;
+  flex: 1; padding-bottom: 16px; min-width: 0; overflow: hidden;
 }
 .guide-stepper-instruction {
   font-size: 13px; color: #202124; font-weight: 500; line-height: 1.4; padding-top: 2px;
@@ -1360,10 +1360,10 @@ body {
 .guide-stepper-screenshot {
   position: relative; border-radius: 6px; overflow: hidden;
   border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 8px;
-  background: #FAFAF9; max-height: 200px;
+  background: #FAFAF9; min-height: 60px;
 }
 .guide-stepper-screenshot img {
-  width: 100%; display: block; border-radius: 5px; object-fit: cover; object-position: top;
+  width: 100%; display: block; border-radius: 5px;
 }
 .guide-stepper-mark-complete {
   background: none; border: 1px solid #D93025; color: #D93025; border-radius: 16px;
