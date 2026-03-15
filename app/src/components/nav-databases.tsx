@@ -28,22 +28,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useProject } from '@/providers/project-provider';
 import {
-  useDatabases,
-  useCreateDatabase,
-  useDeleteDatabase,
-  useUpdateDatabase,
-} from '@/hooks/api/databases';
+  useTables,
+  useCreateTable,
+  useDropTable,
+  useUpdateTable,
+} from '@/hooks/api/tables';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 export function NavDatabases({ userRole }: { userRole: string }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedProjectId } = useProject();
-  const { data: databases = [] } = useDatabases(selectedProjectId || undefined);
-  const createDb = useCreateDatabase();
-  const deleteDb = useDeleteDatabase();
-  const updateDb = useUpdateDatabase();
+  const { data: tables = [] } = useTables(selectedProjectId || '');
+  const createTable = useCreateTable();
+  const dropTable = useDropTable();
+  const updateTable = useUpdateTable();
 
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [renameId, setRenameId] = React.useState<string | null>(null);
@@ -56,41 +55,44 @@ export function NavDatabases({ userRole }: { userRole: string }) {
   const handleCreate = async () => {
     if (!selectedProjectId) return;
     try {
-      const db = await createDb.mutateAsync({ projectId: selectedProjectId });
-      navigate(`/database/${db.id}`);
+      const table = await createTable.mutateAsync({
+        name: 'Untitled Table',
+        project_id: selectedProjectId,
+      });
+      navigate(`/table/${table.id}`);
     } catch {
-      toast.error('Failed to create database');
+      toast.error('Failed to create table');
     }
   };
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel className="flex items-center justify-between">
-        <span>Databases</span>
+        <span>Tables</span>
         {canEdit && (
           <button
             type="button"
             onClick={handleCreate}
             className="p-0.5 rounded hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-            title="New Database"
+            title="New Table"
           >
             <Plus className="size-3.5" />
           </button>
         )}
       </SidebarGroupLabel>
       <SidebarMenu>
-        {databases.map((db) => {
-          const isActive = location.pathname === `/database/${db.id}`;
+        {tables.map((table) => {
+          const isActive = location.pathname === `/table/${table.id}`;
           return (
-            <SidebarMenuItem key={db.id}>
+            <SidebarMenuItem key={table.id}>
               <SidebarMenuButton
                 asChild
                 isActive={isActive}
                 className="gap-2"
               >
-                <Link to={`/database/${db.id}`}>
+                <Link to={`/table/${table.id}`}>
                   <Database className="size-4 text-muted-foreground" />
-                  <span className="truncate">{db.name}</span>
+                  <span className="truncate">{table.name}</span>
                 </Link>
               </SidebarMenuButton>
               {canEdit && (
@@ -103,8 +105,8 @@ export function NavDatabases({ userRole }: { userRole: string }) {
                   <DropdownMenuContent side="right" align="start">
                     <DropdownMenuItem
                       onClick={() => {
-                        setRenameId(db.id);
-                        setRenameName(db.name);
+                        setRenameId(table.id);
+                        setRenameName(table.name);
                         setRenameOpen(true);
                       }}
                     >
@@ -114,7 +116,7 @@ export function NavDatabases({ userRole }: { userRole: string }) {
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={() => {
-                        setDeleteId(db.id);
+                        setDeleteId(table.id);
                         setDeleteOpen(true);
                       }}
                     >
@@ -127,9 +129,9 @@ export function NavDatabases({ userRole }: { userRole: string }) {
             </SidebarMenuItem>
           );
         })}
-        {databases.length === 0 && (
+        {tables.length === 0 && (
           <SidebarMenuItem>
-            <span className="px-2 py-1 text-xs text-muted-foreground">No databases yet</span>
+            <span className="px-2 py-1 text-xs text-muted-foreground">No tables yet</span>
           </SidebarMenuItem>
         )}
       </SidebarMenu>
@@ -138,18 +140,18 @@ export function NavDatabases({ userRole }: { userRole: string }) {
       <Dialog open={renameOpen} onOpenChange={(o) => { setRenameOpen(o); if (!o) setRenameId(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rename Database</DialogTitle>
-            <DialogDescription>Update the database name.</DialogDescription>
+            <DialogTitle>Rename Table</DialogTitle>
+            <DialogDescription>Update the table name.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
               value={renameName}
               onChange={(e) => setRenameName(e.target.value)}
-              placeholder="Database name"
+              placeholder="Table name"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && renameId && renameName.trim() && selectedProjectId) {
-                  updateDb.mutate(
-                    { databaseId: renameId, name: renameName.trim(), projectId: selectedProjectId },
+                  updateTable.mutate(
+                    { tableId: renameId, name: renameName.trim(), projectId: selectedProjectId },
                     { onSuccess: () => setRenameOpen(false), onError: () => toast.error('Failed to rename') }
                   );
                 }
@@ -164,8 +166,8 @@ export function NavDatabases({ userRole }: { userRole: string }) {
               disabled={!renameName.trim() || !renameId}
               onClick={() => {
                 if (renameId && selectedProjectId) {
-                  updateDb.mutate(
-                    { databaseId: renameId, name: renameName.trim(), projectId: selectedProjectId },
+                  updateTable.mutate(
+                    { tableId: renameId, name: renameName.trim(), projectId: selectedProjectId },
                     { onSuccess: () => setRenameOpen(false), onError: () => toast.error('Failed to rename') }
                   );
                 }
@@ -181,9 +183,9 @@ export function NavDatabases({ userRole }: { userRole: string }) {
       <Dialog open={deleteOpen} onOpenChange={(o) => { setDeleteOpen(o); if (!o) setDeleteId(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Database</DialogTitle>
+            <DialogTitle>Delete Table</DialogTitle>
             <DialogDescription>
-              This will permanently remove the database and all its data. This action cannot be undone.
+              This will permanently remove the table and all its data. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -195,13 +197,13 @@ export function NavDatabases({ userRole }: { userRole: string }) {
               onClick={async () => {
                 if (deleteId && selectedProjectId) {
                   try {
-                    await deleteDb.mutateAsync({ databaseId: deleteId, projectId: selectedProjectId });
+                    await dropTable.mutateAsync({ tableId: deleteId, projectId: selectedProjectId });
                     setDeleteOpen(false);
-                    if (location.pathname === `/database/${deleteId}`) {
+                    if (location.pathname === `/table/${deleteId}`) {
                       navigate('/');
                     }
                   } catch {
-                    toast.error('Failed to delete database');
+                    toast.error('Failed to delete table');
                   }
                 }
               }}
