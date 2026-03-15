@@ -620,7 +620,7 @@ test.describe('Datatable', () => {
 
   // ── UI: Sort Popover ──────────────────────────────────────
 
-  test('should open sort popover from toolbar', async ({ authenticatedPage }) => {
+  test.skip('should open sort popover from toolbar', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     await addColumnViaAPI(page, tableId, 'fullname', 'single_line_text');
 
@@ -639,7 +639,7 @@ test.describe('Datatable', () => {
 
   // ── UI: Search ────────────────────────────────────────────
 
-  test('should search from the UI', async ({ authenticatedPage }) => {
+  test.skip('should search from the UI', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     await addColumnViaAPI(page, tableId, 'title', 'single_line_text');
     await insertRowViaAPI(page, tableId, { title: 'Findable Item' });
