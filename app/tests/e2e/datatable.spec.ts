@@ -33,7 +33,10 @@ async function addColumnViaAPI(
   const resp = await page.request.post(`${apiUrl}/api/v1/datatable/columns/`, {
     data: { table_id: tableId, name, ui_type: uiType, ...extra },
   });
-  expect(resp.ok()).toBeTruthy();
+  if (!resp.ok()) {
+    const errBody = await resp.text();
+    throw new Error(`addColumnViaAPI failed for '${name}' (${resp.status()}): ${errBody}`);
+  }
   const body = await resp.json();
   return body.id;
 }
@@ -47,7 +50,10 @@ async function insertRowViaAPI(
   const resp = await page.request.post(`${apiUrl}/api/v1/datatable/rows/`, {
     data: { table_id: tableId, data },
   });
-  expect(resp.ok()).toBeTruthy();
+  if (!resp.ok()) {
+    const errBody = await resp.text();
+    throw new Error(`insertRowViaAPI failed (${resp.status()}): ${errBody}`);
+  }
   const body = await resp.json();
   return body.row_id;
 }
@@ -337,10 +343,10 @@ test.describe('Datatable', () => {
 
   test('should filter rows', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    const colId = await addColumnViaAPI(page, tableId, 'name', 'single_line_text');
-    await insertRowViaAPI(page, tableId, { name: 'Alice' });
-    await insertRowViaAPI(page, tableId, { name: 'Bob' });
-    await insertRowViaAPI(page, tableId, { name: 'Charlie' });
+    const colId = await addColumnViaAPI(page, tableId, 'fullname', 'single_line_text');
+    await insertRowViaAPI(page, tableId, { fullname: 'Alice' });
+    await insertRowViaAPI(page, tableId, { fullname: 'Bob' });
+    await insertRowViaAPI(page, tableId, { fullname: 'Charlie' });
 
     // Create a filter: name equals "Bob"
     const filterResp = await page.request.post(`${apiUrl}/api/v1/datatable/filters/`, {
@@ -360,7 +366,7 @@ test.describe('Datatable', () => {
     );
     const body = await rowsResp.json();
     // Filter should return only Bob
-    const filtered = body.items.filter((r: any) => r.name === 'Bob');
+    const filtered = body.items.filter((r: any) => r.fullname === 'Bob');
     expect(filtered.length).toBe(1);
   });
 
@@ -393,8 +399,8 @@ test.describe('Datatable', () => {
 
   test('should reject SQL injection in filter values', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    const colId = await addColumnViaAPI(page, tableId, 'name', 'single_line_text');
-    await insertRowViaAPI(page, tableId, { name: 'Safe' });
+    const colId = await addColumnViaAPI(page, tableId, 'fullname', 'single_line_text');
+    await insertRowViaAPI(page, tableId, { fullname: 'Safe' });
 
     // Attempt SQL injection via filter value
     const filterResp = await page.request.post(`${apiUrl}/api/v1/datatable/filters/`, {
@@ -623,7 +629,7 @@ test.describe('Datatable', () => {
 
   test('should open sort popover from toolbar', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
-    await addColumnViaAPI(page, tableId, 'name', 'single_line_text');
+    await addColumnViaAPI(page, tableId, 'fullname', 'single_line_text');
 
     await page.goto(`/table/${tableId}`);
     await page.waitForLoadState('networkidle').catch(() => {});
