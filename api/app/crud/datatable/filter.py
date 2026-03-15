@@ -33,7 +33,13 @@ async def create_filter(
     if operation not in allowed_ops:
         raise ValueError(f"Operation '{operation}' not allowed for ui_type '{column.ui_type}'")
 
-    value_str = json.dumps(value) if value is not None else None
+    # Store value as-is if it's already a string, otherwise JSON-encode it
+    if value is None:
+        value_str = None
+    elif isinstance(value, str):
+        value_str = value
+    else:
+        value_str = json.dumps(value)
 
     filter_obj = Filter(
         name=name,

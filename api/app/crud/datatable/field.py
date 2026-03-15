@@ -206,8 +206,20 @@ async def insert_row(
     cols_by_name = {c.name: c for c in col_metas.scalars().all()}
     for k in list(validated.keys()):
         sk = sanitize_identifier(k).lower()
-        if sk in cols_by_name and cols_by_name[sk].ui_type == "long_text":
-            validated[k] = json.dumps(validated[k]) if isinstance(validated[k], (dict, list)) else validated[k]
+        if sk in cols_by_name:
+            col_type = cols_by_name[sk].ui_type
+            if col_type == "long_text":
+                validated[k] = json.dumps(validated[k]) if isinstance(validated[k], (dict, list)) else validated[k]
+            elif col_type == "date" and isinstance(validated[k], str):
+                from datetime import datetime, date
+                try:
+                    # Try ISO datetime first, then date-only
+                    if "T" in validated[k]:
+                        validated[k] = datetime.fromisoformat(validated[k])
+                    else:
+                        validated[k] = datetime.fromisoformat(validated[k] + "T00:00:00")
+                except ValueError:
+                    pass  # Let PG handle the error
 
     col_defaults = await _column_defaults_map(db, table_obj)
     for col_name, def_val in col_defaults.items():
@@ -698,8 +710,18 @@ async def update_row(
     validated = {}
     for k, v in data.items():
         sanitized_key = sanitize_identifier(k).lower()
-        if sanitized_key in cols_by_name and cols_by_name[sanitized_key].ui_type == "long_text":
+        col_type = cols_by_name.get(sanitized_key, None)
+        if col_type and col_type.ui_type == "long_text":
             validated[sanitized_key] = json.dumps(v) if isinstance(v, (dict, list)) else v
+        elif col_type and col_type.ui_type == "date" and isinstance(v, str):
+            from datetime import datetime
+            try:
+                if "T" in v:
+                    validated[sanitized_key] = datetime.fromisoformat(v)
+                else:
+                    validated[sanitized_key] = datetime.fromisoformat(v + "T00:00:00")
+            except ValueError:
+                validated[sanitized_key] = v
         else:
             validated[sanitized_key] = v
 
