@@ -177,15 +177,212 @@ export interface HTTPValidationError {
   }>;
 }
 
-// ── Deprecated / Removed ─────────────────────────────────────────────────────
-// The following type is referenced by legacy editor code but the underlying
-// table/column system has been removed. Keeping a minimal stub to avoid
-// breaking imports.
+// ── DataTable: Tables ───────────────────────────────────────────────────────
+
+export interface TableCreate {
+  name: string;
+  project_id: number;
+}
+
+export interface TableRead {
+  id: number;
+  name: string;
+  physical_name: string;
+  project_id: number;
+}
+
+// ── DataTable: Columns ──────────────────────────────────────────────────────
+
+export interface ColumnCreate {
+  table_id: string;
+  name: string;
+  ui_type: string;
+  referencee_column_id?: string;
+  position?: string;
+}
 
 export interface ColumnRead {
+  id: number;
+  table_id: number;
+  name: string;
+  display_name: string;
+  ui_type: string;
+  column_type: string;
+  relations_table_id?: string;
+  relation_id?: string;
+  allowed_operations?: string[];
+  active_filters?: Array<{
+    id: string;
+    name: string;
+    operation: string;
+    value?: any;
+  }>;
+  [key: string]: any;
+}
+
+export interface ColumnUpdate {
+  name?: string;
+  default_value?: any;
+  settings?: Record<string, any>;
+}
+
+// ── DataTable: Fields / Rows ────────────────────────────────────────────────
+
+export interface FieldCreate {
+  table_id: string;
+  data: Record<string, unknown>;
+}
+
+export type FieldRead = Record<string, unknown>;
+
+// ── DataTable: Relations ────────────────────────────────────────────────────
+
+export interface RelationCreate {
+  left_table_id: string;
+  right_table_id: string;
+  relation_type: 'one_to_one' | 'one_to_many' | 'many_to_many';
+  display_name?: string;
+}
+
+export interface RelationRead {
+  id: string;
+  left_table_id: string;
+  right_table_id: string;
+  relation_type: 'one_to_one' | 'one_to_many' | 'many_to_many';
+  display_name: string;
+}
+
+export interface RelationAssign {
+  left_item_id: number;
+  right_item_id: number;
+}
+
+// ── DataTable: Select Options ───────────────────────────────────────────────
+
+export interface SelectOption {
   id: string;
   name: string;
-  display_name?: string;
-  ui_type?: string;
-  [key: string]: any;
+  color?: string | null;
+  order: number;
+}
+
+export interface SelectColumnCreate {
+  table_id: string;
+  name: string;
+  options: Array<{
+    id?: string;
+    name: string;
+    color?: string | null;
+  }>;
+}
+
+// ── DataTable: Lookup Columns ───────────────────────────────────────────────
+
+export interface LookUpColumnCreate {
+  relation_column_id: string;
+  lookup_column_id: string;
+  custom_name?: string | null;
+}
+
+// ── DataTable: Formulas ─────────────────────────────────────────────────────
+
+export interface FormulaCreate {
+  table_id: string;
+  display_name: string;
+  formula: string;
+  formula_raw: string;
+}
+
+export interface FormulaRead {
+  id: string;
+  column_id: string;
+  display_name: string;
+  formula: string;
+  formula_raw: string;
+}
+
+// ── DataTable: Rollups ──────────────────────────────────────────────────────
+
+export interface RollupBase {
+  table_id: string;
+  relation_column_id: string;
+  aggregate_func: string;
+  rollup_column_id?: string | null;
+  precision?: number | null;
+  show_thousands_sep?: boolean;
+}
+
+export interface RollupCreate extends RollupBase {
+  display_name: string;
+}
+
+export interface RollupUpdate {
+  relation_column_id?: string;
+  rollup_column_id?: string | null;
+  aggregate_func?: string;
+  precision?: number | null;
+  show_thousands_sep?: boolean;
+}
+
+export interface RollupRead extends RollupBase {
+  id: string;
+  column_id: string;
+  display_name: string;
+  show_thousands_sep: boolean;
+}
+
+// ── DataTable: Filters ──────────────────────────────────────────────────────
+
+export interface FilterCreate {
+  name: string;
+  table_id: string;
+  column_id: string;
+  operation: string;
+  value?: any;
+  is_reusable?: boolean;
+}
+
+export interface FilterUpdate {
+  name?: string;
+  operation?: string;
+  value?: any;
+  is_reusable?: boolean;
+  is_active?: boolean;
+}
+
+export interface FilterRead {
+  id: string;
+  name: string;
+  table_id: string;
+  user_id: string;
+  column_id: string;
+  operation: string;
+  value?: any;
+  is_reusable: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── DataTable: Column Visibility ────────────────────────────────────────────
+
+export interface ColumnVisibilityRead {
+  id: string;
+  table_id: string;
+  column_id: string;
+  is_visible: boolean;
+}
+
+export interface ColumnVisibilityCreate {
+  table_id: string;
+  column_id: string;
+  is_visible: boolean;
+}
+
+export interface ColumnVisibilityBulkUpdate {
+  table_id: string;
+  updates: Array<{
+    column_id: string;
+    is_visible: boolean;
+  }>;
 }
