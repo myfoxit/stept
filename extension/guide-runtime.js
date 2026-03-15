@@ -587,6 +587,10 @@
         this._inertObserver.disconnect();
         this._inertObserver = null;
       }
+      if (this._zoomObserver) {
+        this._zoomObserver.disconnect();
+        this._zoomObserver = null;
+      }
       if (this.host) {
         this.host.remove();
         this.host = null;
@@ -622,6 +626,19 @@
         }
       });
       this._inertObserver.observe(this.host, { attributes: true, attributeFilter: ["inert"] });
+
+      // Zoom compensation: counteract page zoom so our overlay stays pixel-perfect.
+      const updateZoom = () => {
+        if (!this.host || this.host.parentElement !== document.documentElement) return;
+        const bodyZoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+        const htmlZoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+        const totalZoom = bodyZoom * htmlZoom;
+        this.host.style.zoom = totalZoom === 1 ? "" : String(1 / totalZoom);
+      };
+      updateZoom();
+      this._zoomObserver = new MutationObserver(updateZoom);
+      this._zoomObserver.observe(document.body, { attributes: true, attributeFilter: ["style", "class"] });
+      this._zoomObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
     }
 
     _clearOverlay() {
