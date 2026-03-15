@@ -23,4 +23,9 @@ export const queryKeys = {
     ['documentsByTableRow', tableId, rowId] as const,
   shareSettings: (resourceType: string, resourceId: string) =>
     ['share', resourceType, resourceId] as const,
+  databases: (projectId: string) => ['databases', projectId] as const,
+  database: (databaseId: string) => ['database', databaseId] as const,
+  dbTable: (tableId: string) => ['dbTable', tableId] as const,
+  dbView: (viewId: string) => ['dbView', viewId] as const,
+  dbRecords: (tableId: string) => ['dbRecords', tableId] as const,
 };

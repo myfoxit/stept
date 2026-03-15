@@ -36,6 +36,7 @@ import { VideoImportPage } from "@/pages/video-import";
 import { AnalyticsDashboardPage } from "@/pages/analytics-dashboard";
 import { VerificationSettingsPage } from "@/pages/verification-settings";
 import TrashPage from "@/pages/trash";
+import { DatabaseViewPage } from "@/pages/database-view";
 import NotFoundPage from "@/pages/NotFoundPage";
 import VerifyPage from "@/pages/VerifyPage";
 import { DeviceConsentPage } from "@/pages/device-consent";
@@ -125,6 +126,10 @@ createRoot(document.getElementById("root")!).render(
                         element={<VerificationSettingsPage />}
                       />
                       <Route path="/trash" element={<TrashPage />} />
+                      <Route
+                        path="/database/:databaseId"
+                        element={<DatabaseViewPage />}
+                      />
                     </Route>
                     <Route path="login" element={<LoginPage />} />
                     <Route path="verify" element={<VerifyPage />} />
