@@ -1176,13 +1176,29 @@
       const isClickStep = step.action_type && step.action_type.toLowerCase().includes("click");
       if (!isClickStep) return;
 
+      const nextIndex = this.currentIndex + 1;
+      const isLinkClick = element.tagName === 'A' || element.closest('a');
+
       const advance = () => {
         this._removeClickHandler();
-        if (this.currentIndex >= this.steps.length - 1) {
+        if (nextIndex >= this.steps.length) {
           this.stop();
-        } else {
-          setTimeout(() => this.showStep(this.currentIndex + 1), 400);
+          return;
         }
+        // Notify background IMMEDIATELY so it has the right index
+        // before any page navigation destroys this context.
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: nextIndex,
+          totalSteps: this.steps.length,
+          stepStatus: 'active',
+        }).catch(() => {});
+
+        // For link clicks that navigate away, don't try to show the next step
+        // locally — the page will unload and background will re-inject.
+        if (isLinkClick) return;
+
+        setTimeout(() => this.showStep(nextIndex), 400);
       };
 
       // Handler directly on the target element (clicks in the cutout go to the page element)

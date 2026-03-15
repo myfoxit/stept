@@ -1313,7 +1313,7 @@ body {
 }
 .guide-steps-list {
   display: flex; flex-direction: column; gap: 0;
-  max-height: calc(100vh - 200px); overflow-y: auto; padding-bottom: 8px;
+  max-height: calc(100vh - 200px); overflow-y: auto; padding-bottom: 120px;
 }
 
 /* Vertical stepper: each step item */
