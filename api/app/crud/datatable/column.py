@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 TYPE_MAP = {
     "single_line_text": "TEXT",
     "number": "INTEGER",
-    "REAL": "REAL",
-    "BOOLEAN": "BOOLEAN",
+    "checkbox": "BOOLEAN",
+    "date": "TIMESTAMP",
     "oo_relation": "INTEGER",
     "om_relation": "INTEGER",
     "mo_relation": "INTEGER",

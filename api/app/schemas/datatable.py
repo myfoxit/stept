@@ -200,7 +200,8 @@ OPERATIONS_BY_UI_TYPE = {
     "lookup": ["equals", "not_equals", "contains", "not_contains", "is_empty", "is_not_empty"],
     "formula": ["equals", "not_equals", "contains", "not_contains"],
     "rollup": ["equals", "not_equals", "gt", "lt", "gte", "lte"],
-    "BOOLEAN": ["equals", "not_equals"],
+    "checkbox": ["equals", "not_equals"],
+    "date": ["equals", "not_equals", "gt", "lt", "gte", "lte", "is_empty", "is_not_empty", "between"],
     "long_text": ["contains", "not_contains", "is_empty", "is_not_empty"],
 }
 

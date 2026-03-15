@@ -181,7 +181,7 @@ class TestColumnCRUD:
     async def test_add_boolean_column(self, async_client: AsyncClient, auth_headers: dict, table_id: str):
         resp = await async_client.post(
             f"{BASE}/columns/",
-            json={"table_id": table_id, "name": "active", "ui_type": "BOOLEAN"},
+            json={"table_id": table_id, "name": "active", "ui_type": "checkbox"},
             headers=auth_headers,
         )
         assert resp.status_code == 200

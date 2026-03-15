@@ -196,6 +196,19 @@ async def insert_row(
     quoted_table = quote_ident(sanitize_identifier(table_obj.physical_name))
     validated = {sanitize_identifier(k): v for k, v in data.items()}
 
+    # Type-aware value coercion (matches update_row behavior)
+    col_metas = await db.execute(
+        select(ColumnMeta).filter(
+            ColumnMeta.table_id == table_obj.id,
+            ColumnMeta.name.in_([sanitize_identifier(k).lower() for k in data.keys()]),
+        )
+    )
+    cols_by_name = {c.name: c for c in col_metas.scalars().all()}
+    for k in list(validated.keys()):
+        sk = sanitize_identifier(k).lower()
+        if sk in cols_by_name and cols_by_name[sk].ui_type == "long_text":
+            validated[k] = json.dumps(validated[k]) if isinstance(validated[k], (dict, list)) else validated[k]
+
     col_defaults = await _column_defaults_map(db, table_obj)
     for col_name, def_val in col_defaults.items():
         if col_name not in validated or validated[col_name] is None:
@@ -601,10 +614,8 @@ async def get_rows(
                 clause = build_filter_clause(column, filter_obj.operation, filter_obj.value, base_alias, fp)
                 filter_clauses.append(f"({clause})")
 
-    # Collect sort clauses
+    # Collect sort clauses — user sorts take precedence, sr__order is tiebreaker
     sort_clauses: List[str] = []
-    if table_obj.has_order_column:
-        sort_clauses.append(f"{base_alias}.sr__order ASC")
 
     if apply_sorts and user_id:
         sorts_stmt = select(Sort).where(
@@ -619,6 +630,10 @@ async def get_rows(
                 col_ref = f"{base_alias}.{quote_ident(sanitize_identifier(column.name))}"
                 direction = "DESC" if sort_obj.direction == "desc" else "ASC"
                 sort_clauses.append(f"{col_ref} {direction}")
+
+    # sr__order as tiebreaker after user sorts
+    if table_obj.has_order_column:
+        sort_clauses.append(f"{base_alias}.sr__order ASC")
 
     if not sort_clauses:
         sort_clauses = [f"{base_alias}.id ASC"]
@@ -725,7 +740,7 @@ async def search_rows(
 
     # Use parameterized search
     search_conditions = []
-    searchable_types = {"single_line_text", "long_text", "email", "url", "phone"}
+    searchable_types = {"single_line_text", "long_text", "email", "url", "phone", "date"}
 
     if scope == "global":
         for col in cols:
