@@ -583,6 +583,10 @@
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
+      if (this._inertObserver) {
+        this._inertObserver.disconnect();
+        this._inertObserver = null;
+      }
       if (this.host) {
         this.host.remove();
         this.host = null;
@@ -609,6 +613,15 @@
       this.shadow.appendChild(style);
 
       document.documentElement.appendChild(this.host);
+
+      // Protect overlay from being made inert by the page (modals/dialogs
+      // often set inert on everything outside themselves).
+      this._inertObserver = new MutationObserver(() => {
+        if (this.host && this.host.hasAttribute("inert")) {
+          this.host.removeAttribute("inert");
+        }
+      });
+      this._inertObserver.observe(this.host, { attributes: true, attributeFilter: ["inert"] });
     }
 
     _clearOverlay() {
