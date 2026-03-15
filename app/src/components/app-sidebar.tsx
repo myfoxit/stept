@@ -19,6 +19,7 @@ import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import { NavPages } from "@/components/nav-pages";
+import { NavDatabases } from "@/components/nav-databases";
 import {
   Sidebar,
   SidebarContent,
@@ -344,6 +345,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </div>
       <SidebarContent>
         <NavMain items={data.navMain} />
+        <NavDatabases userRole={userRole} />
         <NavPages userRole={userRole} />
 
         {/* New Project Dialog */}
