@@ -1,3 +1,14 @@
-// Sidepanel React entry — stub for Commit 1
-// Will be populated in Commit 6
-console.log('Stept sidepanel loaded');
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './sidepanel.css';
+
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
