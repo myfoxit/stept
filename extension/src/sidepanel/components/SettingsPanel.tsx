@@ -63,7 +63,8 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const handleLogout = async () => {
     await sendToBackground({ type: 'LOGOUT' });
     onClose();
-    // Page will re-render via refreshState triggered by RECORDING_STATE_CHANGED
+    // Close the sidepanel after sign-out
+    window.close();
   };
 
   return (

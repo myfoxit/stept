@@ -53,7 +53,8 @@
     "sidePanel",
     "scripting",
     "webNavigation",
-    "identity"
+    "identity",
+    "alarms"
   ],
   "host_permissions": ["<all_urls>"]
 }

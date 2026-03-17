@@ -14,7 +14,7 @@ import {
   notifyGuideStateUpdate, persistSteps, clearPersistedSteps, resetStreamingState, markUserAction,
 } from './state';
 import { getApiBaseUrl, applyDisplayMode } from './settings';
-import { initiateLogin, logout, tryAutoLogin, authedFetch, fetchUserInfo, fetchUserProjects } from './auth';
+import { initiateLogin, logout, tryAutoLogin, authedFetch, fetchUserInfo, fetchUserProjects, startAuthCheck } from './auth';
 import {
   ensureContentScript, startRecording, stopRecording,
   pauseRecording, resumeRecording, captureScreenshotRaw,
@@ -138,6 +138,11 @@ chrome.storage.local.get(
 
     setAuthReady(true);
     authReadyResolve();
+
+    // Start periodic auth check to detect expired sessions
+    if (state.isAuthenticated) {
+      startAuthCheck();
+    }
 
     // Apply display mode on startup
     await applyDisplayMode();

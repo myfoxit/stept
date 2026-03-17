@@ -47,6 +47,22 @@ export async function refreshAccessToken(): Promise<boolean> {
       await persistAuth();
       return true;
     }
+
+    if (response.status === 401 || response.status === 403) {
+      debugLog('Token refresh rejected:', response.status);
+      state.isAuthenticated = false;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.currentUser = null;
+      state.userProjects = [];
+      await chrome.storage.local.remove([
+        'refreshToken',
+        'accessToken',
+        'currentUser',
+        'userProjects',
+      ]);
+      return false;
+    }
   } catch (error) {
     debugLog('Token refresh failed:', error);
   }
@@ -99,22 +115,22 @@ export async function initiateLogin(): Promise<boolean> {
     `state=${encodeURIComponent(state.authState)}`;
 
   return new Promise((resolve, reject) => {
-    chrome.identity.launchWebAuthFlow(
-      { url: authUrl, interactive: true },
-      async (responseUrl) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
+    chrome.tabs.create({ url: authUrl }, (tab) => {
+      const tabId = tab.id!;
+      const onUpdated = (
+        updatedTabId: number,
+        changeInfo: chrome.tabs.TabChangeInfo,
+      ) => {
+        if (updatedTabId !== tabId || !changeInfo.url) return;
+        if (!changeInfo.url.startsWith(redirectUrl)) return;
 
-        try {
-          const success = await handleAuthCallback(responseUrl!);
-          resolve(success);
-        } catch (error) {
-          reject(error);
-        }
-      },
-    );
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        chrome.tabs.remove(tabId).catch(() => {});
+
+        handleAuthCallback(changeInfo.url).then(resolve).catch(reject);
+      };
+      chrome.tabs.onUpdated.addListener(onUpdated);
+    });
   });
 }
 
@@ -273,6 +289,24 @@ export async function fetchUserInfo(): Promise<void> {
     debugLog('Failed to fetch user info:', error);
   }
 }
+
+// Periodic auth check — verifies the session is still valid every 5 minutes
+const AUTH_CHECK_ALARM = 'stept-auth-check';
+
+export function startAuthCheck(): void {
+  chrome.alarms.create(AUTH_CHECK_ALARM, { periodInMinutes: 5 });
+}
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== AUTH_CHECK_ALARM) return;
+  if (!state.isAuthenticated || !state.refreshToken) return;
+
+  const refreshed = await refreshAccessToken();
+  if (!refreshed && !state.refreshToken) {
+    // Session expired — notify sidepanel so it can update UI
+    chrome.runtime.sendMessage({ type: 'RECORDING_STATE_CHANGED' }).catch(() => {});
+  }
+});
 
 export async function fetchUserProjects(): Promise<void> {
   if (!state.accessToken || !state.currentUser) return;
