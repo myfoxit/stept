@@ -55,6 +55,7 @@ export default function App() {
   });
   const [steps, setSteps] = useState<Step[]>([]);
   const [showUpload, setShowUpload] = useState(false);
+  const showUploadRef = useRef(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [contextMatches, setContextMatches] = useState<any[]>([]);
@@ -100,8 +101,12 @@ export default function App() {
         currentUser: state.currentUser || null,
         userProjects: state.userProjects || [],
       });
-      setSteps([]);
-      setShowUpload(false);
+      // Don't clear steps/showUpload if we just completed a capture
+      // (showUploadRef is set before STOP_RECORDING is sent)
+      if (!showUploadRef.current) {
+        setSteps([]);
+        setShowUpload(false);
+      }
       return;
     }
 
@@ -210,8 +215,9 @@ export default function App() {
             smartBlurOpen={smartBlurOpen}
             setSmartBlurOpen={setSmartBlurOpen}
             onComplete={async () => {
-              await sendToBackground({ type: 'STOP_RECORDING' });
+              showUploadRef.current = true;
               setShowUpload(true);
+              await sendToBackground({ type: 'STOP_RECORDING' });
             }}
             refreshState={refreshState}
           />
@@ -224,6 +230,7 @@ export default function App() {
           setSteps={setSteps}
           appState={appState}
           onBack={async () => {
+            showUploadRef.current = false;
             const state = await sendToBackground<any>({ type: 'GET_STATE' });
             if (!state.isRecording && steps.length > 0) {
               setShowUpload(false);
@@ -237,6 +244,7 @@ export default function App() {
             }
           }}
           onNewCapture={async () => {
+            showUploadRef.current = false;
             const state = await sendToBackground<any>({ type: 'GET_STATE' });
             const projectId = state.selectedProjectId;
             if (projectId) {
