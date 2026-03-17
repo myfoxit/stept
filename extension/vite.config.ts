@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync, renameSync, rmSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, renameSync, rmSync, readFileSync, writeFileSync } from 'fs';
 
 // Manual multi-entry config for Chrome Extension MV3
 // Each entry becomes a separate bundle
@@ -22,17 +22,24 @@ export default defineConfig(({ mode }) => ({
           const src = `public/icons/icon${size}.png`;
           if (existsSync(src)) copyFileSync(src, `dist/icons/icon${size}.png`);
         }
-        // Move HTML files from dist/public/ to dist/ root
+        // Move HTML files from dist/public/ to dist/ root and fix asset paths
         for (const file of ['sidepanel.html', 'popup.html']) {
           const from = `dist/public/${file}`;
           const to = `dist/${file}`;
-          if (existsSync(from)) renameSync(from, to);
+          if (existsSync(from)) {
+            // Fix relative paths: ../assets/ → ./assets/ since we move up one level
+            let html = readFileSync(from, 'utf-8');
+            html = html.replace(/\.\.\/assets\//g, './assets/');
+            writeFileSync(to, html);
+          }
         }
         // Clean up empty public dir
         if (existsSync('dist/public')) rmSync('dist/public', { recursive: true });
       },
     },
   ],
+  // Use relative paths for Chrome extension compatibility
+  base: './',
   // Disable default public dir copying (we handle it manually)
   publicDir: false,
   resolve: {
