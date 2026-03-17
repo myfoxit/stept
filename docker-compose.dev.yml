@@ -30,8 +30,8 @@ services:
 
   frontend:
     build:
-      context: ./app
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: app/Dockerfile
       target: builder 
    
     command: pnpm dev --host 0.0.0.0

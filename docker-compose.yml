@@ -101,7 +101,9 @@ services:
 
 
   frontend:
-    build: ./app
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     container_name: stept-frontend
     restart: unless-stopped
     depends_on:
