@@ -61,18 +61,18 @@
   --tt-gray-dark-800: rgba(224, 224, 225, 1);
   --tt-gray-dark-900: rgba(245, 245, 245, 1);
 
-  /* Brand colors — Coral Red */
-  --tt-brand-color-50: rgba(245, 243, 255, 1);
-  --tt-brand-color-100: rgba(232, 229, 254, 1);
-  --tt-brand-color-200: rgba(205, 198, 253, 1);
-  --tt-brand-color-300: rgba(167, 155, 249, 1);
-  --tt-brand-color-400: rgba(137, 120, 244, 1);
-  --tt-brand-color-500: rgba(108, 92, 231, 1);
-  --tt-brand-color-600: rgba(91, 74, 215, 1);
-  --tt-brand-color-700: rgba(76, 60, 184, 1);
-  --tt-brand-color-800: rgba(62, 49, 150, 1);
-  --tt-brand-color-900: rgba(50, 40, 120, 1);
-  --tt-brand-color-950: rgba(32, 24, 76, 1);
+  /* Brand colors — Indigo (matching nixeasy / primary) */
+  --tt-brand-color-50: #eef2ff;
+  --tt-brand-color-100: #e0e7ff;
+  --tt-brand-color-200: #c7d2fe;
+  --tt-brand-color-300: #a5b4fc;
+  --tt-brand-color-400: #818cf8;
+  --tt-brand-color-500: #6366f1;
+  --tt-brand-color-600: #4f46e5;
+  --tt-brand-color-700: #4338ca;
+  --tt-brand-color-800: #3730a3;
+  --tt-brand-color-900: #312e81;
+  --tt-brand-color-950: #1e1b4b;
 
   /* Green */
   --tt-color-green-inc-5: hsla(129, 100%, 97%, 1);
@@ -176,27 +176,27 @@
       Global colors 
   **************************************************/
 
-  /* Global colors - Light mode */
-  --tt-bg-color: #f4f3f8;
-  --tt-border-color: #e4e1ed;
-  --tt-border-color-tint: #eeecf5;
-  --tt-sidebar-bg-color: #faf9fc;
-  --tt-scrollbar-color: #e4e1ed;
-  --tt-cursor-color: #3ab08a;
-  --tt-selection-color: rgba(108, 92, 231, 0.15);
+  /* Global colors - Light mode (nixeasy palette) */
+  --tt-bg-color: #f9fafb;
+  --tt-border-color: #e5e7eb;
+  --tt-border-color-tint: #f3f4f6;
+  --tt-sidebar-bg-color: #ffffff;
+  --tt-scrollbar-color: #e5e7eb;
+  --tt-cursor-color: #4f46e5;
+  --tt-selection-color: rgba(79, 70, 229, 0.15);
   --tt-card-bg-color: var(--white);
-  --tt-card-border-color: #eeecf5;
+  --tt-card-border-color: #e5e7eb;
 }
 
 /* Global colors - Dark mode */
 .dark {
-  --tt-bg-color: var(--black);
-  --tt-border-color: var(--tt-gray-dark-a-200);
-  --tt-border-color-tint: var(--tt-gray-dark-a-100);
-  --tt-sidebar-bg-color: var(--tt-gray-dark-100);
-  --tt-scrollbar-color: var(--tt-gray-dark-a-200);
-  --tt-cursor-color: var(--tt-brand-color-400);
-  --tt-selection-color: rgba(108, 92, 231, 0.15);
+  --tt-bg-color: #0f172a;
+  --tt-border-color: #334155;
+  --tt-border-color-tint: rgba(255, 255, 255, 0.07);
+  --tt-sidebar-bg-color: #1e293b;
+  --tt-scrollbar-color: #334155;
+  --tt-cursor-color: #818cf8;
+  --tt-selection-color: rgba(99, 102, 241, 0.15);
   --tt-card-bg-color: var(--tt-gray-dark-50);
   --tt-card-border-color: var(--tt-gray-dark-a-50);
 
