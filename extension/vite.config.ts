@@ -1,0 +1,76 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
+import { copyFileSync, mkdirSync, existsSync, renameSync, rmSync } from 'fs';
+
+// Manual multi-entry config for Chrome Extension MV3
+// Each entry becomes a separate bundle
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(),
+    {
+      name: 'copy-extension-assets',
+      closeBundle() {
+        // Copy manifest
+        copyFileSync('manifest.json', 'dist/manifest.json');
+        // Copy vendor
+        mkdirSync('dist/vendor', { recursive: true });
+        copyFileSync('src/vendor/rrweb-snapshot.min.js', 'dist/vendor/rrweb-snapshot.min.js');
+        // Copy icons
+        mkdirSync('dist/icons', { recursive: true });
+        for (const size of ['16', '32', '48', '128']) {
+          const src = `public/icons/icon${size}.png`;
+          if (existsSync(src)) copyFileSync(src, `dist/icons/icon${size}.png`);
+        }
+        // Move HTML files from dist/public/ to dist/ root
+        for (const file of ['sidepanel.html', 'popup.html']) {
+          const from = `dist/public/${file}`;
+          const to = `dist/${file}`;
+          if (existsSync(from)) renameSync(from, to);
+        }
+        // Clean up empty public dir
+        if (existsSync('dist/public')) rmSync('dist/public', { recursive: true });
+      },
+    },
+  ],
+  // Disable default public dir copying (we handle it manually)
+  publicDir: false,
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
+  define: {
+    'import.meta.env.BUILD_MODE': JSON.stringify(mode === 'cloud' ? 'cloud' : 'self-hosted'),
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    sourcemap: mode === 'development' ? 'inline' : false,
+    minify: mode === 'development' ? false : 'esbuild',
+    rollupOptions: {
+      input: {
+        // Service worker
+        'background': resolve(__dirname, 'src/background/index.ts'),
+        // Content scripts (no React — vanilla TS)
+        'content': resolve(__dirname, 'src/content/index.ts'),
+        'redaction': resolve(__dirname, 'src/content/redaction.ts'),
+        'guide-runtime': resolve(__dirname, 'src/guide-runtime/index.ts'),
+        // UI pages (React)
+        'sidepanel': resolve(__dirname, 'public/sidepanel.html'),
+        'popup': resolve(__dirname, 'public/popup.html'),
+      },
+      output: {
+        // Content scripts + service worker must be single files (no code splitting)
+        entryFileNames: (chunkInfo) => {
+          if (['background', 'content', 'redaction', 'guide-runtime'].includes(chunkInfo.name)) {
+            return '[name].js';
+          }
+          return 'assets/[name]-[hash].js';
+        },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
+  },
+}));
