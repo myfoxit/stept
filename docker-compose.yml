@@ -7,7 +7,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-stept}
-    # ports: exposed only in docker-compose.dev.yml for local dev tools
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +17,6 @@ services:
     networks:
       - stept-network
 
-
   redis:
     image: redis:7-alpine
     container_name: stept-redis
@@ -26,7 +24,6 @@ services:
     networks:
       - stept-network
 
- 
   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: stept-gotenberg
@@ -37,9 +34,10 @@ services:
     networks:
       - stept-network
 
-
   backend:
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     container_name: stept-backend
     restart: unless-stopped
     depends_on:
@@ -48,7 +46,6 @@ services:
       redis:
         condition: service_started
     environment:
-    
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stept}
       REDIS_URL: redis://redis:6379/0
       GOTENBERG_URL: http://gotenberg:3000
@@ -98,18 +95,17 @@ services:
     networks:
       - stept-network
 
-
-
   frontend:
     build:
       context: .
       dockerfile: app/Dockerfile
+      target: production
     container_name: stept-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "80:80" 
+      - "80:80"
     networks:
       - stept-network
 
@@ -144,9 +140,6 @@ services:
 
   # ── SendCloak — PII obfuscation for AI requests (optional) ──────────
   # Enable:  docker compose --profile privacy up -d
-  # Works standalone (regex + built-in detection) or with Presidio for
-  # enhanced name/org detection:
-  #   docker compose --profile privacy --profile presidio up -d
   sendcloak:
     image: ghcr.io/myfoxit/sendcloak:latest
     container_name: stept-sendcloak
@@ -155,7 +148,6 @@ services:
     environment:
       SENDCLOAK_STRATEGY: "${SENDCLOAK_STRATEGY:-semantic}"
       SENDCLOAK_LOG_LEVEL: info
-      # Point to Presidio if running; SendCloak gracefully degrades without it
       SENDCLOAK_PRESIDIO_URL: "http://presidio:3000"
     ports:
       - "9090:9090"
@@ -188,7 +180,6 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-
 
 volumes:
   db-data:

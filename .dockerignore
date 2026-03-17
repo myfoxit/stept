@@ -1,3 +1,13 @@
 **/node_modules
+**/.git
 **/dist
-.git
+**/.env
+**/.env.*
+**/coverage
+**/.next
+**/.turbo
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache

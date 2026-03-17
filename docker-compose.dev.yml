@@ -1,14 +1,15 @@
+# Development overrides
 # Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
 services:
   db:
-    # Expose DB port for local development tools (pgAdmin, DBeaver, etc.)
     ports:
       - "5432:5432"
 
   backend:
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-include '*.py'
     volumes:
       - ./api:/app
@@ -32,12 +33,11 @@ services:
     build:
       context: .
       dockerfile: app/Dockerfile
-      target: builder 
-   
-    command: pnpm dev --host 0.0.0.0
+      target: dev
     volumes:
-      - ./app:/app
-      - /app/node_modules 
+      - ./app:/monorepo/app
+      - ./packages:/monorepo/packages
+      - frontend_deps:/monorepo/node_modules
     ports:
       - "5173:5173"
     environment:
@@ -81,3 +81,4 @@ services:
 volumes:
   recordings-storage:
   video-uploads:
+  frontend_deps:
