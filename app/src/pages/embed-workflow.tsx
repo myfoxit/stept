@@ -125,7 +125,7 @@ export function EmbedWorkflowPage() {
   );
 }
 
-const ACCENT = '#3AB08A';
+const ACCENT = '#4f46e5';
 
 const styles: Record<string, React.CSSProperties> = {
   root: {

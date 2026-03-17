@@ -108,14 +108,14 @@ body,
 }
 
 .tiptap.ProseMirror a {
-  color: #3ab08a;
+  color: #4f46e5;
   text-decoration: underline;
   text-decoration-color: rgba(108, 92, 231, 0.12);
   text-underline-offset: 3px;
 }
 
 .tiptap.ProseMirror a:hover {
-  text-decoration-color: #3ab08a;
+  text-decoration-color: #4f46e5;
 }
 
 .tiptap.ProseMirror code {
@@ -125,18 +125,18 @@ body,
   border: 1px solid #9bc0b4;
   padding: 2px 7px;
   border-radius: 5px;
-  color: #3ab08a;
+  color: #4f46e5;
 }
 
 .tiptap.ProseMirror blockquote {
-  border-left: 3px solid #3ab08a;
+  border-left: 3px solid #4f46e5;
   padding-left: 18px;
   color: #a5a2b4;
   font-style: italic;
 }
 
 .tiptap.ProseMirror li::marker {
-  color: #3ab08a;
+  color: #4f46e5;
 }
 
 :root[data-page-layout="a4"] .stept-editor-wrapper {

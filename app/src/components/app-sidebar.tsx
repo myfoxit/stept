@@ -332,13 +332,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <div className="px-3 pb-2">
         <button
           onClick={openSpotlight}
-          className="flex w-full items-center gap-2 rounded-lg bg-[#ffffff] px-3 py-2 text-left transition-colors border-[#ebebeb] border"
+          className="flex w-full items-center gap-2 rounded-lg bg-black/[0.03] px-3 py-2 text-left transition-all border border-border hover:border-primary hover:bg-[rgba(79,70,229,0.04)]"
         >
-          <Search className="h-3.5 w-3.5 text-[#a5a2b4] flex-shrink-0" />
-          <span className="text-[0.78rem] font-medium text-[#a5a2b4]">
+          <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <span className="text-[0.8rem] font-medium text-muted-foreground">
             Search...
           </span>
-          <kbd className="ml-auto text-[0.6rem] font-semibold bg-white border border-[#e4e1ed] px-1.5 py-px rounded text-[#a5a2b4]">
+          <kbd className="ml-auto text-[0.65rem] font-medium bg-border px-1.5 py-px rounded text-muted-foreground">
             ⌘K
           </kbd>
         </button>

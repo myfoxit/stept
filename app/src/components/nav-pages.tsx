@@ -1169,7 +1169,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         </SidebarMenu>
       </SidebarGroup>
 
-      <SidebarSeparator />
+      
 
       {/* Shared Section */}
       <SidebarGroup
@@ -1319,7 +1319,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         </SidebarMenu>
       </SidebarGroup>
 
-      <SidebarSeparator />
+      
 
       {/* Private Section */}
       {(privateTree.length > 0 || canCreatePage) && (

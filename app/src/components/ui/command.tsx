@@ -51,7 +51,7 @@ function CommandDialog({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent
-        className={cn("overflow-hidden p-0 !rounded-[14px] !shadow-[0_25px_60px_rgba(0,0,0,0.2),0_0_0_1px_rgba(0,0,0,0.06)] sm:!max-w-[580px]", className)}
+        className={cn("overflow-hidden p-0 !rounded-[14px] !shadow-[0_25px_60px_rgba(0,0,0,0.2),0_0_0_1px_rgba(0,0,0,0.06)] sm:!max-w-[580px] !top-[15vh] !translate-y-0 !max-h-[460px]", className)}
         showCloseButton={showCloseButton}
       >
         <Command shouldFilter={shouldFilter} className="[&_[cmdk-group-heading]]:text-muted-foreground **:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-[0.65rem] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group]]:px-0 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-4 [&_[cmdk-item]]:py-2 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
@@ -92,7 +92,7 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        "max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto",
+        "max-h-[340px] min-h-[200px] scroll-py-1 overflow-x-hidden overflow-y-auto",
         className
       )}
       {...props}
@@ -165,7 +165,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "text-muted-foreground ml-auto text-xs tracking-widest",
+        "text-muted-foreground ml-auto text-[0.65rem] font-medium tracking-normal bg-border px-1.5 py-0.5 rounded",
         className
       )}
       {...props}

@@ -36,7 +36,7 @@ export default function LoginPage() {
               height="36"
               viewBox="0 0 38 36"
             >
-              <rect x="0" y="4" width="32" height="32" rx="9" fill="#3AB08A" />
+              <rect x="0" y="4" width="32" height="32" rx="9" fill="#4f46e5" />
               <rect
                 x="7"
                 y="11"
@@ -63,7 +63,7 @@ export default function LoginPage() {
               />
               <path
                 d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                fill="#3AB08A"
+                fill="#4f46e5"
               />
             </svg>
             stept
