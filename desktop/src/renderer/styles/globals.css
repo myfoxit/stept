@@ -13,26 +13,26 @@
   --accent-glow-lg: 0 6px 24px rgba(62, 175, 138, 0.35);
 
   /* Neutral palette */
-  --dark: #222222;
-  --dark-hover: #333333;
-  --bg: #FAFBFC;
-  --bg-alt: #F7F8F9;
+  --dark: #111827;
+  --dark-hover: #374151;
+  --bg: #f9fafb;
+  --bg-alt: #f3f4f6;
   --card: #ffffff;
-  --border: #E8E8EC;
-  --border-light: #F0F0F4;
-  --border-medium: #E0E0E4;
-  --input-bg: #F8F8FA;
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+  --border-medium: #e5e7eb;
+  --input-bg: #f9fafb;
 
   /* Recording */
   --recording: #E14D2A;
   --recording-light: rgba(225, 77, 42, 0.04);
 
   /* Text */
-  --text-primary: #222222;
-  --text-secondary: #999999;
-  --text-muted: #AAAAAA;
-  --text-dim: #888888;
-  --section-header: #6EC4A4;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --text-dim: #6b7280;
+  --section-header: #6b7280;
 
   /* Upload toast states */
   --upload-bg-info: #EEF2FF;
@@ -54,7 +54,7 @@
   --radius-pill: 999px;
 
   /* Fonts */
-  --font-sans: 'DM Sans', sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* Traffic lights */
