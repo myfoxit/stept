@@ -12,6 +12,7 @@ let lastClickTime = 0;
 let lastClickTarget: EventTarget | null = null;
 let pendingClick: ReturnType<typeof setTimeout> | null = null;
 let focusedFieldValue: string | null = null; // Track value on focus for blur comparison
+let typingElement: HTMLInputElement | HTMLTextAreaElement | HTMLElement | null = null;
 const TYPING_DELAY = 1000;
 const DOUBLE_CLICK_MS = 400;
 
@@ -99,13 +100,14 @@ function sendKeyStep(description: string): void {
     });
 }
 
-function flushTypedText(): void {
+function flushTypedText(targetElement?: Element | null): void {
   clearTimeout(typingTimer as ReturnType<typeof setTimeout>);
+  typingTimer = null;
 
   if (typedText.length === 0) return;
 
-  const activeElement = document.activeElement;
-  const elementInfo = activeElement ? gatherElementInfo(activeElement) : null;
+  const currentElement = targetElement || typingElement || document.activeElement;
+  const elementInfo = currentElement ? gatherElementInfo(currentElement) : null;
 
   const fieldName = elementInfo
     ? (getBestLabel(elementInfo) || elementInfo.id || '')
@@ -132,10 +134,11 @@ function flushTypedText(): void {
     });
 
   typedText = '';
+  typingElement = null;
 
   // Sync focusedFieldValue so handleFocusOut doesn't duplicate this step
-  if (activeElement && isInputLike(activeElement as Element)) {
-    focusedFieldValue = (activeElement as HTMLInputElement).value || '';
+  if (currentElement && isInputLike(currentElement)) {
+    focusedFieldValue = (currentElement as HTMLInputElement).value || '';
   }
 }
 
@@ -207,6 +210,8 @@ function handleFocusIn(event: FocusEvent): void {
   const el = event.target as HTMLInputElement;
   if (!isInputLike(el as Element)) return;
   focusedFieldValue = el.value || '';
+  typedText = '';
+  typingElement = el;
 }
 
 function handleFocusOut(event: FocusEvent): void {
@@ -215,18 +220,26 @@ function handleFocusOut(event: FocusEvent): void {
   if (!isInputLike(el as Element)) return;
 
   const currentValue = el.value || '';
-  if (currentValue === focusedFieldValue) {
-    focusedFieldValue = null;
-    return; // Value didn't change
-  }
 
   // Skip sensitive fields
   if (el.type === 'password' || (el.autocomplete && /cc-|credit/i.test(el.autocomplete))) {
     focusedFieldValue = null;
+    typedText = '';
+    typingElement = null;
     return;
   }
 
-  flushTypedText(); // Flush any pending typed text first
+  if (typedText.length > 0) {
+    flushTypedText(el);
+    focusedFieldValue = null;
+    return;
+  }
+
+  if (currentValue === focusedFieldValue) {
+    focusedFieldValue = null;
+    typingElement = null;
+    return; // Value didn't change
+  }
 
   const elementInfo = gatherElementInfo(el);
   const fieldLabel = getBestLabel(elementInfo) || el.id || 'field';
@@ -248,6 +261,7 @@ function handleFocusOut(event: FocusEvent): void {
   }).catch(() => {});
 
   focusedFieldValue = null;
+  typingElement = null;
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -257,10 +271,12 @@ function handleKeydown(event: KeyboardEvent): void {
   const el = document.activeElement as HTMLInputElement | null;
   if (el && (el.type === 'password' || (el.autocomplete as string) === 'cc-number' || (el.autocomplete as string) === 'cc-cvc' || (el.autocomplete as string) === 'cc-exp')) return;
 
+  const activeInput = el && isInputLike(el) ? el : null;
+
   // Modifier combos (Ctrl+A, Ctrl+C, etc.) — flush text first, then record combo
   if (event.ctrlKey || event.metaKey || event.altKey) {
     if (event.key.length === 1 || ['Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-      flushTypedText();
+      flushTypedText(activeInput);
       const mods: string[] = [];
       if (event.ctrlKey) mods.push('Ctrl');
       if (event.metaKey) mods.push('Cmd');
@@ -272,20 +288,40 @@ function handleKeydown(event: KeyboardEvent): void {
     }
   }
 
-  // Special action keys — flush typed text, then record the key press
-  if (['Enter', 'Tab', 'Escape', 'Delete', 'Backspace'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
-    flushTypedText();
-    const keyLabel = event.key === 'Backspace' ? 'Delete' : event.key;
-    sendKeyStep(`Press ${keyLabel}`);
-    return;
-  }
-
   // Skip lone modifier keys
   if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) {
     return;
   }
 
-  // Regular character typing — accumulate
+  // For editable fields, capture the final field value after the key applies.
+  // This folds corrections like Backspace/Delete into the same typing step.
+  if (activeInput && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (event.key.length === 1 || ['Backspace', 'Delete'].includes(event.key)) {
+      typingElement = activeInput;
+      clearTimeout(typingTimer as ReturnType<typeof setTimeout>);
+      setTimeout(() => {
+        typedText = activeInput.value || '';
+      }, 0);
+      typingTimer = setTimeout(() => flushTypedText(activeInput), TYPING_DELAY);
+      return;
+    }
+
+    if (['Enter', 'Tab', 'Escape'].includes(event.key)) {
+      flushTypedText(activeInput);
+      sendKeyStep(`Press ${event.key}`);
+      return;
+    }
+  }
+
+  // Special action keys outside text editing — flush typed text, then record the key press
+  if (['Enter', 'Tab', 'Escape', 'Delete', 'Backspace'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
+    flushTypedText(activeInput);
+    const keyLabel = event.key === 'Backspace' ? 'Delete' : event.key;
+    sendKeyStep(`Press ${keyLabel}`);
+    return;
+  }
+
+  // Regular character typing outside input fields — accumulate raw keys
   if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
     typedText += event.key;
     clearTimeout(typingTimer as ReturnType<typeof setTimeout>);
