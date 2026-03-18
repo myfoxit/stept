@@ -18,7 +18,7 @@ import { createSlashMenuExtension } from '@/components/Editor/SlashMenu'
 export function useSteptEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   return useEditor({
     immediatelyRender: false,
-    shouldRerenderOnTransaction: true,
+    shouldRerenderOnTransaction: false,
     editable: !readOnly,
     editorProps: {
       attributes: {
