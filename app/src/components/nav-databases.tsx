@@ -76,7 +76,7 @@ export function NavDatabases({ userRole }: { userRole: string }) {
             className="p-0.5 rounded hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
             title="New Table"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-4" />
           </button>
         )}
       </SidebarGroupLabel>

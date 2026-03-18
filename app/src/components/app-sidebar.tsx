@@ -149,9 +149,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <Link to="#" className="flex items-center gap-0 !no-underline">
                 <span
-                  className="text-[1.25rem] tracking-wide text-foreground ml-[10px]"
+                  className="text-[1.25rem] tracking-wide text-foreground ml-[10px] font-bold"
                   style={{
-                    fontFamily: "'Manrope', sans-serif",
                     letterSpacing: "0.04em",
                   }}
                 >
@@ -214,7 +213,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="h-8 w-full justify-between px-2 font-medium text-[0.82rem] text-[#3d3a50] hover:bg-[#f1effe]"
+                      className="h-8 w-full justify-between px-2 font-medium text-[0.875rem] text-foreground hover:bg-sidebar-accent"
                       data-testid="project-selector-trigger"
                     >
                       <span className="truncate">
@@ -334,7 +333,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           onClick={openSpotlight}
           className="flex w-full items-center gap-2 rounded-lg bg-black/[0.03] px-3 py-2 text-left transition-all border border-border hover:border-primary hover:bg-[rgba(79,70,229,0.04)]"
         >
-          <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <span className="text-[0.8rem] font-medium text-muted-foreground">
             Search...
           </span>

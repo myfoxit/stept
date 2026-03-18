@@ -41,13 +41,13 @@ export function NavMain({
                   >
                     {item.url !== '#' ? (
                       <Link to={item.url}>
-                        {item.icon && <item.icon className="size-4 opacity-50" strokeWidth={1.5} />}
-                        <span className="text-[0.82rem] font-medium">{item.title}</span>
+                        {item.icon && <item.icon className="size-5 text-muted-foreground" strokeWidth={1.5} />}
+                        <span className="text-[0.875rem] font-medium">{item.title}</span>
                       </Link>
                     ) : (
                       <>
-                        {item.icon && <item.icon className="size-4 opacity-50" strokeWidth={1.5} />}
-                        <span className="text-[0.82rem] font-medium">{item.title}</span>
+                        {item.icon && <item.icon className="size-5 text-muted-foreground" strokeWidth={1.5} />}
+                        <span className="text-[0.875rem] font-medium">{item.title}</span>
                       </>
                     )}
                   </SidebarMenuButton>

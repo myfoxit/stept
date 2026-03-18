@@ -95,7 +95,7 @@ export default function UploadPanel({
           height="48"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#3AB08A"
+          stroke="#4f46e5"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

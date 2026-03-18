@@ -15,7 +15,7 @@ export function SiteHeader({
   const showTrigger = state === "collapsed" || isMobile;
 
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-white transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-white dark:bg-card transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         {showTrigger && <SidebarTrigger className="size-7 -ml-1 mr-1" />}
         {breadcrumbs && breadcrumbs.length > 0 ? (

@@ -351,12 +351,12 @@ function NavPageItem({
     if (isFolder) {
       return doc.is_expanded ? (
         <FolderOpen
-          className="size-3.5 flex-shrink-0 opacity-50"
+          className="size-4 flex-shrink-0 text-muted-foreground"
           strokeWidth={1.5}
         />
       ) : (
         <Folder
-          className="size-3.5 flex-shrink-0 opacity-50"
+          className="size-4 flex-shrink-0 text-muted-foreground"
           strokeWidth={1.5}
         />
       );
@@ -380,7 +380,7 @@ function NavPageItem({
       );
     }
     return (
-      <File className="size-3.5 flex-shrink-0 opacity-50" strokeWidth={1.5} />
+      <File className="size-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.5} />
     );
   };
 
@@ -402,7 +402,7 @@ function NavPageItem({
       <SidebarMenuItem>
         <div
           className={cn(
-            "flex items-center group/item relative transition-all h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            "flex items-center group/item relative transition-all h-8 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
             isDragging && "opacity-50",
           )}
@@ -477,7 +477,7 @@ function NavPageItem({
           <SidebarMenuButton
             asChild={!isFolder}
             className={cn(
-              "flex-1 h-7 px-1.5 hover:bg-transparent",
+              "flex-1 h-8 px-1.5 hover:bg-transparent",
               level > 0 && "text-sm",
             )}
             onClick={(e) => {
@@ -496,12 +496,12 @@ function NavPageItem({
                   <span className="text-base flex-shrink-0">{doc.icon}</span>
                 ) : doc.is_expanded ? (
                   <FolderOpen
-                    className="size-3.5 flex-shrink-0 opacity-50"
+                    className="size-4 flex-shrink-0 text-muted-foreground"
                     strokeWidth={1.5}
                   />
                 ) : (
                   <Folder
-                    className="size-3.5 flex-shrink-0 opacity-50"
+                    className="size-4 flex-shrink-0 text-muted-foreground"
                     strokeWidth={1.5}
                   />
                 )}
@@ -532,11 +532,11 @@ function NavPageItem({
                 ) : doc.source_file_mime ? (
                   <FileTypeIcon
                     mime={doc.source_file_mime}
-                    className="size-3.5 flex-shrink-0"
+                    className="size-4 flex-shrink-0"
                   />
                 ) : (
                   <File
-                    className="size-3.5 flex-shrink-0 opacity-50"
+                    className="size-4 flex-shrink-0 text-muted-foreground"
                     strokeWidth={1.5}
                   />
                 )}
@@ -1102,7 +1102,7 @@ export function NavPages({ userRole }: { userRole: string }) {
       />
       {/* Gallery View Links */}
       <SidebarGroup className="py-2">
-        <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1]">
+        <SidebarGroupLabel className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
           Content
         </SidebarGroupLabel>
         <SidebarMenu className="gap-0.5">
@@ -1115,9 +1115,9 @@ export function NavPages({ userRole }: { userRole: string }) {
             >
               <Link
                 to="/documents/pages"
-                className="flex items-center gap-2 h-7 px-2"
+                className="flex items-center gap-2 h-8 px-2"
               >
-                <File className="size-3.5 opacity-50" strokeWidth={1.5} />
+                <File className="size-4 text-muted-foreground" strokeWidth={1.5} />
                 <span className="text-sm">Pages</span>
               </Link>
             </SidebarMenuButton>
@@ -1131,7 +1131,7 @@ export function NavPages({ userRole }: { userRole: string }) {
             >
               <Link
                 to="/documents/workflows"
-                className="flex items-center gap-2 h-7 px-2"
+                className="flex items-center gap-2 h-8 px-2"
               >
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
                   <path
@@ -1159,9 +1159,9 @@ export function NavPages({ userRole }: { userRole: string }) {
             >
               <Link
                 to="/documents/all"
-                className="flex items-center gap-2 h-7 px-2"
+                className="flex items-center gap-2 h-8 px-2"
               >
-                <Files className="size-3.5 opacity-50" strokeWidth={1.5} />
+                <Files className="size-4 text-muted-foreground" strokeWidth={1.5} />
                 <span className="text-sm">All Documents</span>
               </Link>
             </SidebarMenuButton>
@@ -1181,7 +1181,7 @@ export function NavPages({ userRole }: { userRole: string }) {
         onDragLeave={() => setIsDraggingOverShared(false)}
         onDrop={handleSharedDrop}
       >
-        <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center justify-between">
+        <SidebarGroupLabel className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center justify-between">
           <span>Shared</span>
           {canCreatePage && (
             <button
@@ -1193,7 +1193,7 @@ export function NavPages({ userRole }: { userRole: string }) {
               title="New Folder"
             >
               <FolderPlus
-                className="size-3.5 text-[#D6D3D1]"
+                className="size-4 text-muted-foreground"
                 strokeWidth={1.5}
               />
             </button>
@@ -1227,7 +1227,7 @@ export function NavPages({ userRole }: { userRole: string }) {
           {/* Unsorted: root-level non-folder items (always visible) */}
           <SidebarMenuItem>
             <div
-              className="flex items-center group/item h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
+              className="flex items-center group/item h-8 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
               onClick={() => setUnsortedSharedExpanded(!unsortedSharedExpanded)}
             >
               <button className="flex items-center justify-center size-5 rounded-sm ml-0.5 outline-none">
@@ -1237,9 +1237,9 @@ export function NavPages({ userRole }: { userRole: string }) {
                   <ChevronRight className="size-3" />
                 )}
               </button>
-              <SidebarMenuButton className="flex-1 h-7 px-1.5 hover:bg-transparent">
+              <SidebarMenuButton className="flex-1 h-8 px-1.5 hover:bg-transparent">
                 <Inbox
-                  className="size-3.5 flex-shrink-0 opacity-50"
+                  className="size-4 flex-shrink-0 text-muted-foreground"
                   strokeWidth={1.5}
                 />
                 <span className="truncate text-sm font-semibold">Unsorted</span>
@@ -1251,7 +1251,7 @@ export function NavPages({ userRole }: { userRole: string }) {
                       className="rounded-sm size-5 mr-1 flex items-center justify-center hover:bg-sidebar-accent-foreground/10 opacity-0 group-hover/item:opacity-100 outline-none"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Plus className="size-3.5" />
+                      <Plus className="size-4" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -1332,7 +1332,7 @@ export function NavPages({ userRole }: { userRole: string }) {
           onDragLeave={() => setIsDraggingOverPrivate(false)}
           onDrop={handlePrivateDrop}
         >
-          <SidebarGroupLabel className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-[#D6D3D1] flex items-center justify-between">
+          <SidebarGroupLabel className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-muted-foreground flex items-center justify-between">
             <span>Private</span>
             {canCreatePage && (
               <button
@@ -1344,7 +1344,7 @@ export function NavPages({ userRole }: { userRole: string }) {
                 title="New Folder"
               >
                 <FolderPlus
-                  className="size-3.5 text-[#D6D3D1]"
+                  className="size-4 text-muted-foreground"
                   strokeWidth={1.5}
                 />
               </button>
@@ -1378,7 +1378,7 @@ export function NavPages({ userRole }: { userRole: string }) {
             {/* Unsorted: root-level non-folder items (always visible) */}
             <SidebarMenuItem>
               <div
-                className="flex items-center group/item h-7 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
+                className="flex items-center group/item h-8 rounded-md mx-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
                 onClick={() =>
                   setUnsortedPrivateExpanded(!unsortedPrivateExpanded)
                 }
@@ -1390,9 +1390,9 @@ export function NavPages({ userRole }: { userRole: string }) {
                     <ChevronRight className="size-3" />
                   )}
                 </button>
-                <SidebarMenuButton className="flex-1 h-7 px-1.5 hover:bg-transparent">
+                <SidebarMenuButton className="flex-1 h-8 px-1.5 hover:bg-transparent">
                   <Inbox
-                    className="size-3.5 flex-shrink-0 opacity-50"
+                    className="size-4 flex-shrink-0 text-muted-foreground"
                     strokeWidth={1.5}
                   />
                   <span className="truncate text-sm font-semibold">
@@ -1406,7 +1406,7 @@ export function NavPages({ userRole }: { userRole: string }) {
                         className="rounded-sm size-5 mr-1 flex items-center justify-center hover:bg-sidebar-accent-foreground/10 opacity-0 group-hover/item:opacity-100 outline-none"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Plus className="size-3.5" />
+                        <Plus className="size-4" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
