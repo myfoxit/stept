@@ -319,6 +319,17 @@ export async function fetchUserProjects(): Promise<void> {
 
     if (response.ok) {
       state.userProjects = await response.json();
+
+      const hasValidSelectedProject = state.userProjects.some(
+        (project: any) => project?.id === state.selectedProjectId,
+      );
+
+      if (!hasValidSelectedProject) {
+        state.selectedProjectId = state.userProjects[0]?.id ?? null;
+        await chrome.storage.local.set({
+          selectedProjectId: state.selectedProjectId,
+        });
+      }
     }
   } catch (error) {
     debugLog('Failed to fetch projects:', error);
