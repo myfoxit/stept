@@ -8,10 +8,15 @@ import { apiClient, getApiBaseUrl } from '@/lib/apiClient';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
+  id?: string;
+  session_id?: string;
+  parent_message_id?: string | null;
   role: 'user' | 'assistant' | 'system';
   content: string;
   tool_calls?: ToolCallEvent[];
   tool_results?: ToolResultEvent[];
+  created_at?: string;
+  deleted_at?: string | null;
 }
 
 export interface ChatContext {
@@ -25,6 +30,24 @@ export interface ChatCompletionRequest {
   model?: string;
   stream?: boolean;
   context?: ChatContext;
+  session_id?: string;
+  parent_message_id?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title?: string | null;
+  project_id?: string | null;
+  recording_id?: string | null;
+  document_id?: string | null;
+  latest_message_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatSessionDetail {
+  session: ChatSession;
+  messages: ChatMessage[];
 }
 
 export interface ChatModel {
@@ -71,6 +94,7 @@ export async function streamChatCompletion(
   signal?: AbortSignal,
   onToolCall?: (toolCall: ToolCallEvent) => void,
   onToolResult?: (toolResult: ToolResultEvent) => void,
+  onSessionId?: (sessionId: string) => void,
 ): Promise<void> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}/chat/completions`;
@@ -83,6 +107,9 @@ export async function streamChatCompletion(
       body: JSON.stringify({ ...request, stream: true }),
       signal,
     });
+
+    const sessionId = response.headers?.get?.('X-Chat-Session-Id');
+    if (sessionId && onSessionId) onSessionId(sessionId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -179,4 +206,20 @@ export async function updateChatConfig(config: ChatConfigUpdate): Promise<ChatCo
 export async function fetchChatTools(): Promise<ChatTool[]> {
   const { data } = await apiClient.get<{ tools: ChatTool[] }>('/chat/tools');
   return data.tools;
+}
+
+
+export async function fetchChatSessions(projectId?: string): Promise<ChatSession[]> {
+  const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  const { data } = await apiClient.get<{ sessions: ChatSession[] }>(`/chat/sessions${query}`);
+  return data.sessions;
+}
+
+export async function fetchChatSession(sessionId: string): Promise<ChatSessionDetail> {
+  const { data } = await apiClient.get<ChatSessionDetail>(`/chat/sessions/${sessionId}`);
+  return data;
+}
+
+export async function deleteChatSession(sessionId: string): Promise<void> {
+  await apiClient.delete(`/chat/sessions/${sessionId}`);
 }

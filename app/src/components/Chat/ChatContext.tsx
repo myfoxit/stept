@@ -1,7 +1,7 @@
 /**
  * React context for Chat state management.
  * Provides messages, loading state, context awareness, panel visibility,
- * and tool call/result tracking.
+ * tool call/result tracking, and persisted session history.
  */
 
 import * as React from 'react';
@@ -11,10 +11,9 @@ import type {
   ToolCallEvent,
   ToolResultEvent,
 } from '@/api/chat';
-import { streamChatCompletion } from '@/api/chat';
+import { streamChatCompletion, fetchChatSession, deleteChatSession } from '@/api/chat';
 import { useProject } from '@/providers/project-provider';
-
-// ── Types ────────────────────────────────────────────────────────────────────
+import { useAuth } from '@/providers/auth-provider';
 
 interface ChatState {
   messages: ChatMessage[];
@@ -22,6 +21,7 @@ interface ChatState {
   isOpen: boolean;
   context: ChatContextPayload | null;
   error: string | null;
+  sessionId: string | null;
 }
 
 interface ChatActions {
@@ -35,19 +35,19 @@ interface ChatActions {
 
 type ChatContextValue = ChatState & ChatActions;
 
-// ── Context ──────────────────────────────────────────────────────────────────
-
 const ChatCtx = React.createContext<ChatContextValue | null>(null);
 
 export function useChat(): ChatContextValue {
   const ctx = React.useContext(ChatCtx);
-  if (!ctx) {
-    throw new Error('useChat must be used within a ChatProvider');
-  }
+  if (!ctx) throw new Error('useChat must be used within a ChatProvider');
   return ctx;
 }
 
-// ── Provider ─────────────────────────────────────────────────────────────────
+function storageKey(userId?: string, projectId?: string | null, context?: ChatContextPayload | null): string | null {
+  if (!userId) return null;
+  const scope = [projectId || 'none', context?.recording_id || 'none', context?.document_id || 'none'].join(':');
+  return `stept_chat_session_${userId}_${scope}`;
+}
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -55,75 +55,107 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [context, setContext] = React.useState<ChatContextPayload | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [sessionId, setSessionId] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
   const { selectedProjectId } = useProject();
+  const { user } = useAuth();
 
-  // Build effective context: always include project_id from global state
   const effectiveContext = React.useMemo<ChatContextPayload | undefined>(() => {
     const pid = context?.project_id || selectedProjectId || undefined;
     if (!pid && !context?.recording_id && !context?.document_id) return undefined;
-    return {
-      ...context,
-      project_id: pid,
-    };
+    return { ...context, project_id: pid };
   }, [context, selectedProjectId]);
+
+  const storageKeyValue = React.useMemo(
+    () => storageKey(user?.id, selectedProjectId, context),
+    [user?.id, selectedProjectId, context],
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!storageKeyValue) return;
+      const stored = localStorage.getItem(storageKeyValue);
+      if (!stored) {
+        setSessionId(null);
+        setMessages([]);
+        return;
+      }
+      try {
+        const session = await fetchChatSession(stored);
+        if (cancelled) return;
+        setSessionId(session.session.id);
+        setMessages(session.messages.filter((m) => m.role !== 'system'));
+      } catch {
+        if (!cancelled) {
+          localStorage.removeItem(storageKeyValue);
+          setSessionId(null);
+          setMessages([]);
+        }
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [storageKeyValue]);
 
   const sendMessage = React.useCallback(
     (content: string) => {
       if (!content.trim() || isLoading) return;
 
       const userMessage: ChatMessage = { role: 'user', content };
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: '',
-        tool_calls: [],
-        tool_results: [],
-      };
+      const assistantMessage: ChatMessage = { role: 'assistant', content: '', tool_calls: [], tool_results: [] };
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setIsLoading(true);
       setError(null);
 
-      // Abort any previous in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // Build full message history for the request (only role + content)
       const allMessages: ChatMessage[] = [...messages, userMessage].map((m) => ({
         role: m.role,
         content: m.content,
       }));
+
+      const lastRealMessage = [...messages].reverse().find((m) => m.id);
 
       streamChatCompletion(
         {
           messages: allMessages,
           stream: true,
           context: effectiveContext,
+          session_id: sessionId || undefined,
+          parent_message_id: lastRealMessage?.id,
         },
-        // onChunk — append to the last (assistant) message
         (text: string) => {
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
             if (last?.role === 'assistant') {
-              updated[updated.length - 1] = {
-                ...last,
-                content: last.content + text,
-              };
+              updated[updated.length - 1] = { ...last, content: last.content + text };
             }
             return updated;
           });
         },
-        // onDone
-        () => {
+        async () => {
           setIsLoading(false);
+          const sid = sessionId || (storageKeyValue ? localStorage.getItem(storageKeyValue) : null);
+          if (sid) {
+            try {
+              const session = await fetchChatSession(sid);
+              setSessionId(session.session.id);
+              setMessages(session.messages.filter((m) => m.role !== 'system'));
+            } catch {
+              // Keep optimistic UI if refresh fails
+            }
+          }
         },
-        // onError
         (err: Error) => {
           setIsLoading(false);
           setError(err.message);
-          // Remove the empty assistant message on error
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last?.role === 'assistant' && !last.content && !last.tool_calls?.length && !last.tool_results?.length) {
@@ -133,56 +165,56 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           });
         },
         controller.signal,
-        // onToolCall
         (toolCall: ToolCallEvent) => {
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
             if (last?.role === 'assistant') {
-              const existingCalls = last.tool_calls || [];
-              updated[updated.length - 1] = {
-                ...last,
-                tool_calls: [...existingCalls, toolCall],
-              };
+              updated[updated.length - 1] = { ...last, tool_calls: [...(last.tool_calls || []), toolCall] };
             }
             return updated;
           });
         },
-        // onToolResult
         (toolResult: ToolResultEvent) => {
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
             if (last?.role === 'assistant') {
-              const existingResults = last.tool_results || [];
-              // Also update the matching tool_call status
               const updatedCalls = (last.tool_calls || []).map((tc) =>
-                tc.id === toolResult.tool_call_id
-                  ? { ...tc, status: toolResult.status as ToolCallEvent['status'] }
-                  : tc,
+                tc.id === toolResult.tool_call_id ? { ...tc, status: toolResult.status as ToolCallEvent['status'] } : tc,
               );
               updated[updated.length - 1] = {
                 ...last,
                 tool_calls: updatedCalls,
-                tool_results: [...existingResults, toolResult],
+                tool_results: [...(last.tool_results || []), toolResult],
               };
             }
             return updated;
           });
         },
+        (sid: string) => {
+          setSessionId(sid);
+          if (storageKeyValue) localStorage.setItem(storageKeyValue, sid);
+        },
       );
     },
-    [messages, isLoading, effectiveContext],
+    [messages, isLoading, effectiveContext, sessionId, storageKeyValue],
   );
 
   const togglePanel = React.useCallback(() => setIsOpen((v) => !v), []);
   const openPanel = React.useCallback(() => setIsOpen(true), []);
   const closePanel = React.useCallback(() => setIsOpen(false), []);
   const clearMessages = React.useCallback(() => {
+    const sid = sessionId;
     abortRef.current?.abort();
     setMessages([]);
     setError(null);
-  }, []);
+    setSessionId(null);
+    if (storageKeyValue) localStorage.removeItem(storageKeyValue);
+    if (sid) {
+      deleteChatSession(sid).catch(() => undefined);
+    }
+  }, [sessionId, storageKeyValue]);
 
   const value = React.useMemo<ChatContextValue>(
     () => ({
@@ -191,6 +223,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       isOpen,
       context,
       error,
+      sessionId,
       sendMessage,
       togglePanel,
       openPanel,
@@ -198,7 +231,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setContext,
       clearMessages,
     }),
-    [messages, isLoading, isOpen, context, error, sendMessage, togglePanel, openPanel, closePanel, clearMessages],
+    [messages, isLoading, isOpen, context, error, sessionId, sendMessage, togglePanel, openPanel, closePanel, clearMessages],
   );
 
   return <ChatCtx.Provider value={value}>{children}</ChatCtx.Provider>;

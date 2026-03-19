@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional, AsyncIterator
+from datetime import datetime
+from typing import Optional, AsyncIterator, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session as get_db, AsyncSessionLocal
@@ -30,6 +31,8 @@ from app.models import (
     ProcessRecordingStep,
     User,
     LLMUsage,
+    ChatSession,
+    ChatMessage,
 )
 from app.security import get_current_user
 from app.services import llm as llm_service
@@ -68,6 +71,38 @@ class ChatCompletionRequest(BaseModel):
     model: Optional[str] = None
     stream: bool = True
     context: Optional[ChatContext] = None
+    session_id: Optional[str] = None
+    parent_message_id: Optional[str] = None
+
+
+class ChatSessionOut(BaseModel):
+    id: str
+    title: Optional[str] = None
+    project_id: Optional[str] = None
+    recording_id: Optional[str] = None
+    document_id: Optional[str] = None
+    latest_message_id: Optional[str] = None
+    created_at: Any
+    updated_at: Any
+
+
+class ChatMessageOut(BaseModel):
+    id: str
+    session_id: str
+    parent_message_id: Optional[str] = None
+    role: str
+    content: str
+    tool_calls: Optional[list] = None
+    tool_results: Optional[list] = None
+    meta: Optional[dict] = None
+    position: int
+    created_at: Any
+    deleted_at: Optional[Any] = None
+
+
+class ChatSessionDetailOut(BaseModel):
+    session: ChatSessionOut
+    messages: list[ChatMessageOut]
 
 
 class ChatConfigUpdate(BaseModel):
@@ -213,6 +248,120 @@ def _build_system_prompt_with_tools() -> str:
     )
 
 
+def _session_title_from_messages(messages: list[dict]) -> str | None:
+    for msg in messages:
+        if msg.get("role") == "user" and (msg.get("content") or "").strip():
+            return (msg.get("content") or "").strip().replace("\n", " ")[:120]
+    return None
+
+
+def _message_to_out(message: ChatMessage) -> ChatMessageOut:
+    return ChatMessageOut(
+        id=message.id,
+        session_id=message.session_id,
+        parent_message_id=message.parent_message_id,
+        role=message.role,
+        content=message.content or "",
+        tool_calls=message.tool_calls,
+        tool_results=message.tool_results,
+        meta=message.meta,
+        position=message.position,
+        created_at=message.created_at,
+        deleted_at=message.deleted_at,
+    )
+
+
+def _session_to_out(session: ChatSession) -> ChatSessionOut:
+    return ChatSessionOut(
+        id=session.id,
+        title=session.title,
+        project_id=session.project_id,
+        recording_id=session.recording_id,
+        document_id=session.document_id,
+        latest_message_id=session.latest_message_id,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+    )
+
+
+async def _get_chat_session_or_404(db: AsyncSession, user_id: str, session_id: str) -> ChatSession:
+    stmt = select(ChatSession).where(
+        ChatSession.id == session_id,
+        ChatSession.user_id == user_id,
+        ChatSession.deleted_at.is_(None),
+    )
+    session = await db.scalar(stmt)
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return session
+
+
+async def _next_message_position(db: AsyncSession, session_id: str) -> int:
+    result = await db.execute(
+        select(func.coalesce(func.max(ChatMessage.position), -1) + 1).where(ChatMessage.session_id == session_id)
+    )
+    return int(result.scalar_one())
+
+
+async def _create_chat_message(
+    db: AsyncSession,
+    session: ChatSession,
+    role: str,
+    content: str,
+    parent_message_id: str | None = None,
+    tool_calls: list | None = None,
+    tool_results: list | None = None,
+    meta: dict | None = None,
+) -> ChatMessage:
+    msg = ChatMessage(
+        session_id=session.id,
+        parent_message_id=parent_message_id,
+        role=role,
+        content=content or "",
+        tool_calls=tool_calls,
+        tool_results=tool_results,
+        meta=meta,
+        position=await _next_message_position(db, session.id),
+    )
+    db.add(msg)
+    await db.flush()
+    session.latest_message_id = msg.id
+    if not session.title and role == "user":
+        session.title = (content or "").strip().replace("\n", " ")[:120] or session.title
+    return msg
+
+
+async def _ensure_session(
+    db: AsyncSession,
+    user_id: str,
+    body: ChatCompletionRequest,
+) -> ChatSession | None:
+    if body.session_id:
+        session = await _get_chat_session_or_404(db, user_id, body.session_id)
+        if body.context:
+            if body.context.project_id and not session.project_id:
+                session.project_id = body.context.project_id
+            if body.context.recording_id and not session.recording_id:
+                session.recording_id = body.context.recording_id
+            if body.context.document_id and not session.document_id:
+                session.document_id = body.context.document_id
+        return session
+
+    if not body.messages:
+        return None
+
+    session = ChatSession(
+        user_id=user_id,
+        project_id=body.context.project_id if body.context else None,
+        recording_id=body.context.recording_id if body.context else None,
+        document_id=body.context.document_id if body.context else None,
+        title=_session_title_from_messages([m.model_dump(exclude_none=True) for m in body.messages]),
+    )
+    db.add(session)
+    await db.flush()
+    return session
+
+
 # ---------------------------------------------------------------------------
 # Tool execution
 # ---------------------------------------------------------------------------
@@ -290,6 +439,7 @@ async def _chat_with_tools(
     base_url_override: Optional[str],
     user_id: str,
     project_id: Optional[str],
+    capture: Optional[dict] = None,
 ) -> AsyncIterator[str]:
     """
     Multi-round chat with tool calling.
@@ -303,6 +453,11 @@ async def _chat_with_tools(
     """
     tool_defs = tool_registry.openai_tool_definitions()
     current_messages = list(messages)
+    if capture is None:
+        capture = {}
+    capture.setdefault("content", "")
+    capture.setdefault("tool_calls", [])
+    capture.setdefault("tool_results", [])
 
     for round_num in range(MAX_TOOL_ROUNDS):
         # Non-streaming request with tools
@@ -355,6 +510,7 @@ async def _chat_with_tools(
             # No tool calls — stream the text response as SSE chunks
             text = llm_service.extract_text_from_response(response_json)
             if text:
+                capture["content"] += text
                 # Send as a single chunk (already got full response)
                 chunk = {
                     "choices": [{
@@ -370,6 +526,12 @@ async def _chat_with_tools(
         # Tool calls detected — emit tool execution events to frontend
         for tc in tool_calls:
             func = tc.get("function", {})
+            capture["tool_calls"].append({
+                "id": tc.get("id", ""),
+                "name": func.get("name", ""),
+                "arguments": func.get("arguments", "{}"),
+                "status": "executing",
+            })
             tool_event = {
                 "tool_call": {
                     "id": tc.get("id", ""),
@@ -393,6 +555,12 @@ async def _chat_with_tools(
                 result_data = json.loads(tr["content"])
             except json.JSONDecodeError:
                 result_data = {"message": tr["content"]}
+
+            capture["tool_results"].append({
+                "tool_call_id": tr["tool_call_id"],
+                "result": result_data,
+                "status": "error" if result_data.get("error") else "completed",
+            })
 
             tool_result_event = {
                 "tool_result": {
@@ -427,9 +595,112 @@ async def _chat_with_tools(
         yield "data: [DONE]\n\n"
 
 
+async def _stream_and_capture(source: AsyncIterator[str], capture: dict) -> AsyncIterator[str]:
+    async for chunk in source:
+        if chunk.startswith("data: "):
+            payload = chunk[6:].strip()
+            if payload and payload != "[DONE]":
+                try:
+                    parsed = json.loads(payload)
+                    content = parsed.get("choices", [{}])[0].get("delta", {}).get("content")
+                    if content:
+                        capture["content"] = capture.get("content", "") + content
+                except Exception:
+                    pass
+        yield chunk
+
+
+async def _persist_chat_turn(
+    db: AsyncSession,
+    session: ChatSession | None,
+    user_message: MessageIn | None,
+    assistant_content: str,
+    parent_message_id: str | None,
+    tool_calls: list | None = None,
+    tool_results: list | None = None,
+    meta: dict | None = None,
+) -> tuple[ChatSession | None, ChatMessage | None, ChatMessage | None]:
+    if not session or not user_message:
+        return session, None, None
+
+    user_db_message = await _create_chat_message(
+        db,
+        session=session,
+        role="user",
+        content=user_message.content,
+        parent_message_id=parent_message_id,
+        meta={"source": "chat_completions"},
+    )
+    assistant_db_message = await _create_chat_message(
+        db,
+        session=session,
+        role="assistant",
+        content=assistant_content or "",
+        parent_message_id=user_db_message.id,
+        tool_calls=tool_calls,
+        tool_results=tool_results,
+        meta=meta or {},
+    )
+    await db.commit()
+    await db.refresh(session)
+    return session, user_db_message, assistant_db_message
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@router.get("/sessions")
+async def list_chat_sessions(
+    project_id: Optional[str] = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(ChatSession).where(
+        ChatSession.user_id == current_user.id,
+        ChatSession.deleted_at.is_(None),
+    )
+    if project_id:
+        stmt = stmt.where(ChatSession.project_id == project_id)
+    stmt = stmt.order_by(ChatSession.updated_at.desc()).limit(limit)
+    sessions = (await db.scalars(stmt)).all()
+    return {"sessions": [_session_to_out(s).model_dump() for s in sessions]}
+
+
+@router.get("/sessions/{session_id}", response_model=ChatSessionDetailOut)
+async def get_chat_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = await _get_chat_session_or_404(db, current_user.id, session_id)
+    stmt = select(ChatMessage).where(
+        ChatMessage.session_id == session.id,
+        ChatMessage.deleted_at.is_(None),
+    ).order_by(ChatMessage.position.asc(), ChatMessage.created_at.asc())
+    messages = (await db.scalars(stmt)).all()
+    return ChatSessionDetailOut(
+        session=_session_to_out(session),
+        messages=[_message_to_out(m) for m in messages],
+    )
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_chat_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = await _get_chat_session_or_404(db, current_user.id, session_id)
+    now = datetime.utcnow()
+    session.deleted_at = now
+    stmt = select(ChatMessage).where(ChatMessage.session_id == session.id, ChatMessage.deleted_at.is_(None))
+    for message in (await db.scalars(stmt)).all():
+        message.deleted_at = now
+    await db.commit()
+    return None
+
 
 @router.post("/completions")
 async def chat_completions(
@@ -440,51 +711,64 @@ async def chat_completions(
 ):
     """
     Chat completion endpoint. Supports streaming (SSE) and non-streaming.
-    Optionally injects recording/document context.
-    Supports AI tool/function calling when tools are registered.
+    Persists chat sessions and messages when user turns are submitted.
     """
-    # Convert messages
-    messages = [m.model_dump(exclude_none=True) for m in body.messages]
+    if not body.messages:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one message is required")
 
-    # Resolve project_id from context
-    project_id = body.context.project_id if body.context else None
+    session = await _ensure_session(db, current_user.id, body)
 
-    # Inject context if provided
+    raw_messages = [m.model_dump(exclude_none=True) for m in body.messages]
+    latest_user_message = next((m for m in reversed(body.messages) if m.role == "user"), None)
+
+    messages = list(raw_messages)
+    project_id = body.context.project_id if body.context else (session.project_id if session else None)
+
     if body.context:
         if body.context.recording_id:
-            messages = await _inject_recording_context(
-                db, body.context.recording_id, messages
-            )
+            messages = await _inject_recording_context(db, body.context.recording_id, messages)
         if body.context.document_id:
-            messages = await _inject_document_context(
-                db, body.context.document_id, messages
-            )
+            messages = await _inject_document_context(db, body.context.document_id, messages)
 
-    # Inject tool system prompt
     tool_system_prompt = _build_system_prompt_with_tools()
     if tool_system_prompt:
         messages = [{"role": "system", "content": tool_system_prompt}] + messages
 
     base_url_override = None
-
-    # Check if tools are available — use tool-calling flow
     has_tools = len(tool_registry.all_tools()) > 0
 
     if body.stream and has_tools:
-        # Tool-calling flow: may do multiple rounds before streaming final response
-        return StreamingResponse(
-            _chat_with_tools(
+        capture = {"content": "", "tool_calls": [], "tool_results": []}
+
+        async def event_stream():
+            async for chunk in _chat_with_tools(
                 messages=messages,
                 model=body.model,
                 base_url_override=base_url_override,
                 user_id=current_user.id,
                 project_id=project_id,
-            ),
+                capture=capture,
+            ):
+                yield chunk
+            await _persist_chat_turn(
+                db=db,
+                session=session,
+                user_message=latest_user_message,
+                assistant_content=capture.get("content", ""),
+                parent_message_id=body.parent_message_id or (session.latest_message_id if session else None),
+                tool_calls=capture.get("tool_calls"),
+                tool_results=capture.get("tool_results"),
+                meta={"model": body.model, "stream": True, "has_tools": True},
+            )
+
+        return StreamingResponse(
+            event_stream(),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
+                **({"X-Chat-Session-Id": session.id} if session else {}),
             },
         )
 
@@ -505,25 +789,54 @@ async def chat_completions(
         )
 
     if body.stream:
-        # result is an AsyncIterator[str]
+        capture = {"content": ""}
+
+        async def event_stream():
+            async for chunk in _stream_and_capture(result, capture):  # type: ignore[arg-type]
+                yield chunk
+            await _persist_chat_turn(
+                db=db,
+                session=session,
+                user_message=latest_user_message,
+                assistant_content=capture.get("content", ""),
+                parent_message_id=body.parent_message_id or (session.latest_message_id if session else None),
+                meta={"model": body.model, "stream": True, "has_tools": False},
+            )
+
         return StreamingResponse(
-            result,  # type: ignore[arg-type]
+            event_stream(),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
+                **({"X-Chat-Session-Id": session.id} if session else {}),
             },
         )
-    else:
-        # result is an httpx.Response
-        resp = result  # type: ignore[assignment]
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=resp.status_code,
-                detail=resp.text,
-            )
-        return resp.json()
+
+    resp = result  # type: ignore[assignment]
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=resp.text,
+        )
+    payload = resp.json()
+    assistant_content = llm_service.extract_text_from_response(payload)
+    session, user_db_message, assistant_db_message = await _persist_chat_turn(
+        db=db,
+        session=session,
+        user_message=latest_user_message,
+        assistant_content=assistant_content or "",
+        parent_message_id=body.parent_message_id or (session.latest_message_id if session else None),
+        meta={"model": body.model, "stream": False, "has_tools": False},
+    )
+    payload.setdefault("stept", {})
+    payload["stept"].update({
+        "session_id": session.id if session else None,
+        "user_message_id": user_db_message.id if user_db_message else None,
+        "assistant_message_id": assistant_db_message.id if assistant_db_message else None,
+    })
+    return payload
 
 
 @router.get("/models")

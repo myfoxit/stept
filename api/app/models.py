@@ -273,6 +273,50 @@ class Session(Base):
 
     user = relationship("User", backref="sessions")
 
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    user_id = Column(String(16), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(String(16), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True)
+    title = Column(String(255), nullable=True)
+    recording_id = Column(String(16), ForeignKey("process_recording_sessions.id", ondelete="SET NULL"), nullable=True, index=True)
+    document_id = Column(String(16), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True)
+    latest_message_id = Column(String(16), nullable=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+
+    user = relationship("User", backref="chat_sessions")
+    project = relationship("Project", backref="chat_sessions")
+    recording = relationship("ProcessRecordingSession", foreign_keys=[recording_id])
+    document = relationship("Document", foreign_keys=[document_id])
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    session_id = Column(String(16), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_message_id = Column(String(16), ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True, index=True)
+    role = Column(String(20), nullable=False, index=True)
+    content = Column(Text, nullable=False, default="")
+    tool_calls = Column(JSON, nullable=True)
+    tool_results = Column(JSON, nullable=True)
+    meta = Column(JSON, nullable=True)
+    position = Column(Integer, nullable=False, default=0)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    session = relationship("ChatSession", backref=backref("messages", cascade="all, delete-orphan", order_by="ChatMessage.created_at"))
+    parent = relationship("ChatMessage", remote_side=[id], backref=backref("children"))
+
+    __table_args__ = (
+        Index('ix_chat_messages_session_position', 'session_id', 'position'),
+    )
+
 # Updated: Process Recording Models
 class ProcessRecordingSession(Base):
     __tablename__ = "process_recording_sessions"
