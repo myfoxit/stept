@@ -1,7 +1,7 @@
 /**
  * React context for Chat state management.
  * Provides messages, loading state, context awareness, panel visibility,
- * tool call/result tracking, and persisted session history.
+ * tool call/result tracking, persisted session history, and session switching.
  */
 
 import * as React from 'react';
@@ -10,13 +10,15 @@ import type {
   ChatContext as ChatContextPayload,
   ToolCallEvent,
   ToolResultEvent,
+  ChatSession,
 } from '@/api/chat';
-import { streamChatCompletion, fetchChatSession, deleteChatSession } from '@/api/chat';
+import { streamChatCompletion, fetchChatSession, fetchChatSessions } from '@/api/chat';
 import { useProject } from '@/providers/project-provider';
 import { useAuth } from '@/providers/auth-provider';
 
 interface ChatState {
   messages: ChatMessage[];
+  sessions: ChatSession[];
   isLoading: boolean;
   isOpen: boolean;
   context: ChatContextPayload | null;
@@ -31,6 +33,8 @@ interface ChatActions {
   closePanel: () => void;
   setContext: (ctx: ChatContextPayload | null) => void;
   clearMessages: () => void;
+  selectSession: (id: string) => Promise<void>;
+  refreshSessions: () => Promise<void>;
 }
 
 type ChatContextValue = ChatState & ChatActions;
@@ -43,14 +47,14 @@ export function useChat(): ChatContextValue {
   return ctx;
 }
 
-function storageKey(userId?: string, projectId?: string | null, context?: ChatContextPayload | null): string | null {
+function storageKey(userId?: string, projectId?: string | null): string | null {
   if (!userId) return null;
-  const scope = [projectId || 'none', context?.recording_id || 'none', context?.document_id || 'none'].join(':');
-  return `stept_chat_session_${userId}_${scope}`;
+  return `stept_chat_session_${userId}_${projectId || 'global'}`;
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = React.useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [context, setContext] = React.useState<ChatContextPayload | null>(null);
@@ -66,29 +70,46 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return { ...context, project_id: pid };
   }, [context, selectedProjectId]);
 
-  const storageKeyValue = React.useMemo(
-    () => storageKey(user?.id, selectedProjectId, context),
-    [user?.id, selectedProjectId, context],
-  );
+  const storageKeyValue = React.useMemo(() => storageKey(user?.id, selectedProjectId), [user?.id, selectedProjectId]);
+
+  const selectSession = React.useCallback(async (id: string) => {
+    const detail = await fetchChatSession(id);
+    setSessionId(detail.session.id);
+    setMessages(detail.messages.filter((m) => m.role !== 'system'));
+    if (storageKeyValue) localStorage.setItem(storageKeyValue, detail.session.id);
+  }, [storageKeyValue]);
+
+  const refreshSessions = React.useCallback(async () => {
+    const list = await fetchChatSessions(selectedProjectId || undefined);
+    setSessions(list);
+    return;
+  }, [selectedProjectId]);
 
   React.useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!storageKeyValue) return;
-      const stored = localStorage.getItem(storageKeyValue);
-      if (!stored) {
-        setSessionId(null);
-        setMessages([]);
-        return;
-      }
+      if (!user?.id) return;
       try {
-        const session = await fetchChatSession(stored);
+        const list = await fetchChatSessions(selectedProjectId || undefined);
         if (cancelled) return;
-        setSessionId(session.session.id);
-        setMessages(session.messages.filter((m) => m.role !== 'system'));
+        setSessions(list);
+
+        const stored = storageKeyValue ? localStorage.getItem(storageKeyValue) : null;
+        const target = stored && list.some((s) => s.id === stored) ? stored : list[0]?.id || null;
+
+        if (!target) {
+          setSessionId(null);
+          setMessages([]);
+          return;
+        }
+        const detail = await fetchChatSession(target);
+        if (cancelled) return;
+        setSessionId(detail.session.id);
+        setMessages(detail.messages.filter((m) => m.role !== 'system'));
+        if (storageKeyValue) localStorage.setItem(storageKeyValue, detail.session.id);
       } catch {
         if (!cancelled) {
-          localStorage.removeItem(storageKeyValue);
+          setSessions([]);
           setSessionId(null);
           setMessages([]);
         }
@@ -98,7 +119,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [storageKeyValue]);
+  }, [user?.id, selectedProjectId, storageKeyValue]);
 
   const sendMessage = React.useCallback(
     (content: string) => {
@@ -106,7 +127,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       const userMessage: ChatMessage = { role: 'user', content };
       const assistantMessage: ChatMessage = { role: 'assistant', content: '', tool_calls: [], tool_results: [] };
-
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setIsLoading(true);
       setError(null);
@@ -115,11 +135,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const allMessages: ChatMessage[] = [...messages, userMessage].map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
+      const allMessages: ChatMessage[] = [...messages, userMessage].map((m) => ({ role: m.role, content: m.content }));
       const lastRealMessage = [...messages].reverse().find((m) => m.id);
 
       streamChatCompletion(
@@ -145,9 +161,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           const sid = sessionId || (storageKeyValue ? localStorage.getItem(storageKeyValue) : null);
           if (sid) {
             try {
-              const session = await fetchChatSession(sid);
-              setSessionId(session.session.id);
-              setMessages(session.messages.filter((m) => m.role !== 'system'));
+              const detail = await fetchChatSession(sid);
+              setSessionId(detail.session.id);
+              setMessages(detail.messages.filter((m) => m.role !== 'system'));
+              const list = await fetchChatSessions(selectedProjectId || undefined);
+              setSessions(list);
             } catch {
               // Keep optimistic UI if refresh fails
             }
@@ -198,27 +216,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         },
       );
     },
-    [messages, isLoading, effectiveContext, sessionId, storageKeyValue],
+    [messages, isLoading, effectiveContext, sessionId, storageKeyValue, selectedProjectId],
   );
 
   const togglePanel = React.useCallback(() => setIsOpen((v) => !v), []);
   const openPanel = React.useCallback(() => setIsOpen(true), []);
   const closePanel = React.useCallback(() => setIsOpen(false), []);
   const clearMessages = React.useCallback(() => {
-    const sid = sessionId;
     abortRef.current?.abort();
     setMessages([]);
     setError(null);
     setSessionId(null);
     if (storageKeyValue) localStorage.removeItem(storageKeyValue);
-    if (sid) {
-      deleteChatSession(sid).catch(() => undefined);
-    }
-  }, [sessionId, storageKeyValue]);
+  }, [storageKeyValue]);
 
   const value = React.useMemo<ChatContextValue>(
     () => ({
       messages,
+      sessions,
       isLoading,
       isOpen,
       context,
@@ -230,8 +245,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       closePanel,
       setContext,
       clearMessages,
+      selectSession,
+      refreshSessions,
     }),
-    [messages, isLoading, isOpen, context, error, sessionId, sendMessage, togglePanel, openPanel, closePanel, clearMessages],
+    [messages, sessions, isLoading, isOpen, context, error, sessionId, sendMessage, togglePanel, openPanel, closePanel, clearMessages, selectSession, refreshSessions],
   );
 
   return <ChatCtx.Provider value={value}>{children}</ChatCtx.Provider>;
