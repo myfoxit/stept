@@ -215,11 +215,16 @@ export async function fetchChatSessions(projectId?: string): Promise<ChatSession
   return data.sessions;
 }
 
-export async function fetchChatSession(sessionId: string): Promise<ChatSessionDetail> {
-  const { data } = await apiClient.get<ChatSessionDetail>(`/chat/sessions/${sessionId}`);
+export async function fetchChatSession(sessionId: string, leafMessageId?: string): Promise<ChatSessionDetail> {
+  const query = leafMessageId ? `?leaf_message_id=${encodeURIComponent(leafMessageId)}` : '';
+  const { data } = await apiClient.get<ChatSessionDetail>(`/chat/sessions/${sessionId}${query}`);
   return data;
 }
 
 export async function deleteChatSession(sessionId: string): Promise<void> {
   await apiClient.delete(`/chat/sessions/${sessionId}`);
+}
+
+export async function deleteChatMessage(sessionId: string, messageId: string): Promise<void> {
+  await apiClient.delete(`/chat/sessions/${sessionId}/messages/${messageId}`);
 }

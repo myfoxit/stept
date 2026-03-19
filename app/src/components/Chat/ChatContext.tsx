@@ -1,7 +1,5 @@
 /**
  * React context for Chat state management.
- * Provides messages, loading state, context awareness, panel visibility,
- * tool call/result tracking, persisted session history, and session switching.
  */
 
 import * as React from 'react';
@@ -12,9 +10,14 @@ import type {
   ToolResultEvent,
   ChatSession,
 } from '@/api/chat';
-import { streamChatCompletion, fetchChatSession, fetchChatSessions } from '@/api/chat';
+import { streamChatCompletion, fetchChatSession, fetchChatSessions, deleteChatMessage } from '@/api/chat';
 import { useProject } from '@/providers/project-provider';
 import { useAuth } from '@/providers/auth-provider';
+
+interface SendOptions {
+  parentMessageId?: string;
+  messagesOverride?: ChatMessage[];
+}
 
 interface ChatState {
   messages: ChatMessage[];
@@ -27,7 +30,9 @@ interface ChatState {
 }
 
 interface ChatActions {
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, options?: SendOptions) => void;
+  regenerateFromMessage: (messageId: string) => void;
+  deleteMessage: (messageId: string) => Promise<void>;
   togglePanel: () => void;
   openPanel: () => void;
   closePanel: () => void;
@@ -40,7 +45,6 @@ interface ChatActions {
 type ChatContextValue = ChatState & ChatActions;
 
 const ChatCtx = React.createContext<ChatContextValue | null>(null);
-
 export function useChat(): ChatContextValue {
   const ctx = React.useContext(ChatCtx);
   if (!ctx) throw new Error('useChat must be used within a ChatProvider');
@@ -82,7 +86,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const refreshSessions = React.useCallback(async () => {
     const list = await fetchChatSessions(selectedProjectId || undefined);
     setSessions(list);
-    return;
   }, [selectedProjectId]);
 
   React.useEffect(() => {
@@ -93,10 +96,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const list = await fetchChatSessions(selectedProjectId || undefined);
         if (cancelled) return;
         setSessions(list);
-
         const stored = storageKeyValue ? localStorage.getItem(storageKeyValue) : null;
         const target = stored && list.some((s) => s.id === stored) ? stored : list[0]?.id || null;
-
         if (!target) {
           setSessionId(null);
           setMessages([]);
@@ -116,108 +117,125 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }
     }
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [user?.id, selectedProjectId, storageKeyValue]);
 
-  const sendMessage = React.useCallback(
-    (content: string) => {
-      if (!content.trim() || isLoading) return;
+  const sendMessage = React.useCallback((content: string, options?: SendOptions) => {
+    if (!content.trim() || isLoading) return;
 
-      const userMessage: ChatMessage = { role: 'user', content };
-      const assistantMessage: ChatMessage = { role: 'assistant', content: '', tool_calls: [], tool_results: [] };
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
-      setIsLoading(true);
-      setError(null);
+    const userMessage: ChatMessage = { role: 'user', content };
+    const assistantMessage: ChatMessage = { role: 'assistant', content: '', tool_calls: [], tool_results: [] };
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    setIsLoading(true);
+    setError(null);
 
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-      const allMessages: ChatMessage[] = [...messages, userMessage].map((m) => ({ role: m.role, content: m.content }));
-      const lastRealMessage = [...messages].reverse().find((m) => m.id);
+    const sourceMessages = options?.messagesOverride || messages;
+    const allMessages: ChatMessage[] = [...sourceMessages, userMessage].map((m) => ({ role: m.role, content: m.content }));
+    const lastRealMessage = [...sourceMessages].reverse().find((m) => m.id);
 
-      streamChatCompletion(
-        {
-          messages: allMessages,
-          stream: true,
-          context: effectiveContext,
-          session_id: sessionId || undefined,
-          parent_message_id: lastRealMessage?.id,
-        },
-        (text: string) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.role === 'assistant') {
-              updated[updated.length - 1] = { ...last, content: last.content + text };
-            }
-            return updated;
-          });
-        },
-        async () => {
-          setIsLoading(false);
-          const sid = sessionId || (storageKeyValue ? localStorage.getItem(storageKeyValue) : null);
-          if (sid) {
-            try {
-              const detail = await fetchChatSession(sid);
-              setSessionId(detail.session.id);
-              setMessages(detail.messages.filter((m) => m.role !== 'system'));
-              const list = await fetchChatSessions(selectedProjectId || undefined);
-              setSessions(list);
-            } catch {
-              // Keep optimistic UI if refresh fails
-            }
+    streamChatCompletion(
+      {
+        messages: allMessages,
+        stream: true,
+        context: effectiveContext,
+        session_id: sessionId || undefined,
+        parent_message_id: options?.parentMessageId || lastRealMessage?.id,
+      },
+      (text: string) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === 'assistant') {
+            updated[updated.length - 1] = { ...last, content: last.content + text };
           }
-        },
-        (err: Error) => {
-          setIsLoading(false);
-          setError(err.message);
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role === 'assistant' && !last.content && !last.tool_calls?.length && !last.tool_results?.length) {
-              return prev.slice(0, -1);
-            }
-            return prev;
-          });
-        },
-        controller.signal,
-        (toolCall: ToolCallEvent) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.role === 'assistant') {
-              updated[updated.length - 1] = { ...last, tool_calls: [...(last.tool_calls || []), toolCall] };
-            }
-            return updated;
-          });
-        },
-        (toolResult: ToolResultEvent) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.role === 'assistant') {
-              const updatedCalls = (last.tool_calls || []).map((tc) =>
-                tc.id === toolResult.tool_call_id ? { ...tc, status: toolResult.status as ToolCallEvent['status'] } : tc,
-              );
-              updated[updated.length - 1] = {
-                ...last,
-                tool_calls: updatedCalls,
-                tool_results: [...(last.tool_results || []), toolResult],
-              };
-            }
-            return updated;
-          });
-        },
-        (sid: string) => {
-          setSessionId(sid);
-          if (storageKeyValue) localStorage.setItem(storageKeyValue, sid);
-        },
-      );
-    },
-    [messages, isLoading, effectiveContext, sessionId, storageKeyValue, selectedProjectId],
-  );
+          return updated;
+        });
+      },
+      async () => {
+        setIsLoading(false);
+        const sid = sessionId || (storageKeyValue ? localStorage.getItem(storageKeyValue) : null);
+        if (sid) {
+          try {
+            const detail = await fetchChatSession(sid);
+            setSessionId(detail.session.id);
+            setMessages(detail.messages.filter((m) => m.role !== 'system'));
+            await refreshSessions();
+          } catch {}
+        }
+      },
+      (err: Error) => {
+        setIsLoading(false);
+        setError(err.message);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant' && !last.content && !last.tool_calls?.length && !last.tool_results?.length) {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
+      },
+      controller.signal,
+      (toolCall: ToolCallEvent) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === 'assistant') {
+            updated[updated.length - 1] = { ...last, tool_calls: [...(last.tool_calls || []), toolCall] };
+          }
+          return updated;
+        });
+      },
+      (toolResult: ToolResultEvent) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === 'assistant') {
+            const updatedCalls = (last.tool_calls || []).map((tc) =>
+              tc.id === toolResult.tool_call_id ? { ...tc, status: toolResult.status as ToolCallEvent['status'] } : tc,
+            );
+            updated[updated.length - 1] = {
+              ...last,
+              tool_calls: updatedCalls,
+              tool_results: [...(last.tool_results || []), toolResult],
+            };
+          }
+          return updated;
+        });
+      },
+      (sid: string) => {
+        setSessionId(sid);
+        if (storageKeyValue) localStorage.setItem(storageKeyValue, sid);
+      },
+    );
+  }, [messages, isLoading, effectiveContext, sessionId, storageKeyValue, refreshSessions]);
+
+  const regenerateFromMessage = React.useCallback((messageId: string) => {
+    const assistantIndex = messages.findIndex((m) => m.id === messageId);
+    if (assistantIndex < 0) return;
+    const assistant = messages[assistantIndex];
+    if (assistant.role !== 'assistant') return;
+    const userIndex = assistantIndex - 1;
+    const userMessage = messages[userIndex];
+    if (!userMessage || userMessage.role !== 'user') return;
+    const baseMessages = messages.slice(0, userIndex);
+    setMessages(baseMessages);
+    sendMessage(userMessage.content, {
+      parentMessageId: userMessage.parent_message_id || undefined,
+      messagesOverride: baseMessages,
+    });
+  }, [messages, sendMessage]);
+
+  const deleteMessage = React.useCallback(async (messageId: string) => {
+    if (!sessionId) return;
+    await deleteChatMessage(sessionId, messageId);
+    const detail = await fetchChatSession(sessionId);
+    setMessages(detail.messages.filter((m) => m.role !== 'system'));
+    await refreshSessions();
+  }, [sessionId, refreshSessions]);
 
   const togglePanel = React.useCallback(() => setIsOpen((v) => !v), []);
   const openPanel = React.useCallback(() => setIsOpen(true), []);
@@ -230,26 +248,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (storageKeyValue) localStorage.removeItem(storageKeyValue);
   }, [storageKeyValue]);
 
-  const value = React.useMemo<ChatContextValue>(
-    () => ({
-      messages,
-      sessions,
-      isLoading,
-      isOpen,
-      context,
-      error,
-      sessionId,
-      sendMessage,
-      togglePanel,
-      openPanel,
-      closePanel,
-      setContext,
-      clearMessages,
-      selectSession,
-      refreshSessions,
-    }),
-    [messages, sessions, isLoading, isOpen, context, error, sessionId, sendMessage, togglePanel, openPanel, closePanel, clearMessages, selectSession, refreshSessions],
-  );
+  const value = React.useMemo<ChatContextValue>(() => ({
+    messages,
+    sessions,
+    isLoading,
+    isOpen,
+    context,
+    error,
+    sessionId,
+    sendMessage,
+    regenerateFromMessage,
+    deleteMessage,
+    togglePanel,
+    openPanel,
+    closePanel,
+    setContext,
+    clearMessages,
+    selectSession,
+    refreshSessions,
+  }), [messages, sessions, isLoading, isOpen, context, error, sessionId, sendMessage, regenerateFromMessage, deleteMessage, togglePanel, openPanel, closePanel, clearMessages, selectSession, refreshSessions]);
 
   return <ChatCtx.Provider value={value}>{children}</ChatCtx.Provider>;
 }

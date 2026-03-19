@@ -35,6 +35,8 @@ export function ChatPanel() {
     sessionId,
     selectSession,
     refreshSessions,
+    regenerateFromMessage,
+    deleteMessage,
   } = useChat();
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -193,7 +195,12 @@ export function ChatPanel() {
                   </div>
                 )}
                 {messages.filter((m) => m.role !== 'system').map((msg, i) => (
-                  <ChatMessage key={msg.id || i} message={msg} />
+                  <ChatMessage
+                    key={msg.id || i}
+                    message={msg}
+                    onRetry={msg.role === 'assistant' ? regenerateFromMessage : undefined}
+                    onDelete={msg.id ? (id) => void deleteMessage(id) : undefined}
+                  />
                 ))}
               </div>
             </div>

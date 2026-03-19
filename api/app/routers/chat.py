@@ -610,6 +610,51 @@ async def _stream_and_capture(source: AsyncIterator[str], capture: dict) -> Asyn
         yield chunk
 
 
+
+async def _branch_message_ids(db: AsyncSession, session: ChatSession, leaf_id: str | None = None) -> list[str]:
+    if not leaf_id:
+        leaf_id = session.latest_message_id
+    if not leaf_id:
+        return []
+    stmt = select(ChatMessage).where(ChatMessage.session_id == session.id)
+    all_messages = {m.id: m for m in (await db.scalars(stmt)).all()}
+    ordered: list[str] = []
+    current_id = leaf_id
+    seen: set[str] = set()
+    while current_id and current_id not in seen:
+        seen.add(current_id)
+        msg = all_messages.get(current_id)
+        if not msg or msg.deleted_at is not None:
+            break
+        ordered.append(msg.id)
+        current_id = msg.parent_message_id
+    ordered.reverse()
+    return ordered
+
+
+async def _active_branch_messages(db: AsyncSession, session: ChatSession, leaf_id: str | None = None) -> list[ChatMessage]:
+    ids = await _branch_message_ids(db, session, leaf_id)
+    if not ids:
+        return []
+    stmt = select(ChatMessage).where(ChatMessage.id.in_(ids)).order_by(ChatMessage.position.asc(), ChatMessage.created_at.asc())
+    return list((await db.scalars(stmt)).all())
+
+
+async def _collect_descendant_ids(db: AsyncSession, session_id: str, root_id: str) -> list[str]:
+    stmt = select(ChatMessage).where(ChatMessage.session_id == session_id)
+    messages = (await db.scalars(stmt)).all()
+    children: dict[str, list[str]] = {}
+    for msg in messages:
+        if msg.parent_message_id:
+            children.setdefault(msg.parent_message_id, []).append(msg.id)
+    ids = []
+    stack = [root_id]
+    while stack:
+        cur = stack.pop()
+        ids.append(cur)
+        stack.extend(children.get(cur, []))
+    return ids
+
 async def _persist_chat_turn(
     db: AsyncSession,
     session: ChatSession | None,
@@ -671,15 +716,12 @@ async def list_chat_sessions(
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetailOut)
 async def get_chat_session(
     session_id: str,
+    leaf_message_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     session = await _get_chat_session_or_404(db, current_user.id, session_id)
-    stmt = select(ChatMessage).where(
-        ChatMessage.session_id == session.id,
-        ChatMessage.deleted_at.is_(None),
-    ).order_by(ChatMessage.position.asc(), ChatMessage.created_at.asc())
-    messages = (await db.scalars(stmt)).all()
+    messages = await _active_branch_messages(db, session, leaf_message_id)
     return ChatSessionDetailOut(
         session=_session_to_out(session),
         messages=[_message_to_out(m) for m in messages],
@@ -698,6 +740,35 @@ async def delete_chat_session(
     stmt = select(ChatMessage).where(ChatMessage.session_id == session.id, ChatMessage.deleted_at.is_(None))
     for message in (await db.scalars(stmt)).all():
         message.deleted_at = now
+    await db.commit()
+    return None
+
+
+@router.delete("/sessions/{session_id}/messages/{message_id}", status_code=204)
+async def delete_chat_message(
+    session_id: str,
+    message_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = await _get_chat_session_or_404(db, current_user.id, session_id)
+    message = await db.scalar(select(ChatMessage).where(ChatMessage.id == message_id, ChatMessage.session_id == session.id))
+    if not message or message.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Chat message not found")
+    ids = await _collect_descendant_ids(db, session.id, message.id)
+    now = datetime.utcnow()
+    stmt = select(ChatMessage).where(ChatMessage.id.in_(ids))
+    for msg in (await db.scalars(stmt)).all():
+        msg.deleted_at = now
+    # move latest pointer to nearest undeleted ancestor
+    latest = message.parent_message_id
+    while latest:
+        candidate = await db.scalar(select(ChatMessage).where(ChatMessage.id == latest, ChatMessage.session_id == session.id))
+        if not candidate or candidate.deleted_at is not None:
+            latest = candidate.parent_message_id if candidate else None
+            continue
+        break
+    session.latest_message_id = latest
     await db.commit()
     return None
 
