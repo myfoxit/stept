@@ -57,30 +57,6 @@ export default function SetupPanel({
   return (
     <div id="spSetupPanel" className="sp-auth-panel">
       <div className="sp-setup-content">
-        {/* Header project selector is rendered in Header, but we also need
-            the selector visible in setup. The original HTML had the select
-            in both the header-center AND used spProjectSelector id.
-            We replicate the same structure. */}
-        <div className="header-center" id="headerProjectSelector">
-          <select
-            id="spProjectSelector"
-            className="header-select"
-            value={selectedProjectId}
-            onChange={handleProjectChange}
-          >
-            <option value="">Select project</option>
-            {userProjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <p id="spGreeting" className="sp-greeting">
-          Hello, {displayName}
-        </p>
-
         <button
           id="spStartBtn"
           className="btn btn-cta"
@@ -102,6 +78,26 @@ export default function SetupPanel({
           </svg>
           Start Capture
         </button>
+
+        <div className="header-center" id="headerProjectSelector">
+          <select
+            id="spProjectSelector"
+            className="header-select"
+            value={selectedProjectId}
+            onChange={handleProjectChange}
+          >
+            <option value="">Select project</option>
+            {userProjects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <p id="spGreeting" className="sp-greeting">
+          Hello, {displayName}
+        </p>
 
         <SearchBar selectedProjectId={selectedProjectId} />
 

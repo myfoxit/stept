@@ -214,7 +214,7 @@ body, #root {
 .sp-setup-content {
   display: flex;
   flex-direction: column;
-  padding: 16px 16px 16px;
+  padding: 16px;
   gap: 12px;
   flex: 1;
   overflow-y: auto;
