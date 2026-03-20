@@ -14,7 +14,13 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.tsx?$/,
-          use: 'ts-loader',
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: path.resolve(__dirname, 'tsconfig.json'),
+              transpileOnly: true,
+            },
+          },
           exclude: /node_modules/,
         },
         {
@@ -26,10 +32,7 @@ module.exports = (env, argv) => {
               loader: 'postcss-loader',
               options: {
                 postcssOptions: {
-                  plugins: [
-                    require('tailwindcss'),
-                    require('autoprefixer'),
-                  ],
+                  config: path.resolve(__dirname, 'postcss.config.js'),
                 },
               },
             },
@@ -43,10 +46,14 @@ module.exports = (env, argv) => {
     },
     resolve: {
       extensions: ['.tsx', '.ts', '.js'],
+      modules: [path.resolve(__dirname, 'node_modules'), 'node_modules'],
       alias: {
         '@': path.resolve(__dirname, 'src'),
         '@renderer': path.resolve(__dirname, 'src/renderer'),
         '@main': path.resolve(__dirname, 'src/main'),
+        'react': path.resolve(__dirname, 'node_modules/react'),
+        'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+        '@types/react': path.resolve(__dirname, 'node_modules/@types/react'),
       },
     },
     output: {

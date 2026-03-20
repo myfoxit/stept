@@ -1,6 +1,7 @@
 name: E2E Desktop Tests
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, develop]
   pull_request:
@@ -14,7 +15,8 @@ jobs:
         os: [macos-latest, windows-latest]
         # No Linux — Electron desktop recording needs a GUI session
 
-    runs-on: ${{ matrix.os }}
+    runs-on:
+  workflow_dispatch: ${{ matrix.os }}
     timeout-minutes: 30
 
     steps:
@@ -24,7 +26,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version:
+  workflow_dispatch: 20
 
       - name: Install dependencies
         working-directory: desktop
