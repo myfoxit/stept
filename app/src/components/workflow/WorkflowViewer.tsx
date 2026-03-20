@@ -78,6 +78,29 @@ function ExpandedView({ workflow, token, compact }: { workflow: PublicWorkflow; 
         visibleIndex++;
         const hasImage = String(step.step_number) in workflow.files;
 
+        // Compact display for navigate, type, typing, and key actions
+        const actionType = (step.step_type || '').toLowerCase();
+        const isCompactStep = ['navigate', 'type', 'typing', 'key'].includes(actionType);
+
+        if (isCompactStep) {
+          return (
+            <div key={step.step_number} className="flex items-center gap-3 px-4 py-3 bg-muted/50 rounded-lg border">
+              <div className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                {visibleIndex}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{step.description || step.window_title || `Step ${visibleIndex}`}</p>
+                {step.text_typed && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Text: <code className="bg-muted px-1 rounded">{step.text_typed}</code></p>
+                )}
+                {step.key_pressed && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Key: <code className="bg-muted px-1 rounded">{step.key_pressed}</code></p>
+                )}
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div key={step.step_number} className="bg-card rounded-xl border shadow-sm overflow-hidden">
             <div className="flex items-center gap-3 p-4 border-b">
