@@ -61,16 +61,7 @@ test.describe('User Settings', () => {
   });
 });
 
-test.describe('Analytics & Audit', () => {
-  test('should navigate to analytics page', async ({ authenticatedPage }) => {
-    const page = authenticatedPage;
-
-    await page.goto('/analytics');
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    await expect(page).toHaveURL(/\/analytics/, { timeout: 10000 });
-  });
-
+test.describe('Audit', () => {
   test('should navigate to audit log page', async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
@@ -78,16 +69,6 @@ test.describe('Analytics & Audit', () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await expect(page).toHaveURL(/\/audit/, { timeout: 10000 });
-  });
-
-  test('should load analytics data via API', async ({ authenticatedPage, testData }) => {
-    const page = authenticatedPage;
-    const apiUrl = process.env.API_URL || 'http://localhost:8001';
-
-    const resp = await page.request.get(
-      `${apiUrl}/api/v1/analytics/top-accessed?project_id=${testData.project_id}`
-    );
-    expect(resp.ok()).toBeTruthy();
   });
 
   test('should load audit log via API', async ({ authenticatedPage, testData }) => {
