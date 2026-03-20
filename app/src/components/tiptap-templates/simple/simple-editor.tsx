@@ -2,9 +2,8 @@ import * as React from 'react';
 import { Textarea } from '@/components/ui/textarea';
 
 /**
- * Simplified editor for DataTable long text fields.
- * Uses a basic textarea instead of the full tiptap editor to avoid
- * pulling in the complete SnapRow tiptap dependency tree.
+ * Simplified editor for long text fields.
+ * Uses a basic textarea instead of the full tiptap editor.
  */
 export function SimpleEditor({
   initialContent,

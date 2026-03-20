@@ -148,6 +148,12 @@ class Settings(BaseSettings):
     SENDCLOAK_ENABLED: Annotated[bool, BeforeValidator(parse_bool_env)] = False
     SENDCLOAK_URL: str = "http://sendcloak:9090"
 
+    # ── Experimental Features ──────────────────────────────────
+    STEPT_ENABLE_VIDEO_IMPORT: Annotated[bool, BeforeValidator(parse_bool_env)] = False
+    STEPT_ENABLE_KNOWLEDGE_BASE: Annotated[bool, BeforeValidator(parse_bool_env)] = False
+    STEPT_ENABLE_AI_CHAT: Annotated[bool, BeforeValidator(parse_bool_env)] = False
+    STEPT_ENABLE_MCP: Annotated[bool, BeforeValidator(parse_bool_env)] = False
+
     # ── JWT (from legacy config) ────────────────────────────────
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"

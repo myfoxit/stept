@@ -2,17 +2,18 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useProject } from '@/providers/project-provider';
+import { useFeatures } from '@/hooks/use-features';
 
-const tabs: { label: string; path: string; external?: boolean }[] = [
+interface TabDef { label: string; path: string; external?: boolean; feature?: string }
+
+const allTabs: TabDef[] = [
   { label: 'General', path: 'settings' },
   { label: 'AI', path: 'settings/ai' },
   { label: 'Privacy', path: 'settings/privacy' },
   { label: 'Integrations', path: 'settings/integrations' },
   { label: 'SSO', path: 'settings/sso' },
-  { label: 'Verification', path: 'settings/verification' },
-  { label: 'Analytics', path: '/analytics' },
-  { label: 'Knowledge Base', path: '/knowledge' },
-  { label: 'Video \u2192 Guide', path: '/video-import' },
+  { label: 'Knowledge Base', path: '/knowledge', feature: 'knowledge_base' },
+  { label: 'Video \u2192 Guide', path: '/video-import', feature: 'video_import' },
   { label: 'Audit Log', path: '/audit' },
   { label: 'Documentation', path: 'https://docs.stept.ai', external: true },
 ];
@@ -20,6 +21,12 @@ const tabs: { label: string; path: string; external?: boolean }[] = [
 export function SettingsTabs() {
   const location = useLocation();
   const { selectedProjectId } = useProject();
+  const features = useFeatures();
+
+  const tabs = allTabs.filter((tab) => {
+    if (!tab.feature) return true;
+    return features[tab.feature as keyof typeof features];
+  });
 
   return (
     <div className="mb-6 flex gap-1 overflow-x-auto border-b">

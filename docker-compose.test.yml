@@ -7,8 +7,8 @@
 services:
   test-backend:
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
     volumes:
       - ./api:/app
     ports:

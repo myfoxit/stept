@@ -55,11 +55,6 @@ import { CommentPanel } from '@/components/Comments/CommentPanel';
 import { useAuth } from '@/providers/auth-provider';
 // Translation is only on public/embed views, not the editable view
 import { VersionHistoryPanel } from '@/components/VersionHistory/VersionHistoryPanel';
-import { WorkflowHealthBanner } from '@/components/workflow-health-banner';
-import { StepHealthBadge } from '@/components/step-health-badge';
-import { StepHealthDetail } from '@/components/step-health-detail';
-import { useWorkflowHealth } from '@/hooks/use-staleness';
-import type { StepHealth } from '@/hooks/use-staleness';
 
 
 export function WorkflowView() {
@@ -67,7 +62,6 @@ export function WorkflowView() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: workflow, isLoading, error } = useWorkflow(workflowId || '');
-  const { data: workflowHealth } = useWorkflowHealth(workflowId);
   const { setContext } = useChat();
   const { selectedProjectId, selectedProject } = useProject();
   const { user } = useAuth();
@@ -75,11 +69,6 @@ export function WorkflowView() {
   // Comments state
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [commentCount, setCommentCount] = React.useState(0);
-
-  // Step health detail panel state
-  const [stepDetailOpen, setStepDetailOpen] = React.useState(false);
-  const [selectedStepHealth, setSelectedStepHealth] = React.useState<StepHealth | null>(null);
-  const [selectedStepNumber, setSelectedStepNumber] = React.useState(0);
 
   // Translation preview state
   // Translation removed from editable view — only available on public/embed views
@@ -737,27 +726,7 @@ export function WorkflowView() {
           isEditMode={isEditMode}
           onAnnotationUpdate={handleAnnotationUpdate}
         />
-        {workflowHealth && (() => {
-          const sh = workflowHealth.steps.find(
-            (s) => s.step_number === backendStepNumber,
-          );
-          return sh ? (
-            <div className="flex justify-center">
-              <div
-                className={`w-full max-w-3xl px-4 -mt-3 ${sh.status === 'failed' ? 'cursor-pointer' : ''}`}
-                onClick={() => {
-                  if (sh.status === 'failed') {
-                    setSelectedStepHealth(sh);
-                    setSelectedStepNumber(backendStepNumber);
-                    setStepDetailOpen(true);
-                  }
-                }}
-              >
-                <StepHealthBadge stepHealth={sh} />
-              </div>
-            </div>
-          ) : null;
-        })()}
+
       </div>
     );
   };
@@ -820,10 +789,6 @@ export function WorkflowView() {
           </div>
           {selectedProjectId && workflowId && (
             <ContextLinkPanel projectId={selectedProjectId} resourceType="workflow" resourceId={workflowId} />
-          )}
-
-          {workflowHealth && (
-            <WorkflowHealthBanner health={workflowHealth} workflowId={workflowId} />
           )}
 
           {aiEnabled && (
@@ -924,12 +889,6 @@ export function WorkflowView() {
           />
         )}
 
-        <StepHealthDetail
-          open={stepDetailOpen}
-          onOpenChange={setStepDetailOpen}
-          stepHealth={selectedStepHealth}
-          stepNumber={selectedStepNumber}
-        />
       </div>
     </div>
   );

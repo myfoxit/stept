@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, chat, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, knowledge, analytics, upload, privacy, sso_admin, tts, enterprise_api, translation, transcription, video_import, staleness
+from app.routers import auth, text_container, user, project, document, process_recording, folder, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, upload, privacy, sso_admin, tts, enterprise_api, translation, features
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -30,24 +30,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass  # Not critical — user can re-authenticate
 
-    # Startup: launch verification scheduler + worker as background tasks
-    import asyncio
-    _bg_tasks = []
-    try:
-        from app.services.verification_scheduler import verification_scheduler_loop
-        from app.services.playwright_worker import verification_worker_loop
-        _bg_tasks.append(asyncio.create_task(verification_scheduler_loop()))
-        _bg_tasks.append(asyncio.create_task(verification_worker_loop()))
-    except Exception:
-        pass  # Playwright may not be installed — verification features disabled
-
     yield
-
-    # Shutdown: cancel background tasks
-    for task in _bg_tasks:
-        task.cancel()
-    if _bg_tasks:
-        await asyncio.gather(*_bg_tasks, return_exceptions=True)
 
 
 app = FastAPI(title="Stept", lifespan=lifespan)
@@ -135,7 +118,6 @@ api_router.include_router(text_container.router, prefix="/text_container", tags=
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(process_recording.router, prefix="/process-recording", tags=["process_recording"])
 api_router.include_router(folder.router, prefix="/folders", tags=["folders"])
-api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(inline_ai.router, prefix="/chat", tags=["chat"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(auth_providers.router, prefix="/auth/providers", tags=["auth_providers"])
@@ -145,21 +127,27 @@ api_router.include_router(comments.router, tags=["comments"])
 api_router.include_router(git_sync.router, tags=["git-sync"])
 api_router.include_router(mcp_keys.router, tags=["mcp"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
-api_router.include_router(knowledge.router, prefix="/knowledge", tags=["knowledge"])
-api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(features.router)
 api_router.include_router(upload.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(privacy.router, tags=["privacy"])
 api_router.include_router(sso_admin.router, tags=["sso-admin"])
 api_router.include_router(tts.router, prefix="/tts", tags=["tts"])
 api_router.include_router(enterprise_api.router, prefix="/enterprise", tags=["enterprise-api"])
 api_router.include_router(translation.router, tags=["translation"])
-api_router.include_router(transcription.router, prefix="/transcription", tags=["transcription"])
-api_router.include_router(video_import.router, prefix="/video-import", tags=["video-import"])
-api_router.include_router(staleness.router, tags=["staleness"])
 
-# Datatable feature (ported from SnapRow with security fixes)
-from app.routers.datatable import router as datatable_router
-api_router.include_router(datatable_router, prefix="/datatable", tags=["datatable"])
+# ── Conditional experimental routers ──────────────────────────
+if settings.STEPT_ENABLE_AI_CHAT:
+    from app.routers import chat
+    api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+
+if settings.STEPT_ENABLE_KNOWLEDGE_BASE:
+    from app.routers import knowledge
+    api_router.include_router(knowledge.router, prefix="/knowledge", tags=["knowledge"])
+
+if settings.STEPT_ENABLE_VIDEO_IMPORT:
+    from app.routers import video_import, transcription
+    api_router.include_router(video_import.router, prefix="/video-import", tags=["video-import"])
+    api_router.include_router(transcription.router, prefix="/transcription", tags=["transcription"])
 
 
 # Mount the versioned router on the main app
@@ -173,11 +161,12 @@ app.include_router(public_router, prefix="/api/v1/public", tags=["public"])
 app.include_router(health.router)
 
 # MCP (Model Context Protocol) server — mounted outside versioned API
-try:
-    from app.mcp_server import mcp as mcp_server
-    app.mount("/mcp", mcp_server.streamable_http_app())
-except ImportError:
-    pass  # mcp package not installed — MCP endpoints disabled
+if settings.STEPT_ENABLE_MCP:
+    try:
+        from app.mcp_server import mcp as mcp_server
+        app.mount("/mcp", mcp_server.streamable_http_app())
+    except ImportError:
+        pass  # mcp package not installed — MCP endpoints disabled
 
 # Test-only endpoints (seed/cleanup) — only in test/development environments
 if os.getenv("ENVIRONMENT") == "test":

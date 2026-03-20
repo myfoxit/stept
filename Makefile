@@ -44,6 +44,10 @@ test-backend: test-db
 		-e DATABASE_URL_TEST=$(DATABASE_URL_TEST) \
 		-e STEPT_ENCRYPTION_KEY=$(TEST_ENCRYPTION_KEY) \
 		-e JWT_SECRET=$(TEST_JWT_SECRET) \
+		-e STEPT_ENABLE_AI_CHAT=true \
+		-e STEPT_ENABLE_KNOWLEDGE_BASE=true \
+		-e STEPT_ENABLE_VIDEO_IMPORT=true \
+		-e STEPT_ENABLE_MCP=true \
 		backend python -m pytest tests/ -v --tb=short
 
 # Drop and recreate test database for a guaranteed clean slate

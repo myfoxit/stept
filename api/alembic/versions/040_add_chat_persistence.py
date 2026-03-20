@@ -1,13 +1,13 @@
 """add chat persistence tables
 
 Revision ID: 040
-Revises: 039
+Revises: 037
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "040"
-down_revision = "039"
+down_revision = "037"
 
 
 def upgrade() -> None:
