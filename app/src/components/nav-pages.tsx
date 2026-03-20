@@ -363,18 +363,18 @@ function NavPageItem({
     }
     if (isWorkflow) {
       return (
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" className="size-4 flex-shrink-0 text-muted-foreground">
           <path
             d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2z"
             stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linejoin="round"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
           />
           <path
             d="M17 14l.75 2.25L20 17l-2.25.75L17 20l-.75-2.25L14 17l2.25-.75L17 14z"
             stroke="currentColor"
-            stroke-width="1.2"
-            stroke-linejoin="round"
+            strokeWidth="1.2"
+            strokeLinejoin="round"
           />
         </svg>
       );
@@ -477,7 +477,7 @@ function NavPageItem({
           <SidebarMenuButton
             asChild={!isFolder}
             className={cn(
-              "flex-1 h-8 px-1.5 hover:bg-transparent",
+              "flex-1",
               level > 0 && "text-sm",
             )}
             onClick={(e) => {

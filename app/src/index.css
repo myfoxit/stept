@@ -47,7 +47,7 @@
 :root {
   --radius: 0.5rem;
   /* Page background — warm gray like nixeasy --bg */
-  --background: #f9fafb;
+  --background: #fefefe;
   --foreground: #111827;
   /* Cards — white on gray bg creates depth */
   --card: #ffffff;
@@ -133,7 +133,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
