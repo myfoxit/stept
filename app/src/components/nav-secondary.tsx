@@ -34,7 +34,7 @@ export function NavSecondary({
             if (item.url.startsWith('http')) {
               return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton size="sm" className="h-8" asChild>
                     <a href={item.url} target="_blank" rel="noopener noreferrer">
                       <item.icon />
                       <span>{item.title}</span>
@@ -52,7 +52,7 @@ export function NavSecondary({
               const isActive = projectId ? location.pathname.startsWith(`/projects/${projectId}/settings`) : false;
               return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild={!!projectId} data-active={isActive || undefined}>
+                  <SidebarMenuButton size="sm" className="h-8" asChild={!!projectId} data-active={isActive || undefined}>
                     {projectId ? (
                       <Link to={settingsUrl}>
                         <item.icon />
@@ -72,7 +72,7 @@ export function NavSecondary({
             // Default internal links
             return (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton size="sm" className="h-8" asChild>
                   <Link to={item.url}>
                     <item.icon />
                     <span>{item.title}</span>
