@@ -454,7 +454,22 @@ async def finalize_upload_session(
             from app.services.indexer import index_workflow_background
             asyncio.create_task(index_workflow_background(session_id))
         
-        # Auto-generate smart title + summary (lightweight, no vision)
+        # Heuristic title + icon (always runs, no AI needed)
+        if session and (not session.name or session.name.startswith("Untitled") or session.name.startswith("Workflow:")):
+            from app.services.heuristic_title import generate_heuristic_title, extract_favicon_icon
+            await db.refresh(session, ["steps"])
+            steps = sorted(session.steps, key=lambda s: s.step_number)
+            title = generate_heuristic_title(steps)
+            if title:
+                session.name = title
+                session.generated_title = title
+            icon_type, icon_value = extract_favicon_icon(steps)
+            if icon_type and icon_value:
+                session.icon_type = icon_type
+                session.icon_value = icon_value
+            await db.commit()
+
+        # Auto-generate smart title + summary via AI (lightweight, no vision)
         # Only if AI is enabled for the project (or no project set)
         if session and not session.is_processed:
             ai_enabled = True
