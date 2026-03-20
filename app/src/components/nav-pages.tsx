@@ -476,9 +476,9 @@ function NavPageItem({
 
           <SidebarMenuButton
             asChild={!isFolder}
+            size="sm"
             className={cn(
-              "flex-1",
-              level > 0 && "text-sm",
+              "flex-1 h-8",
             )}
             onClick={(e) => {
               if (isFolder) {

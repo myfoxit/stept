@@ -35,6 +35,8 @@ export function NavMain({
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
+                    size="sm"
+                    className="h-8"
                     tooltip={item.title}
                     asChild={item.url !== '#'}
                     data-active={isActive || undefined}
