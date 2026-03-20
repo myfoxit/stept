@@ -53,6 +53,10 @@ if (window.__steptContentLoaded) {
         break;
       case 'STOP_RECORDING':
         stopCapturing();
+        // Clean up any active redaction/blur
+        if ((window as any).__steptRedaction?.removeAll) {
+          (window as any).__steptRedaction.removeAll();
+        }
         sendResponse({ success: true });
         break;
       case 'PAUSE_RECORDING':

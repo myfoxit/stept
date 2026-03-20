@@ -272,6 +272,11 @@ export function closeSmartBlur(): void {
   smartBlurElement = null;
   smartBlurOpen = false;
 
+  // Remove all blur effects from the page
+  if ((window as any).__steptRedaction?.removeAll) {
+    (window as any).__steptRedaction.removeAll();
+  }
+
   // Resume capture
   sendMsg({ type: 'RESUME_RECORDING' });
 }

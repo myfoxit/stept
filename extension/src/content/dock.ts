@@ -4,6 +4,7 @@
 import { sendMsg } from './index';
 
 let dockElement: HTMLDivElement | null = null;
+let dockShadowRef: ShadowRoot | null = null;
 let dockStepCount = 0;
 let dockTimerInterval: ReturnType<typeof setInterval> | null = null;
 let dockStartTime: number | null = null;
@@ -22,7 +23,7 @@ export function getDockIsPaused(): boolean {
 }
 
 export function getDockShadow(): ShadowRoot | null {
-  return dockElement ? dockElement.shadowRoot : null;
+  return dockShadowRef;
 }
 
 export function createDock(): void {
@@ -33,6 +34,7 @@ export function createDock(): void {
   dockElement.setAttribute('data-stept-exclude', 'true');
 
   const shadow = dockElement.attachShadow({ mode: 'closed' });
+  dockShadowRef = shadow;
 
   const style = document.createElement('style');
   style.textContent = `

@@ -59,11 +59,11 @@ interface OriginalValueRecord {
 
   // Default redaction settings
   let redactionSettings: RedactionSettings = {
-    enabled: true,
-    emails: true,
-    names: true,
+    enabled: false,
+    emails: false,
+    names: false,
     numbers: false,
-    formFields: true,
+    formFields: false,
     longText: false,
     images: false,
   };

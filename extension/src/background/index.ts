@@ -417,9 +417,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'GET_REDACTION_SETTINGS': {
         const stored = await chrome.storage.local.get(['redactionSettings']);
         sendResponse(stored.redactionSettings || {
-          enabled: true,
-          formFields: true,
-          emails: true,
+          enabled: false,
+          formFields: false,
+          emails: false,
           names: false,
           numbers: false,
         });

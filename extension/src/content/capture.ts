@@ -194,10 +194,21 @@ function handleClick(event: PointerEvent): void {
     lastClickTarget = target;
     const stepData = buildStepData('Left Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Click'));
     clearTimeout(pendingClick as ReturnType<typeof setTimeout>);
-    pendingClick = setTimeout(() => {
+
+    // For navigation-triggering elements, send immediately (page may unload)
+    const tag = (target as HTMLElement).tagName?.toLowerCase();
+    const isLink = tag === 'a' || !!(target as HTMLElement).closest?.('a');
+    const isSubmit = (tag === 'button' && (target as HTMLButtonElement).type === 'submit') ||
+                     tag === 'input' && (target as HTMLInputElement).type === 'submit';
+    if (isLink || isSubmit) {
       sendClickStep(stepData);
       pendingClick = null;
-    }, DOUBLE_CLICK_MS);
+    } else {
+      pendingClick = setTimeout(() => {
+        sendClickStep(stepData);
+        pendingClick = null;
+      }, DOUBLE_CLICK_MS);
+    }
   }
 }
 
@@ -293,6 +304,15 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+function handlePageUnload(): void {
+  // Flush any pending click or typing before page unloads
+  if (pendingClick) {
+    clearTimeout(pendingClick);
+    pendingClick = null;
+  }
+  flushTypedText();
+}
+
 export function startCapturing(): void {
   if (isRecording) return;
   isRecording = true;
@@ -303,6 +323,7 @@ export function startCapturing(): void {
   document.addEventListener('keydown', handleKeydown, true);
   document.addEventListener('focusin', handleFocusIn as EventListener, true);
   document.addEventListener('focusout', handleFocusOut as EventListener, true);
+  window.addEventListener('pagehide', handlePageUnload);
 }
 
 export function stopCapturing(): void {
@@ -314,4 +335,5 @@ export function stopCapturing(): void {
   document.removeEventListener('keydown', handleKeydown, true);
   document.removeEventListener('focusin', handleFocusIn as EventListener, true);
   document.removeEventListener('focusout', handleFocusOut as EventListener, true);
+  window.removeEventListener('pagehide', handlePageUnload);
 }
