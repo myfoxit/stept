@@ -61,7 +61,7 @@ export default function SetupPanel({
             the selector visible in setup. The original HTML had the select
             in both the header-center AND used spProjectSelector id.
             We replicate the same structure. */}
-        <div className="header-center" id="headerProjectSelector">
+        <div id="headerProjectSelector">
           <select
             id="spProjectSelector"
             className="header-select"
