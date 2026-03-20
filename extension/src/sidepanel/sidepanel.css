@@ -109,7 +109,7 @@ body, #root {
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
-  color: #3AB08A;
+  color: #4f46e5;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -136,7 +136,7 @@ body, #root {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #3AB08A;
+  background: #4f46e5;
   animation: pulse 1.5s infinite;
   flex-shrink: 0;
 }
@@ -216,13 +216,23 @@ body, #root {
   flex-direction: column;
   padding: 16px;
   gap: 12px;
-  overflow-y: auto;
 }
 
 .sp-greeting {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin: 0;
+}
+
+.sp-project-name {
+  font-size: 13px;
+  font-weight: 500;
   color: #111827;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
 /* Workflow empty state */
@@ -326,48 +336,43 @@ body, #root {
 
 .btn-cta {
   width: 100%;
-  padding: 14px 20px;
-  border-radius: 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  background: #3AB08A;
+  background: #4f46e5;
   color: white;
   border: none;
-  box-shadow: 0 4px 14px rgba(58, 176, 138, 0.35);
-  transition: all 0.2s;
   cursor: pointer;
   font-family: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  transition: background 0.15s;
 }
 
 .btn-cta:hover:not(:disabled) {
-  background: #33a07d;
-  box-shadow: 0 6px 20px rgba(58, 176, 138, 0.45);
-  transform: translateY(-1px);
+  background: #4338ca;
 }
 
 .btn-cta:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(58, 176, 138, 0.3);
+  background: #3730a3;
 }
 
 .btn-cta:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .btn-primary {
-  background: #3AB08A;
+  background: #4f46e5;
   color: white;
   flex: 1;
 }
 
 .btn-primary:hover {
-  background: #33a07d;
+  background: #4338ca;
 }
 
 .btn-outline {
@@ -743,7 +748,7 @@ body, #root {
   justify-content: center;
   min-width: 28px;
   height: 28px;
-  background: #3AB08A;
+  background: #4f46e5;
   color: white;
   font-size: 12px;
   font-weight: 700;
@@ -867,12 +872,12 @@ body, #root {
 .footer-icon-btn.redaction-active {
   color: #4f46e5;
   border-color: #4f46e5;
-  background: rgba(58, 176, 138, 0.06);
+  background: rgba(79, 70, 229, 0.06);
 }
 
 .footer-icon-btn.redaction-active:hover {
-  background: rgba(58, 176, 138, 0.12);
-  color: #33a07d;
+  background: rgba(79, 70, 229, 0.12);
+  color: #4338ca;
 }
 
 /* Smart Blur active state */
@@ -889,14 +894,14 @@ body, #root {
   font-weight: 600;
   cursor: pointer;
   border: none;
-  background: #3AB08A;
+  background: #4f46e5;
   color: white;
   font-family: inherit;
   transition: all 0.15s;
 }
 
 .complete-bar-btn:hover {
-  background: #33a07d;
+  background: #4338ca;
 }
 
 /* === Upload Panel === */
@@ -1012,7 +1017,7 @@ body, #root {
   height: 32px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: rgba(58, 176, 138, 0.2);
+  background: rgba(79, 70, 229, 0.2);
   animation: pulse-ring 2s ease-out infinite;
 }
 
@@ -1025,7 +1030,7 @@ body, #root {
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 2px solid #4f46e5;
-  background: rgba(58, 176, 138, 0.3);
+  background: rgba(79, 70, 229, 0.3);
 }
 
 .click-marker-dot {
@@ -1036,7 +1041,7 @@ body, #root {
   height: 6px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #3AB08A;
+  background: #4f46e5;
 }
 
 @keyframes pulse-ring {
@@ -1151,7 +1156,7 @@ body, #root {
 }
 
 .search-result-snippet mark {
-  background: rgba(58, 176, 138, 0.15);
+  background: rgba(79, 70, 229, 0.15);
   color: #111827;
   padding: 0 2px;
   border-radius: 2px;
@@ -1267,7 +1272,7 @@ body, #root {
 .context-link-btn:hover {
   border-color: #4f46e5;
   color: #4f46e5;
-  background: rgba(58, 176, 138, 0.04);
+  background: rgba(79, 70, 229, 0.04);
 }
 
 /* ── Workflow Guide Play Button ── */
@@ -1288,7 +1293,7 @@ body, #root {
 }
 
 .workflow-play-btn:hover {
-  background: #3AB08A;
+  background: #4f46e5;
   color: #fff;
   transform: scale(1.08);
 }

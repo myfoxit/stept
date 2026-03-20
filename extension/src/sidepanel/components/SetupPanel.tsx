@@ -36,6 +36,13 @@ export default function SetupPanel({
   const { selectedProjectId, currentUser, userProjects } = appState;
   const displayName = currentUser?.name || currentUser?.email || 'User';
 
+  // Auto-select first project
+  useEffect(() => {
+    if (!selectedProjectId && userProjects.length > 0) {
+      onProjectChange(userProjects[0].id);
+    }
+  }, [selectedProjectId, userProjects, onProjectChange]);
+
   // Load context matches on mount
   useEffect(() => {
     (async () => {
@@ -57,6 +64,10 @@ export default function SetupPanel({
   return (
     <div id="spSetupPanel" className="sp-auth-panel">
       <div className="sp-setup-content">
+        <p id="spGreeting" className="sp-greeting">
+          Hello, {displayName}
+        </p>
+
         <button
           id="spStartBtn"
           className="btn btn-cta"
@@ -79,25 +90,25 @@ export default function SetupPanel({
           Start Capture
         </button>
 
-        <div id="headerProjectSelector">
-          <select
-            id="spProjectSelector"
-            className="header-select"
-            value={selectedProjectId}
-            onChange={handleProjectChange}
-          >
-            <option value="">Select project</option>
-            {userProjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <p id="spGreeting" className="sp-greeting">
-          Hello, {displayName}
-        </p>
+        {userProjects.length > 1 ? (
+          <div id="headerProjectSelector">
+            <select
+              id="spProjectSelector"
+              className="header-select"
+              value={selectedProjectId}
+              onChange={handleProjectChange}
+            >
+              <option value="">Select project</option>
+              {userProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : userProjects.length === 1 ? (
+          <div className="sp-project-name">{userProjects[0].name}</div>
+        ) : null}
 
         <SearchBar selectedProjectId={selectedProjectId} />
 
