@@ -101,24 +101,36 @@ function sendKeyStep(description: string): void {
 
 function flushTypedText(): void {
   clearTimeout(typingTimer as ReturnType<typeof setTimeout>);
+  typingTimer = null;
 
   if (typedText.length === 0) return;
 
   const activeElement = document.activeElement;
   const elementInfo = activeElement ? gatherElementInfo(activeElement) : null;
 
+  // Use actual field value if available for more accurate representation
+  let finalText = typedText;
+  if (activeElement && isInputLike(activeElement as Element)) {
+    const currentValue = (activeElement as HTMLInputElement).value || '';
+    // If we have a focusedFieldValue baseline, use the net change
+    if (focusedFieldValue !== null && currentValue !== focusedFieldValue) {
+      finalText = currentValue;
+    }
+  }
+
+  const displayText = finalText.length > 60 ? finalText.substring(0, 57) + '...' : finalText;
   const fieldName = elementInfo
     ? (getBestLabel(elementInfo) || elementInfo.id || '')
     : '';
   const description = fieldName
-    ? `Type "${typedText}" into the "${cleanLabel(fieldName)}" field`
-    : `Type "${typedText}"`;
+    ? `Type "${displayText}" into the "${cleanLabel(fieldName)}" field`
+    : `Type "${displayText}"`;
 
   const stepData: StepData = {
     actionType: 'Type',
     pageTitle: document.title,
     description: description,
-    textTyped: typedText,
+    textTyped: finalText,
     url: window.location.href,
     windowSize: { width: window.outerWidth, height: window.outerHeight },
     viewportSize: { width: window.innerWidth, height: window.innerHeight },
@@ -214,39 +226,10 @@ function handleFocusOut(event: FocusEvent): void {
   const el = event.target as HTMLInputElement;
   if (!isInputLike(el as Element)) return;
 
-  const currentValue = el.value || '';
-  if (currentValue === focusedFieldValue) {
-    focusedFieldValue = null;
-    return; // Value didn't change
-  }
+  // Flush any pending typed text — this already emits the step if needed
+  flushTypedText();
 
-  // Skip sensitive fields
-  if (el.type === 'password' || (el.autocomplete && /cc-|credit/i.test(el.autocomplete))) {
-    focusedFieldValue = null;
-    return;
-  }
-
-  flushTypedText(); // Flush any pending typed text first
-
-  const elementInfo = gatherElementInfo(el);
-  const fieldLabel = getBestLabel(elementInfo) || el.id || 'field';
-  const displayValue = currentValue.length > 60 ? currentValue.substring(0, 57) + '...' : currentValue;
-  const description = `Type "${displayValue}" in the "${cleanLabel(fieldLabel)}" field`;
-
-  chrome.runtime.sendMessage({
-    type: 'TYPE_EVENT',
-    data: {
-      actionType: 'Type',
-      pageTitle: document.title,
-      description: description,
-      textTyped: currentValue,
-      url: window.location.href,
-      windowSize: { width: window.outerWidth, height: window.outerHeight },
-      viewportSize: { width: window.innerWidth, height: window.innerHeight },
-      elementInfo: elementInfo,
-    },
-  }).catch(() => {});
-
+  // Reset focus tracking (flushTypedText already synced focusedFieldValue)
   focusedFieldValue = null;
 }
 
@@ -272,11 +255,27 @@ function handleKeydown(event: KeyboardEvent): void {
     }
   }
 
-  // Special action keys — flush typed text, then record the key press
-  if (['Enter', 'Tab', 'Escape', 'Delete', 'Backspace'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
+  // Backspace/Delete while typing: update accumulated text instead of separate step
+  if (['Backspace', 'Delete'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
+    if (typedText.length > 0) {
+      // Remove last character from accumulated text
+      if (event.key === 'Backspace') {
+        typedText = typedText.slice(0, -1);
+      }
+      // Reset the typing timer
+      clearTimeout(typingTimer as ReturnType<typeof setTimeout>);
+      typingTimer = setTimeout(flushTypedText, TYPING_DELAY);
+      return;
+    }
+    // No accumulated text — record as a standalone key press
+    sendKeyStep(`Press ${event.key === 'Backspace' ? 'Delete' : event.key}`);
+    return;
+  }
+
+  // Other special action keys — flush typed text, then record the key press
+  if (['Enter', 'Tab', 'Escape'].includes(event.key) && !event.ctrlKey && !event.metaKey) {
     flushTypedText();
-    const keyLabel = event.key === 'Backspace' ? 'Delete' : event.key;
-    sendKeyStep(`Press ${keyLabel}`);
+    sendKeyStep(`Press ${event.key}`);
     return;
   }
 
