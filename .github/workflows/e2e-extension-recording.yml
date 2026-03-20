@@ -2,10 +2,7 @@ name: E2E Recording Tests
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+
 
 jobs:
   e2e-tests:

@@ -2,10 +2,7 @@ name: E2E Desktop Tests
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+
 
 jobs:
   e2e:
