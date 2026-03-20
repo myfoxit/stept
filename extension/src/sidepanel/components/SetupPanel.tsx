@@ -79,7 +79,7 @@ export default function SetupPanel({
           Start Capture
         </button>
 
-        <div className="header-center" id="headerProjectSelector">
+        <div id="headerProjectSelector">
           <select
             id="spProjectSelector"
             className="header-select"

@@ -164,7 +164,7 @@ body, #root {
   display: none !important;
 }
 
-/* Setup panel (authenticated) — top-aligned, not centered */
+/* Setup panel (authenticated) — top-aligned, scrollable */
 #spSetupPanel {
   align-items: stretch;
   justify-content: flex-start;
