@@ -3,8 +3,11 @@
 import {
   Check,
   ChevronDown,
+  Chrome,
   Eye,
+  FileText,
   HelpCircle,
+  Monitor,
   MoreVertical,
   Pencil,
   Plus,
@@ -163,20 +166,67 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
             <div className="flex items-center gap-0.5 ml-auto">
               {selectedProjectId && (
-                <button
-                  onClick={async () => {
-                    const newDoc = await createDoc.mutateAsync({
-                      title: "Untitled",
-                      projectId: selectedProjectId,
-                      isPrivate: true,
-                    });
-                    navigate(`/editor/${newDoc.id}`);
-                  }}
-                  className="size-7 flex items-center justify-center rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
-                  title="New Page"
-                >
-                  <Plus className="size-4" stroke={2} />
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="size-7 flex items-center justify-center rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
+                      title="New"
+                    >
+                      <Plus className="size-4" strokeWidth={2} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      onSelect={async () => {
+                        const newDoc = await createDoc.mutateAsync({
+                          title: "Untitled",
+                          projectId: selectedProjectId,
+                          isPrivate: false,
+                        });
+                        navigate(`/editor/${newDoc.id}`);
+                      }}
+                    >
+                      <FileText className="mr-2 size-4" />
+                      Page
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        toast.info("Install the Chrome Extension", {
+                          description:
+                            "Capture workflows directly from your browser.",
+                          action: {
+                            label: "Get Extension",
+                            onClick: () =>
+                              window.open(
+                                "https://chromewebstore.google.com",
+                                "_blank",
+                              ),
+                          },
+                        });
+                      }}
+                    >
+                      <Chrome className="mr-2 size-4" />
+                      Browser
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        toast.info("Download the Desktop App", {
+                          description:
+                            "Capture workflows from any desktop application.",
+                          action: {
+                            label: "Download",
+                            onClick: () =>
+                              window.open("https://stept.ai/download", "_blank"),
+                          },
+                        });
+                      }}
+                    >
+                      <Monitor className="mr-2 size-4" />
+                      Desktop
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               <SidebarTrigger className="size-7" />
             </div>
