@@ -296,6 +296,16 @@ export function getSiblingText(el: Element): string[] | null {
   }
 }
 
+/** Check if an element is a sensitive input (password, credit card, etc.) */
+function isSensitiveInput(el: Element): boolean {
+  const tag = el.tagName.toLowerCase();
+  if (tag !== 'input' && tag !== 'textarea') return false;
+  const input = el as HTMLInputElement;
+  if (input.type === 'password') return true;
+  const ac = (input.autocomplete || '').toLowerCase();
+  return /cc-|credit|cvv|cvc|card-number|exp-|security-code/.test(ac);
+}
+
 export function gatherElementInfo(target: Element): ElementInfo {
   const tag = target.tagName.toLowerCase();
   const el = target as HTMLElement & HTMLInputElement & HTMLAnchorElement;

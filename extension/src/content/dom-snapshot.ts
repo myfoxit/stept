@@ -7,6 +7,7 @@ declare const rrwebSnapshot: {
   snapshot: (doc: Document, opts: {
     blockClass: string;
     maskTextClass: string;
+    maskInputOptions?: Record<string, boolean>;
     inlineStylesheet: boolean;
     recordCanvas: boolean;
   }) => unknown;
@@ -18,8 +19,12 @@ export function captureDomSnapshot(): string | null {
     const snap = rrwebSnapshot.snapshot(document, {
       blockClass: 'stept-exclude',
       maskTextClass: 'stept-mask',
-      inlineStylesheet: false,
-      recordCanvas: false,
+      // Inline all stylesheets into the snapshot so replay works without the original server
+      inlineStylesheet: true,
+      // Capture canvas content (WebGL preserveDrawingBuffer override makes this work)
+      recordCanvas: true,
+      // Mask password fields — never capture credentials in snapshots
+      maskInputOptions: { password: true },
     });
     return snap ? JSON.stringify(snap) : null;
   } catch (e) {
