@@ -116,8 +116,18 @@ interface SandboxViewerProps {
 const INJECT_SCRIPT = `
 (function() {
   var HC = '\\\\:hover';
-  function add(el) { while (el && el !== document.documentElement) { el.classList.add(HC); el = el.parentElement; } }
-  function rem(el) { while (el && el !== document.documentElement) { el.classList.remove(HC); el = el.parentElement; } }
+  function add(el) {
+    while (el && el !== document.documentElement) {
+      if (el.classList) try { el.classList.add(HC); } catch(e) {}
+      el = el.parentElement;
+    }
+  }
+  function rem(el) {
+    while (el && el !== document.documentElement) {
+      if (el.classList) try { el.classList.remove(HC); } catch(e) {}
+      el = el.parentElement;
+    }
+  }
   document.addEventListener('mouseenter', function(e) { add(e.target); }, true);
   document.addEventListener('mouseleave', function(e) { rem(e.target); }, true);
   document.addEventListener('click', function(e) {
@@ -125,7 +135,6 @@ const INJECT_SCRIPT = `
     window.parent.postMessage({ type: 'stept-sandbox-click', x: e.clientX, y: e.clientY }, '*');
   }, true);
   document.addEventListener('submit', function(e) { e.preventDefault(); e.stopPropagation(); }, true);
-  // Hide noscript tags (scripts are disabled via sandbox)
   var s = document.createElement('style');
   s.textContent = 'noscript{display:none!important}';
   document.head.appendChild(s);
@@ -208,8 +217,8 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         // Inject highlight CSS into the iframe
         const highlightStyle = iframeDoc.createElement('style');
         highlightStyle.textContent = `
-          @keyframes stept-pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.8), 0 0 12px rgba(99,102,241,0.3); } 50% { box-shadow: 0 0 0 3px rgba(99,102,241,0.3), 0 0 4px rgba(99,102,241,0.1); } }
-          [data-stept-target] { animation: stept-pulse 2s ease-in-out infinite !important; cursor: pointer !important; position: relative; z-index: 10000; }
+          @keyframes stept-pulse { 0%,100% { outline-color: rgba(99,102,241,0.9); } 50% { outline-color: rgba(99,102,241,0.3); } }
+          [data-stept-target] { outline: 3px solid rgba(99,102,241,0.9) !important; outline-offset: 3px !important; animation: stept-pulse 1.5s ease-in-out infinite !important; cursor: pointer !important; position: relative !important; z-index: 10000 !important; }
         `;
         iframeDoc.head.appendChild(highlightStyle);
 
