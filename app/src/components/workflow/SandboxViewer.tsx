@@ -232,19 +232,30 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
               const target = doc.querySelector(nextSel);
               if (target) {
                 (target as HTMLElement).setAttribute('data-stept-target', 'true');
-                console.log('[Sandbox] Highlighted target:', nextSel);
-              } else if (attempts < 5) {
+                console.log('[Sandbox] Highlighted target:', nextSel, target);
+              } else if (attempts < 10) {
                 attempts++;
-                setTimeout(tryHighlight, 200);
+                // Log what we can find for debugging
+                if (attempts === 5) {
+                  console.log('[Sandbox] Still looking for:', nextSel);
+                  console.log('[Sandbox] Body children:', doc.body?.children?.length);
+                  console.log('[Sandbox] All IDs:', Array.from(doc.querySelectorAll('[id]')).map(e => e.id).slice(0, 20));
+                  // Try just the ID part if selector has one
+                  const idMatch = nextSel.match(/#([\w-]+)/);
+                  if (idMatch) {
+                    const byId = doc.getElementById(idMatch[1]);
+                    console.log('[Sandbox] getElementById(' + idMatch[1] + '):', byId);
+                  }
+                }
+                setTimeout(tryHighlight, 300);
               } else {
-                console.log('[Sandbox] Could not find target:', nextSel);
+                console.log('[Sandbox] FAILED to find target after 10 attempts:', nextSel);
               }
             } catch (err) {
               console.log('[Sandbox] Invalid selector:', nextSel, err);
             }
           };
-          // Start trying after a short delay
-          setTimeout(tryHighlight, 100);
+          setTimeout(tryHighlight, 200);
         }
 
         setLoading(false);
