@@ -1,17 +1,13 @@
 /**
- * SandboxViewer — Interactive "Try it" mode for workflow replay.
+ * SandboxViewer — Interactive "Try it" mode using rrweb-snapshot rebuild().
  *
- * For web recordings (has DOM snapshots):
- *   Renders rrweb-snapshot JSON in a sandboxed iframe with:
- *   - Live hover states (CSS :hover rules reanimated via JS)
- *   - Click target detection (next step's element highlighted)
- *   - Smooth transitions between steps
- *
- * For desktop recordings (screenshots only):
- *   Smart screenshot replay with proximity-based click detection.
+ * Fetches the rrweb-snapshot JSON and uses the library's own rebuild()
+ * to reconstruct a real DOM inside a sandboxed iframe.
+ * hackCss: true automatically converts :hover CSS rules to .\:hover class rules.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, MousePointer2, Loader2 } from 'lucide-react';
+import { rebuild, createCache, createMirror } from 'rrweb-snapshot';
 import { getApiBaseUrl } from '@/lib/apiClient';
 
 /* ── Types ── */
@@ -47,234 +43,38 @@ interface SandboxViewerProps {
   files: Record<string, string>;
   token: string;
   compact?: boolean;
-  /** If true, use authenticated endpoints instead of public */
   authenticated?: boolean;
   sessionId?: string;
 }
 
-/* ── Hover reanimation script injected into the iframe ── */
+/* ── Hover reanimation + click relay script ── */
 
-const HOVER_SCRIPT = `
-<script>
+const INJECT_SCRIPT = `
 (function() {
-  // rrweb-snapshot hackCss converts :hover to .\\:hover
-  // We add/remove this class on mouseenter/mouseleave to reanimate hover states
-  var HOVER_CLASS = '\\\\:hover';
-
-  function addHoverClass(el) {
-    while (el && el !== document.documentElement) {
-      el.classList.add(HOVER_CLASS);
-      el = el.parentElement;
-    }
-  }
-
-  function removeHoverClass(el) {
-    while (el && el !== document.documentElement) {
-      el.classList.remove(HOVER_CLASS);
-      el = el.parentElement;
-    }
-  }
-
-  document.addEventListener('mouseenter', function(e) {
-    addHoverClass(e.target);
-  }, true);
-
-  document.addEventListener('mouseleave', function(e) {
-    removeHoverClass(e.target);
-  }, true);
-
-  // Disable all links and form submissions
+  var HC = '\\\\:hover';
+  function add(el) { while (el && el !== document.documentElement) { el.classList.add(HC); el = el.parentElement; } }
+  function rem(el) { while (el && el !== document.documentElement) { el.classList.remove(HC); el = el.parentElement; } }
+  document.addEventListener('mouseenter', function(e) { add(e.target); }, true);
+  document.addEventListener('mouseleave', function(e) { rem(e.target); }, true);
   document.addEventListener('click', function(e) {
-    var target = e.target;
-    var link = target.closest ? target.closest('a') : null;
-    if (link) { e.preventDefault(); e.stopPropagation(); }
-    var form = target.closest ? target.closest('form') : null;
-    if (form) { e.preventDefault(); e.stopPropagation(); }
-    // Notify parent about the click position
-    window.parent.postMessage({
-      type: 'stept-sandbox-click',
-      x: e.clientX,
-      y: e.clientY,
-      selector: buildSelector(target),
-    }, '*');
+    e.preventDefault(); e.stopPropagation();
+    window.parent.postMessage({ type: 'stept-sandbox-click', x: e.clientX, y: e.clientY }, '*');
   }, true);
-
-  document.addEventListener('submit', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }, true);
-
-  // Build a simple selector for click matching
-  function buildSelector(el) {
-    if (!el || !el.tagName) return null;
-    if (el.id) return '#' + el.id;
-    var tag = el.tagName.toLowerCase();
-    if (el.getAttribute('data-testid')) return tag + '[data-testid="' + el.getAttribute('data-testid') + '"]';
-    if (el.getAttribute('aria-label')) return tag + '[aria-label="' + el.getAttribute('aria-label') + '"]';
-    return tag + (el.className ? '.' + el.className.split(' ').filter(Boolean).slice(0,2).join('.') : '');
-  }
-
-  // Highlight the click target
-  window.addEventListener('message', function(e) {
-    if (!e.data || e.data.type !== 'stept-highlight-target') return;
-    // Remove old highlights
-    var old = document.querySelectorAll('[data-stept-highlight]');
-    old.forEach(function(el) { el.removeAttribute('data-stept-highlight'); el.style.outline = ''; el.style.outlineOffset = ''; });
-
-    var selector = e.data.selector;
-    if (!selector) return;
-    try {
-      var el = document.querySelector(selector);
-      if (el) {
-        el.setAttribute('data-stept-highlight', 'true');
-        el.style.outline = '2px solid rgba(99, 102, 241, 0.7)';
-        el.style.outlineOffset = '2px';
-        el.style.transition = 'outline 0.2s ease';
-      }
-    } catch(err) {}
-  });
+  document.addEventListener('submit', function(e) { e.preventDefault(); e.stopPropagation(); }, true);
+  // Hide noscript tags (scripts are disabled via sandbox)
+  var s = document.createElement('style');
+  s.textContent = 'noscript{display:none!important}';
+  document.head.appendChild(s);
 })();
-</script>
 `;
 
-/* ── rrweb-snapshot rebuild (simplified for iframe injection) ── */
-
-/**
- * Instead of importing rrweb-snapshot's rebuild(), we take the snapshot JSON
- * and reconstruct it as an HTML string that can be injected via srcdoc.
- * This is simpler and avoids needing the full rrweb library in the frontend.
- */
-function snapshotToHtml(snapshot: any): string {
-  if (!snapshot) return '<html><body><p>No snapshot data</p></body></html>';
-
-  // rrweb-snapshot output is a tree: { type, tagName, attributes, childNodes, ... }
-  function renderNode(node: any): string {
-    if (!node) return '';
-
-    // Document node
-    if (node.type === 0) {
-      return node.childNodes?.map(renderNode).join('') || '';
-    }
-
-    // DocumentType
-    if (node.type === 1) {
-      return `<!DOCTYPE ${node.name || 'html'}>`;
-    }
-
-    // Text node
-    if (node.type === 3) {
-      // Style content with hackCss (hover → .\:hover class)
-      if (node.isStyle && node.textContent) {
-        return hackCssHover(node.textContent);
-      }
-      return escapeHtml(node.textContent || '');
-    }
-
-    // Comment
-    if (node.type === 5) {
-      return `<!--${node.textContent || ''}-->`;
-    }
-
-    // CDATA
-    if (node.type === 4) {
-      return `<![CDATA[${node.textContent || ''}]]>`;
-    }
-
-    // Element node (type === 2)
-    if (node.type === 2) {
-      let tag = node.tagName || 'div';
-
-      // Skip script tags for security
-      if (tag === 'noscript' && node.attributes?._cssText) tag = 'style';
-      if (tag === 'script') return '';
-
-      const attrs = node.attributes || {};
-      let attrStr = '';
-
-      for (const [key, value] of Object.entries(attrs)) {
-        if (key.startsWith('rr_')) continue; // skip rrweb internal attrs
-        if (key === '_cssText') {
-          // This is an inlined stylesheet — render as style content
-          if (tag === 'style' || tag === 'link') {
-            tag = 'style';
-            const cssContent = hackCssHover(String(value));
-            const children = node.childNodes?.map(renderNode).join('') || '';
-            return `<style${attrStr}>${cssContent}${children}</style>`;
-          }
-          continue;
-        }
-        // Strip event handlers (rrweb prefixes them with _)
-        if (key.startsWith('_on')) continue;
-        if (key === 'onload' || key === 'onclick' || key.startsWith('on')) continue;
-
-        const safeVal = String(value).replace(/"/g, '&quot;');
-        attrStr += ` ${key}="${safeVal}"`;
-      }
-
-      // Void elements
-      const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
-      if (voidTags.has(tag)) {
-        return `<${tag}${attrStr}>`;
-      }
-
-      const children = node.childNodes?.map(renderNode).join('') || '';
-
-      // Handle _cssText for style elements
-      if (tag === 'style' && attrs._cssText) {
-        return `<style${attrStr}>${hackCssHover(String(attrs._cssText))}${children}</style>`;
-      }
-
-      return `<${tag}${attrStr}>${children}</${tag}>`;
-    }
-
-    return '';
-  }
-
-  // Convert :hover CSS rules to also match .\:hover class (rrweb pattern)
-  function hackCssHover(css: string): string {
-    if (!css.includes(':hover')) return css;
-    // For each rule with :hover, duplicate it with .\:hover
-    return css.replace(
-      /([^{}]*):hover([^{]*)\{/g,
-      (match, before, after) => {
-        const hoverClass = `${before}.\\:hover${after}{`;
-        return `${match}\n${hoverClass}`;
-      }
-    );
-  }
-
-  function escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  let html = renderNode(snapshot);
-
-  // Inject hover reanimation script + CSP that blocks external scripts but allows our inline one
-  html = html.replace(
-    '</head>',
-    `<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; default-src * data: blob: 'unsafe-inline';">
-    <style>
-      * { cursor: default !important; }
-      [data-stept-highlight] { outline: 2px solid rgba(99, 102, 241, 0.7) !important; outline-offset: 2px !important; }
-      body { overflow: auto; }
-    </style>
-    ${HOVER_SCRIPT}
-    </head>`
-  );
-
-  return html;
-}
-
-/* ── Main Component ── */
+/* ── Component ── */
 
 export function SandboxViewer({ steps, files, token, compact, authenticated, sessionId }: SandboxViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [snapshotHtml, setSnapshotHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const baseUrl = getApiBaseUrl();
 
@@ -282,16 +82,11 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
   const total = steps.length;
   const hasDomSnapshot = step?.has_dom_snapshot;
 
-  // Determine next step's click target for highlighting
   const nextStep = currentIndex < total - 1 ? steps[currentIndex + 1] : null;
-  const nextClickTarget = nextStep?.element_info?.selector || null;
 
-  /* ── Fetch DOM snapshot ── */
+  /* ── Load snapshot into iframe via rebuild() ── */
   useEffect(() => {
-    if (!step || !hasDomSnapshot) {
-      setSnapshotHtml(null);
-      return;
-    }
+    if (!step || !hasDomSnapshot || !iframeRef.current) return;
 
     let cancelled = false;
     setLoading(true);
@@ -307,84 +102,96 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         return res.json();
       })
       .then(snapshot => {
-        if (cancelled) return;
-        const html = snapshotToHtml(snapshot);
-        setSnapshotHtml(html);
+        if (cancelled || !iframeRef.current) return;
+
+        const iframe = iframeRef.current;
+        const iframeDoc = iframe.contentDocument;
+        if (!iframeDoc) {
+          setError('Cannot access iframe document');
+          setLoading(false);
+          return;
+        }
+
+        // Clear the iframe
+        iframeDoc.open();
+        iframeDoc.write('<!DOCTYPE html><html><head></head><body></body></html>');
+        iframeDoc.close();
+
+        // Use rrweb-snapshot rebuild() to reconstruct DOM
+        const mirror = createMirror();
+        const cache = createCache();
+
+        rebuild(snapshot, {
+          doc: iframeDoc,
+          hackCss: true,     // converts :hover to .\:hover automatically
+          mirror,
+          cache,
+          onVisit: (_node: Node) => {
+            // Could add per-node processing here if needed
+          },
+        });
+
+        // Inject hover reanimation + click relay script
+        const scriptEl = iframeDoc.createElement('script');
+        scriptEl.textContent = INJECT_SCRIPT;
+        iframeDoc.body.appendChild(scriptEl);
+
+        // Highlight next click target
+        if (nextStep?.element_info?.selector) {
+          try {
+            const target = iframeDoc.querySelector(nextStep.element_info.selector);
+            if (target) {
+              (target as HTMLElement).style.outline = '2px solid rgba(99, 102, 241, 0.7)';
+              (target as HTMLElement).style.outlineOffset = '2px';
+              (target as HTMLElement).style.transition = 'outline 0.3s ease';
+            }
+          } catch { /* selector may be invalid */ }
+        }
+
         setLoading(false);
       })
       .catch(err => {
         if (cancelled) return;
-        setError(`Failed to load snapshot: ${err.message}`);
-        setSnapshotHtml(null);
+        setError(`Failed to load: ${err.message}`);
         setLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [currentIndex, step, hasDomSnapshot, baseUrl, token, authenticated, sessionId]);
-
-  /* ── Highlight next click target in iframe ── */
-  useEffect(() => {
-    if (!iframeRef.current?.contentWindow || !nextClickTarget) return;
-    // Wait a tick for iframe to render
-    const timer = setTimeout(() => {
-      iframeRef.current?.contentWindow?.postMessage({
-        type: 'stept-highlight-target',
-        selector: nextClickTarget,
-      }, '*');
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [snapshotHtml, nextClickTarget]);
+  }, [currentIndex, step, hasDomSnapshot, baseUrl, token, authenticated, sessionId, nextStep]);
 
   /* ── Listen for clicks from iframe ── */
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
       if (e.data?.type !== 'stept-sandbox-click') return;
-
-      // Check if click is near the next step's target
       if (!nextStep) return;
 
-      const nextEi = nextStep.element_info;
-      const nextRect = nextEi?.elementRect;
       const nextPos = nextStep.screenshot_relative_position;
+      const nextRect = nextStep.element_info?.elementRect;
 
-      // Strategy 1: selector match
-      if (nextEi?.selector && e.data.selector) {
-        // Loose match: check if clicked selector contains the target selector parts
-        const clickedSel = String(e.data.selector).toLowerCase();
-        const targetSel = String(nextEi.selector).toLowerCase();
-        if (clickedSel === targetSel || clickedSel.includes(targetSel.split(' ').pop() || '')) {
-          goTo(currentIndex + 1);
-          return;
-        }
-      }
-
-      // Strategy 2: proximity to element rect
+      // Proximity check against element rect
       if (nextRect) {
-        const cx = e.data.x;
-        const cy = e.data.y;
-        const margin = 40; // px tolerance
+        const margin = 40;
         if (
-          cx >= nextRect.x - margin && cx <= nextRect.x + nextRect.width + margin &&
-          cy >= nextRect.y - margin && cy <= nextRect.y + nextRect.height + margin
+          e.data.x >= nextRect.x - margin && e.data.x <= nextRect.x + nextRect.width + margin &&
+          e.data.y >= nextRect.y - margin && e.data.y <= nextRect.y + nextRect.height + margin
         ) {
           goTo(currentIndex + 1);
           return;
         }
       }
 
-      // Strategy 3: proximity to click position
+      // Proximity check against click position
       if (nextPos) {
         const dx = e.data.x - nextPos.x;
         const dy = e.data.y - nextPos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 60) {
+        if (Math.sqrt(dx * dx + dy * dy) < 80) {
           goTo(currentIndex + 1);
           return;
         }
       }
 
-      // Click wasn't near the target — show a gentle hint
-      showHint();
+      // Any click advances for now (better UX than showing error hints)
+      goTo(currentIndex + 1);
     }
 
     window.addEventListener('message', handleMessage);
@@ -399,7 +206,6 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
   const goNext = useCallback(() => goTo(currentIndex + 1), [goTo, currentIndex]);
   const goPrev = useCallback(() => goTo(currentIndex - 1), [goTo, currentIndex]);
 
-  /* ── Keyboard nav ── */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
@@ -409,20 +215,12 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
     return () => window.removeEventListener('keydown', onKey);
   }, [goNext, goPrev]);
 
-  /* ── Hint toast ── */
-  const [hint, setHint] = useState<string | null>(null);
-  const showHint = useCallback(() => {
-    const nextDesc = nextStep?.description || nextStep?.generated_title || 'the highlighted element';
-    setHint(`Try clicking ${nextDesc}`);
-    setTimeout(() => setHint(null), 2500);
-  }, [nextStep]);
-
   if (!step) return null;
 
   const hasImage = String(step.step_number) in files;
   const imageUrl = `${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`;
   const descText = step.description || step.generated_description || step.generated_title || '';
-  const progress = total > 1 ? ((currentIndex) / (total - 1)) * 100 : 100;
+  const progress = total > 1 ? (currentIndex / (total - 1)) * 100 : 100;
 
   return (
     <div className="flex flex-col">
@@ -448,44 +246,25 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
           </div>
         )}
 
-        {/* DOM Snapshot iframe (HTML sandbox) */}
-        {hasDomSnapshot && snapshotHtml && !loading && (
+        {/* DOM Snapshot iframe — rrweb rebuild() renders into this */}
+        {hasDomSnapshot && (
           <iframe
             ref={iframeRef}
-            srcDoc={snapshotHtml}
             sandbox="allow-same-origin allow-scripts"
             className="w-full border-0"
-            style={{ height: compact ? 400 : 600 }}
+            style={{ height: compact ? 400 : 600, display: loading || error ? 'none' : 'block' }}
             title={`Step ${currentIndex + 1}`}
           />
         )}
 
-        {/* Screenshot fallback (desktop or no snapshot) */}
-        {(!hasDomSnapshot || (!snapshotHtml && !loading)) && hasImage && (
+        {/* Screenshot fallback */}
+        {!hasDomSnapshot && hasImage && (
           <div className="p-4">
-            <div className="relative w-full">
-              <img
-                src={imageUrl}
-                alt={`Step ${currentIndex + 1}`}
-                className="w-full rounded-lg"
-              />
-              {/* Click target highlight for screenshot mode */}
-              {nextStep?.screenshot_relative_position && nextStep?.screenshot_size && (
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${(nextStep.screenshot_relative_position.x / nextStep.screenshot_size.width) * 100}%`,
-                    top: `${(nextStep.screenshot_relative_position.y / nextStep.screenshot_size.height) * 100}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <div className="absolute -inset-4 rounded-full bg-primary/20 animate-pulse" />
-                  <div className="relative h-8 w-8 rounded-full border-2 border-primary bg-primary/30">
-                    <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
-                  </div>
-                </div>
-              )}
-            </div>
+            <img
+              src={imageUrl}
+              alt={`Step ${currentIndex + 1}`}
+              className="w-full rounded-lg"
+            />
           </div>
         )}
 
@@ -500,7 +279,7 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         )}
       </div>
 
-      {/* Description + typing info */}
+      {/* Description */}
       {(descText || step.text_typed) && (
         <div className={`mt-3 rounded-lg border bg-card ${compact ? 'p-3' : 'p-4'}`}>
           {descText && <p className={compact ? 'text-sm' : 'text-base'}>{descText}</p>}

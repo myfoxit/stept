@@ -1,0 +1,108 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "images/128x128.png",
+         "16": "images/16x16.png",
+         "32": "images/32x32.png",
+         "48": "images/48x48.png"
+      }
+   },
+   "background": {
+      "service_worker": "background.bundle.js",
+      "type": "module"
+   },
+   "commands": {
+      "capture": {
+         "description": "Capture current page (when recording)",
+         "suggested_key": {
+            "default": "Alt+S"
+         }
+      },
+      "pause": {
+         "description": "Pause/resume current capture session",
+         "suggested_key": {
+            "default": "Alt+A"
+         }
+      },
+      "stop": {
+         "description": "Stop current capture session",
+         "suggested_key": {
+            "default": "Alt+Q"
+         }
+      }
+   },
+   "content_scripts": [ {
+      "all_frames": true,
+      "js": [ "sendMessagesForEvents.bundle.js" ],
+      "match_about_blank": true,
+      "matches": [ "\u003Call_urls>" ],
+      "run_at": "document_start"
+   }, {
+      "js": [ "injectedShareButtonScript.bundle.js" ],
+      "matches": [ "https://mail.google.com/*" ],
+      "run_at": "document_idle"
+   }, {
+      "js": [ "injectedShareButtonScript.bundle.js" ],
+      "matches": [ "https://www.linkedin.com/in/*" ],
+      "run_at": "document_idle"
+   }, {
+      "js": [ "injectedShareButtonScript.bundle.js" ],
+      "matches": [ "https://app.hubspot.com/*", "https://app-eu1.hubspot.com/*", "https://app-eu2.hubspot.com/*", "https://app-us1.hubspot.com/*", "https://app-us2.hubspot.com/*", "https://app-asia1.hubspot.com/*", "https://app-asia2.hubspot.com/*" ],
+      "run_at": "document_idle"
+   }, {
+      "js": [ "injectedShareButtonScript.bundle.js" ],
+      "matches": [ "https://*.lightning.force.com/*", "https://*.salesforce.com/*", "https://*.salesforce-sites.com/*" ],
+      "run_at": "document_idle"
+   }, {
+      "js": [ "markExtensionAsInstalled.bundle.js" ],
+      "matches": [ "https://*.storylane.io/*", "https://*.storylane.us/*", "http://localhost/*" ],
+      "run_at": "document_idle"
+   }, {
+      "js": [ "sendMessageToSharePage.bundle.js" ],
+      "matches": [ "\u003Call_urls>" ],
+      "run_at": "document_start"
+   }, {
+      "all_frames": true,
+      "js": [ "lib/chrome-browser-polyfill.js", "lib/web-capture-frames.js", "lib/web-capture-extension-frames.js" ],
+      "match_about_blank": true,
+      "matches": [ "\u003Call_urls>" ],
+      "run_at": "document_start"
+   }, {
+      "all_frames": true,
+      "js": [ "lib/web-capture-hooks-frames.js" ],
+      "match_about_blank": true,
+      "matches": [ "\u003Call_urls>" ],
+      "run_at": "document_start",
+      "world": "MAIN"
+   }, {
+      "js": [ "lib/chrome-browser-polyfill.js", "lib/web-capture-bootstrap.js", "lib/web-capture-extension-bootstrap.js" ],
+      "matches": [ "\u003Call_urls>" ],
+      "run_at": "document_start"
+   }, {
+      "js": [ "receiveMessagesFromFE.bundle.js" ],
+      "matches": [ "https://*.storylane.io/*", "https://*.storylane.us/*", "http://localhost/*" ],
+      "run_at": "document_start"
+   } ],
+   "description": "Capture your product application pages easily, and build interactive product demo in Storylane.",
+   "host_permissions": [ "\u003Call_urls>" ],
+   "icons": {
+      "128": "images/128x128.png",
+      "16": "images/16x16.png",
+      "32": "images/32x32.png",
+      "48": "images/48x48.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo8qGTSjpRCmXU1dZr0RDbd4Saao9P/g192R2koN8kKJkOLOXMMsau65tQvN+X22RolNuKen4V7pUFOQDVRmQFnO0UtbZBucQ4q2kT+JhJUxCXUzZML0YU/2C4uIEFH17UOaFvBlJiVDNskPkwxvuPT2di1v8JhXNI/pyPhmJvtM6X+CVhux9u+0kdBlUfPiCp7v3Ts4imglmc4U6XWffvN9vZrXZ8FFSFu0knwRexPH/8wRyjhQ/xI07bNbbo5NjEs4tDbg5RwO75XPUXAiHxhFlnlo9PzamTI4eyodpubQRO7CxmJaopdlBHhpZjK25rQt3hQ/hamtZANWsRL/PeQIDAQAB",
+   "manifest_version": 3,
+   "name": "Storylane",
+   "options_page": "options.html",
+   "permissions": [ "activeTab", "tabs", "storage", "cookies", "scripting", "tabCapture", "offscreen", "webNavigation", "system.display" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "4.0.3",
+   "web_accessible_resources": [ {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "lib/web-capture-hooks-frames.js" ]
+   }, {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "fonts/Inter.ttf" ]
+   } ]
+}
