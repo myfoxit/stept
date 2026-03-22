@@ -220,10 +220,11 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         if (nextPos && nextSize?.width && nextSize?.height) {
           const hotspot = iframeDoc.createElement('div');
           hotspot.id = 'stept-hotspot';
+          // Exact same markup as SlidesPlayer / ExpandedView hotspot
           hotspot.innerHTML = `
-            <div style="position:absolute;inset:-8px;border-radius:50%;background:rgba(99,102,241,0.2);animation:stept-ping 2s cubic-bezier(0,0,0.2,1) infinite"></div>
-            <div style="position:relative;width:16px;height:16px;border-radius:50%;background:rgba(99,102,241,0.35);border:2px solid rgba(99,102,241,0.9);display:flex;align-items:center;justify-content:center">
-              <div style="width:4px;height:4px;border-radius:50%;background:rgba(99,102,241,1)"></div>
+            <div style="position:absolute;inset:-16px;border-radius:50%;background:rgba(99,102,241,0.2);animation:stept-pulse 2s ease-in-out infinite"></div>
+            <div style="position:relative;width:32px;height:32px;border-radius:50%;border:2px solid rgba(99,102,241,0.9);background:rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center">
+              <div style="width:8px;height:8px;border-radius:50%;background:rgba(99,102,241,1)"></div>
             </div>
           `;
           hotspot.style.cssText = `
@@ -235,7 +236,7 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
             pointer-events: none;
           `;
           const style = iframeDoc.createElement('style');
-          style.textContent = '@keyframes stept-ping { 75%,100% { transform:scale(2.5); opacity:0; } }';
+          style.textContent = '@keyframes stept-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.6; transform:scale(1.3); } }';
           iframeDoc.head.appendChild(style);
           iframeDoc.body.appendChild(hotspot);
 
