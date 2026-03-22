@@ -114,6 +114,9 @@ function flushTypedText(): void {
     ? `Type "${typedText}" into the "${cleanLabel(fieldName)}" field`
     : `Type "${typedText}"`;
 
+  // Capture DOM snapshot for type events (same as clicks — enables sandbox replay)
+  const domSnapshot = captureDomSnapshot();
+
   const stepData: StepData = {
     actionType: 'Type',
     pageTitle: document.title,
@@ -123,6 +126,7 @@ function flushTypedText(): void {
     windowSize: { width: window.outerWidth, height: window.outerHeight },
     viewportSize: { width: window.innerWidth, height: window.innerHeight },
     elementInfo: elementInfo,
+    domSnapshot: domSnapshot || undefined,
   };
 
   chrome.runtime

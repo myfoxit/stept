@@ -249,8 +249,13 @@ export async function addStep(stepData: any): Promise<void> {
 
   let screenshot: string | null = null;
   const isClickAction = stepData.actionType && stepData.actionType.includes('Click');
+  const isTypeWithScreenshot = stepData._typeScreenshot;
 
-  if (isClickAction) {
+  // Use pre-captured type screenshot if available
+  if (isTypeWithScreenshot) {
+    screenshot = stepData._typeScreenshot;
+    delete stepData._typeScreenshot;
+  } else if (isClickAction) {
     if (preCapturePromise) {
       debugLog('Waiting for in-flight pre-capture to complete...');
       await preCapturePromise;

@@ -273,14 +273,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
-      case 'TYPE_EVENT':
+      case 'TYPE_EVENT': {
         // Enter/Tab can trigger navigations (form submits, link activation)
         if (message.data?.actionType === 'Key' && /Enter|Tab/.test(message.data.description || '')) {
           markUserAction();
         }
+        // Extract domSnapshot before addStep (too large for step storage)
+        const typeDomSnapshot = message.data?.domSnapshot;
+        delete message.data?.domSnapshot;
+        // For Type actions with typed text, capture a screenshot showing the result
+        // This makes typing steps visual (like click steps) instead of text-only
+        if (message.data?.actionType === 'Type' && message.data.textTyped) {
+          try {
+            const screenshot = await captureScreenshot();
+            if (screenshot) {
+              // Promote from text step to visual step with screenshot
+              message.data._typeScreenshot = screenshot;
+              // Use element center as the relative position if we have elementRect
+              const ei = message.data.elementInfo;
+              if (ei?.elementRect && message.data.windowSize) {
+                message.data.clickPosition = {
+                  x: ei.elementRect.x + ei.elementRect.width / 2,
+                  y: ei.elementRect.y + ei.elementRect.height / 2,
+                };
+                message.data.viewportSize = {
+                  width: message.data.windowSize.width,
+                  height: message.data.windowSize.height,
+                };
+              }
+            }
+          } catch (e) {
+            debugLog('Type screenshot failed:', e);
+          }
+        }
         await addStep(message.data);
+        // Queue DOM snapshot for upload alongside the screenshot
+        if (typeDomSnapshot && streamingSessionId) {
+          enqueueDomSnapshotUpload(state.stepCounter, typeDomSnapshot);
+        }
         sendResponse({ success: true });
         break;
+      }
 
       case 'GET_STEPS':
         sendResponse({ steps: state.steps });
