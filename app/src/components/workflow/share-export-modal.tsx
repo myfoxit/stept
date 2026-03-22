@@ -70,12 +70,16 @@ export function ShareExportModal({
   const [permission, setPermission] = React.useState<string>('view');
   const [inviteError, setInviteError] = React.useState<string | null>(null);
   const [embedSize, setEmbedSize] = React.useState<'small' | 'medium' | 'large'>('medium');
-  const [embedMode, setEmbedMode] = React.useState<'slides' | 'movie' | 'expanded'>('slides');
+  const [shareMode, setShareMode] = React.useState<'expanded' | 'slides' | 'movie' | 'sandbox'>('expanded');
+  const [embedMode, setEmbedMode] = React.useState<'slides' | 'movie' | 'expanded' | 'sandbox'>('slides');
   const [embedCopied, setEmbedCopied] = React.useState(false);
   const [exportLang, setExportLang] = React.useState('original');
 
-  const publicUrl = settings?.share_token
+  const publicBaseUrl = settings?.share_token
     ? `${window.location.origin}/public/workflow/${settings.share_token}`
+    : '';
+  const publicUrl = publicBaseUrl
+    ? (shareMode === 'expanded' ? publicBaseUrl : `${publicBaseUrl}?mode=${shareMode}`)
     : '';
 
   const embedWidth = embedSize === 'small' ? '640px' : embedSize === 'medium' ? '800px' : '100%';
@@ -221,20 +225,43 @@ export function ShareExportModal({
                   </div>
 
                   {settings?.is_public && publicUrl && (
-                    <div className="flex gap-2">
-                      <Input
-                        value={publicUrl}
-                        readOnly
-                        className="flex-1 text-xs font-mono bg-muted/50"
-                        onClick={(e) => (e.target as HTMLInputElement).select()}
-                      />
-                      <Button variant="outline" size="icon" aria-label="Copy public link" onClick={() => handleCopy(publicUrl)}>
-                        {copied ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
+                    <div className="space-y-3">
+                      {/* Viewing mode for shared link */}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {([
+                          ['expanded', 'Scroll'],
+                          ['slides', 'Slides'],
+                          ['movie', 'Movie'],
+                          ['sandbox', 'Try it'],
+                        ] as const).map(([value, label]) => (
+                          <button
+                            key={value}
+                            onClick={() => setShareMode(value)}
+                            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                              shareMode === value
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:bg-muted/50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={publicUrl}
+                          readOnly
+                          className="flex-1 text-xs font-mono bg-muted/50"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <Button variant="outline" size="icon" aria-label="Copy public link" onClick={() => handleCopy(publicUrl)}>
+                          {copied ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
