@@ -313,10 +313,37 @@ function handlePageUnload(): void {
   flushTypedText();
 }
 
+/** Apply JS overrides to preserve canvas/blob content during capture (Storylane technique). */
+function applyJsOverrides(): void {
+  if ((window as any).__steptOverridesApplied) return;
+  (window as any).__steptOverridesApplied = true;
+
+  // 1. Force WebGL preserveDrawingBuffer so canvas.toDataURL() works
+  const origGetContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type: string, opts?: any) {
+    if (type === 'webgl' || type === 'webgl2') {
+      opts = Object.assign({}, opts, { preserveDrawingBuffer: true });
+    }
+    return origGetContext.call(this, type, opts) as any;
+  } as any;
+
+  // 2. Prevent blob URL revocation so resources survive capture
+  const origRevoke = URL.revokeObjectURL;
+  URL.revokeObjectURL = function (url: string) {
+    // No-op during recording — blobs stay alive for snapshot capture
+    if (isRecording) return;
+    return origRevoke.call(this, url);
+  };
+
+  debugLog('JS overrides applied (WebGL buffer, blob revocation)');
+}
+
 export function startCapturing(): void {
   if (isRecording) return;
   isRecording = true;
   debugLog('Started capturing events');
+
+  applyJsOverrides();
 
   // Use pointerdown — fires before click handlers, captures pre-click state
   document.addEventListener('pointerdown', handleClick, { capture: true });
