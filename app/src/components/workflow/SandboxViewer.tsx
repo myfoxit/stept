@@ -74,29 +74,25 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   const viewerRef = useRef<HTMLDivElement>(null);
   const base = getApiBaseUrl();
 
-  const step = steps[idx];
-  const total = steps.length;
-  const next = idx < total - 1 ? steps[idx + 1] : null;
-  const hasDom = step?.has_dom_snapshot;
+  // These are kept for the useEffect deps but visual rendering uses vStep/vNext/vTotal
+  const hasDomRaw = steps[idx]?.has_dom_snapshot;
 
-  const go = useCallback((i: number) => { if (i >= 0 && i < total) setIdx(i); }, [total]);
+  const go = useCallback((i: number) => { if (i >= 0 && i < vTotal) setIdx(i); }, [vTotal]);
 
-  // Screenshot URL helper
   const imgUrl = (sn: number) => `${base.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${sn}`;
-
-  // Capture dimensions for scaling
-  const capW = step?.screenshot_size?.width || step?.window_size?.width || 1440;
-  const capH = step?.screenshot_size?.height || step?.window_size?.height || 900;
+  const hasDom = vStep?.has_dom_snapshot;
+  const capW = vStep?.screenshot_size?.width || vStep?.window_size?.width || 1440;
+  const capH = vStep?.screenshot_size?.height || vStep?.window_size?.height || 900;
 
   /* ── Load DOM snapshot ── */
   useEffect(() => {
-    if (!step || !hasDom || !iframeRef.current) return;
+    if (!vStep || !hasDom || !iframeRef.current) return;
     let cancelled = false;
     setLoading(true); setError(null);
 
     const url = authenticated && sessionId
-      ? `${base}/process-recording/session/${sessionId}/dom-snapshot/${step.step_number}`
-      : `${base.replace('/api/v1', '')}/api/v1/public/workflow/${token}/dom-snapshot/${step.step_number}`;
+      ? `${base}/process-recording/session/${sessionId}/dom-snapshot/${vStep.step_number}`
+      : `${base.replace('/api/v1', '')}/api/v1/public/workflow/${token}/dom-snapshot/${vStep.step_number}`;
 
     fetch(url, authenticated ? { credentials: 'include' } : {})
       .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
@@ -106,21 +102,21 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
         doc.open(); doc.write('<!DOCTYPE html><html><head></head><body></body></html>'); doc.close();
         rebuild(snap, { doc, hackCss: true, mirror: createMirror(), cache: createCache() });
         const s = doc.createElement('script'); s.textContent = INJECT_SCRIPT; doc.body.appendChild(s);
-        const np = next?.screenshot_relative_position;
+        const np = vNext?.screenshot_relative_position;
         if (np) injectHotspot(doc, np.x, np.y);
         setLoading(false);
       })
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
 
     return () => { cancelled = true; };
-  }, [idx, step, hasDom, base, token, authenticated, sessionId, next]);
+  }, [idx, vStep, hasDom, base, token, authenticated, sessionId, vNext]);
 
   /* ── Click detection ── */
   useEffect(() => {
     const h = (e: MessageEvent) => {
-      if (e.data?.type !== 'stept-sandbox-click' || !next) return;
-      const np = next.screenshot_relative_position;
-      const nr = next.element_info?.elementRect;
+      if (e.data?.type !== 'stept-sandbox-click' || !vNext) return;
+      const np = vNext.screenshot_relative_position;
+      const nr = vNext.element_info?.elementRect;
       // Check element rect
       if (nr) { const m=50; if (e.data.x>=nr.x-m&&e.data.x<=nr.x+nr.width+m&&e.data.y>=nr.y-m&&e.data.y<=nr.y+nr.height+m) { go(idx+1); return; } }
       // Check click position
@@ -128,7 +124,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
     };
     window.addEventListener('message', h);
     return () => window.removeEventListener('message', h);
-  }, [idx, next, go]);
+  }, [idx, vNext, go]);
 
   /* ── Keys ── */
   useEffect(() => {
@@ -147,14 +143,36 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   }, []);
   useEffect(() => { const h=()=>setFs(!!document.fullscreenElement); document.addEventListener('fullscreenchange',h); return ()=>document.removeEventListener('fullscreenchange',h); }, []);
 
-  if (!step) return null;
+  // Filter out Navigate steps — merge them into the following step's description
+  const visualSteps = React.useMemo(() => {
+    const result: (SandboxStep & { navPrefix?: string })[] = [];
+    let pendingNav: string | null = null;
+    for (const s of steps) {
+      const isNav = (s.action_type || '').toLowerCase() === 'navigate' || (s.step_type || '').toLowerCase() === 'navigate';
+      if (isNav) {
+        pendingNav = s.description || s.window_title || 'Navigate';
+      } else {
+        result.push({ ...s, navPrefix: pendingNav || undefined });
+        pendingNav = null;
+      }
+    }
+    return result;
+  }, [steps]);
 
-  const hasImg = String(step.step_number) in files;
-  const desc = next?.description || next?.generated_title || '';
-  const pct = total > 1 ? (idx / (total - 1)) * 100 : 100;
+  // Remap idx to visual steps
+  const vStep = visualSteps[idx];
+  const vNext = idx < visualSteps.length - 1 ? visualSteps[idx + 1] : null;
+  const vTotal = visualSteps.length;
+
+  if (!vStep) return null;
+
+  const hasImg = String(vStep.step_number) in files;
+  const rawDesc = vNext?.description || vNext?.generated_title || '';
+  const desc = vNext?.navPrefix ? `${vNext.navPrefix} → ${rawDesc}` : rawDesc;
+  const pct = vTotal > 1 ? (idx / (vTotal - 1)) * 100 : 100;
 
   return (
-    <div ref={viewerRef} className={`relative ${fs ? 'bg-white dark:bg-zinc-950' : ''}`} style={{ minHeight: fs ? '100vh' : undefined }}>
+    <div ref={viewerRef} className={`relative ${fs ? 'bg-white dark:bg-zinc-950' : '-mx-6 md:-mx-10 lg:-mx-16 xl:-mx-24'}`} style={{ minHeight: fs ? '100vh' : undefined }}>
       {/* Viewport container — near full viewport height */}
       <div className="relative overflow-hidden rounded-lg border" style={{ height: fs ? 'calc(100vh - 48px)' : 'calc(100vh - 120px)' }}>
 
@@ -189,17 +207,16 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
         {!hasDom && hasImg && (
           <div className="w-full h-full relative">
             <img
-              src={imgUrl(step.step_number)}
+              src={imgUrl(vStep.step_number)}
               alt={`Step ${idx + 1}`}
               className="w-full h-full object-contain"
             />
-            {/* Hotspot on screenshot */}
-            {next?.screenshot_relative_position && next?.screenshot_size && (
+            {vNext?.screenshot_relative_position && vNext?.screenshot_size && (
               <div
                 className="absolute pointer-events-none"
                 style={{
-                  left: `${(next.screenshot_relative_position.x / next.screenshot_size.width) * 100}%`,
-                  top: `${(next.screenshot_relative_position.y / next.screenshot_size.height) * 100}%`,
+                  left: `${(vNext.screenshot_relative_position.x / vNext.screenshot_size.width) * 100}%`,
+                  top: `${(vNext.screenshot_relative_position.y / vNext.screenshot_size.height) * 100}%`,
                   transform: 'translate(-50%, -50%)',
                 }}
               >
@@ -223,8 +240,8 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
 
         {/* Tooltip near the click target */}
         {desc && !loading && (() => {
-          const np = next?.screenshot_relative_position;
-          const ns = next?.screenshot_size || next?.window_size;
+          const np = vNext?.screenshot_relative_position;
+          const ns = vNext?.screenshot_size || vNext?.window_size;
           if (!np || !ns?.width || !ns?.height) return null;
           // Convert click position to percentage
           const xPct = (np.x / ns.width) * 100;
@@ -255,7 +272,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
           Step {idx + 1}
         </span>
         <div className="flex-1 flex gap-1">
-          {steps.map((_, i) => (
+          {visualSteps.map((_, i) => (
             <button
               key={i}
               onClick={() => go(i)}
@@ -266,7 +283,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
           ))}
         </div>
         <span className="flex-shrink-0 text-xs text-muted-foreground">
-          {total} steps
+          {vTotal} steps
         </span>
       </div>
     </div>
