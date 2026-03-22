@@ -1,78 +1,11 @@
 /**
  * SandboxViewer — Interactive "Try it" mode using rrweb-snapshot rebuild().
- *
- * Fetches the rrweb-snapshot JSON and uses the library's own rebuild()
- * to reconstruct a real DOM inside a sandboxed iframe.
- * hackCss: true automatically converts :hover CSS rules to .\:hover class rules.
+ * Storylane-style: full-width viewport, tooltip near click target, bottom step indicator.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MousePointer2, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { rebuild, createCache, createMirror } from 'rrweb-snapshot';
 import { getApiBaseUrl } from '@/lib/apiClient';
-
-/* ── Scaled iframe viewport: renders at original size, CSS-scaled to fit ── */
-
-function IframeViewport({
-  iframeRef,
-  loading,
-  error,
-  step,
-  compact,
-  currentIndex,
-  isFullscreen,
-}: {
-  iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  loading: boolean;
-  error: string | null;
-  step: SandboxStep;
-  compact?: boolean;
-  currentIndex: number;
-  isFullscreen: boolean;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-
-  // Original viewport from the recording
-  const captureWidth = step.screenshot_size?.width || step.window_size?.width || 1440;
-  const captureHeight = step.screenshot_size?.height || step.window_size?.height || 900;
-
-  // Compute scale to fit container
-  useEffect(() => {
-    function updateScale() {
-      if (!containerRef.current) return;
-      const containerWidth = containerRef.current.clientWidth;
-      const newScale = isFullscreen ? 1 : Math.min(containerWidth / captureWidth, 1);
-      setScale(newScale);
-    }
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [captureWidth, isFullscreen]);
-
-  const scaledHeight = captureHeight * scale;
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative overflow-hidden"
-      style={{ height: isFullscreen ? '100vh' : scaledHeight }}
-    >
-      <iframe
-        ref={iframeRef}
-        sandbox="allow-same-origin allow-scripts"
-        className="border-0 origin-top-left"
-        style={{
-          width: captureWidth,
-          height: captureHeight,
-          transform: isFullscreen ? 'none' : `scale(${scale})`,
-          transformOrigin: 'top left',
-          display: loading || error ? 'none' : 'block',
-        }}
-        title={`Step ${currentIndex + 1}`}
-      />
-    </div>
-  );
-}
 
 /* ── Types ── */
 
@@ -111,7 +44,7 @@ interface SandboxViewerProps {
   sessionId?: string;
 }
 
-/* ── Hover reanimation + click relay script ── */
+/* ── Script injected into iframe ── */
 
 const INJECT_SCRIPT = `
 (function() {
@@ -141,25 +74,81 @@ const INJECT_SCRIPT = `
 })();
 `;
 
-/* ── Component ── */
+/* ── Scaled iframe viewport ── */
+
+function IframeViewport({
+  iframeRef,
+  loading,
+  step,
+  isFullscreen,
+}: {
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  loading: boolean;
+  step: SandboxStep;
+  isFullscreen: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  const captureWidth = step.screenshot_size?.width || step.window_size?.width || 1440;
+  const captureHeight = step.screenshot_size?.height || step.window_size?.height || 900;
+
+  useEffect(() => {
+    function updateScale() {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.clientWidth;
+      setScale(isFullscreen ? 1 : Math.min(containerWidth / captureWidth, 1));
+    }
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [captureWidth, isFullscreen]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative overflow-hidden"
+      style={{ height: isFullscreen ? '100vh' : captureHeight * scale }}
+    >
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-same-origin allow-scripts"
+        className="border-0 origin-top-left"
+        style={{
+          width: captureWidth,
+          height: captureHeight,
+          transform: isFullscreen ? 'none' : `scale(${scale})`,
+          transformOrigin: 'top left',
+          display: loading ? 'none' : 'block',
+        }}
+        title="Interactive demo"
+      />
+    </div>
+  );
+}
+
+/* ── Main Component ── */
 
 export function SandboxViewer({ steps, files, token, compact, authenticated, sessionId }: SandboxViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const viewerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
   const baseUrl = getApiBaseUrl();
 
   const step = steps[currentIndex];
   const total = steps.length;
   const hasDomSnapshot = step?.has_dom_snapshot;
-
   const nextStep = currentIndex < total - 1 ? steps[currentIndex + 1] : null;
 
-  /* ── Load snapshot into iframe via rebuild() ── */
+  /* ── Navigation ── */
+  const goTo = useCallback((index: number) => {
+    if (index >= 0 && index < total) setCurrentIndex(index);
+  }, [total]);
+
+  /* ── Load snapshot into iframe ── */
   useEffect(() => {
     if (!step || !hasDomSnapshot || !iframeRef.current) return;
 
@@ -179,45 +168,28 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
       .then(snapshot => {
         if (cancelled || !iframeRef.current) return;
 
-        const iframe = iframeRef.current;
-        const iframeDoc = iframe.contentDocument;
-        if (!iframeDoc) {
-          setError('Cannot access iframe document');
-          setLoading(false);
-          return;
-        }
+        const iframeDoc = iframeRef.current.contentDocument;
+        if (!iframeDoc) { setError('Cannot access iframe'); setLoading(false); return; }
 
-        // Clear the iframe
         iframeDoc.open();
         iframeDoc.write('<!DOCTYPE html><html><head></head><body></body></html>');
         iframeDoc.close();
 
-        // Use rrweb-snapshot rebuild() to reconstruct DOM
-        const mirror = createMirror();
-        const cache = createCache();
-
         rebuild(snapshot, {
           doc: iframeDoc,
-          hackCss: true,     // converts :hover to .\:hover automatically
-          mirror,
-          cache,
-          onVisit: (_node: Node) => {
-            // Could add per-node processing here if needed
-          },
+          hackCss: true,
+          mirror: createMirror(),
+          cache: createCache(),
         });
 
-        // Inject hover reanimation + click relay script
+        // Inject hover + click relay
         const scriptEl = iframeDoc.createElement('script');
         scriptEl.textContent = INJECT_SCRIPT;
         iframeDoc.body.appendChild(scriptEl);
 
-        // Highlight next click target — inject the highlight style + find element
-        const nextSel = nextStep?.element_info?.selector;
-        
-        // Place a circular pulsing hotspot at the next step's click position
+        // Place hotspot at next step's click position
         const nextPos = nextStep?.screenshot_relative_position;
-        const nextSize = nextStep?.screenshot_size || nextStep?.window_size;
-        if (nextPos && nextSize?.width && nextSize?.height) {
+        if (nextPos) {
           const hotspot = iframeDoc.createElement('div');
           hotspot.id = 'stept-hotspot';
           hotspot.innerHTML = `
@@ -227,14 +199,8 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
               <div style="width:10px;height:10px;border-radius:50%;background:rgba(239,68,68,1)"></div>
             </div>
           `;
-          hotspot.style.cssText = `
-            position: absolute;
-            left: ${nextPos.x}px;
-            top: ${nextPos.y}px;
-            transform: translate(-50%, -50%);
-            z-index: 100000;
-            pointer-events: none;
-          `;
+          hotspot.style.cssText = `position:absolute;left:${nextPos.x}px;top:${nextPos.y}px;transform:translate(-50%,-50%);z-index:100000;pointer-events:none;`;
+
           const style = iframeDoc.createElement('style');
           style.textContent = `
             @keyframes stept-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.4); } }
@@ -242,224 +208,171 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
           `;
           iframeDoc.head.appendChild(style);
           iframeDoc.body.appendChild(hotspot);
-
-          // Scroll the hotspot into view
-          hotspot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => hotspot.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
         }
 
         setLoading(false);
       })
       .catch(err => {
         if (cancelled) return;
-        setError(`Failed to load: ${err.message}`);
+        setError(err.message);
         setLoading(false);
       });
 
     return () => { cancelled = true; };
   }, [currentIndex, step, hasDomSnapshot, baseUrl, token, authenticated, sessionId, nextStep]);
 
-  /* ── Navigation ── */
-  const goTo = useCallback((index: number) => {
-    if (index >= 0 && index < total) setCurrentIndex(index);
-  }, [total]);
-
-  const goNext = useCallback(() => goTo(currentIndex + 1), [goTo, currentIndex]);
-  const goPrev = useCallback(() => goTo(currentIndex - 1), [goTo, currentIndex]);
-
-  /* ── Listen for clicks from iframe ── */
+  /* ── Click detection ── */
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
-      if (e.data?.type !== 'stept-sandbox-click') return;
-      if (!nextStep) { return; }
+      if (e.data?.type !== 'stept-sandbox-click' || !nextStep) return;
 
       const nextSel = nextStep.element_info?.selector;
       const nextPos = nextStep.screenshot_relative_position;
       const nextRect = nextStep.element_info?.elementRect;
 
-      // Strategy 1: Check if click hit the highlighted target element
       if (nextSel && iframeRef.current?.contentDocument) {
         try {
           const target = iframeRef.current.contentDocument.querySelector(nextSel);
           if (target) {
             const rect = target.getBoundingClientRect();
-            const margin = 20;
-            if (
-              e.data.x >= rect.left - margin && e.data.x <= rect.right + margin &&
-              e.data.y >= rect.top - margin && e.data.y <= rect.bottom + margin
-            ) {
-              goTo(currentIndex + 1);
-              return;
+            const m = 30;
+            if (e.data.x >= rect.left - m && e.data.x <= rect.right + m &&
+                e.data.y >= rect.top - m && e.data.y <= rect.bottom + m) {
+              goTo(currentIndex + 1); return;
             }
           }
-        } catch { /* invalid selector */ }
+        } catch {}
       }
 
-      // Strategy 2: Proximity to recorded element rect
       if (nextRect) {
-        const margin = 40;
-        if (
-          e.data.x >= nextRect.x - margin && e.data.x <= nextRect.x + nextRect.width + margin &&
-          e.data.y >= nextRect.y - margin && e.data.y <= nextRect.y + nextRect.height + margin
-        ) {
-          goTo(currentIndex + 1);
-          return;
+        const m = 50;
+        if (e.data.x >= nextRect.x - m && e.data.x <= nextRect.x + nextRect.width + m &&
+            e.data.y >= nextRect.y - m && e.data.y <= nextRect.y + nextRect.height + m) {
+          goTo(currentIndex + 1); return;
         }
       }
 
-      // Strategy 3: Proximity to click position
       if (nextPos) {
-        const dx = e.data.x - nextPos.x;
-        const dy = e.data.y - nextPos.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 80) {
-          goTo(currentIndex + 1);
-          return;
+        const dx = e.data.x - nextPos.x, dy = e.data.y - nextPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 100) {
+          goTo(currentIndex + 1); return;
         }
       }
-
-      // Wrong click — show hint
-      const desc = nextStep?.description || nextStep?.generated_title || 'the highlighted element';
-      setHint(`Try clicking ${desc}`);
-      setTimeout(() => setHint(null), 2500);
     }
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [currentIndex, nextStep, goTo]);
 
+  /* ── Keyboard nav ── */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentIndex + 1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(currentIndex - 1); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goNext, goPrev]);
+  }, [goTo, currentIndex]);
 
+  /* ── Fullscreen ── */
   const toggleFullscreen = useCallback(() => {
     if (!viewerRef.current) return;
     if (!document.fullscreenElement) {
       viewerRef.current.requestFullscreen();
-      setIsFullscreen(true);
     } else {
       document.exitFullscreen();
-      setIsFullscreen(false);
     }
   }, []);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', h);
+    return () => document.removeEventListener('fullscreenchange', h);
   }, []);
 
   if (!step) return null;
 
   const hasImage = String(step.step_number) in files;
   const imageUrl = `${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/image/${step.step_number}`;
-  const descText = step.description || step.generated_description || step.generated_title || '';
-  const progress = total > 1 ? (currentIndex / (total - 1)) * 100 : 100;
+  const descText = nextStep?.description || nextStep?.generated_title || nextStep?.generated_description || '';
+  const progress = total > 1 ? ((currentIndex) / (total - 1)) * 100 : 100;
 
   return (
-    <div ref={viewerRef} className={`flex flex-col ${isFullscreen ? 'bg-background p-4' : ''}`}>
-      {/* Progress bar */}
-      <div className="h-1 bg-muted rounded-full overflow-hidden mb-3">
-        <div
-          className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+    <div ref={viewerRef} className={`flex flex-col ${isFullscreen ? 'bg-black' : ''}`}>
+      {/* Main viewport — taller than other modes */}
+      <div className="relative rounded-lg overflow-hidden border bg-muted/20" style={{ minHeight: isFullscreen ? '100vh' : 700 }}>
+        {/* Fullscreen toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className="absolute top-3 right-3 z-30 p-2 rounded-lg bg-black/50 text-white/80 hover:text-white hover:bg-black/70 transition-colors backdrop-blur-sm"
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
 
-      {/* Main viewport */}
-      <div className="relative bg-muted/30 rounded-lg overflow-hidden border" style={{ minHeight: compact ? 300 : 450 }}>
+        {/* Loading */}
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="absolute inset-0 flex items-center justify-center bg-background/60 z-20">
+            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
           </div>
         )}
 
+        {/* Error */}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-destructive">{error}</p>
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <p className="text-sm text-destructive bg-background/80 px-4 py-2 rounded-lg">{error}</p>
           </div>
         )}
 
-        {/* DOM Snapshot iframe — rendered at original viewport size, scaled to fit */}
+        {/* DOM Snapshot iframe */}
         {hasDomSnapshot && (
           <IframeViewport
             iframeRef={iframeRef}
             loading={loading}
-            error={error}
             step={step}
-            compact={compact}
-            currentIndex={currentIndex}
             isFullscreen={isFullscreen}
           />
         )}
 
         {/* Screenshot fallback */}
         {!hasDomSnapshot && hasImage && (
-          <div className="p-4">
-            <img
-              src={imageUrl}
-              alt={`Step ${currentIndex + 1}`}
-              className="w-full rounded-lg"
-            />
+          <div className="flex items-center justify-center p-4" style={{ minHeight: 600 }}>
+            <img src={imageUrl} alt={`Step ${currentIndex + 1}`} className="max-w-full max-h-[600px] rounded-lg shadow-lg" />
           </div>
         )}
 
-        {/* Fullscreen toggle */}
-        <button
-          onClick={toggleFullscreen}
-          className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-background/80 border text-muted-foreground hover:text-foreground transition-colors"
-          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        >
-          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </button>
-
-        {/* Hint toast */}
-        {hint && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <div className="bg-foreground text-background px-4 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
-              <MousePointer2 className="h-3.5 w-3.5" />
-              {hint}
+        {/* Tooltip near click target — Storylane style */}
+        {descText && !loading && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-700 px-5 py-4">
+              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{descText}</p>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Description */}
-      {(descText || step.text_typed) && (
-        <div className={`mt-3 rounded-lg border bg-card ${compact ? 'p-3' : 'p-4'}`}>
-          {descText && <p className={compact ? 'text-sm' : 'text-base'}>{descText}</p>}
-          {step.text_typed && (
-            <div className="mt-2 text-sm text-muted-foreground">
-              Text entered: <code className="bg-muted px-1 rounded">{step.text_typed}</code>
+        {/* Bottom step indicator — Storylane style */}
+        <div className="absolute bottom-0 left-0 right-0 z-30 px-6 pb-4 pt-8 bg-gradient-to-t from-black/40 to-transparent">
+          <div className="flex items-center gap-3">
+            {/* Step badge */}
+            <span className="flex-shrink-0 bg-black/70 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm">
+              Step {currentIndex + 1}
+            </span>
+
+            {/* Progress bar */}
+            <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-          )}
+
+            {/* Step count */}
+            <span className="flex-shrink-0 text-white/60 text-xs font-medium">
+              {total} steps
+            </span>
+          </div>
         </div>
-      )}
-
-      {/* Navigation */}
-      <div className={`flex items-center justify-between ${compact ? 'mt-3' : 'mt-4'}`}>
-        <button
-          onClick={goPrev}
-          disabled={currentIndex === 0}
-          className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back
-        </button>
-        <span className="text-sm text-muted-foreground">
-          Step {currentIndex + 1} of {total}
-        </span>
-        <button
-          onClick={goNext}
-          disabled={currentIndex === total - 1}
-          className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Next
-          <ChevronRight className="h-4 w-4" />
-        </button>
       </div>
     </div>
   );
