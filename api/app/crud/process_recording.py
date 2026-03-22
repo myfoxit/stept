@@ -103,6 +103,20 @@ async def upload_metadata(
         seen_steps[meta.step_number] = meta
     metadata = list(seen_steps.values())
 
+    # Check which steps have DOM snapshots already uploaded (streamed during recording)
+    from app.services.storage import get_storage_backend
+    backend = get_storage_backend(session.storage_type)
+    dom_snapshot_keys: dict[int, str] = {}
+    if session.storage_path:
+        for meta in metadata:
+            snap_key = f"step_{meta.step_number}_dom.json"
+            try:
+                data = await backend.read_file(session.storage_path, snap_key)
+                if data:
+                    dom_snapshot_keys[meta.step_number] = snap_key
+            except Exception:
+                pass
+
     # Create step records
     for meta in metadata:
         timestamp = meta.timestamp
@@ -134,6 +148,8 @@ async def upload_metadata(
             generated_title=meta.generated_title if ai_enabled else None,
             generated_description=meta.generated_description if ai_enabled else None,
             is_annotated=bool(meta.generated_title) if ai_enabled else False,
+            # Link DOM snapshot if it was already streamed during recording
+            dom_snapshot_key=dom_snapshot_keys.get(meta.step_number),
         )
         db.add(step)
     
