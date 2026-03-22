@@ -473,6 +473,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ matches: contextMatches });
         break;
 
+      case 'OPEN_RESOURCE': {
+        const settings = await chrome.storage.local.get(['frontendUrl', 'apiBaseUrl']);
+        const baseUrl = settings.frontendUrl || (settings.apiBaseUrl || '').replace('/api/v1', '') || 'http://localhost:5173';
+        const path = message.resourceType === 'workflow' ? 'workflow' : 'documents';
+        chrome.tabs.create({ url: `${baseUrl}/${path}/${message.resourceId}` });
+        sendResponse({ success: true });
+        break;
+      }
+
       case 'SET_DISPLAY_MODE':
         await chrome.storage.local.set({ displayMode: message.displayMode });
         await applyDisplayMode();

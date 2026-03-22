@@ -2,6 +2,7 @@
 // Mechanical port from content.js
 
 import { startCapturing, stopCapturing } from './capture';
+import { updateContextIndicator } from './context-indicator';
 import {
   createDock,
   removeDock,
@@ -109,6 +110,10 @@ if (window.__steptContentLoaded) {
         break;
       case 'STEP_ADDED':
         incrementDockSteps();
+        sendResponse({ success: true });
+        break;
+      case 'CONTEXT_MATCHES_UPDATED':
+        updateContextIndicator(message.matches || []);
         sendResponse({ success: true });
         break;
       case 'PING':

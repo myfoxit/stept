@@ -89,11 +89,23 @@ export async function checkContextLinks(tabUrl: string): Promise<void> {
       }
     }
 
+    // Notify sidepanel (runtime message)
     chrome.runtime.sendMessage({
       type: 'CONTEXT_MATCHES_UPDATED',
       matches: contextMatches,
       url: tabUrl,
     }).catch(() => {});
+
+    // Notify content script on the active tab (page-level indicator)
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab?.id) {
+        chrome.tabs.sendMessage(activeTab.id, {
+          type: 'CONTEXT_MATCHES_UPDATED',
+          matches: contextMatches,
+        }).catch(() => {});
+      }
+    } catch { /* no active tab */ }
   } catch (e) {
     debugLog('Context link check failed:', e);
     setContextMatches([]);
