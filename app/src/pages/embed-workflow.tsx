@@ -26,7 +26,7 @@ export function EmbedWorkflowPage() {
   const modeParam = searchParams.get('mode');
   const langParam = searchParams.get('lang') || '';
   const mode: ViewMode =
-    (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded')
+    (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded' || modeParam === 'sandbox')
       ? modeParam
       : 'slides';
 

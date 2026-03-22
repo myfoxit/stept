@@ -26,7 +26,7 @@ export function PublicWorkflowPage() {
 
   const modeParam = searchParams.get('mode');
   const langParam = searchParams.get('lang') || 'original';
-  const mode: ViewMode = (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded')
+  const mode: ViewMode = (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded' || modeParam === 'sandbox')
     ? modeParam
     : 'expanded';
 
