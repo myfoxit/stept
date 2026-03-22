@@ -214,50 +214,33 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         // Highlight next click target — inject the highlight style + find element
         const nextSel = nextStep?.element_info?.selector;
         
-        // Inject highlight CSS into the iframe
-        const highlightStyle = iframeDoc.createElement('style');
-        highlightStyle.textContent = `
-          @keyframes stept-pulse { 0%,100% { outline-color: rgba(99,102,241,1); box-shadow: 0 0 20px 4px rgba(99,102,241,0.4); } 50% { outline-color: rgba(99,102,241,0.5); box-shadow: 0 0 8px 2px rgba(99,102,241,0.15); } }
-          [data-stept-target] { outline: 3px solid rgba(99,102,241,1) !important; outline-offset: 4px !important; animation: stept-pulse 1.5s ease-in-out infinite !important; cursor: pointer !important; position: relative !important; z-index: 10000 !important; border-radius: 4px !important; }
-        `;
-        iframeDoc.head.appendChild(highlightStyle);
+        // Place a circular pulsing hotspot at the next step's click position
+        const nextPos = nextStep?.screenshot_relative_position;
+        const nextSize = nextStep?.screenshot_size || nextStep?.window_size;
+        if (nextPos && nextSize?.width && nextSize?.height) {
+          const hotspot = iframeDoc.createElement('div');
+          hotspot.id = 'stept-hotspot';
+          hotspot.innerHTML = `
+            <div style="position:absolute;inset:-8px;border-radius:50%;background:rgba(99,102,241,0.2);animation:stept-ping 2s cubic-bezier(0,0,0.2,1) infinite"></div>
+            <div style="position:relative;width:16px;height:16px;border-radius:50%;background:rgba(99,102,241,0.35);border:2px solid rgba(99,102,241,0.9);display:flex;align-items:center;justify-content:center">
+              <div style="width:4px;height:4px;border-radius:50%;background:rgba(99,102,241,1)"></div>
+            </div>
+          `;
+          hotspot.style.cssText = `
+            position: absolute;
+            left: ${nextPos.x}px;
+            top: ${nextPos.y}px;
+            transform: translate(-50%, -50%);
+            z-index: 100000;
+            pointer-events: none;
+          `;
+          const style = iframeDoc.createElement('style');
+          style.textContent = '@keyframes stept-ping { 75%,100% { transform:scale(2.5); opacity:0; } }';
+          iframeDoc.head.appendChild(style);
+          iframeDoc.body.appendChild(hotspot);
 
-        // Try to find and highlight the target element (retry a few times for DOM settling)
-        if (nextSel) {
-          let attempts = 0;
-          const tryHighlight = () => {
-            if (!iframeRef.current?.contentDocument) return;
-            const doc = iframeRef.current.contentDocument;
-            try {
-              const target = doc.querySelector(nextSel);
-              if (target) {
-                (target as HTMLElement).setAttribute('data-stept-target', 'true');
-                // Scroll the target into view
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                console.log('[Sandbox] Highlighted target:', nextSel, target);
-              } else if (attempts < 10) {
-                attempts++;
-                // Log what we can find for debugging
-                if (attempts === 5) {
-                  console.log('[Sandbox] Still looking for:', nextSel);
-                  console.log('[Sandbox] Body children:', doc.body?.children?.length);
-                  console.log('[Sandbox] All IDs:', Array.from(doc.querySelectorAll('[id]')).map(e => e.id).slice(0, 20));
-                  // Try just the ID part if selector has one
-                  const idMatch = nextSel.match(/#([\w-]+)/);
-                  if (idMatch) {
-                    const byId = doc.getElementById(idMatch[1]);
-                    console.log('[Sandbox] getElementById(' + idMatch[1] + '):', byId);
-                  }
-                }
-                setTimeout(tryHighlight, 300);
-              } else {
-                console.log('[Sandbox] FAILED to find target after 10 attempts:', nextSel);
-              }
-            } catch (err) {
-              console.log('[Sandbox] Invalid selector:', nextSel, err);
-            }
-          };
-          setTimeout(tryHighlight, 200);
+          // Scroll the hotspot into view
+          hotspot.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         setLoading(false);
