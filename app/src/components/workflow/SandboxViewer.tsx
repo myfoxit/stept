@@ -230,6 +230,18 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
           </div>
         )}
 
+        {/* No DOM, no image — show description card */}
+        {!hasDom && !hasImg && (
+          <div className="w-full h-full flex items-center justify-center bg-muted/30 p-8">
+            <div className="max-w-md text-center">
+              <p className="text-lg font-medium mb-2">{desc || 'Step ' + (idx + 1)}</p>
+              {vStep.text_typed && (
+                <p className="text-muted-foreground">Typed: <code className="bg-muted px-2 py-1 rounded">{vStep.text_typed}</code></p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Fullscreen toggle */}
         <button
           onClick={toggleFs}
