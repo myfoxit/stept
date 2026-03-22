@@ -220,11 +220,11 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         if (nextPos && nextSize?.width && nextSize?.height) {
           const hotspot = iframeDoc.createElement('div');
           hotspot.id = 'stept-hotspot';
-          // Exact same markup as SlidesPlayer / ExpandedView hotspot
           hotspot.innerHTML = `
-            <div style="position:absolute;inset:-16px;border-radius:50%;background:rgba(99,102,241,0.2);animation:stept-pulse 2s ease-in-out infinite"></div>
-            <div style="position:relative;width:32px;height:32px;border-radius:50%;border:2px solid rgba(99,102,241,0.9);background:rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center">
-              <div style="width:8px;height:8px;border-radius:50%;background:rgba(99,102,241,1)"></div>
+            <div style="position:absolute;inset:-20px;border-radius:50%;background:rgba(239,68,68,0.15);animation:stept-ping 2s cubic-bezier(0,0,0.2,1) infinite"></div>
+            <div style="position:absolute;inset:-10px;border-radius:50%;background:rgba(239,68,68,0.2);animation:stept-pulse 1.5s ease-in-out infinite"></div>
+            <div style="position:relative;width:36px;height:36px;border-radius:50%;border:3px solid rgba(239,68,68,1);background:rgba(239,68,68,0.25);box-shadow:0 0 16px 4px rgba(239,68,68,0.4);display:flex;align-items:center;justify-content:center">
+              <div style="width:10px;height:10px;border-radius:50%;background:rgba(239,68,68,1)"></div>
             </div>
           `;
           hotspot.style.cssText = `
@@ -236,7 +236,10 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
             pointer-events: none;
           `;
           const style = iframeDoc.createElement('style');
-          style.textContent = '@keyframes stept-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.6; transform:scale(1.3); } }';
+          style.textContent = `
+            @keyframes stept-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.4); } }
+            @keyframes stept-ping { 75%,100% { transform:scale(3); opacity:0; } }
+          `;
           iframeDoc.head.appendChild(style);
           iframeDoc.body.appendChild(hotspot);
 
