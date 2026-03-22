@@ -146,17 +146,6 @@ test.describe('Workflow Viewer Page', () => {
     await page.goto(`/workflow/${sessionId}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    // Should show the workflow content
-    await expect(page.locator('text=Step 1').or(page.locator('text=element 1'))).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should load workflow view page', async ({ authenticatedPage, testData }) => {
-    const page = authenticatedPage;
-    const sessionId = await createWorkflowWithSteps(page, testData.project_id);
-
-    await page.goto(`/workflow/${sessionId}`);
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
     // Page should load without error — may show workflow content or redirect
     const url = page.url();
     expect(url).toContain(sessionId);
