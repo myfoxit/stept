@@ -119,21 +119,24 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
         doc.open(); doc.write('<!DOCTYPE html><html><head></head><body></body></html>'); doc.close();
         rebuild(snap, { doc, hackCss: true, mirror: createMirror(), cache: createCache() });
         const s = doc.createElement('script'); s.textContent = INJECT_SCRIPT; doc.body.appendChild(s);
-        const np = vNext?.screenshot_relative_position;
-        if (np) injectHotspot(doc, np.x, np.y);
+        // Hotspot at THIS step's click position — the screenshot shows the page
+        // BEFORE the click, so the click target IS on this screenshot
+        const cp = vStep?.screenshot_relative_position;
+        if (cp) injectHotspot(doc, cp.x, cp.y);
         setLoading(false);
       })
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
 
     return () => { cancelled = true; };
-  }, [idx, vStep, hasDom, base, token, authenticated, sessionId, vNext]);
+  }, [idx, vStep, hasDom, base, token, authenticated, sessionId]);
 
   /* ── Click detection ── */
   useEffect(() => {
     const h = (e: MessageEvent) => {
-      if (e.data?.type !== 'stept-sandbox-click' || !vNext) return;
-      const np = vNext.screenshot_relative_position;
-      const nr = vNext.element_info?.elementRect;
+      if (e.data?.type !== 'stept-sandbox-click' || !vStep) return;
+      // Click target is on the CURRENT step (screenshot is pre-click state)
+      const np = vStep.screenshot_relative_position;
+      const nr = vStep.element_info?.elementRect;
       // Check element rect
       if (nr) { const m=50; if (e.data.x>=nr.x-m&&e.data.x<=nr.x+nr.width+m&&e.data.y>=nr.y-m&&e.data.y<=nr.y+nr.height+m) { go(idx+1); return; } }
       // Check click position
@@ -141,7 +144,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
     };
     window.addEventListener('message', h);
     return () => window.removeEventListener('message', h);
-  }, [idx, vNext, go]);
+  }, [idx, vStep, go]);
 
   /* ── Keys ── */
   useEffect(() => {
@@ -163,8 +166,9 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   if (!vStep) return null;
 
   const hasImg = String(vStep.step_number) in files;
-  const rawDesc = vNext?.description || vNext?.generated_title || '';
-  const desc = vNext?.navPrefix ? `${vNext.navPrefix} → ${rawDesc}` : rawDesc;
+  // Tooltip shows CURRENT step's action — what the user needs to do
+  const rawDesc = vStep?.description || vStep?.generated_title || '';
+  const desc = (vStep as any)?.navPrefix ? `${(vStep as any).navPrefix} → ${rawDesc}` : rawDesc;
   const pct = vTotal > 1 ? (idx / (vTotal - 1)) * 100 : 100;
 
   return (
@@ -207,12 +211,12 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
               alt={`Step ${idx + 1}`}
               className="w-full h-full object-contain"
             />
-            {vNext?.screenshot_relative_position && vNext?.screenshot_size && (
+            {vStep?.screenshot_relative_position && vStep?.screenshot_size && (
               <div
                 className="absolute pointer-events-none"
                 style={{
-                  left: `${(vNext.screenshot_relative_position.x / vNext.screenshot_size.width) * 100}%`,
-                  top: `${(vNext.screenshot_relative_position.y / vNext.screenshot_size.height) * 100}%`,
+                  left: `${(vStep.screenshot_relative_position.x / vStep.screenshot_size.width) * 100}%`,
+                  top: `${(vStep.screenshot_relative_position.y / vStep.screenshot_size.height) * 100}%`,
                   transform: 'translate(-50%, -50%)',
                 }}
               >
@@ -236,8 +240,8 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
 
         {/* Tooltip near the click target */}
         {desc && !loading && (() => {
-          const np = vNext?.screenshot_relative_position;
-          const ns = vNext?.screenshot_size || vNext?.window_size;
+          const np = vStep?.screenshot_relative_position;
+          const ns = vStep?.screenshot_size || vStep?.window_size;
           if (!np || !ns?.width || !ns?.height) return null;
           // Convert click position to percentage
           const xPct = (np.x / ns.width) * 100;
