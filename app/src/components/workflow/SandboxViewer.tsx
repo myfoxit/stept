@@ -155,8 +155,8 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
 
   return (
     <div ref={viewerRef} className={`relative ${fs ? 'bg-white dark:bg-zinc-950' : ''}`} style={{ minHeight: fs ? '100vh' : undefined }}>
-      {/* Viewport container — full bleed, no padding */}
-      <div className="relative overflow-hidden rounded-lg border" style={{ height: fs ? 'calc(100vh - 48px)' : Math.min(capH * Math.min(1, (typeof window !== 'undefined' ? window.innerWidth : 1200) / capW), 800) }}>
+      {/* Viewport container — near full viewport height */}
+      <div className="relative overflow-hidden rounded-lg border" style={{ height: fs ? 'calc(100vh - 48px)' : 'calc(100vh - 120px)' }}>
 
         {/* Loading spinner */}
         {loading && (
@@ -221,14 +221,32 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
           {fs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
 
-        {/* Tooltip with step description */}
-        {desc && !loading && (
-          <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-30 max-w-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-xl border px-4 py-3">
-              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{desc}</p>
+        {/* Tooltip near the click target */}
+        {desc && !loading && (() => {
+          const np = next?.screenshot_relative_position;
+          const ns = next?.screenshot_size || next?.window_size;
+          if (!np || !ns?.width || !ns?.height) return null;
+          // Convert click position to percentage
+          const xPct = (np.x / ns.width) * 100;
+          const yPct = (np.y / ns.height) * 100;
+          // Position tooltip: to the right of hotspot if space, otherwise left
+          const tooltipLeft = xPct < 60;
+          return (
+            <div
+              className="absolute z-30 max-w-xs animate-in fade-in duration-300 pointer-events-none"
+              style={{
+                top: `${Math.max(5, Math.min(yPct - 5, 75))}%`,
+                ...(tooltipLeft
+                  ? { left: `${Math.min(xPct + 5, 70)}%` }
+                  : { right: `${Math.min(100 - xPct + 5, 70)}%` }),
+              }}
+            >
+              <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-xl border-2 border-dashed border-red-300 dark:border-red-700 px-4 py-3">
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{desc}</p>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* ── Bottom step bar — outside the viewport, always visible ── */}
