@@ -74,25 +74,9 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   const viewerRef = useRef<HTMLDivElement>(null);
   const base = getApiBaseUrl();
 
-  // Filter out Navigate steps — merge into following step's description
-  const visualSteps = React.useMemo(() => {
-    const result: (SandboxStep & { navPrefix?: string })[] = [];
-    let pendingNav: string | null = null;
-    for (const s of steps) {
-      const isNav = (s.action_type || '').toLowerCase() === 'navigate' || (s.step_type || '').toLowerCase() === 'navigate';
-      if (isNav) {
-        pendingNav = s.description || s.window_title || 'Navigate';
-      } else {
-        result.push({ ...s, navPrefix: pendingNav || undefined });
-        pendingNav = null;
-      }
-    }
-    return result;
-  }, [steps]);
-
-  const vStep = visualSteps[idx];
-  const vNext = idx < visualSteps.length - 1 ? visualSteps[idx + 1] : null;
-  const vTotal = visualSteps.length;
+  // Steps are already filtered (navigate merged) by WorkflowViewer/public page
+  const vStep = steps[idx];
+  const vTotal = steps.length;
 
   const go = useCallback((i: number) => { if (i >= 0 && i < vTotal) setIdx(i); }, [vTotal]);
 
@@ -168,7 +152,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   const hasImg = String(vStep.step_number) in files;
   // Tooltip shows CURRENT step's action — what the user needs to do
   const rawDesc = vStep?.description || vStep?.generated_title || '';
-  const desc = (vStep as any)?.navPrefix ? `${(vStep as any).navPrefix} → ${rawDesc}` : rawDesc;
+  const desc = rawDesc;
   const pct = vTotal > 1 ? (idx / (vTotal - 1)) * 100 : 100;
 
   return (
@@ -284,7 +268,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
           Step {idx + 1}
         </span>
         <div className="flex-1 flex gap-1">
-          {visualSteps.map((_, i) => (
+          {steps.map((_, i) => (
             <button
               key={i}
               onClick={() => go(i)}

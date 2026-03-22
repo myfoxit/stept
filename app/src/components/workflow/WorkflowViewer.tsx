@@ -25,6 +25,31 @@ export interface PublicStep {
   has_dom_snapshot?: boolean;
 }
 
+/**
+ * Filter navigate steps out of the visual step list.
+ * Navigate info is merged as a prefix on the following step's description.
+ * Used by ALL viewer modes — navigate is never a separate visual step.
+ */
+export function prepareVisualSteps(steps: PublicStep[]): PublicStep[] {
+  const result: PublicStep[] = [];
+  let pendingNav: string | null = null;
+  for (const s of steps) {
+    const action = (s.action_type || '').toLowerCase();
+    const stype = (s.step_type || '').toLowerCase();
+    const isNav = action === 'navigate' || stype === 'navigate';
+    if (isNav) {
+      pendingNav = s.description || s.window_title || null;
+    } else {
+      const step = pendingNav
+        ? { ...s, description: `${pendingNav} → ${s.description || s.generated_title || ''}` }
+        : s;
+      result.push(step);
+      pendingNav = null;
+    }
+  }
+  return result;
+}
+
 export interface PublicWorkflow {
   id: string;
   name: string;
@@ -173,9 +198,13 @@ export function WorkflowViewer({
   compact,
   showModeSelector = false,
 }: WorkflowViewerProps) {
+  // Filter navigate steps for ALL viewer modes
+  const visualSteps = useMemo(() => prepareVisualSteps(workflow.steps), [workflow.steps]);
+  const visualWorkflow = useMemo(() => ({ ...workflow, steps: visualSteps }), [workflow, visualSteps]);
+
   const hasDomSnapshots = useMemo(
-    () => workflow.steps.some(s => s.has_dom_snapshot),
-    [workflow.steps],
+    () => visualSteps.some(s => s.has_dom_snapshot),
+    [visualSteps],
   );
 
   return (
@@ -187,12 +216,12 @@ export function WorkflowViewer({
       )}
 
       {mode === 'expanded' && (
-        <ExpandedView workflow={workflow} token={token} compact={compact} />
+        <ExpandedView workflow={visualWorkflow} token={token} compact={compact} />
       )}
 
       {mode === 'slides' && (
         <SlidesPlayer
-          steps={workflow.steps}
+          steps={visualSteps}
           files={workflow.files}
           token={token}
           compact={compact}
@@ -201,7 +230,7 @@ export function WorkflowViewer({
 
       {mode === 'movie' && (
         <MoviePlayer
-          steps={workflow.steps}
+          steps={visualSteps}
           files={workflow.files}
           token={token}
           compact={compact}
@@ -210,7 +239,7 @@ export function WorkflowViewer({
 
       {mode === 'sandbox' && (
         <SandboxViewer
-          steps={workflow.steps}
+          steps={visualSteps}
           files={workflow.files}
           token={token}
           compact={compact}

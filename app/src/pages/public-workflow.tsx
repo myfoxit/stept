@@ -6,7 +6,7 @@ import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
-import { WorkflowViewer, type ViewMode, type PublicWorkflow } from '@/components/workflow/WorkflowViewer';
+import { WorkflowViewer, type ViewMode, type PublicWorkflow, prepareVisualSteps } from '@/components/workflow/WorkflowViewer';
 import { SandboxViewer } from '@/components/workflow/SandboxViewer';
 import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
 
@@ -94,7 +94,7 @@ export function PublicWorkflowPage() {
     return (
       <div className="min-h-screen bg-background">
         <SandboxViewer
-          steps={workflow.steps}
+          steps={prepareVisualSteps(workflow.steps)}
           files={workflow.files}
           token={token!}
         />
