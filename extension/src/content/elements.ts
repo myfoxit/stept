@@ -331,8 +331,18 @@ export function gatherElementInfo(target: Element): ElementInfo {
       width: target.getBoundingClientRect().width,
       height: target.getBoundingClientRect().height,
     },
-    // Enhanced element capture fields
-    selector: generateStableSelector(target),
+    // Enhanced element capture fields — selector validated against live DOM
+    selector: (() => {
+      const sel = generateStableSelector(target);
+      // Storylane pattern: verify selector resolves to THIS element (not just unique)
+      if (sel) {
+        try {
+          const found = document.querySelector(sel);
+          if (found !== target) return null; // selector doesn't point to the right element
+        } catch { return null; }
+      }
+      return sel;
+    })(),
     xpath: generateXPath(target),
     dataId: target.getAttribute('data-id') || null,
     dataRole: target.getAttribute('data-role') || null,
