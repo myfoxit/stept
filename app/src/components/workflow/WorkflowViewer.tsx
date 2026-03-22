@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { getApiBaseUrl } from '@/lib/apiClient';
 import { ModeSelector, type ViewMode } from './ModeSelector';
 import { SlidesPlayer } from './SlidesPlayer';
 import { MoviePlayer } from './MoviePlayer';
+import { SandboxViewer } from './SandboxViewer';
 
 /* ── Types (shared) ── */
 
 export interface PublicStep {
   step_number: number;
   step_type: string | null;
+  action_type?: string | null;
   description: string | null;
   content: string | null;
   window_title: string | null;
@@ -19,6 +21,8 @@ export interface PublicStep {
   screenshot_relative_position: { x: number; y: number } | null;
   screenshot_size: { width: number; height: number } | null;
   window_size: { width: number; height: number } | null;
+  element_info?: Record<string, unknown> | null;
+  has_dom_snapshot?: boolean;
 }
 
 export interface PublicWorkflow {
@@ -169,11 +173,16 @@ export function WorkflowViewer({
   compact,
   showModeSelector = false,
 }: WorkflowViewerProps) {
+  const hasDomSnapshots = useMemo(
+    () => workflow.steps.some(s => s.has_dom_snapshot),
+    [workflow.steps],
+  );
+
   return (
     <div>
       {showModeSelector && onModeChange && (
         <div className={compact ? 'mb-3' : 'mb-6'}>
-          <ModeSelector mode={mode} onChange={onModeChange} compact={compact} />
+          <ModeSelector mode={mode} onChange={onModeChange} compact={compact} hasDomSnapshots={hasDomSnapshots} />
         </div>
       )}
 
@@ -192,6 +201,15 @@ export function WorkflowViewer({
 
       {mode === 'movie' && (
         <MoviePlayer
+          steps={workflow.steps}
+          files={workflow.files}
+          token={token}
+          compact={compact}
+        />
+      )}
+
+      {mode === 'sandbox' && (
+        <SandboxViewer
           steps={workflow.steps}
           files={workflow.files}
           token={token}
