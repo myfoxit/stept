@@ -239,6 +239,14 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
     return () => { cancelled = true; };
   }, [currentIndex, step, hasDomSnapshot, baseUrl, token, authenticated, sessionId, nextStep]);
 
+  /* ── Navigation ── */
+  const goTo = useCallback((index: number) => {
+    if (index >= 0 && index < total) setCurrentIndex(index);
+  }, [total]);
+
+  const goNext = useCallback(() => goTo(currentIndex + 1), [goTo, currentIndex]);
+  const goPrev = useCallback(() => goTo(currentIndex - 1), [goTo, currentIndex]);
+
   /* ── Listen for clicks from iframe ── */
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
@@ -298,14 +306,6 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [currentIndex, nextStep, goTo]);
-
-  /* ── Navigation ── */
-  const goTo = useCallback((index: number) => {
-    if (index >= 0 && index < total) setCurrentIndex(index);
-  }, [total]);
-
-  const goNext = useCallback(() => goTo(currentIndex + 1), [goTo, currentIndex]);
-  const goPrev = useCallback(() => goTo(currentIndex - 1), [goTo, currentIndex]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
