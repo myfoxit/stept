@@ -350,6 +350,7 @@ export function ShareExportModal({
                       ['slides', 'Slides'],
                       ['movie', 'Movie'],
                       ['expanded', 'Expanded'],
+                      ['sandbox', 'Try it'],
                     ] as const).map(([value, label]) => (
                       <button
                         key={value}
