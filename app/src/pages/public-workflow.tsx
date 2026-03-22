@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiBaseUrl } from '@/lib/apiClient';
 import { WorkflowViewer, type ViewMode, type PublicWorkflow } from '@/components/workflow/WorkflowViewer';
+import { SandboxViewer } from '@/components/workflow/SandboxViewer';
 import { ContentLanguageToggle } from '@/components/ui/content-language-toggle';
 
 async function fetchPublicWorkflow(token: string, lang?: string): Promise<PublicWorkflow> {
@@ -29,18 +30,6 @@ export function PublicWorkflowPage() {
   const mode: ViewMode = (modeParam === 'movie' || modeParam === 'slides' || modeParam === 'expanded' || modeParam === 'sandbox')
     ? modeParam
     : 'expanded';
-
-  const setMode = (m: ViewMode) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (m === 'expanded') {
-        next.delete('mode');
-      } else {
-        next.set('mode', m);
-      }
-      return next;
-    }, { replace: true });
-  };
 
   const setLang = (lang: string) => {
     setSearchParams((prev) => {
@@ -100,6 +89,25 @@ export function PublicWorkflowPage() {
     );
   }
 
+  // ── Sandbox mode: dedicated full-screen layout, no chrome ──
+  if (mode === 'sandbox') {
+    return (
+      <div className="min-h-screen bg-background">
+        <SandboxViewer
+          steps={workflow.steps}
+          files={workflow.files}
+          token={token!}
+        />
+        <div className="fixed bottom-2 right-3 z-50">
+          <a href="/" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+            Made with Stept
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Classic modes: Slides / Movie / Expanded ──
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
@@ -130,14 +138,12 @@ export function PublicWorkflowPage() {
           <p className="text-muted-foreground mb-8">{workflow.summary}</p>
         )}
 
-        {/* Viewer with mode selector */}
+        {/* Viewer — no mode selector for public viewers, author chose the mode */}
         <WorkflowViewer
           workflow={workflow}
           token={token!}
           mode={mode}
-          onModeChange={setMode}
           compact={false}
-          showModeSelector
         />
 
         {/* Footer */}

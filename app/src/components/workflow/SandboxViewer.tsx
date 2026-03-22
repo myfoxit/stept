@@ -168,7 +168,7 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   const pct = vTotal > 1 ? (idx / (vTotal - 1)) * 100 : 100;
 
   return (
-    <div ref={viewerRef} className={`relative ${fs ? 'bg-white dark:bg-zinc-950' : '-mx-6 md:-mx-10 lg:-mx-16 xl:-mx-24'}`} style={{ minHeight: fs ? '100vh' : undefined }}>
+    <div ref={viewerRef} className={`relative ${fs ? 'bg-white dark:bg-zinc-950' : ''}`} style={{ minHeight: fs ? '100vh' : undefined }}>
       {/* Viewport container — near full viewport height */}
       <div className="relative overflow-hidden rounded-lg border" style={{ height: fs ? 'calc(100vh - 48px)' : 'calc(100vh - 120px)' }}>
 
