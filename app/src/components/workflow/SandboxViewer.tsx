@@ -6,9 +6,73 @@
  * hackCss: true automatically converts :hover CSS rules to .\:hover class rules.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MousePointer2, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MousePointer2, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { rebuild, createCache, createMirror } from 'rrweb-snapshot';
 import { getApiBaseUrl } from '@/lib/apiClient';
+
+/* ── Scaled iframe viewport: renders at original size, CSS-scaled to fit ── */
+
+function IframeViewport({
+  iframeRef,
+  loading,
+  error,
+  step,
+  compact,
+  currentIndex,
+  isFullscreen,
+}: {
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  loading: boolean;
+  error: string | null;
+  step: SandboxStep;
+  compact?: boolean;
+  currentIndex: number;
+  isFullscreen: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  // Original viewport from the recording
+  const captureWidth = step.screenshot_size?.width || step.window_size?.width || 1440;
+  const captureHeight = step.screenshot_size?.height || step.window_size?.height || 900;
+
+  // Compute scale to fit container
+  useEffect(() => {
+    function updateScale() {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.clientWidth;
+      const newScale = isFullscreen ? 1 : Math.min(containerWidth / captureWidth, 1);
+      setScale(newScale);
+    }
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [captureWidth, isFullscreen]);
+
+  const scaledHeight = captureHeight * scale;
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative overflow-hidden"
+      style={{ height: isFullscreen ? '100vh' : scaledHeight }}
+    >
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-same-origin allow-scripts"
+        className="border-0 origin-top-left"
+        style={{
+          width: captureWidth,
+          height: captureHeight,
+          transform: isFullscreen ? 'none' : `scale(${scale})`,
+          transformOrigin: 'top left',
+          display: loading || error ? 'none' : 'block',
+        }}
+        title={`Step ${currentIndex + 1}`}
+      />
+    </div>
+  );
+}
 
 /* ── Types ── */
 
@@ -75,6 +139,8 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const viewerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const baseUrl = getApiBaseUrl();
 
@@ -96,7 +162,7 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
       ? `${baseUrl}/process-recording/session/${sessionId}/dom-snapshot/${step.step_number}`
       : `${baseUrl.replace('/api/v1', '')}/api/v1/public/workflow/${token}/dom-snapshot/${step.step_number}`;
 
-    fetch(url, { credentials: 'include' })
+    fetch(url, authenticated ? { credentials: 'include' } : {})
       .then(res => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json();
@@ -215,6 +281,23 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
     return () => window.removeEventListener('keydown', onKey);
   }, [goNext, goPrev]);
 
+  const toggleFullscreen = useCallback(() => {
+    if (!viewerRef.current) return;
+    if (!document.fullscreenElement) {
+      viewerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
   if (!step) return null;
 
   const hasImage = String(step.step_number) in files;
@@ -223,7 +306,7 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
   const progress = total > 1 ? (currentIndex / (total - 1)) * 100 : 100;
 
   return (
-    <div className="flex flex-col">
+    <div ref={viewerRef} className={`flex flex-col ${isFullscreen ? 'bg-background p-4' : ''}`}>
       {/* Progress bar */}
       <div className="h-1 bg-muted rounded-full overflow-hidden mb-3">
         <div
@@ -246,14 +329,16 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
           </div>
         )}
 
-        {/* DOM Snapshot iframe — rrweb rebuild() renders into this */}
+        {/* DOM Snapshot iframe — rendered at original viewport size, scaled to fit */}
         {hasDomSnapshot && (
-          <iframe
-            ref={iframeRef}
-            sandbox="allow-same-origin allow-scripts"
-            className="w-full border-0"
-            style={{ height: compact ? 400 : 600, display: loading || error ? 'none' : 'block' }}
-            title={`Step ${currentIndex + 1}`}
+          <IframeViewport
+            iframeRef={iframeRef}
+            loading={loading}
+            error={error}
+            step={step}
+            compact={compact}
+            currentIndex={currentIndex}
+            isFullscreen={isFullscreen}
           />
         )}
 
@@ -267,6 +352,15 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
             />
           </div>
         )}
+
+        {/* Fullscreen toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-background/80 border text-muted-foreground hover:text-foreground transition-colors"
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
 
         {/* Hint toast */}
         {hint && (
