@@ -25,7 +25,7 @@ async def test_enterprise_search(async_client: AsyncClient, auth_headers: dict, 
     resp = await async_client.post(
         "/api/v1/enterprise/search",
         json={"query": "test workflow"},
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"X-API-Key": api_key},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -50,7 +50,7 @@ async def test_enterprise_projects(async_client: AsyncClient, auth_headers: dict
 
     resp = await async_client.get(
         "/api/v1/enterprise/projects",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"X-API-Key": api_key},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -64,7 +64,7 @@ async def test_enterprise_stats(async_client: AsyncClient, auth_headers: dict, t
 
     resp = await async_client.get(
         "/api/v1/enterprise/stats",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"X-API-Key": api_key},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -81,7 +81,7 @@ async def test_enterprise_search_empty_query(async_client: AsyncClient, auth_hea
     resp = await async_client.post(
         "/api/v1/enterprise/search",
         json={"query": ""},
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"X-API-Key": api_key},
     )
     assert resp.status_code == 422
 
@@ -91,6 +91,6 @@ async def test_enterprise_invalid_api_key(async_client: AsyncClient):
     resp = await async_client.post(
         "/api/v1/enterprise/search",
         json={"query": "test"},
-        headers={"Authorization": "Bearer stept_invalid_key_12345"},
+        headers={"X-API-Key": "stept_invalid_key_12345"},
     )
     assert resp.status_code in [401, 403]

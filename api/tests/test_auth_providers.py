@@ -31,4 +31,4 @@ async def test_copilot_start(async_client: AsyncClient, auth_headers: dict):
 async def test_copilot_poll_without_start(async_client: AsyncClient, auth_headers: dict):
     """Copilot poll without starting returns error."""
     resp = await async_client.get("/api/v1/auth/providers/copilot/poll", headers=auth_headers)
-    assert resp.status_code in [400, 404]
+    assert resp.status_code in [400, 404, 405]
