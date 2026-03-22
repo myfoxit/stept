@@ -41,6 +41,7 @@ def _serialize_workflow(session, permission: str = "view"):
         step_dict = {
             "step_number": step.step_number,
             "step_type": step.step_type,
+            "action_type": step.action_type,
             "description": step.description,
             "content": step.content,
             "window_title": step.window_title,
@@ -51,6 +52,8 @@ def _serialize_workflow(session, permission: str = "view"):
             "screenshot_relative_position": step.screenshot_relative_position,
             "screenshot_size": step.screenshot_size,
             "window_size": step.window_size,
+            "element_info": step.element_info,
+            "has_dom_snapshot": bool(step.dom_snapshot_key),
         }
         steps_data.append(step_dict)
 

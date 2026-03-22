@@ -605,6 +605,7 @@ async def get_session_status(
             "url": step.url,
             "owner_app": step.owner_app,
             "element_info": step.element_info,
+            "has_dom_snapshot": bool(step.dom_snapshot_key),
             "file_uploaded": step.step_number in file_steps,
             # AI annotation fields
             "step_id": step.id,
