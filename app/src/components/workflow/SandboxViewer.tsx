@@ -202,17 +202,31 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         scriptEl.textContent = INJECT_SCRIPT;
         iframeDoc.body.appendChild(scriptEl);
 
-        // Highlight next click target
-        if (nextStep?.element_info?.selector) {
-          try {
-            const target = iframeDoc.querySelector(nextStep.element_info.selector);
-            if (target) {
-              (target as HTMLElement).style.outline = '2px solid rgba(99, 102, 241, 0.7)';
-              (target as HTMLElement).style.outlineOffset = '2px';
-              (target as HTMLElement).style.transition = 'outline 0.3s ease';
-            }
-          } catch { /* selector may be invalid */ }
-        }
+        // Highlight next click target after a short delay (DOM needs to settle)
+        setTimeout(() => {
+          if (!iframeRef.current?.contentDocument) return;
+          const doc = iframeRef.current.contentDocument;
+          const sel = nextStep?.element_info?.selector;
+          if (sel) {
+            try {
+              const target = doc.querySelector(sel);
+              if (target) {
+                const el = target as HTMLElement;
+                el.style.outline = '3px solid rgba(99, 102, 241, 0.8)';
+                el.style.outlineOffset = '3px';
+                el.style.borderRadius = '4px';
+                // Add pulsing animation
+                const style = doc.createElement('style');
+                style.textContent = `
+                  @keyframes stept-pulse { 0%,100% { outline-color: rgba(99,102,241,0.8); } 50% { outline-color: rgba(99,102,241,0.3); } }
+                  [data-stept-target] { animation: stept-pulse 2s ease-in-out infinite; cursor: pointer !important; }
+                `;
+                doc.head.appendChild(style);
+                el.setAttribute('data-stept-target', 'true');
+              }
+            } catch { /* selector may be invalid */ }
+          }
+        }, 300);
 
         setLoading(false);
       })
@@ -229,12 +243,31 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
       if (e.data?.type !== 'stept-sandbox-click') return;
-      if (!nextStep) return;
+      if (!nextStep) { return; }
 
+      const nextSel = nextStep.element_info?.selector;
       const nextPos = nextStep.screenshot_relative_position;
       const nextRect = nextStep.element_info?.elementRect;
 
-      // Proximity check against element rect
+      // Strategy 1: Check if click hit the highlighted target element
+      if (nextSel && iframeRef.current?.contentDocument) {
+        try {
+          const target = iframeRef.current.contentDocument.querySelector(nextSel);
+          if (target) {
+            const rect = target.getBoundingClientRect();
+            const margin = 20;
+            if (
+              e.data.x >= rect.left - margin && e.data.x <= rect.right + margin &&
+              e.data.y >= rect.top - margin && e.data.y <= rect.bottom + margin
+            ) {
+              goTo(currentIndex + 1);
+              return;
+            }
+          }
+        } catch { /* invalid selector */ }
+      }
+
+      // Strategy 2: Proximity to recorded element rect
       if (nextRect) {
         const margin = 40;
         if (
@@ -246,7 +279,7 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         }
       }
 
-      // Proximity check against click position
+      // Strategy 3: Proximity to click position
       if (nextPos) {
         const dx = e.data.x - nextPos.x;
         const dy = e.data.y - nextPos.y;
@@ -256,13 +289,15 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         }
       }
 
-      // Any click advances for now (better UX than showing error hints)
-      goTo(currentIndex + 1);
+      // Wrong click — show hint
+      const desc = nextStep?.description || nextStep?.generated_title || 'the highlighted element';
+      setHint(`Try clicking ${desc}`);
+      setTimeout(() => setHint(null), 2500);
     }
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [currentIndex, nextStep]);
+  }, [currentIndex, nextStep, goTo]);
 
   /* ── Navigation ── */
   const goTo = useCallback((index: number) => {
