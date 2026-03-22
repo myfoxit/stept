@@ -212,6 +212,54 @@ async def get_public_workflow_image(
     raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
 
 
+@router.get("/workflow/{share_token}/dom-snapshot/{step_number}")
+async def get_public_dom_snapshot(
+    share_token: str,
+    step_number: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    _rl=Depends(_public_limiter),
+):
+    """Get a DOM snapshot from a publicly shared workflow (for sandbox replay)."""
+    from fastapi.responses import Response
+
+    stmt = select(ProcessRecordingSession).options(
+        selectinload(ProcessRecordingSession.steps)
+    ).where(ProcessRecordingSession.share_token == share_token)
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+
+    if not session.is_public:
+        if not current_user:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+        allowed, _ = await can_access_resource("workflow", session.id, current_user, db)
+        if not allowed:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Workflow not found or not public")
+
+    step = next((s for s in session.steps if s.step_number == step_number), None)
+    if not step or not step.dom_snapshot_key:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "DOM snapshot not found")
+
+    from app.services.storage import get_storage_backend
+    backend = get_storage_backend(session.storage_type)
+    try:
+        data = await backend.read_file(session.storage_path, step.dom_snapshot_key)
+        if not data:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "DOM snapshot file not found")
+        return Response(
+            content=data,
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/document/{share_token}")
 async def get_public_document(
     share_token: str,

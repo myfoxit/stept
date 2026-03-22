@@ -383,6 +383,47 @@ async def upload_dom_snapshot(
     return {"status": "ok"}
 
 
+@router.get("/session/{session_id}/dom-snapshot/{step_number}")
+async def get_dom_snapshot(
+    session_id: str,
+    step_number: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve a DOM snapshot JSON for a recording step."""
+    await _verify_session_access(db, session_id, current_user.id)
+
+    stmt = select(ProcessRecordingStep).where(
+        ProcessRecordingStep.session_id == session_id,
+        ProcessRecordingStep.step_number == step_number,
+    )
+    result = await db.execute(stmt)
+    step = result.scalar_one_or_none()
+    if not step or not step.dom_snapshot_key:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "DOM snapshot not found")
+
+    session = await db.get(ProcessRecordingSession, session_id)
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+
+    from app.services.storage import get_storage_backend
+    backend = get_storage_backend(session.storage_type)
+    try:
+        data = await backend.read_file(session.storage_path, step.dom_snapshot_key)
+        if not data:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "DOM snapshot file not found")
+        from fastapi.responses import Response
+        return Response(
+            content=data,
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("/session/{session_id}/audio", status_code=status.HTTP_200_OK)
 async def upload_audio(
     session_id: str,
