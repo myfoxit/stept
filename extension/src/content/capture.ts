@@ -37,9 +37,9 @@ function isInputLike(el: Element | null): el is HTMLInputElement | HTMLTextAreaE
     ((el as HTMLElement).isContentEditable && tag !== 'body');
 }
 
-function sendClickStep(stepData: StepData): void {
-  // Capture DOM snapshot for click events (non-blocking, best-effort)
-  const domSnapshot = captureDomSnapshot();
+function sendClickStep(stepData: StepData, preSnapshot?: string | null): void {
+  // Use pre-captured snapshot (from pointerdown) if available, otherwise capture now
+  const domSnapshot = preSnapshot || captureDomSnapshot();
   const messageData: StepData = domSnapshot
     ? Object.assign({}, stepData, { domSnapshot: domSnapshot })
     : stepData;
@@ -153,8 +153,10 @@ function handleClick(event: PointerEvent): void {
   flushTypedText();
 
   // Pre-capture screenshot immediately at pointerdown, BEFORE click effects propagate.
-  // Background stores the result and uses it when CLICK_EVENT arrives later.
   chrome.runtime.sendMessage({ type: 'PRE_CAPTURE' }).catch(() => {});
+
+  // Capture DOM snapshot NOW (before click effects) — matches the pre-capture screenshot timing
+  const preClickDomSnapshot = captureDomSnapshot();
 
   const target = event.target as Element;
   const rect = target.getBoundingClientRect();
@@ -180,7 +182,7 @@ function handleClick(event: PointerEvent): void {
 
   // Right-click: send immediately (no double-click possible)
   if (event.button === 2) {
-    sendClickStep(buildStepData('Right Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Right-click')));
+    sendClickStep(buildStepData('Right Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Right-click')), preClickDomSnapshot);
     return;
   }
 
@@ -191,7 +193,7 @@ function handleClick(event: PointerEvent): void {
     pendingClick = null;
     lastClickTime = 0;
     lastClickTarget = null;
-    sendClickStep(buildStepData('Double Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Double-click')));
+    sendClickStep(buildStepData('Double Click', generateClickDescription(elementInfo, event.clientX, event.clientY, 'Double-click')), preClickDomSnapshot);
   } else {
     // Potential single click — delay to see if a second click follows
     lastClickTime = now;
@@ -205,11 +207,12 @@ function handleClick(event: PointerEvent): void {
     const isSubmit = (tag === 'button' && (target as HTMLButtonElement).type === 'submit') ||
                      tag === 'input' && (target as HTMLInputElement).type === 'submit';
     if (isLink || isSubmit) {
-      sendClickStep(stepData);
+      sendClickStep(stepData, preClickDomSnapshot);
       pendingClick = null;
     } else {
+      const snapshot = preClickDomSnapshot; // capture in closure
       pendingClick = setTimeout(() => {
-        sendClickStep(stepData);
+        sendClickStep(stepData, snapshot);
         pendingClick = null;
       }, DOUBLE_CLICK_MS);
     }
