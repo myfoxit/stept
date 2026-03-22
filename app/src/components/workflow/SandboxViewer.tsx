@@ -202,31 +202,41 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         scriptEl.textContent = INJECT_SCRIPT;
         iframeDoc.body.appendChild(scriptEl);
 
-        // Highlight next click target after a short delay (DOM needs to settle)
-        setTimeout(() => {
-          if (!iframeRef.current?.contentDocument) return;
-          const doc = iframeRef.current.contentDocument;
-          const sel = nextStep?.element_info?.selector;
-          if (sel) {
+        // Highlight next click target — inject the highlight style + find element
+        const nextSel = nextStep?.element_info?.selector;
+        
+        // Inject highlight CSS into the iframe
+        const highlightStyle = iframeDoc.createElement('style');
+        highlightStyle.textContent = `
+          @keyframes stept-pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.8), 0 0 12px rgba(99,102,241,0.3); } 50% { box-shadow: 0 0 0 3px rgba(99,102,241,0.3), 0 0 4px rgba(99,102,241,0.1); } }
+          [data-stept-target] { animation: stept-pulse 2s ease-in-out infinite !important; cursor: pointer !important; position: relative; z-index: 10000; }
+        `;
+        iframeDoc.head.appendChild(highlightStyle);
+
+        // Try to find and highlight the target element (retry a few times for DOM settling)
+        if (nextSel) {
+          let attempts = 0;
+          const tryHighlight = () => {
+            if (!iframeRef.current?.contentDocument) return;
+            const doc = iframeRef.current.contentDocument;
             try {
-              const target = doc.querySelector(sel);
+              const target = doc.querySelector(nextSel);
               if (target) {
-                const el = target as HTMLElement;
-                el.style.outline = '3px solid rgba(99, 102, 241, 0.8)';
-                el.style.outlineOffset = '3px';
-                el.style.borderRadius = '4px';
-                // Add pulsing animation
-                const style = doc.createElement('style');
-                style.textContent = `
-                  @keyframes stept-pulse { 0%,100% { outline-color: rgba(99,102,241,0.8); } 50% { outline-color: rgba(99,102,241,0.3); } }
-                  [data-stept-target] { animation: stept-pulse 2s ease-in-out infinite; cursor: pointer !important; }
-                `;
-                doc.head.appendChild(style);
-                el.setAttribute('data-stept-target', 'true');
+                (target as HTMLElement).setAttribute('data-stept-target', 'true');
+                console.log('[Sandbox] Highlighted target:', nextSel);
+              } else if (attempts < 5) {
+                attempts++;
+                setTimeout(tryHighlight, 200);
+              } else {
+                console.log('[Sandbox] Could not find target:', nextSel);
               }
-            } catch { /* selector may be invalid */ }
-          }
-        }, 300);
+            } catch (err) {
+              console.log('[Sandbox] Invalid selector:', nextSel, err);
+            }
+          };
+          // Start trying after a short delay
+          setTimeout(tryHighlight, 100);
+        }
 
         setLoading(false);
       })
