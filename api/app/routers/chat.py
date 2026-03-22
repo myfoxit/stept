@@ -105,11 +105,7 @@ class ChatSessionDetailOut(BaseModel):
     messages: list[ChatMessageOut]
 
 
-class ChatConfigUpdate(BaseModel):
-    provider: Optional[str] = None
-    model: Optional[str] = None
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
+
 
 
 # ---------------------------------------------------------------------------
@@ -910,50 +906,7 @@ async def chat_completions(
     return payload
 
 
-@router.get("/models")
-async def list_models(
-    current_user: User = Depends(get_current_user),
-):
-    """List available models from the configured provider."""
-    models = await llm_service.list_models()
-    return {"models": models}
 
-
-@router.get("/config")
-async def get_config(
-    current_user: User = Depends(get_current_user),
-):
-    """Return current LLM config (no secrets)."""
-    return llm_service.get_config()
-
-
-@router.put("/config")
-async def update_config(
-    body: ChatConfigUpdate,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Save LLM configuration to the database.
-    Only non-None fields are updated; existing values are preserved.
-    """
-    # Load current DB config
-    current = await llm_service.load_db_config()
-
-    # Merge in non-None fields
-    if body.provider is not None:
-        current["provider"] = body.provider
-    if body.model is not None:
-        current["model"] = body.model
-    if body.base_url is not None:
-        current["base_url"] = body.base_url
-    if body.api_key is not None:
-        current["api_key"] = body.api_key
-
-    await llm_service.save_db_config(current)
-    logger.info("LLM config updated by user %s: provider=%s model=%s",
-                current_user.id, current.get("provider"), current.get("model"))
-
-    return llm_service.get_config()
 
 
 @router.get("/tools")

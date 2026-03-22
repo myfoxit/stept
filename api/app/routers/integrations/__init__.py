@@ -6,7 +6,9 @@ from fastapi import APIRouter
 
 from .slack import router as slack_router
 from .teams import router as teams_router
+from .intercom import router as intercom_router
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 router.include_router(slack_router)
 router.include_router(teams_router)
+router.include_router(intercom_router)

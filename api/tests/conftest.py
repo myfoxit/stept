@@ -45,7 +45,7 @@ _TEST_DB_URL = os.environ.get(
 # This overrides any value set by Docker or .env files
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ.setdefault("JWT_SECRET", "test-secret-for-ci")
-os.environ.setdefault("STEPT_ENCRYPTION_KEY", "dGVzdC1rZXktMzItYnl0ZXMtZm9yLWZlcm5ldC14eA==")
+os.environ.setdefault("STEPT_ENCRYPTION_KEY", "pqC_5wJ7PryhNidj3phDtC1Us76oNfGEoEWg-UUiXzE=")
 
 # Prevent dotenv from loading any .env file that might override DATABASE_URL
 os.environ["DOTENV_LOADED"] = "1"

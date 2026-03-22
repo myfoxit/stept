@@ -5,6 +5,9 @@ import { useProjectMembers } from '@/hooks/api/projects';
 import { GitSyncCard } from '@/components/Settings/GitSyncCard';
 import { McpSettingsCard } from '@/components/Settings/McpSettingsCard';
 import { ReindexCard } from '@/components/Settings/ReindexCard';
+import { SlackSettingsCard } from '@/components/Settings/SlackSettingsCard';
+import { TeamsSettingsCard } from '@/components/Settings/TeamsSettingsCard';
+import { IntercomSettingsCard } from '@/components/Settings/IntercomSettingsCard';
 import { SettingsLayout } from '@/components/settings-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,35 +57,11 @@ export function IntegrationsSettingsPage() {
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Knowledge Surfacing</h3>
           <div className="space-y-4">
-            <IntegrationCard
-              icon="💬"
-              title="Slack"
-              description="Surface relevant workflows when team members ask questions in Slack. @mention the bot to search."
-              comingSoon={false}
-            >
-              {canManage && projectId && (
-                <p className="text-sm text-muted-foreground">
-                  Configure your Slack bot token and signing secret to enable the integration.
-                  <br />
-                  <a href="https://api.slack.com/apps" target="_blank" rel="noopener" className="text-primary hover:underline">Create a Slack App →</a>
-                </p>
-              )}
-            </IntegrationCard>
+            {canManage && projectId && <SlackSettingsCard projectId={projectId} />}
 
-            <IntegrationCard
-              icon="👥"
-              title="Microsoft Teams"
-              description="Surface relevant workflows in Teams channels. @mention the bot to search your knowledge base."
-              comingSoon={false}
-            >
-              {canManage && projectId && (
-                <p className="text-sm text-muted-foreground">
-                  Configure an incoming webhook or Bot Framework app to connect.
-                  <br />
-                  <a href="https://dev.teams.microsoft.com/" target="_blank" rel="noopener" className="text-primary hover:underline">Teams Developer Portal →</a>
-                </p>
-              )}
-            </IntegrationCard>
+            {canManage && projectId && <TeamsSettingsCard projectId={projectId} />}
+
+            {canManage && projectId && <IntercomSettingsCard projectId={projectId} />}
 
             {canManage && projectId && <McpSettingsCard projectId={projectId} />}
           </div>

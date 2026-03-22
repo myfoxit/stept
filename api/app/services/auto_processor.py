@@ -581,7 +581,7 @@ class RecordingAutoProcessor:
             "Return ONLY valid JSON, no extra text."
         )
 
-        base_url_override = await dataveil_service.get_proxied_base_url_with_fallback()
+        base_url_override = None  # Use default LLM endpoint
 
         messages = [
             {"role": "system", "content": "You are a precise workflow documentation assistant. Always respond with valid JSON only."},
