@@ -217,8 +217,8 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
         // Inject highlight CSS into the iframe
         const highlightStyle = iframeDoc.createElement('style');
         highlightStyle.textContent = `
-          @keyframes stept-pulse { 0%,100% { outline-color: rgba(99,102,241,0.9); } 50% { outline-color: rgba(99,102,241,0.3); } }
-          [data-stept-target] { outline: 3px solid rgba(99,102,241,0.9) !important; outline-offset: 3px !important; animation: stept-pulse 1.5s ease-in-out infinite !important; cursor: pointer !important; position: relative !important; z-index: 10000 !important; }
+          @keyframes stept-pulse { 0%,100% { outline-color: rgba(99,102,241,1); box-shadow: 0 0 20px 4px rgba(99,102,241,0.4); } 50% { outline-color: rgba(99,102,241,0.5); box-shadow: 0 0 8px 2px rgba(99,102,241,0.15); } }
+          [data-stept-target] { outline: 3px solid rgba(99,102,241,1) !important; outline-offset: 4px !important; animation: stept-pulse 1.5s ease-in-out infinite !important; cursor: pointer !important; position: relative !important; z-index: 10000 !important; border-radius: 4px !important; }
         `;
         iframeDoc.head.appendChild(highlightStyle);
 
@@ -232,6 +232,8 @@ export function SandboxViewer({ steps, files, token, compact, authenticated, ses
               const target = doc.querySelector(nextSel);
               if (target) {
                 (target as HTMLElement).setAttribute('data-stept-target', 'true');
+                // Scroll the target into view
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 console.log('[Sandbox] Highlighted target:', nextSel, target);
               } else if (attempts < 10) {
                 attempts++;
