@@ -326,13 +326,22 @@ async def get_workflow(workflow_id: str, ctx=None) -> dict[str, Any]:
             "name": wf.name or wf.generated_title or "Untitled",
             "summary": wf.summary,
             "tags": wf.tags,
+            "estimated_time": wf.estimated_time,
+            "difficulty": wf.difficulty,
+            "total_steps": len(steps),
             "steps": [
                 {
                     "step_number": s.step_number,
                     "action_type": s.action_type,
+                    "step_type": s.step_type,
                     "description": s.description,
                     "generated_title": s.generated_title,
+                    "generated_description": s.generated_description,
                     "ui_element": s.ui_element,
+                    "url": s.url,
+                    "window_title": s.window_title,
+                    "text_typed": s.text_typed,
+                    "key_pressed": s.key_pressed,
                 }
                 for s in steps
             ],

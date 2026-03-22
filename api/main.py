@@ -135,6 +135,9 @@ api_router.include_router(tts.router, prefix="/tts", tags=["tts"])
 api_router.include_router(enterprise_api.router, prefix="/enterprise", tags=["enterprise-api"])
 api_router.include_router(translation.router, tags=["translation"])
 
+from app.routers.integrations import router as integrations_router
+api_router.include_router(integrations_router)
+
 # ── Conditional experimental routers ──────────────────────────
 if settings.STEPT_ENABLE_AI_CHAT:
     from app.routers import chat
