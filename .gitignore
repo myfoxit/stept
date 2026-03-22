@@ -71,3 +71,4 @@ extension/dist-self-hosted/
 .turbo
 .DS_Store
 research/
+output.md
