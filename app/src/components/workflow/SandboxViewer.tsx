@@ -74,8 +74,25 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
   const viewerRef = useRef<HTMLDivElement>(null);
   const base = getApiBaseUrl();
 
-  // These are kept for the useEffect deps but visual rendering uses vStep/vNext/vTotal
-  const hasDomRaw = steps[idx]?.has_dom_snapshot;
+  // Filter out Navigate steps — merge into following step's description
+  const visualSteps = React.useMemo(() => {
+    const result: (SandboxStep & { navPrefix?: string })[] = [];
+    let pendingNav: string | null = null;
+    for (const s of steps) {
+      const isNav = (s.action_type || '').toLowerCase() === 'navigate' || (s.step_type || '').toLowerCase() === 'navigate';
+      if (isNav) {
+        pendingNav = s.description || s.window_title || 'Navigate';
+      } else {
+        result.push({ ...s, navPrefix: pendingNav || undefined });
+        pendingNav = null;
+      }
+    }
+    return result;
+  }, [steps]);
+
+  const vStep = visualSteps[idx];
+  const vNext = idx < visualSteps.length - 1 ? visualSteps[idx + 1] : null;
+  const vTotal = visualSteps.length;
 
   const go = useCallback((i: number) => { if (i >= 0 && i < vTotal) setIdx(i); }, [vTotal]);
 
@@ -142,27 +159,6 @@ export function SandboxViewer({ steps, files, token, authenticated, sessionId }:
     document.fullscreenElement ? document.exitFullscreen() : viewerRef.current.requestFullscreen();
   }, []);
   useEffect(() => { const h=()=>setFs(!!document.fullscreenElement); document.addEventListener('fullscreenchange',h); return ()=>document.removeEventListener('fullscreenchange',h); }, []);
-
-  // Filter out Navigate steps — merge them into the following step's description
-  const visualSteps = React.useMemo(() => {
-    const result: (SandboxStep & { navPrefix?: string })[] = [];
-    let pendingNav: string | null = null;
-    for (const s of steps) {
-      const isNav = (s.action_type || '').toLowerCase() === 'navigate' || (s.step_type || '').toLowerCase() === 'navigate';
-      if (isNav) {
-        pendingNav = s.description || s.window_title || 'Navigate';
-      } else {
-        result.push({ ...s, navPrefix: pendingNav || undefined });
-        pendingNav = null;
-      }
-    }
-    return result;
-  }, [steps]);
-
-  // Remap idx to visual steps
-  const vStep = visualSteps[idx];
-  const vNext = idx < visualSteps.length - 1 ? visualSteps[idx + 1] : null;
-  const vTotal = visualSteps.length;
 
   if (!vStep) return null;
 
