@@ -296,6 +296,90 @@ async def finalize_session(
     
     await db.commit()
 
+    # ── Auto-generate context links from recording URLs ──
+    # Record once → surfaces everywhere automatically.
+    # Extracts unique hostnames from step URLs and creates url_pattern links.
+    if session.project_id and user_id:
+        try:
+            await _auto_create_context_links(db, session, user_id)
+        except Exception as e:
+            # Non-fatal: don't fail finalize if context links fail
+            import logging
+            logging.getLogger(__name__).warning(
+                "Auto context link creation failed for session %s: %s", session_id, e
+            )
+
+async def _auto_create_context_links(
+    db: AsyncSession,
+    session: ProcessRecordingSession,
+    user_id: str,
+) -> None:
+    """
+    Auto-generate context links from recording step URLs.
+    For each unique hostname in the recording, creates a url_pattern link
+    (e.g. *.salesforce.com*) pointing back to this workflow.
+    Deduplicates: won't create if a link for this pattern+resource already exists.
+    """
+    from urllib.parse import urlparse
+    from app.models import ContextLink
+
+    # Collect unique hostname-based patterns from step URLs
+    patterns_seen: set[str] = set()
+    for step in session.steps:
+        url = step.url
+        if not url or not url.startswith(('http://', 'https://')):
+            continue
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname or ""
+            # Skip localhost and common non-app domains
+            if not hostname or hostname in ('localhost', '127.0.0.1', '0.0.0.0'):
+                continue
+            if hostname.endswith(('.google.com', '.googleapis.com', '.gstatic.com')):
+                # Google search/auth pages aren't useful for context matching
+                # But Google Workspace apps (docs, sheets, etc.) ARE useful
+                if not any(sub in hostname for sub in ('docs.', 'sheets.', 'slides.', 'drive.', 'mail.', 'calendar.')):
+                    continue
+            parts = hostname.rsplit(".", 2)
+            hostname_base = ".".join(parts[-2:]) if len(parts) >= 2 else hostname
+            pattern = f"*.{hostname_base}*"
+            patterns_seen.add(pattern)
+        except Exception:
+            continue
+
+    if not patterns_seen:
+        return
+
+    # Create context links for each unique pattern (with dedup)
+    for pattern in patterns_seen:
+        # Check if this exact (project, pattern, resource) already exists
+        existing = await db.execute(
+            select(ContextLink).where(
+                ContextLink.project_id == session.project_id,
+                ContextLink.match_type == "url_pattern",
+                ContextLink.match_value == pattern,
+                ContextLink.resource_id == session.id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue  # Already exists, skip
+
+        link = ContextLink(
+            project_id=session.project_id,
+            created_by=user_id,
+            match_type="url_pattern",
+            match_value=pattern,
+            resource_type="workflow",
+            resource_id=session.id,
+            note=f"Auto-generated from recording on {pattern}",
+            source="auto",
+            weight=100.0,
+        )
+        db.add(link)
+
+    await db.commit()
+
+
 # Add CRUD operations for workflows
 async def update_workflow(
     db: AsyncSession,
