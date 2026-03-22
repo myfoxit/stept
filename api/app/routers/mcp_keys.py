@@ -45,7 +45,10 @@ async def _check_admin(project_id: str, user: User, db: AsyncSession):
         )
     )
     row = result.first()
-    if not row or row.role not in ("admin", "owner"):
+    role_val = None
+    if row:
+        role_val = row.role.value if hasattr(row.role, 'value') else str(row.role)
+    if not role_val or role_val not in ("admin", "owner"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin or owner role required")
 
 
