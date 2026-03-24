@@ -483,17 +483,23 @@
     .guide-highlight {
       position: fixed;
       z-index: 2147483641;
-      border: 2px solid #3AB08A;
+      border: 3px solid #3AB08A;
       border-radius: 6px;
-      box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25);
+      box-shadow: 0 0 0 6px rgba(58, 176, 138, 0.25);
       pointer-events: none;
-      transition: all 0.3s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       animation: guide-pulse 2s ease-in-out infinite;
     }
 
     @keyframes guide-pulse {
-      0%, 100% { box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25); }
-      50% { box-shadow: 0 0 0 8px rgba(58, 176, 138, 0.15); }
+      0%, 100% { 
+        box-shadow: 0 0 0 6px rgba(58, 176, 138, 0.25);
+        border-color: #3AB08A;
+      }
+      50% { 
+        box-shadow: 0 0 0 12px rgba(58, 176, 138, 0.15);
+        border-color: #4ADA64;
+      }
     }
 
     .guide-tooltip {
@@ -501,11 +507,13 @@
       z-index: 2147483642;
       background: #1C1917;
       border: 1px solid #292524;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 16px;
       max-width: 320px;
       min-width: 240px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
       pointer-events: auto;
       animation: guide-tooltip-in 0.25s ease-out;
     }
@@ -513,6 +521,11 @@
     @keyframes guide-tooltip-in {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes guide-tooltip-out {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-8px); }
     }
 
     .guide-tooltip-title {
@@ -531,16 +544,24 @@
     }
 
     .guide-tooltip-progress {
-      font-size: 11px;
-      color: #78716C;
+      font-size: 13px;
+      font-weight: 500;
+      color: #A8A29E;
       margin-bottom: 12px;
+    }
+
+    .guide-tooltip-progress-counter {
+      font-size: 14px;
+      font-weight: 600;
+      color: #FAFAF9;
+      margin-bottom: 8px;
     }
 
     .guide-tooltip-progress-bar {
       height: 3px;
       background: #292524;
       border-radius: 2px;
-      margin-top: 6px;
+      margin-bottom: 8px;
       overflow: hidden;
     }
 
@@ -549,6 +570,33 @@
       background: #3AB08A;
       border-radius: 2px;
       transition: width 0.3s ease;
+    }
+
+    .guide-tooltip-progress-dots {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .guide-progress-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+
+    .guide-progress-dot.completed {
+      background: #3AB08A;
+    }
+
+    .guide-progress-dot.current {
+      background: #3AB08A;
+      transform: scale(1.2);
+    }
+
+    .guide-progress-dot.remaining {
+      background: #44403C;
     }
 
     .guide-tooltip-actions {
@@ -594,16 +642,16 @@
 
     .guide-close-btn {
       position: absolute;
-      top: 8px;
-      right: 8px;
+      top: 10px;
+      right: 10px;
       background: none;
       border: none;
       color: #78716C;
       cursor: pointer;
-      padding: 4px;
+      padding: 6px;
       line-height: 1;
-      font-size: 18px;
-      border-radius: 4px;
+      font-size: 20px;
+      border-radius: 6px;
     }
 
     .guide-close-btn:hover { color: #D6D3D1; background: #292524; }
@@ -665,10 +713,53 @@
       background: #92400E;
     }
 
+    .guide-search-indicator {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483643;
+      background: #1C1917;
+      color: #A8A29E;
+      padding: 8px 16px;
+      border-radius: 24px;
+      font-size: 12px;
+      border: 1px solid #292524;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: guide-search-in 0.3s ease-out;
+    }
+
+    @keyframes guide-search-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    @keyframes guide-search-out {
+      from { opacity: 1; transform: translateX(-50%) translateY(0); }
+      to { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    }
+
+    .guide-search-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid #292524;
+      border-top: 2px solid #3AB08A;
+      border-radius: 50%;
+      animation: guide-spin 1s linear infinite;
+    }
+
+    @keyframes guide-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
     .guide-not-found {
       background: #1C1917;
       border: 1px solid #292524;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 20px;
       position: fixed;
       top: 50%;
@@ -679,6 +770,9 @@
       max-width: 300px;
       pointer-events: auto;
       animation: guide-tooltip-in 0.25s ease-out;
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
     }
 
     .guide-not-found-title {
@@ -852,9 +946,20 @@
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
-      // Remove all overlay elements to prevent artifacts across navigations
+      
+      // Fade out tooltip if it exists, then remove elements
+      if (this._tooltip) { 
+        this._tooltip.style.animation = 'guide-tooltip-out 0.2s ease-out forwards';
+        setTimeout(() => {
+          if (this._tooltip) {
+            this._tooltip.remove(); 
+            this._tooltip = null; 
+          }
+        }, 200);
+      }
+      
+      // Remove other elements immediately
       if (this._highlight) { this._highlight.remove(); this._highlight = null; }
-      if (this._tooltip) { this._tooltip.remove(); this._tooltip = null; }
       if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
       if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
       if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
@@ -875,20 +980,14 @@
       let lastStatus: string | null = null;
       let healthReported = false;
 
-      // Show a subtle "searching..." indicator immediately so user knows we're working
+      // Show a polished "searching..." indicator with spinner
       if (this.shadow) {
         const searchHint = document.createElement('div');
-        searchHint.className = 'guide-search-hint';
+        searchHint.className = 'guide-search-indicator';
         searchHint.setAttribute('data-search-hint', 'true');
-        searchHint.textContent = 'Finding element...';
-        // Style it as a small pill at the top
-        searchHint.style.cssText = `
-          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #1C1917; color: #A8A29E;
-          padding: 6px 16px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #292524; pointer-events: none;
-          animation: guide-tooltip-in 0.2s ease-out;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        searchHint.innerHTML = `
+          <div class="guide-search-spinner"></div>
+          <span>Finding element...</span>
         `;
         this.shadow.appendChild(searchHint);
       }
@@ -942,10 +1041,13 @@
 
           if (lastStatus !== 'found') {
             lastStatus = 'found';
-            // Clear search hint and any previous not-found UI
+            // Fade out search hint with animation
             if (this.shadow) {
-              const hint = this.shadow.querySelector('[data-search-hint]');
-              if (hint) hint.remove();
+              const hint = this.shadow.querySelector('[data-search-hint]') as HTMLElement;
+              if (hint) {
+                hint.style.animation = 'guide-search-out 0.3s ease-out forwards';
+                setTimeout(() => hint.remove(), 300);
+              }
             }
             if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
 
@@ -988,10 +1090,13 @@
               }).catch(() => {});
             } catch (_) {}
 
-            // Remove search hint
+            // Fade out search hint with animation
             if (this.shadow) {
-              const hint = this.shadow.querySelector('[data-search-hint]');
-              if (hint) hint.remove();
+              const hint = this.shadow.querySelector('[data-search-hint]') as HTMLElement;
+              if (hint) {
+                hint.style.animation = 'guide-search-out 0.3s ease-out forwards';
+                setTimeout(() => hint.remove(), 300);
+              }
             }
             chrome.runtime.sendMessage({
               type: 'GUIDE_STEP_CHANGED',
@@ -1128,12 +1233,14 @@
       this._highlight.style.width = `${rect.width + pad * 2}px`;
       this._highlight.style.height = `${rect.height + pad * 2}px`;
 
-      // Recreate tooltip (content changes each step)
-      if (this._tooltip) {
-        this._tooltip.remove();
+      // Create or update tooltip content (smooth transition between steps)
+      if (!this._tooltip) {
+        this._tooltip = this._createTooltip(step, urlMismatch, obstructor);
+        this.shadow!.appendChild(this._tooltip);
+      } else {
+        // Update existing tooltip content
+        this._updateTooltipContent(this._tooltip, step, urlMismatch, obstructor);
       }
-      this._tooltip = this._createTooltip(step, urlMismatch, obstructor);
-      this.shadow!.appendChild(this._tooltip);
       this._positionTooltip(this._tooltip, rect);
     }
 
@@ -1152,54 +1259,9 @@
     }
 
     _createTooltip(step: GuideStep, urlMismatch: boolean, obstructor: Element | null): HTMLDivElement {
-      const total = this.steps.length;
-      const idx = this.currentIndex;
-      const progressPct = ((idx + 1) / total) * 100;
-
       const tooltip = document.createElement("div");
       tooltip.className = "guide-tooltip";
-
-      let html = `<button class="guide-close-btn" data-action="close">&times;</button>`;
-
-      if (urlMismatch) {
-        html += `<div class="guide-url-warning">
-          This step expects a different page.
-          <br><button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
-        </div>`;
-      }
-
-      // Feature 3: Obstruction warning
-      if (obstructor) {
-        const obDesc = describeElement(obstructor);
-        html += `<div class="guide-obstruction-warning">
-          This element is behind another element. You may need to close a dialog or scroll.
-          <br><small>Obstructed by: &lt;${this._esc(obDesc)}&gt;</small>
-        </div>`;
-      }
-
-      // Feature 2: Determine if this is a non-click step (Type, Key, Select, Navigate)
-      const actionType = (step.action_type || '').toLowerCase();
-      const isNonClickStep = actionType.includes('type') || actionType.includes('key') || actionType.includes('select') || actionType.includes('navigate');
-
-      html += `
-        <div class="guide-tooltip-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
-        ${step.description && step.description !== step.title ? `<div class="guide-tooltip-desc">${this._esc(step.description)}</div>` : ""}
-        <div class="guide-tooltip-progress">
-          Step ${idx + 1} of ${total}
-          <div class="guide-tooltip-progress-bar">
-            <div class="guide-tooltip-progress-fill" style="width: ${progressPct}%"></div>
-          </div>
-        </div>
-        <div class="guide-tooltip-actions">
-          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
-          <div class="guide-spacer"></div>
-          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
-          ${isNonClickStep ? `<button class="guide-btn guide-btn-done" data-action="done">&#10003; Step Done</button>` : ""}
-          <button class="guide-btn guide-btn-primary" data-action="next">${idx === total - 1 ? "Finish" : "Next"}</button>
-        </div>
-      `;
-
-      tooltip.innerHTML = html;
+      this._updateTooltipContent(tooltip, step, urlMismatch, obstructor);
 
       // Stop ALL events on the tooltip from reaching the document.
       // In shadow DOM, stopPropagation prevents crossing the shadow boundary,
@@ -1255,6 +1317,64 @@
       });
 
       return tooltip;
+    }
+
+    _updateTooltipContent(tooltip: HTMLDivElement, step: GuideStep, urlMismatch: boolean, obstructor: Element | null): void {
+      const total = this.steps.length;
+      const idx = this.currentIndex;
+      const progressPct = ((idx + 1) / total) * 100;
+
+      let html = `<button class="guide-close-btn" data-action="close">&times;</button>`;
+
+      if (urlMismatch) {
+        html += `<div class="guide-url-warning">
+          This step expects a different page.
+          <br><button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
+        </div>`;
+      }
+
+      // Feature 3: Obstruction warning
+      if (obstructor) {
+        const obDesc = describeElement(obstructor);
+        html += `<div class="guide-obstruction-warning">
+          This element is behind another element. You may need to close a dialog or scroll.
+          <br><small>Obstructed by: &lt;${this._esc(obDesc)}&gt;</small>
+        </div>`;
+      }
+
+      // Feature 2: Determine if this is a non-click step (Type, Key, Select, Navigate)
+      const actionType = (step.action_type || '').toLowerCase();
+      const isNonClickStep = actionType.includes('type') || actionType.includes('key') || actionType.includes('select') || actionType.includes('navigate');
+
+      // Progress indicator with step counter and dots
+      const progressDotsHtml = Array.from({ length: total }, (_, i) => {
+        let dotClass = 'guide-progress-dot ';
+        if (i < idx) dotClass += 'completed';
+        else if (i === idx) dotClass += 'current';
+        else dotClass += 'remaining';
+        return `<div class="${dotClass}"></div>`;
+      }).join('');
+
+      html += `
+        <div class="guide-tooltip-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
+        ${step.description && step.description !== step.title ? `<div class="guide-tooltip-desc">${this._esc(step.description)}</div>` : ""}
+        <div class="guide-tooltip-progress-counter">Step ${idx + 1} of ${total}</div>
+        <div class="guide-tooltip-progress-bar">
+          <div class="guide-tooltip-progress-fill" style="width: ${progressPct}%"></div>
+        </div>
+        <div class="guide-tooltip-progress-dots">
+          ${progressDotsHtml}
+        </div>
+        <div class="guide-tooltip-actions">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <div class="guide-spacer"></div>
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          ${isNonClickStep ? `<button class="guide-btn guide-btn-done" data-action="done">&#10003; Step Done</button>` : ""}
+          <button class="guide-btn guide-btn-primary" data-action="next">${idx === total - 1 ? "Finish" : "Next"}</button>
+        </div>
+      `;
+
+      tooltip.innerHTML = html;
     }
 
     _positionTooltip(tooltip: HTMLDivElement, rect: AdjustedRect): void {
