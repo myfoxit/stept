@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import auth, text_container, user, project, document, process_recording, folder, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, upload, privacy, sso_admin, tts, enterprise_api, translation, features, guide_analytics, widget_config
+from app.routers import auth, text_container, user, project, document, process_recording, folder, search, inline_ai, auth_providers, health, shared, context_links, comments, git_sync, mcp_keys, audit, upload, privacy, sso_admin, tts, enterprise_api, translation, features, guide_analytics, widget_config, guide_recovery
 from app.logging_config import setup_logging, RequestIdMiddleware
 
 from app.database import Base, engine, AsyncSessionLocal
@@ -136,6 +136,7 @@ api_router.include_router(enterprise_api.router, prefix="/enterprise", tags=["en
 api_router.include_router(translation.router, tags=["translation"])
 api_router.include_router(guide_analytics.router, tags=["guide-analytics"])
 api_router.include_router(widget_config.router, tags=["widget-config"])
+api_router.include_router(guide_recovery.router, prefix="/guide", tags=["guide-recovery"])
 
 from app.routers.integrations import router as integrations_router
 api_router.include_router(integrations_router)
