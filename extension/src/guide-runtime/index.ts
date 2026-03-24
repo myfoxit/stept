@@ -245,19 +245,29 @@
 
   // Search a single root for the step's element using all strategies
   function findInRoot(root: Document | ShadowRoot, step: GuideStep): FindResult | null {
-    // CSS selector
-    if (step.selector) {
-      const el = safeQuerySelector(root, step.selector);
-      if (el && isVisible(el)) return { element: el, confidence: 1.0, method: "selector" };
+    // Level 0: Multi-selector set (Usertour/WalkMe pattern — most reliable)
+    // Try ALL recorded selectors — if ANY resolves uniquely, use it
+    const selectorSet = (step as any).selectorSet || step.element_info?.selectorSet;
+    if (selectorSet && Array.isArray(selectorSet) && selectorSet.length > 0) {
+      for (const sel of selectorSet) {
+        const el = safeQuerySelector(root, sel);
+        if (el && isVisible(el)) return { element: el, confidence: 1.0, method: "selector-set" };
+      }
     }
 
-    // data-testid
+    // Level 1: Primary CSS selector
+    if (step.selector) {
+      const el = safeQuerySelector(root, step.selector);
+      if (el && isVisible(el)) return { element: el, confidence: 0.95, method: "selector" };
+    }
+
+    // Level 2: data-testid (expanded attribute list)
     const testId = step.element_info?.testId;
     if (testId) {
-      for (const attr of ["data-testid", "data-test", "data-cy"]) {
+      for (const attr of ["data-testid", "data-test", "data-cy", "data-qa", "data-automation-id", "data-e2e", "data-hook"]) {
         try {
           const el = root.querySelector(`[${attr}="${CSS.escape(testId)}"]`);
-          if (el && isVisible(el)) return { element: el, confidence: 0.95, method: "testid" };
+          if (el && isVisible(el)) return { element: el, confidence: 0.90, method: "testid" };
         } catch {}
       }
     }

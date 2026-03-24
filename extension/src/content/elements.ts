@@ -35,6 +35,7 @@ export interface ElementInfo {
   testId: string | null;
   elementRect: ElementRect;
   selector: string | null;
+  selectorSet: string[] | null;  // Multiple selectors for reliability
   xpath: string | null;
   dataId: string | null;
   dataRole: string | null;
@@ -163,67 +164,116 @@ export function generateClickDescription(elementInfo: ElementInfo, x: number, y:
   return `${prefix} here`;
 }
 
-export function generateStableSelector(el: Element): string | null {
+/**
+ * Generate MULTIPLE selectors for an element (Usertour/WalkMe pattern).
+ * Instead of one brittle selector, we generate 6+ strategies.
+ * During replay, we try all of them and pick the one that resolves uniquely.
+ * This is the #1 reason DAPs are reliable.
+ */
+export function generateSelectorSet(el: Element): string[] {
+  const selectors: string[] = [];
+  const tag = el.tagName.toLowerCase();
+
   try {
-    // Try #id first (skip if id contains digits — likely auto-generated)
-    if (el.id && !/\d/.test(el.id)) {
+    // Strategy 1: #id (skip auto-generated IDs with digits)
+    if (el.id && !/^\d/.test(el.id) && !/^:/.test(el.id)) {
       const sel = `#${CSS.escape(el.id)}`;
-      if (document.querySelectorAll(sel).length === 1) return sel;
+      if (_unique(sel)) selectors.push(sel);
     }
 
-    const tag = el.tagName.toLowerCase();
-
-    // Try tag[stable-attr="value"] for common stable attributes
-    const stableAttrs = [
-      'data-testid', 'data-test', 'data-cy', 'data-id',
-      'aria-label', 'name', 'placeholder', 'title', 'alt', 'role',
-    ];
-    for (const attr of stableAttrs) {
+    // Strategy 2: data-testid / data-test / data-cy / data-qa / data-automation-id
+    for (const attr of ['data-testid', 'data-test', 'data-cy', 'data-qa', 'data-automation-id', 'data-e2e', 'data-hook']) {
       const val = el.getAttribute(attr);
       if (val) {
-        const sel = `${tag}[${attr}="${CSS.escape(val)}"]`;
-        if (document.querySelectorAll(sel).length === 1) return sel;
+        const sel = `[${attr}="${CSS.escape(val)}"]`;
+        if (_unique(sel)) { selectors.push(sel); break; } // One testid is enough
       }
     }
 
-    // Try compound: tag[attr1][attr2]...
+    // Strategy 3: tag[aria-label="..."]
+    const ariaLabel = el.getAttribute('aria-label');
+    if (ariaLabel) {
+      const sel = `${tag}[aria-label="${CSS.escape(ariaLabel)}"]`;
+      if (_unique(sel)) selectors.push(sel);
+    }
+
+    // Strategy 4: tag[name="..."] (for form elements)
+    const name = el.getAttribute('name');
+    if (name) {
+      const sel = `${tag}[name="${CSS.escape(name)}"]`;
+      if (_unique(sel)) selectors.push(sel);
+    }
+
+    // Strategy 5: tag[placeholder="..."]
+    const placeholder = el.getAttribute('placeholder');
+    if (placeholder) {
+      const sel = `${tag}[placeholder="${CSS.escape(placeholder)}"]`;
+      if (_unique(sel)) selectors.push(sel);
+    }
+
+    // Strategy 6: tag[role="..."][aria-label="..."] compound
+    const role = el.getAttribute('role');
+    if (role && ariaLabel) {
+      const sel = `${tag}[role="${role}"][aria-label="${CSS.escape(ariaLabel)}"]`;
+      if (_unique(sel)) selectors.push(sel);
+    }
+
+    // Strategy 7: tag[title="..."]
+    const title = el.getAttribute('title');
+    if (title) {
+      const sel = `${tag}[title="${CSS.escape(title)}"]`;
+      if (_unique(sel)) selectors.push(sel);
+    }
+
+    // Strategy 8: Compound attributes
+    const stableAttrs = ['data-testid', 'data-id', 'aria-label', 'name', 'placeholder', 'title', 'role'];
     const attrParts = stableAttrs
-      .map(attr => {
-        const val = el.getAttribute(attr);
-        return val ? `[${attr}="${CSS.escape(val)}"]` : null;
-      })
+      .map(attr => { const v = el.getAttribute(attr); return v ? `[${attr}="${CSS.escape(v)}"]` : null; })
       .filter(Boolean);
     if (attrParts.length >= 2) {
       const sel = tag + attrParts.join('');
-      if (document.querySelectorAll(sel).length === 1) return sel;
+      if (_unique(sel)) selectors.push(sel);
     }
 
-    // Fallback: nth-of-type path from nearest ancestor with stable id
-    const parts: string[] = [];
-    let current: Element | null = el;
-    while (current && current !== document.documentElement) {
-      const ctag = current.tagName.toLowerCase();
-      if (current.id && !/\d/.test(current.id)) {
-        parts.unshift(`#${CSS.escape(current.id)}`);
-        break;
-      }
-      const parent: Element | null = current.parentElement;
-      if (parent) {
-        const siblings = Array.from(parent.children).filter(c => c.tagName === current!.tagName);
-        const idx = siblings.indexOf(current!) + 1;
-        parts.unshift(siblings.length > 1 ? `${ctag}:nth-of-type(${idx})` : ctag);
-      } else {
-        parts.unshift(ctag);
-      }
-      current = parent;
-    }
-    const sel = parts.join(' > ');
-    if (sel && document.querySelectorAll(sel).length === 1) return sel;
+    // Strategy 9: nth-of-type path from nearest stable ancestor
+    const pathSel = _buildPathSelector(el);
+    if (pathSel && _unique(pathSel)) selectors.push(pathSel);
 
-    return sel || null;
-  } catch (e) {
-    return null;
+  } catch (_) {}
+
+  return [...new Set(selectors)]; // Deduplicate
+}
+
+function _unique(sel: string): boolean {
+  try { return document.querySelectorAll(sel).length === 1; } catch { return false; }
+}
+
+function _buildPathSelector(el: Element): string | null {
+  const parts: string[] = [];
+  let current: Element | null = el;
+  while (current && current !== document.documentElement) {
+    const ctag = current.tagName.toLowerCase();
+    if (current.id && !/^\d/.test(current.id)) {
+      parts.unshift(`#${CSS.escape(current.id)}`);
+      break;
+    }
+    const parent: Element | null = current.parentElement;
+    if (parent) {
+      const siblings = Array.from(parent.children).filter(c => c.tagName === current!.tagName);
+      const idx = siblings.indexOf(current!) + 1;
+      parts.unshift(siblings.length > 1 ? `${ctag}:nth-of-type(${idx})` : ctag);
+    } else {
+      parts.unshift(ctag);
+    }
+    current = parent;
   }
+  return parts.join(' > ') || null;
+}
+
+/** Legacy single-selector function — returns the BEST selector from the set */
+export function generateStableSelector(el: Element): string | null {
+  const set = generateSelectorSet(el);
+  return set.length > 0 ? set[0] : _buildPathSelector(el);
 }
 
 export function generateXPath(el: Element): string | null {
@@ -331,18 +381,12 @@ export function gatherElementInfo(target: Element): ElementInfo {
       width: target.getBoundingClientRect().width,
       height: target.getBoundingClientRect().height,
     },
-    // Enhanced element capture fields — selector validated against live DOM
+    // Multi-selector capture (Usertour/WalkMe pattern) — store multiple strategies
     selector: (() => {
-      const sel = generateStableSelector(target);
-      // Storylane pattern: verify selector resolves to THIS element (not just unique)
-      if (sel) {
-        try {
-          const found = document.querySelector(sel);
-          if (found !== target) return null; // selector doesn't point to the right element
-        } catch { return null; }
-      }
-      return sel;
+      const set = generateSelectorSet(target);
+      return set.length > 0 ? set[0] : generateStableSelector(target);
     })(),
+    selectorSet: generateSelectorSet(target),
     xpath: generateXPath(target),
     dataId: target.getAttribute('data-id') || null,
     dataRole: target.getAttribute('data-role') || null,
