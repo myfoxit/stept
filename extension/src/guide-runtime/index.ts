@@ -243,8 +243,122 @@
     return best;
   }
 
-  // Search a single root for the step's element using all strategies
+  /**
+   * Find element by SelectorTree structure (Layer 1 - Deterministic).
+   * Based on Usertour's finderX algorithm with parent chain verification.
+   */
+  function findElementByTree(tree: any, content?: string): { element: Element | null, confidence: number, method: string } {
+    if (!tree || !tree.selectors || tree.selectors.length === 0) {
+      return { element: null, confidence: 0, method: 'no-tree' };
+    }
+
+    // 1. Try all selectors for the target, collect candidates with vote counting
+    const votes = new Map<Element, number>();
+    for (const sel of tree.selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && isVisible(el)) {
+          votes.set(el, (votes.get(el) || 0) + 1);
+        }
+      } catch (e) {
+        // Invalid selector, skip
+      }
+    }
+
+    // 2. Single candidate with all votes → definite match (confidence 1.0)
+    if (votes.size === 1) {
+      return { element: [...votes.keys()][0], confidence: 1.0, method: 'selector-unanimous' };
+    }
+
+    // 3. Multiple candidates → disambiguate by parent chain
+    if (votes.size > 1) {
+      const best = disambiguateByParentChain([...votes.keys()], tree);
+      if (best) return { element: best, confidence: 0.9, method: 'parent-chain' };
+    }
+
+    // 4. No candidates from tree → try content matching
+    if (content) {
+      const contentMatch = findByContent(content);
+      if (contentMatch) return { element: contentMatch, confidence: 0.6, method: 'content-match' };
+    }
+
+    return { element: null, confidence: 0, method: 'not-found' };
+  }
+
+  /**
+   * Disambiguate multiple candidates using parent chain verification.
+   */
+  function disambiguateByParentChain(candidates: Element[], tree: any): Element | null {
+    let bestEl: Element | null = null;
+    let bestScore = -1;
+
+    for (const candidate of candidates) {
+      let score = 0;
+      let parentNode = tree.parent;
+      let parentEl = candidate.parentElement;
+
+      // Walk up the tree comparing parents
+      while (parentNode && parentEl) {
+        const parentMatches = parentNode.selectors.some((sel: string) => {
+          try { 
+            return parentEl === document.querySelector(sel); 
+          } catch { 
+            return false; 
+          }
+        });
+        if (parentMatches) score++;
+
+        // Also check siblings for bonus points
+        if (parentNode.prevSiblingSelectors?.length) {
+          const prevMatch = parentNode.prevSiblingSelectors.some((sel: string) => {
+            try { 
+              return parentEl!.previousElementSibling === document.querySelector(sel); 
+            } catch { 
+              return false; 
+            }
+          });
+          if (prevMatch) score += 0.5;
+        }
+
+        parentNode = parentNode.parent;
+        parentEl = parentEl.parentElement;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestEl = candidate;
+      }
+    }
+
+    return bestEl;
+  }
+
+  /**
+   * Find element by content/text matching.
+   */
+  function findByContent(content: string): Element | null {
+    if (!content) return null;
+    
+    // Search all visible elements for matching text
+    const allInteractive = document.querySelectorAll(
+      'button, a, input, select, textarea, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [tabindex]'
+    );
+    
+    return findByText(Array.from(allInteractive), content, { fuzzy: true });
+  }
+
+  // Search a single root for the step's element using the NEW three-layer approach
   function findInRoot(root: Document | ShadowRoot, step: GuideStep): FindResult | null {
+    // Layer 1: Try new SelectorTree structure first
+    if ((step as any).element_info?.selectorTree) {
+      const treeResult = findElementByTree((step as any).element_info.selectorTree, (step as any).element_info?.content);
+      if (treeResult.element) {
+        return { element: treeResult.element, confidence: treeResult.confidence, method: treeResult.method };
+      }
+    }
+
+    // Fallback to existing strategies for backward compatibility
+
     // CSS selector
     if (step.selector) {
       const el = safeQuerySelector(root, step.selector);
@@ -465,7 +579,7 @@
     .guide-backdrop-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.45);
+      background: transparent;
       transition: clip-path 0.3s ease;
       pointer-events: none;
     }
@@ -473,17 +587,16 @@
     .guide-highlight {
       position: fixed;
       z-index: 2147483641;
-      border: 2px solid #3AB08A;
+      border: 2px dashed #3AB08A;
       border-radius: 6px;
-      box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25);
+      box-shadow: none;
       pointer-events: none;
       transition: all 0.3s ease;
-      animation: guide-pulse 2s ease-in-out infinite;
     }
 
     @keyframes guide-pulse {
-      0%, 100% { box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25); }
-      50% { box-shadow: 0 0 0 8px rgba(58, 176, 138, 0.15); }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
 
     .guide-tooltip {
