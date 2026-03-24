@@ -1,6 +1,16 @@
 // ===== ELEMENT IDENTIFICATION =====
 // Mechanical port from content.js — element info gathering, selectors, xpath, labels
 
+import { finder as medvFinder } from '@medv/finder';
+
+export interface SelectorTree {
+  selectors: string[];
+  prevSiblingSelectors: string[];
+  nextSiblingSelectors: string[];
+  depth: number;
+  parent: SelectorTree | null;
+}
+
 export interface ElementRect {
   x: number;
   y: number;
@@ -36,6 +46,8 @@ export interface ElementInfo {
   elementRect: ElementRect;
   selector: string | null;
   selectorSet: string[] | null;  // Multiple selectors for reliability
+  selectorTree: SelectorTree | null;  // Tree structure for reliable finding
+  content: string;  // element.innerText for verification
   xpath: string | null;
   dataId: string | null;
   dataRole: string | null;
@@ -244,6 +256,95 @@ export function generateSelectorSet(el: Element): string[] {
   return [...new Set(selectors)]; // Deduplicate
 }
 
+/**
+ * Generate multiple selectors for an element using @medv/finder with different configs.
+ * Based on Usertour's finderConfigs pattern for maximum reliability.
+ */
+function generateMedvSelectors(el: Element): string[] {
+  const selectors: string[] = [];
+  
+  // Usertour's finder configurations - same strategies as finderx.ts
+  const finderAttrs = [
+    'data-for', 'data-id', 'data-testid', 'data-test-id', 'for', 'id', 
+    'name', 'placeholder', 'role', 'data-cy', 'data-qa', 'data-automation-id'
+  ];
+
+  const defaultConfig = {
+    idName: () => false,
+    className: () => false,
+    tagName: () => false,
+    attr: () => false,
+    seedMinLength: 1,
+    optimizedMinLength: 2,
+    threshold: 1000,
+    maxNumberOfTries: 10_000,
+  };
+
+  const finderConfigs = [
+    { ...defaultConfig, tagName: () => true },
+    { ...defaultConfig, idName: () => true },
+    { ...defaultConfig, tagName: () => true, attr: (name: string) => finderAttrs.includes(name) },
+    { ...defaultConfig, className: () => true, attr: (name: string) => finderAttrs.includes(name) },
+    { ...defaultConfig, tagName: () => true, idName: () => true, className: () => true, attr: () => false },
+    { ...defaultConfig, tagName: () => true, idName: () => true, className: () => true, attr: (name: string) => finderAttrs.includes(name) },
+  ];
+
+  // Generate selector with each config
+  for (const config of finderConfigs) {
+    try {
+      const selector = medvFinder(el, config);
+      if (selector && _unique(selector)) {
+        selectors.push(selector);
+      }
+    } catch (e) {
+      // Config failed, continue with next
+    }
+  }
+
+  return [...new Set(selectors)]; // Deduplicate
+}
+
+/**
+ * Capture complete SelectorTree structure for an element.
+ * Based on Usertour's XNode tree structure for parent chain verification.
+ */
+export function captureSelectorTree(el: Element, depth = 0, maxDepth = 4): SelectorTree {
+  // Generate multiple selectors for this element
+  const directSelectors = generateSelectorSet(el);
+  const medvSelectors = generateMedvSelectors(el);
+  const selectors = [...new Set([...directSelectors, ...medvSelectors])];
+
+  // Capture sibling selectors
+  let prevSiblingSelectors: string[] = [];
+  let nextSiblingSelectors: string[] = [];
+  
+  if (el.previousElementSibling) {
+    prevSiblingSelectors = generateMedvSelectors(el.previousElementSibling);
+  }
+  
+  if (el.nextElementSibling) {
+    nextSiblingSelectors = generateMedvSelectors(el.nextElementSibling);
+  }
+
+  // Build tree structure
+  const tree: SelectorTree = {
+    selectors,
+    prevSiblingSelectors,
+    nextSiblingSelectors,
+    depth,
+    parent: null,
+  };
+
+  // Recursively capture parent chain up to maxDepth
+  if (depth < maxDepth && el.parentElement && 
+      el.parentElement !== document.body && 
+      el.parentElement !== document.documentElement) {
+    tree.parent = captureSelectorTree(el.parentElement, depth + 1, maxDepth);
+  }
+
+  return tree;
+}
+
 function _unique(sel: string): boolean {
   try { return document.querySelectorAll(sel).length === 1; } catch { return false; }
 }
@@ -387,6 +488,8 @@ export function gatherElementInfo(target: Element): ElementInfo {
       return set.length > 0 ? set[0] : generateStableSelector(target);
     })(),
     selectorSet: generateSelectorSet(target),
+    selectorTree: captureSelectorTree(target),
+    content: (target as HTMLElement).innerText || target.textContent || '',
     xpath: generateXPath(target),
     dataId: target.getAttribute('data-id') || null,
     dataRole: target.getAttribute('data-role') || null,
