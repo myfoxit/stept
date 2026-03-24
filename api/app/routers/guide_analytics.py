@@ -89,7 +89,7 @@ async def receive_analytics_events(
 @router.get("/analytics/overview")
 async def get_analytics_overview(
     project_id: str = Query(...),
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -164,7 +164,7 @@ async def get_analytics_overview(
 @router.get("/analytics/guides")
 async def get_guides_analytics(
     project_id: str = Query(...),
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -250,7 +250,7 @@ async def get_guides_analytics(
 async def get_guide_funnel(
     guide_id: str,
     project_id: str = Query(...),
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -316,7 +316,7 @@ async def get_guide_funnel(
 async def get_guide_step_metrics(
     guide_id: str,
     project_id: str = Query(...),
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -330,7 +330,7 @@ async def get_guide_step_metrics(
 @router.post("/analytics/export")
 async def export_analytics(
     project_id: str = Query(...),
-    period: str = Query("7d", regex="^(7d|30d|90d)$"),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
