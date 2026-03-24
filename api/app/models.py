@@ -819,3 +819,30 @@ class AuditLog(Base):
     project = relationship("Project", backref="audit_logs")
     user = relationship("User", backref="audit_logs")
 
+
+class GuideAnalyticsEvent(Base):
+    """Analytics events from guide walkthroughs and widgets."""
+    __tablename__ = "guide_analytics_events"
+    
+    id = Column(String(16), primary_key=True, default=gen_suffix)
+    project_id = Column(String(16), ForeignKey("projects.id"), index=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    
+    # Guide/widget context
+    guide_id = Column(String(16), nullable=True, index=True)
+    step_index = Column(Integer, nullable=True)
+    widget_id = Column(String(50), nullable=True)
+    
+    # User context (from widget user identification)
+    user_external_id = Column(String(255), nullable=True, index=True)
+    session_id = Column(String(64), nullable=True)
+    
+    # Event data (JSON blob for flexible event-specific data)
+    data = Column(JSON, nullable=True)
+    
+    # Page context
+    page_url = Column(String(1024), nullable=True)
+    
+    # Timing
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
