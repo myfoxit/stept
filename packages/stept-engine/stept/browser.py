@@ -353,3 +353,31 @@ async def browser_page(headless: bool = True, **kwargs) -> AsyncGenerator[Page, 
     manager = BrowserManager(headless=headless)
     async with manager.page_context(**kwargs) as page:
         yield page
+
+
+# ── Proxy Helpers ─────────────────────────────────────────────────
+
+def tor_proxy(port: int = 9050) -> str:
+    """Get Tor SOCKS5 proxy URL. Requires tor running locally.
+    
+    Install: brew install tor && tor  (or apt install tor)
+    Usage:   BrowserManager(proxy=tor_proxy())
+    """
+    return f"socks5://127.0.0.1:{port}"
+
+
+def rotating_proxy(url: str, username: str = None, password: str = None) -> str:
+    """Configure a rotating residential proxy.
+    
+    Works with: BrightData, Oxylabs, SmartProxy, etc.
+    Usage:   BrowserManager(proxy=rotating_proxy("http://proxy.provider.com:8080", "user", "pass"))
+    """
+    if username and password:
+        # Insert credentials into URL
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(url)
+        netloc = f"{username}:{password}@{parsed.hostname}"
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        return urlunparse(parsed._replace(netloc=netloc))
+    return url
