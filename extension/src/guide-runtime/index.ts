@@ -171,6 +171,20 @@
     return results;
   }
 
+  // ── Smart Hint Generation ─────────────────────────────────────────
+
+  function getActionHint(step: GuideStep): string {
+    const action = (step.action_type || '').toLowerCase();
+    const name = step.element_text || step.title || step.description || 'this element';
+    const shortName = name.length > 40 ? name.substring(0, 37) + '...' : name;
+    
+    if (action.includes('click')) return `Click on ${shortName}`;
+    if (action.includes('type')) return `Type in ${shortName}`;
+    if (action.includes('select')) return `Select ${shortName}`;
+    if (action.includes('scroll')) return `Scroll to ${shortName}`;
+    return step.title || step.description || `Step ${step.step_number || ''}`;
+  }
+
   // ── Element Finder ────────────────────────────────────────────────
 
   function safeQuerySelector(root: Document | ShadowRoot | Element, selector: string): Element | null {
@@ -502,6 +516,40 @@
       }
     }
 
+    /* New light mode styles */
+    .guide-light-highlight {
+      position: fixed;
+      z-index: 2147483641;
+      border: 2px dashed #3AB08A;
+      border-radius: 4px;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .guide-hint-pill {
+      position: fixed;
+      z-index: 2147483642;
+      background: #1C1917;
+      color: #E7E5E4;
+      border: 1px solid #292524;
+      border-radius: 16px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      animation: guide-tooltip-in 0.2s ease-out;
+      max-width: 260px;
+    }
+
+    .guide-hint-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
     .guide-tooltip {
       position: fixed;
       z-index: 2147483642;
@@ -816,6 +864,7 @@
     currentResult: FindResult | null;
     _clickHandler: ((e: Event) => void) | null;
     _stepSeq: number;
+    displayMode: string;
     // Persistent overlay elements for in-place updates
     _backdrop: HTMLDivElement | null;
     _overlay: HTMLDivElement | null;
@@ -823,6 +872,7 @@
     _tooltip: HTMLDivElement | null;
     _notFoundPanel: HTMLDivElement | null;
     _intermediatePanel: HTMLDivElement | null;
+    _hintPill: HTMLDivElement | null;
     // Internal state
     _replacing: boolean;
     _pollInterval: ReturnType<typeof setInterval> | null;
@@ -837,7 +887,7 @@
     _completionCleanup: (() => void) | null;
     _completionTimeout: ReturnType<typeof setTimeout> | null;
 
-    constructor(guide: Guide) {
+    constructor(guide: Guide, displayMode: string = 'light') {
       this.guide = guide;
       this.steps = guide.steps || [];
       this.currentIndex = 0;
@@ -847,6 +897,7 @@
       this.currentResult = null;
       this._clickHandler = null;
       this._stepSeq = 0; // concurrency guard: increments on each showStep call
+      this.displayMode = displayMode;
       // Persistent overlay elements for in-place updates
       this._backdrop = null;
       this._overlay = null;
@@ -854,6 +905,7 @@
       this._tooltip = null;
       this._notFoundPanel = null;
       this._intermediatePanel = null;
+      this._hintPill = null;
       // Internal state
       this._replacing = false;
       this._pollInterval = null;
@@ -963,6 +1015,7 @@
       if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
       if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
       if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
+      if (this._hintPill) { this._hintPill.remove(); this._hintPill = null; }
     }
 
     _stopElementPolling(): void {
@@ -1126,6 +1179,32 @@
       this._clearOverlay();
 
       const step = this.steps[index];
+      
+      // Smart step skipping for multi-page workflows
+      if (step.expected_url || step.url) {
+        const stepUrl = step.expected_url || step.url;
+        const currentUrl = window.location.href;
+        // If the current URL is MORE specific than the step URL (further in the flow),
+        // the user may have already completed this step
+        // For now, just check: if step URL doesn't match current URL AND 
+        // the next step's URL DOES match, skip this step
+        if (index + 1 < this.steps.length) {
+          const nextStep = this.steps[index + 1];
+          const nextUrl = nextStep.expected_url || nextStep.url;
+          if (nextUrl && currentUrl.includes(new URL(nextUrl).pathname)) {
+            // User is already on the page the NEXT step expects — skip current
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: index + 1,
+              totalSteps: this.steps.length,
+              stepStatus: 'completed',
+            }).catch(() => {});
+            this.showStep(index + 1);
+            return;
+          }
+        }
+      }
+
       const actionType = (step.action_type || '').toLowerCase();
 
       // Navigate / new-tab steps have no element to highlight — auto-advance
@@ -1208,6 +1287,67 @@
 
     _renderOverlay(step: GuideStep, result: FindResult, urlMismatch: boolean, obstructor: Element | null): void {
       const rect = this._getAdjustedRect(result);
+
+      if (this.displayMode === 'light') {
+        // Light mode: dashed border + hint pill, NO backdrop
+        this._renderLightOverlay(step, result, rect, urlMismatch, obstructor);
+      } else {
+        // Spotlight mode: original heavy overlay with backdrop
+        this._renderSpotlightOverlay(step, result, rect, urlMismatch, obstructor);
+      }
+    }
+
+    _renderLightOverlay(step: GuideStep, result: FindResult, rect: AdjustedRect, urlMismatch: boolean, obstructor: Element | null): void {
+      const pad = 2; // Smaller padding for light mode
+
+      // Create or update light highlight (dashed border, no pulse)
+      if (!this._highlight) {
+        this._highlight = document.createElement("div");
+        this._highlight.className = "guide-light-highlight";
+        this.shadow!.appendChild(this._highlight);
+      } else {
+        this._highlight.className = "guide-light-highlight"; // Switch from heavy to light
+      }
+      this._highlight.style.display = "";
+      this._highlight.style.left = `${rect.left - pad}px`;
+      this._highlight.style.top = `${rect.top - pad}px`;
+      this._highlight.style.width = `${rect.width + pad * 2}px`;
+      this._highlight.style.height = `${rect.height + pad * 2}px`;
+
+      // Create or update hint pill (small, positioned near element)
+      if (!this._hintPill) {
+        this._hintPill = document.createElement("div");
+        this._hintPill.className = "guide-hint-pill";
+        this.shadow!.appendChild(this._hintPill);
+      }
+
+      const hintText = getActionHint(step);
+      const icon = step.action_type?.toLowerCase().includes('click') ? '👆' : 
+                   step.action_type?.toLowerCase().includes('type') ? '⌨️' : 
+                   step.action_type?.toLowerCase().includes('select') ? '📝' : '👀';
+
+      this._hintPill.innerHTML = `
+        <span class="guide-hint-icon">${icon}</span>
+        <span>${this._esc(hintText)}</span>
+      `;
+
+      this._positionHintPill(this._hintPill, rect);
+
+      // NO backdrop in light mode
+      if (this._backdrop) {
+        this._backdrop.remove();
+        this._backdrop = null;
+        this._overlay = null;
+      }
+
+      // NO tooltip in light mode (sidepanel handles details)
+      if (this._tooltip) {
+        this._tooltip.remove();
+        this._tooltip = null;
+      }
+    }
+
+    _renderSpotlightOverlay(step: GuideStep, result: FindResult, rect: AdjustedRect, urlMismatch: boolean, obstructor: Element | null): void {
       const pad = 6;
 
       // Create or update backdrop with cutout (in-place)
@@ -1226,6 +1366,8 @@
         this._highlight = document.createElement("div");
         this._highlight.className = "guide-highlight";
         this.shadow!.appendChild(this._highlight);
+      } else {
+        this._highlight.className = "guide-highlight"; // Switch from light to heavy
       }
       this._highlight.style.display = "";
       this._highlight.style.left = `${rect.left - pad}px`;
@@ -1242,6 +1384,12 @@
         this._updateTooltipContent(this._tooltip, step, urlMismatch, obstructor);
       }
       this._positionTooltip(this._tooltip, rect);
+
+      // NO hint pill in spotlight mode
+      if (this._hintPill) {
+        this._hintPill.remove();
+        this._hintPill = null;
+      }
     }
 
     _updateCutout(overlay: HTMLDivElement, rect: AdjustedRect, pad: number): void {
@@ -1423,11 +1571,92 @@
       });
     }
 
+    _positionHintPill(pill: HTMLDivElement, rect: AdjustedRect): void {
+      const gap = 8;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Measure pill size after render
+      requestAnimationFrame(() => {
+        const pr = pill.getBoundingClientRect();
+        const pw = pr.width || 150;
+        const ph = pr.height || 30;
+
+        const spaceBelow = vh - rect.bottom;
+        const spaceAbove = rect.top;
+        const spaceRight = vw - rect.right;
+
+        let top: number, left: number;
+
+        // Prefer below-right
+        if (spaceBelow >= ph + gap && spaceRight >= pw + gap) {
+          top = rect.bottom + gap;
+          left = Math.min(rect.right - pw + gap, vw - pw - 8);
+        } 
+        // Then above-right
+        else if (spaceAbove >= ph + gap && spaceRight >= pw + gap) {
+          top = rect.top - ph - gap;
+          left = Math.min(rect.right - pw + gap, vw - pw - 8);
+        }
+        // Then below-left
+        else if (spaceBelow >= ph + gap) {
+          top = rect.bottom + gap;
+          left = Math.max(8, Math.min(rect.left, vw - pw - 8));
+        }
+        // Finally above-left
+        else {
+          top = Math.max(gap, rect.top - ph - gap);
+          left = Math.max(8, Math.min(rect.left, vw - pw - 8));
+        }
+
+        pill.style.top = `${top}px`;
+        pill.style.left = `${left}px`;
+      });
+    }
+
     _renderNotFound(step: GuideStep, urlMismatch: boolean): void {
       const idx = this.currentIndex;
       const total = this.steps.length;
 
-      // Show backdrop without cutout
+      if (this.displayMode === 'light') {
+        // Light mode: show a small hint pill saying "Check the screenshot in the sidebar"
+        if (!this._hintPill) {
+          this._hintPill = document.createElement("div");
+          this._hintPill.className = "guide-hint-pill";
+          this.shadow!.appendChild(this._hintPill);
+        }
+
+        this._hintPill.innerHTML = `
+          <span class="guide-hint-icon">📷</span>
+          <span>Check the screenshot in the sidebar</span>
+        `;
+
+        // Position it at the top-center of the viewport
+        this._hintPill.style.top = "20px";
+        this._hintPill.style.left = "50%";
+        this._hintPill.style.transform = "translateX(-50%)";
+        this._hintPill.style.pointerEvents = "auto";
+        this._hintPill.style.cursor = "pointer";
+
+        // Add click handler to mark as complete
+        this._hintPill.addEventListener('click', () => {
+          if (this.currentIndex >= this.steps.length - 1) {
+            this.stop();
+          } else {
+            this.showStep(this.currentIndex + 1);
+          }
+        });
+
+        // Send message to sidepanel to show screenshot
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_SHOW_SCREENSHOT',
+          stepIndex: this.currentIndex,
+        }).catch(() => {});
+
+        return;
+      }
+
+      // Spotlight mode: show backdrop without cutout
       if (!this._backdrop) {
         this._backdrop = document.createElement("div");
         this._backdrop.className = "guide-backdrop";
@@ -1595,7 +1824,7 @@
         }
 
         const rect = this._getAdjustedRect(result);
-        const pad = 6;
+        const pad = this.displayMode === 'light' ? 2 : 6;
 
         if (this._highlight) {
           this._highlight.style.left = `${rect.left - pad}px`;
@@ -1608,6 +1837,9 @@
         }
         if (this._tooltip) {
           this._positionTooltip(this._tooltip, rect);
+        }
+        if (this._hintPill) {
+          this._positionHintPill(this._hintPill, rect);
         }
       }, 200);
     }
@@ -1881,14 +2113,15 @@
 
   // ── Message Handling ──────────────────────────────────────────────
 
-  chrome.runtime.onMessage.addListener((message: { type: string; guide: Guide; startIndex?: number; stepIndex?: number }, _sender: MessageSender, sendResponse: SendResponse) => {
+  chrome.runtime.onMessage.addListener((message: { type: string; guide: Guide; startIndex?: number; stepIndex?: number; displayMode?: string }, _sender: MessageSender, sendResponse: SendResponse) => {
     if (message.type === "START_GUIDE") {
       try {
         if (activeRunner) {
           activeRunner._replacing = true; // don't send GUIDE_STOPPED
           activeRunner.stop();
         }
-        const runner = new GuideRunner(message.guide);
+        const displayMode = message.displayMode || 'light'; // Default to light mode
+        const runner = new GuideRunner(message.guide, displayMode);
         activeRunner = runner;
         _window.__steptGuideRunner = runner;
         if (typeof message.startIndex === "number" && message.startIndex > 0) {
