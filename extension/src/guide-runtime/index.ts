@@ -1072,38 +1072,11 @@
           }
         } else {
           tickCount++;
-          // Only show not-found after timeout threshold
-          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'notfound') {
-            lastStatus = 'notfound';
-            // Report health
-            try {
-              chrome.runtime.sendMessage({
-                type: 'GUIDE_STEP_HEALTH',
-                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-                stepNumber: this.currentIndex,
-                elementFound: false,
-                finderMethod: null,
-                finderConfidence: 0,
-                expectedUrl: step.expected_url || step.url || null,
-                actualUrl: window.location.href,
-                urlMatched: false,
-                timestamp: Date.now(),
-              }).catch(() => {});
-            } catch (_) {}
-
-            // Remove search hint
-            if (this.shadow) {
-              const hint = this.shadow.querySelector('[data-search-hint]');
-              if (hint) hint.remove();
-            }
-            chrome.runtime.sendMessage({
-              type: 'GUIDE_STEP_CHANGED',
-              currentIndex: this.currentIndex,
-              totalSteps: this.steps.length,
-              stepStatus: 'notfound',
-            }).catch(() => {});
-            this._renderNotFound(step, urlMismatch);
-            // Keep polling even after showing not-found — element may appear later
+          // First try LLM recovery after timeout threshold
+          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'recovery' && lastStatus !== 'notfound') {
+            lastStatus = 'recovery';
+            this._stopElementPolling();
+            await this._tryLlmRecovery(step, seq, urlMismatch);
           }
         }
       };
@@ -1111,6 +1084,277 @@
       // Immediate first poll, then every 100ms
       poll();
       this._pollInterval = setInterval(poll, POLL_MS);
+    }
+
+    async _tryLlmRecovery(step: GuideStep, seq: number, urlMismatch: boolean): Promise<void> {
+      // Show "AI is looking..." indicator
+      if (this.shadow) {
+        const hint = this.shadow.querySelector('[data-search-hint]');
+        if (hint) hint.remove();
+        
+        const recoveryHint = document.createElement('div');
+        recoveryHint.className = 'guide-search-hint';
+        recoveryHint.setAttribute('data-search-hint', 'recovery');
+        recoveryHint.textContent = '🔄 AI is looking...';
+        recoveryHint.style.cssText = `
+          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+          z-index: 2147483642; background: #1C1917; color: #3AB08A;
+          padding: 8px 18px; border-radius: 20px; font-size: 12px;
+          border: 1px solid #292524; pointer-events: none;
+          animation: guide-tooltip-in 0.2s ease-out;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        `;
+        this.shadow.appendChild(recoveryHint);
+      }
+
+      try {
+        // Collect all interactive elements on the page  
+        const pageElements = this._collectInteractiveElements();
+        
+        // Build target info from step
+        const targetInfo = this._buildTargetInfo(step);
+        
+        // Call recovery API
+        const recovery = await this._callRecoveryApi(targetInfo, pageElements);
+        
+        if (this._stepSeq !== seq) return; // Step changed during recovery
+        
+        // Remove recovery hint
+        if (this.shadow) {
+          const hint = this.shadow.querySelector('[data-search-hint="recovery"]');
+          if (hint) hint.remove();
+        }
+        
+        if (recovery.found && recovery.element_index !== null) {
+          // Recovery successful - highlight the found element
+          const foundElement = pageElements[recovery.element_index];
+          const domElement = this._findDomElementByInfo(foundElement);
+          
+          if (domElement && isVisible(domElement)) {
+            const result: FindResult = {
+              element: domElement,
+              confidence: recovery.confidence,
+              method: 'llm-recovery',
+              iframeOffset: { x: 0, y: 0 }
+            };
+            
+            this.currentResult = result;
+            
+            // Report successful recovery
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_HEALTH',
+              workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+              stepNumber: this.currentIndex,
+              elementFound: true,
+              finderMethod: 'llm-recovery',
+              finderConfidence: recovery.confidence,
+              expectedUrl: step.expected_url || step.url || null,
+              actualUrl: window.location.href,
+              urlMatched: !urlMismatch,
+              timestamp: Date.now(),
+            }).catch(() => {});
+            
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'found',
+            }).catch(() => {});
+            
+            // Render overlay and set up interactions
+            const obstructor = isObstructed(result.element);
+            this._renderOverlay(step, result, urlMismatch, obstructor);
+            this._startPositionTracking(step, result);
+            this._setupClickAdvance(result.element, step);
+            this._setupCompletionDetection(result.element, step);
+            
+            return; // Success!
+          }
+        }
+        
+        // Recovery failed - show original not-found UI
+        this._showRecoveryFailed(step, urlMismatch, recovery.error);
+        
+      } catch (error: any) {
+        if (this._stepSeq !== seq) return; // Step changed during recovery
+        
+        // Remove recovery hint on error
+        if (this.shadow) {
+          const hint = this.shadow.querySelector('[data-search-hint="recovery"]');
+          if (hint) hint.remove();
+        }
+        
+        console.warn('LLM recovery failed:', error);
+        this._showRecoveryFailed(step, urlMismatch, error.message);
+      }
+    }
+
+    _collectInteractiveElements(): any[] {
+      // Similar to the stept-engine DOM extraction but simpler for browser runtime
+      const interactiveSelectors = [
+        'a[href]', 'button', 'input', 'select', 'textarea',
+        '[role="button"]', '[role="link"]', '[role="textbox"]',
+        '[role="combobox"]', '[role="checkbox"]', '[role="radio"]',
+        '[role="tab"]', '[role="menuitem"]', '[role="option"]',
+        '[onclick]', '[tabindex]:not([tabindex="-1"])',
+        'label[for]', '[contenteditable="true"]'
+      ];
+      
+      const elements: any[] = [];
+      const seen = new Set<string>();
+      
+      document.querySelectorAll(interactiveSelectors.join(', ')).forEach((el: Element, index: number) => {
+        if (!isVisible(el)) return;
+        
+        const rect = el.getBoundingClientRect();
+        const text = (el.textContent || '').trim();
+        
+        // Deduplicate by position + text
+        const dedupeKey = `${Math.round(rect.x)},${Math.round(rect.y)},${text.slice(0, 20)}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+        
+        const elementData = {
+          index: elements.length,
+          tagName: el.tagName.toLowerCase(),
+          text: text.slice(0, 200),
+          role: el.getAttribute('role'),
+          ariaLabel: el.getAttribute('aria-label'),
+          type: el.getAttribute('type'),
+          name: el.getAttribute('name'),
+          placeholder: el.getAttribute('placeholder'),
+          id: el.id || null,
+          href: (el.tagName === 'A' && (el as HTMLAnchorElement).href) ? (el as HTMLAnchorElement).href : null,
+          value: (el as any).value || null,
+          disabled: (el as any).disabled || false,
+          checked: (el as any).checked || false,
+          focused: document.activeElement === el,
+          testId: el.getAttribute('data-testid') || el.getAttribute('data-test') || el.getAttribute('data-cy') || null,
+          parentText: el.parentElement?.textContent?.slice(0, 100) || null
+        };
+        
+        elements.push(elementData);
+      });
+      
+      return elements;
+    }
+
+    _buildTargetInfo(step: GuideStep): any {
+      const info: any = {
+        step_title: step.title,
+        step_description: step.description,
+        action_type: step.action_type
+      };
+      
+      // Add element info if available
+      if ((step as any).element_info) {
+        const ei = (step as any).element_info;
+        Object.assign(info, {
+          content: ei.content,
+          text: ei.text || step.element_text,
+          tagName: ei.tagName,
+          role: ei.role || step.element_role,
+          ariaLabel: ei.ariaLabel,
+          placeholder: ei.placeholder,
+          type: ei.type,
+          title: ei.title
+        });
+      } else {
+        // Fallback to legacy fields
+        info.text = step.element_text;
+        info.role = step.element_role;
+      }
+      
+      return info;
+    }
+
+    async _callRecoveryApi(targetInfo: any, pageElements: any[]): Promise<any> {
+      const response = await fetch('/api/v1/guide/recover-element', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // TODO: Add auth headers if needed
+        },
+        body: JSON.stringify({
+          target: targetInfo,
+          page_elements: pageElements,
+          workflow_id: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+          step_index: this.currentIndex
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Recovery API failed: ${response.status}`);
+      }
+      
+      return await response.json();
+    }
+
+    _findDomElementByInfo(elementInfo: any): Element | null {
+      // Try to find the DOM element that matches the elementInfo from the API response
+      // This uses the same logic as the collection phase
+      const selectors = [
+        'a[href]', 'button', 'input', 'select', 'textarea',
+        '[role="button"]', '[role="link"]', '[role="textbox"]',
+        '[role="combobox"]', '[role="checkbox"]', '[role="radio"]',
+        '[role="tab"]', '[role="menuitem"]', '[role="option"]',
+        '[onclick]', '[tabindex]:not([tabindex="-1"])',
+        'label[for]', '[contenteditable="true"]'
+      ];
+      
+      const candidates = Array.from(document.querySelectorAll(selectors.join(', ')));
+      let elementIndex = 0;
+      
+      for (const el of candidates) {
+        if (!isVisible(el)) continue;
+        
+        const rect = el.getBoundingClientRect();
+        const text = (el.textContent || '').trim();
+        
+        // Skip duplicates (same logic as collection)
+        const dedupeKey = `${Math.round(rect.x)},${Math.round(rect.y)},${text.slice(0, 20)}`;
+        
+        if (elementIndex === elementInfo.index) {
+          // Additional verification - check key attributes match
+          if (elementInfo.tagName === el.tagName.toLowerCase() &&
+              (elementInfo.text || '').slice(0, 50) === text.slice(0, 50)) {
+            return el;
+          }
+        }
+        
+        elementIndex++;
+      }
+      
+      return null;
+    }
+
+    _showRecoveryFailed(step: GuideStep, urlMismatch: boolean, error?: string): void {
+      // Report health
+      try {
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_HEALTH',
+          workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+          stepNumber: this.currentIndex,
+          elementFound: false,
+          finderMethod: 'llm-recovery',
+          finderConfidence: 0,
+          expectedUrl: step.expected_url || step.url || null,
+          actualUrl: window.location.href,
+          urlMatched: !urlMismatch,
+          timestamp: Date.now(),
+          errorMessage: error || 'LLM recovery failed',
+        }).catch(() => {});
+      } catch {}
+      
+      chrome.runtime.sendMessage({
+        type: 'GUIDE_STEP_CHANGED',
+        currentIndex: this.currentIndex,
+        totalSteps: this.steps.length,
+        stepStatus: 'notfound',
+      }).catch(() => {});
+      
+      // Show enhanced not-found panel with recovery info
+      this._renderNotFound(step, urlMismatch);
     }
 
     async showStep(index: number): Promise<void> {
