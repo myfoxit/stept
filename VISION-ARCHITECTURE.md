@@ -497,3 +497,233 @@ Fetch, parse, and cache documentation.
 4. **Should completed AI-guided workflows auto-publish** to the knowledge base, or require admin review?
 
 5. **Pricing for Mode 1**: The AI calls cost money. Who pays? Is it metered per-guide, per-user, or flat rate?
+
+---
+
+## Appendix: Three-Layer Element Finding Architecture
+
+### The Core Insight
+
+No single approach is bullet-proof. The answer is three layers, each handling a different failure mode:
+
+```
+Layer 1: Deterministic (Usertour approach) — 95% of cases
+  Multi-selector tree + parent chain + sibling verification
+  Instant, free, handles minor UI changes
+
+Layer 2: AI-Assisted (browser-use approach) — 4% of cases  
+  Extract all page elements → LLM matches to target description
+  2-3 seconds, $0.01, handles major UI changes
+  → Self-heals: updates Layer 1's selectors for next time
+
+Layer 3: Human Fallback (Tango approach) — 1% of cases
+  Show screenshot with click marker
+  "We couldn't find the element. Do what's shown here."
+  → "Mark as complete" to proceed
+```
+
+### Layer 1: Deterministic Finder (REWRITE recording capture + guide finder)
+
+**At CAPTURE TIME** — upgrade `extension/src/content/elements.ts`:
+
+Currently we capture `selectorSet` (6-9 flat selectors). Upgrade to Usertour's tree structure:
+
+```typescript
+interface SelectorTree {
+  // Multiple selectors for THIS element (6-9 strategies)
+  selectors: string[];
+  // Multiple selectors for previous sibling
+  prevSiblingSelectors: string[];
+  // Multiple selectors for next sibling
+  nextSiblingSelectors: string[];
+  // Depth in the tree (0 = target element)
+  depth: number;
+  // Parent's selector tree (recursive)
+  parent: SelectorTree | null;
+}
+
+// At capture time:
+function captureElementFingerprint(el: Element): {
+  selectorTree: SelectorTree;   // Full tree structure for reliable finding
+  selectorSet: string[];        // Flat list (backward compatible)
+  content: string;              // innerText for verification
+  elementInfo: ElementInfo;     // Existing rich element data
+}
+```
+
+Key: we use `@medv/finder` library (same as Usertour) — it generates optimal CSS selectors with configurable strategies. We run it 6 times with different configs to get 6 different selectors.
+
+**At REPLAY TIME** — rewrite guide-runtime finder:
+
+```typescript
+function findElement(target: CapturedElement): Element | null {
+  // Step 1: Try all selectors, collect candidates
+  const candidates = new Map<Element, number>(); // element → vote count
+  for (const sel of target.selectorTree.selectors) {
+    try {
+      const el = document.querySelector(sel);
+      if (el && isVisible(el)) {
+        candidates.set(el, (candidates.get(el) || 0) + 1);
+      }
+    } catch {}
+  }
+  
+  // Step 2: If one element got ALL votes → it's definitely right
+  if (candidates.size === 1) return [...candidates.keys()][0];
+  
+  // Step 3: If multiple candidates → disambiguate with parent chain
+  if (candidates.size > 1) {
+    return disambiguateByParentChain(
+      [...candidates.keys()], 
+      target.selectorTree
+    );
+  }
+  
+  // Step 4: No candidates from selectors → try content/text match
+  // (uses our existing role+text, tag+text, title-hint fallbacks)
+  return findByContent(target);
+}
+
+function disambiguateByParentChain(candidates: Element[], tree: SelectorTree): Element | null {
+  let bestEl: Element | null = null;
+  let bestScore = -1;
+  
+  for (const candidate of candidates) {
+    let score = 0;
+    let parentNode = tree.parent;
+    let parentEl = candidate.parentElement;
+    
+    // Walk up the tree comparing parents
+    while (parentNode && parentEl) {
+      const parentMatches = parentNode.selectors.some(sel => {
+        try { return parentEl === document.querySelector(sel); } catch { return false; }
+      });
+      if (parentMatches) score++;
+      
+      // Also check siblings for bonus points
+      if (parentNode.prevSiblingSelectors?.length) {
+        const prevMatch = parentNode.prevSiblingSelectors.some(sel => {
+          try { return parentEl.previousElementSibling === document.querySelector(sel); } catch { return false; }
+        });
+        if (prevMatch) score += 0.5;
+      }
+      
+      parentNode = parentNode.parent;
+      parentEl = parentEl.parentElement;
+    }
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestEl = candidate;
+    }
+  }
+  
+  return bestEl;
+}
+```
+
+### Layer 2: AI-Assisted Recovery (REUSE existing Python SDK code)
+
+We already built this in `packages/stept-engine/stept/`:
+- `dom.py` → `get_interactive_elements()` extracts all page elements
+- `dom.py` → `serialize_elements_for_llm()` formats for LLM
+- `agent.py` → LLM prompt for element matching
+- `prompts.py` → System prompt
+
+For the extension, we need a BACKEND ENDPOINT that the guide-runtime calls:
+
+```
+POST /api/v1/guide/recover-element
+Body: {
+  "target": { elementInfo, selectorTree, content },
+  "page_elements": [{ tag, text, role, ariaLabel, ... }],  
+  "page_url": "https://..."
+}
+Response: {
+  "found": true,
+  "element_index": 5,
+  "confidence": 0.87,
+  "new_selectors": ["#new-id", "button[aria-label='Save']"]
+}
+```
+
+The extension's guide-runtime:
+1. Calls this endpoint when Layer 1 fails
+2. Backend uses existing `serialize_elements_for_llm()` + LLM to find the match
+3. Returns the matching element index + new selectors
+4. Guide-runtime highlights element index 5
+5. **Self-healing**: backend updates the recording's selectorTree with new_selectors
+
+### Layer 3: Human Fallback (KEEP existing sidepanel)
+
+Already built in `GuideStepsPanel.tsx`:
+- Shows screenshot with click marker ✅
+- "Mark as complete" button ✅
+- Step list with progress ✅
+
+Just need the guide-runtime to properly communicate "not found" to the sidepanel so it shows the screenshot.
+
+### Multi-Page Handling (NEEDS IMPLEMENTATION)
+
+Tango handles this via their service worker. We need:
+
+1. **URL watcher in guide-runtime**: popstate + hashchange + 500ms SPA polling
+2. **Step-URL matching in background script**: when URL changes, find which step expects this URL
+3. **Re-injection**: when full page navigation happens, background re-injects guide-runtime at the correct step
+4. **Auto-skip**: if user navigates ahead of the current step, jump to the matching step
+
+This is partially implemented in `extension/src/background/guides.ts` but needs to be more robust.
+
+### What We REWRITE vs REUSE vs KEEP
+
+```
+REWRITE (from scratch, properly):
+├── extension/src/guide-runtime/index.ts 
+│   New architecture: ElementFinder (Usertour tree) + ElementWatcher (events) 
+│   + OverlayRenderer (light) + GuideRunner (state machine)
+│
+├── extension/src/content/elements.ts (UPGRADE capture)
+│   Add: SelectorTree capture (parents + siblings)
+│   Add: @medv/finder for optimal selector generation
+│   Keep: existing ElementInfo, selectorSet (backward compatible)
+
+REUSE (already built):
+├── packages/stept-engine/stept/dom.py → page element extraction for Layer 2
+├── packages/stept-engine/stept/prompts.py → LLM prompts for Layer 2
+├── packages/stept-engine/stept/agent.py → LLM decision logic for Layer 2
+├── api/app/services/llm.py → LLM gateway for Layer 2 backend endpoint
+
+KEEP (don't touch):
+├── extension/src/sidepanel/components/GuideStepsPanel.tsx → step list UI
+├── extension/src/sidepanel/components/StepCard.tsx → step card with screenshot
+├── extension/src/background/guides.ts → guide loading + injection
+├── extension/src/content/capture.ts → recording capture flow
+├── All API routes, models, frontend
+```
+
+### Implementation Order
+
+```
+Step 1: Upgrade element CAPTURE (elements.ts)
+  Add SelectorTree recording with parent chain + siblings
+  Add @medv/finder integration
+  Test: record a workflow, verify selectorTree is populated
+
+Step 2: Rewrite element FINDER (guide-runtime)
+  Implement Usertour-style finderX with parent disambiguation
+  Use event-driven watcher (not setInterval)
+  Test: replay a recorded workflow, verify elements found reliably
+
+Step 3: Add Layer 2 backend endpoint
+  POST /api/v1/guide/recover-element
+  Reuse existing SDK dom extraction + LLM code
+  Test: break a selector manually, verify LLM recovery works
+
+Step 4: Wire Layer 2 into guide-runtime
+  When finder fails → call recovery endpoint → self-heal
+  Test: change a page's CSS, verify guide still works
+
+Step 5: Multi-page handling
+  URL watcher + step-URL matching + re-injection
+  Test: record a multi-page workflow, replay across navigations
+```
