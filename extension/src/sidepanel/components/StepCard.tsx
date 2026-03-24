@@ -157,8 +157,6 @@ export default function StepCard({
           />
           {hasClickMarker && (
             <div className="click-marker" style={clickMarkerStyle}>
-              <div className="click-marker-pulse" />
-              <div className="click-marker-ring" />
               <div className="click-marker-dot" />
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { sendToBackground } from '@/shared/messages';
 import type { GuideData, GuideStep } from '../App';
 
@@ -17,7 +17,9 @@ export default function GuideStepsPanel({
 }: GuideStepsPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const imageCacheRef = useRef<Record<string, string>>({});
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const handleZoom = useCallback((dataUrl: string) => {
+    sendToBackground({ type: 'GUIDE_SHOW_IMAGE', dataUrl } as any);
+  }, []);
 
   // Scroll active into view
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function GuideStepsPanel({
             state={getDesiredState(i)}
             totalSteps={guide.steps.length}
             imageCacheRef={imageCacheRef}
-            onZoom={setZoomedImage}
+            onZoom={handleZoom}
           />
         ))}
       </div>
@@ -78,11 +80,6 @@ export default function GuideStepsPanel({
         </button>
       </div>
 
-      {zoomedImage && (
-        <div className="guide-zoom-modal" onClick={() => setZoomedImage(null)}>
-          <img src={zoomedImage} alt="Zoomed screenshot" />
-        </div>
-      )}
     </div>
   );
 }
@@ -151,13 +148,17 @@ function GuideStepItem({
               className="guide-mark-complete-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                sendToBackground({
-                  type: 'GUIDE_GO_TO_STEP',
-                  stepIndex: index + 1,
-                });
+                if (index + 1 >= totalSteps) {
+                  sendToBackground({ type: 'STOP_GUIDE' });
+                } else {
+                  sendToBackground({
+                    type: 'GUIDE_GO_TO_STEP',
+                    stepIndex: index + 1,
+                  });
+                }
               }}
             >
-              &#x2713; Mark as complete
+              {index + 1 >= totalSteps ? '\u2713 Finish guide' : '\u2713 Mark as complete'}
             </button>
           </div>
         )}
@@ -220,16 +221,31 @@ function GuideStepImage({ step, index, imageCacheRef, onZoom }: GuideStepImagePr
 
   const hasClickMarker =
     step.screenshot_relative_position && step.screenshot_size;
-  const clickMarkerStyle = hasClickMarker
-    ? {
-        left: `${(step.screenshot_relative_position!.x / step.screenshot_size!.width) * 100}%`,
-        top: `${(step.screenshot_relative_position!.y / step.screenshot_size!.height) * 100}%`,
-      }
-    : undefined;
+
+  // Compute crop/zoom transform to center on click point
+  const containerHeight = 190;
+  let imgStyle: React.CSSProperties = { width: '100%', display: 'block' };
+  if (hasClickMarker) {
+    const imgW = step.screenshot_size!.width;
+    const imgH = step.screenshot_size!.height;
+    const clickX = step.screenshot_relative_position!.x;
+    const clickY = step.screenshot_relative_position!.y;
+    // Scale to zoom ~2x into a region around the click point
+    const scale = 2;
+    const originX = (clickX / imgW) * 100;
+    const originY = (clickY / imgH) * 100;
+    imgStyle = {
+      width: '100%',
+      display: 'block',
+      transform: `scale(${scale})`,
+      transformOrigin: `${originX}% ${originY}%`,
+    };
+  }
 
   return (
     <div
       className="guide-step-screenshot"
+      style={hasClickMarker ? { height: containerHeight, overflow: 'hidden' } : undefined}
       onClick={(e) => {
         e.stopPropagation();
         if (dataUrl) onZoom(dataUrl);
@@ -247,11 +263,9 @@ function GuideStepImage({ step, index, imageCacheRef, onZoom }: GuideStepImagePr
       )}
       {dataUrl && (
         <>
-          <img src={dataUrl} alt={`Step ${index + 1}`} />
+          <img src={dataUrl} alt={`Step ${index + 1}`} style={imgStyle} />
           {hasClickMarker && (
-            <div className="click-marker" style={clickMarkerStyle}>
-              <div className="click-marker-pulse" />
-              <div className="click-marker-ring" />
+            <div className="click-marker" style={{ left: '50%', top: '50%' }}>
               <div className="click-marker-dot" />
             </div>
           )}

@@ -243,122 +243,8 @@
     return best;
   }
 
-  /**
-   * Find element by SelectorTree structure (Layer 1 - Deterministic).
-   * Based on Usertour's finderX algorithm with parent chain verification.
-   */
-  function findElementByTree(tree: any, content?: string): { element: Element | null, confidence: number, method: string } {
-    if (!tree || !tree.selectors || tree.selectors.length === 0) {
-      return { element: null, confidence: 0, method: 'no-tree' };
-    }
-
-    // 1. Try all selectors for the target, collect candidates with vote counting
-    const votes = new Map<Element, number>();
-    for (const sel of tree.selectors) {
-      try {
-        const el = document.querySelector(sel);
-        if (el && isVisible(el)) {
-          votes.set(el, (votes.get(el) || 0) + 1);
-        }
-      } catch (e) {
-        // Invalid selector, skip
-      }
-    }
-
-    // 2. Single candidate with all votes → definite match (confidence 1.0)
-    if (votes.size === 1) {
-      return { element: [...votes.keys()][0], confidence: 1.0, method: 'selector-unanimous' };
-    }
-
-    // 3. Multiple candidates → disambiguate by parent chain
-    if (votes.size > 1) {
-      const best = disambiguateByParentChain([...votes.keys()], tree);
-      if (best) return { element: best, confidence: 0.9, method: 'parent-chain' };
-    }
-
-    // 4. No candidates from tree → try content matching
-    if (content) {
-      const contentMatch = findByContent(content);
-      if (contentMatch) return { element: contentMatch, confidence: 0.6, method: 'content-match' };
-    }
-
-    return { element: null, confidence: 0, method: 'not-found' };
-  }
-
-  /**
-   * Disambiguate multiple candidates using parent chain verification.
-   */
-  function disambiguateByParentChain(candidates: Element[], tree: any): Element | null {
-    let bestEl: Element | null = null;
-    let bestScore = -1;
-
-    for (const candidate of candidates) {
-      let score = 0;
-      let parentNode = tree.parent;
-      let parentEl = candidate.parentElement;
-
-      // Walk up the tree comparing parents
-      while (parentNode && parentEl) {
-        const parentMatches = parentNode.selectors.some((sel: string) => {
-          try { 
-            return parentEl === document.querySelector(sel); 
-          } catch { 
-            return false; 
-          }
-        });
-        if (parentMatches) score++;
-
-        // Also check siblings for bonus points
-        if (parentNode.prevSiblingSelectors?.length) {
-          const prevMatch = parentNode.prevSiblingSelectors.some((sel: string) => {
-            try { 
-              return parentEl!.previousElementSibling === document.querySelector(sel); 
-            } catch { 
-              return false; 
-            }
-          });
-          if (prevMatch) score += 0.5;
-        }
-
-        parentNode = parentNode.parent;
-        parentEl = parentEl.parentElement;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestEl = candidate;
-      }
-    }
-
-    return bestEl;
-  }
-
-  /**
-   * Find element by content/text matching.
-   */
-  function findByContent(content: string): Element | null {
-    if (!content) return null;
-    
-    // Search all visible elements for matching text
-    const allInteractive = document.querySelectorAll(
-      'button, a, input, select, textarea, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [tabindex]'
-    );
-    
-    return findByText(Array.from(allInteractive), content, { fuzzy: true });
-  }
-
-  // Search a single root for the step's element using the NEW three-layer approach
+  // Search a single root for the step's element using all strategies
   function findInRoot(root: Document | ShadowRoot, step: GuideStep): FindResult | null {
-    // Layer 1: Try new SelectorTree structure first
-    if ((step as any).element_info?.selectorTree) {
-      const treeResult = findElementByTree((step as any).element_info.selectorTree, (step as any).element_info?.content);
-      if (treeResult.element) {
-        return { element: treeResult.element, confidence: treeResult.confidence, method: treeResult.method };
-      }
-    }
-
-    // Fallback to existing strategies for backward compatibility
-
     // CSS selector
     if (step.selector) {
       const el = safeQuerySelector(root, step.selector);
@@ -566,32 +452,52 @@
       all: initial;
       font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 14px;
-      color: #1A1A1A;
+      color: #E7E5E4;
+    }
+
+    .guide-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483640;
+      pointer-events: none;
+    }
+
+    .guide-backdrop-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      transition: clip-path 0.3s ease;
+      pointer-events: none;
     }
 
     .guide-highlight {
       position: fixed;
       z-index: 2147483641;
-      border: 2px solid #FF6B52;
+      border: 2px solid #3AB08A;
       border-radius: 6px;
-      box-shadow: 0 0 0 4px rgba(255, 107, 82, 0.15);
+      box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25);
       pointer-events: none;
       transition: all 0.3s ease;
+      animation: guide-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes guide-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25); }
+      50% { box-shadow: 0 0 0 8px rgba(58, 176, 138, 0.15); }
     }
 
     .guide-tooltip {
       position: fixed;
       z-index: 2147483642;
-      background: #FFFFFF;
-      border: 1px solid #E5E5E5;
-      border-radius: 14px;
+      background: #1C1917;
+      border: 1px solid #292524;
+      border-radius: 12px;
       padding: 16px;
-      max-width: 300px;
+      max-width: 320px;
       min-width: 240px;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
       pointer-events: auto;
       animation: guide-tooltip-in 0.25s ease-out;
-      color: #1A1A1A;
     }
 
     @keyframes guide-tooltip-in {
@@ -602,27 +508,27 @@
     .guide-tooltip-title {
       font-size: 15px;
       font-weight: 600;
-      color: #1A1A1A;
+      color: #FAFAF9;
       margin: 0 0 6px 0;
       line-height: 1.3;
     }
 
     .guide-tooltip-desc {
       font-size: 13px;
-      color: #666666;
+      color: #A8A29E;
       margin: 0 0 14px 0;
       line-height: 1.5;
     }
 
     .guide-tooltip-progress {
       font-size: 11px;
-      color: #999999;
+      color: #78716C;
       margin-bottom: 12px;
     }
 
     .guide-tooltip-progress-bar {
       height: 3px;
-      background: #F0F0F0;
+      background: #292524;
       border-radius: 2px;
       margin-top: 6px;
       overflow: hidden;
@@ -630,7 +536,7 @@
 
     .guide-tooltip-progress-fill {
       height: 100%;
-      background: #FF6B52;
+      background: #3AB08A;
       border-radius: 2px;
       transition: width 0.3s ease;
     }
@@ -657,23 +563,22 @@
     .guide-btn:active { transform: scale(0.97); }
 
     .guide-btn-primary {
-      background: #FF6B52;
+      background: #3AB08A;
       color: #fff;
     }
 
     .guide-btn-secondary {
-      background: #F5F5F5;
-      color: #333;
-      border: 1px solid #E0E0E0;
+      background: #292524;
+      color: #D6D3D1;
     }
 
     .guide-btn-ghost {
       background: transparent;
-      color: #999;
+      color: #78716C;
       padding: 8px 8px;
     }
 
-    .guide-btn-ghost:hover { color: #666; }
+    .guide-btn-ghost:hover { color: #D6D3D1; }
 
     .guide-spacer { flex: 1; }
 
@@ -683,7 +588,7 @@
       right: 8px;
       background: none;
       border: none;
-      color: #CCCCCC;
+      color: #78716C;
       cursor: pointer;
       padding: 4px;
       line-height: 1;
@@ -691,43 +596,43 @@
       border-radius: 4px;
     }
 
-    .guide-close-btn:hover { color: #666; background: #F5F5F5; }
+    .guide-close-btn:hover { color: #D6D3D1; background: #292524; }
 
     .guide-btn-done {
-      background: #10B981;
+      background: #059669;
       color: #fff;
     }
 
     .guide-obstruction-warning {
-      background: #FFFBEB;
-      border: 1px solid #FDE68A;
+      background: #451A03;
+      border: 1px solid #92400E;
       border-radius: 8px;
       padding: 10px 12px;
       margin-bottom: 12px;
       font-size: 12px;
-      color: #92400E;
+      color: #FDE68A;
       line-height: 1.4;
     }
 
     .guide-intermediate-hint {
-      background: #EEF2FF;
-      border: 1px solid #C7D2FE;
+      background: #1E1B4B;
+      border: 1px solid #3730A3;
       border-radius: 8px;
       padding: 10px 12px;
       margin-bottom: 12px;
       font-size: 12px;
-      color: #4338CA;
+      color: #C7D2FE;
       line-height: 1.4;
     }
 
     .guide-url-warning {
-      background: #FFFBEB;
-      border: 1px solid #FDE68A;
+      background: #451A03;
+      border: 1px solid #78350F;
       border-radius: 8px;
       padding: 10px 12px;
       margin-bottom: 12px;
       font-size: 12px;
-      color: #92400E;
+      color: #FDE68A;
       line-height: 1.4;
     }
 
@@ -735,9 +640,9 @@
       display: inline-block;
       margin-top: 8px;
       padding: 6px 12px;
-      background: #FEF3C7;
-      color: #92400E;
-      border: 1px solid #FDE68A;
+      background: #78350F;
+      color: #FDE68A;
+      border: 1px solid #92400E;
       border-radius: 6px;
       font-size: 12px;
       font-weight: 500;
@@ -747,13 +652,13 @@
     }
 
     .guide-navigate-btn:hover {
-      background: #FDE68A;
+      background: #92400E;
     }
 
     .guide-not-found {
-      background: #FFFFFF;
-      border: 1px solid #E5E5E5;
-      border-radius: 14px;
+      background: #1C1917;
+      border: 1px solid #292524;
+      border-radius: 12px;
       padding: 20px;
       position: fixed;
       top: 50%;
@@ -763,88 +668,37 @@
       text-align: center;
       max-width: 300px;
       pointer-events: auto;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
       animation: guide-tooltip-in 0.25s ease-out;
     }
 
     .guide-not-found-title {
       font-size: 15px;
       font-weight: 600;
-      color: #1A1A1A;
+      color: #FAFAF9;
       margin-bottom: 8px;
     }
 
     .guide-not-found-desc {
       font-size: 13px;
-      color: #666666;
+      color: #A8A29E;
       margin-bottom: 14px;
     }
 
     .guide-roadblock-icon {
-      font-size: 24px;
+      font-size: 28px;
       margin-bottom: 8px;
     }
 
     .guide-roadblock-step-title {
       font-size: 13px;
       font-weight: 500;
-      color: #333;
+      color: #D6D3D1;
       margin-bottom: 10px;
       padding: 8px 12px;
-      background: #F5F5F5;
+      background: #292524;
       border-radius: 6px;
     }
   `;
-
-  // ── URL Watcher for Multi-Page Handling ─────────────────────────
-
-  class URLWatcher {
-    private _interval: ReturnType<typeof setInterval> | null = null;
-    private _lastUrl: string;
-    private _onUrlChange: (newUrl: string, oldUrl: string) => void;
-
-    constructor(onUrlChange: (newUrl: string, oldUrl: string) => void) {
-      this._lastUrl = window.location.href;
-      this._onUrlChange = onUrlChange;
-    }
-
-    start(): void {
-      this.stop(); // Ensure no duplicate intervals
-      
-      // Listen for browser navigation events
-      window.addEventListener('popstate', this._handleUrlChange);
-      window.addEventListener('hashchange', this._handleUrlChange);
-      
-      // Poll for URL changes (for SPA navigation that doesn't trigger events)
-      this._interval = setInterval(() => {
-        this._checkUrlChange();
-      }, 500);
-    }
-
-    stop(): void {
-      if (this._interval) {
-        clearInterval(this._interval);
-        this._interval = null;
-      }
-      
-      window.removeEventListener('popstate', this._handleUrlChange);
-      window.removeEventListener('hashchange', this._handleUrlChange);
-    }
-
-    private _handleUrlChange = (): void => {
-      // Small delay to ensure the page has processed the navigation
-      setTimeout(() => this._checkUrlChange(), 100);
-    };
-
-    private _checkUrlChange(): void {
-      const currentUrl = window.location.href;
-      if (currentUrl !== this._lastUrl) {
-        const oldUrl = this._lastUrl;
-        this._lastUrl = currentUrl;
-        this._onUrlChange(currentUrl, oldUrl);
-      }
-    }
-  }
 
   // ── Guide Runner ──────────────────────────────────────────────────
 
@@ -859,6 +713,8 @@
     _clickHandler: ((e: Event) => void) | null;
     _stepSeq: number;
     // Persistent overlay elements for in-place updates
+    _backdrop: HTMLDivElement | null;
+    _overlay: HTMLDivElement | null;
     _highlight: HTMLDivElement | null;
     _tooltip: HTMLDivElement | null;
     _notFoundPanel: HTMLDivElement | null;
@@ -876,11 +732,6 @@
     _completionObserver: MutationObserver | null;
     _completionCleanup: (() => void) | null;
     _completionTimeout: ReturnType<typeof setTimeout> | null;
-    // Position tracking via rAF
-    _positionFrame: number | null;
-    // Multi-page handling
-    _urlWatcher: URLWatcher | null;
-    _lastKnownUrl: string;
 
     constructor(guide: Guide) {
       this.guide = guide;
@@ -893,6 +744,8 @@
       this._clickHandler = null;
       this._stepSeq = 0; // concurrency guard: increments on each showStep call
       // Persistent overlay elements for in-place updates
+      this._backdrop = null;
+      this._overlay = null;
       this._highlight = null;
       this._tooltip = null;
       this._notFoundPanel = null;
@@ -910,22 +763,10 @@
       this._completionObserver = null;
       this._completionCleanup = null;
       this._completionTimeout = null;
-      // Position tracking via rAF
-      this._positionFrame = null;
-      // Multi-page handling
-      this._urlWatcher = null;
-      this._lastKnownUrl = window.location.href;
     }
 
     async start(): Promise<void> {
       this._createHost();
-      
-      // Start URL watching for multi-page handling
-      this._urlWatcher = new URLWatcher((newUrl: string, oldUrl: string) => {
-        this._handleUrlChange(newUrl, oldUrl);
-      });
-      this._urlWatcher.start();
-      
       if (this.steps.length === 0) {
         this._showEmpty();
         return;
@@ -946,19 +787,13 @@
         this._zoomObserver.disconnect();
         this._zoomObserver = null;
       }
-      if (this._positionFrame) {
-        cancelAnimationFrame(this._positionFrame);
-        this._positionFrame = null;
-      }
-      if (this._urlWatcher) {
-        this._urlWatcher.stop();
-        this._urlWatcher = null;
-      }
       if (this.host) {
         this.host.remove();
         this.host = null;
         this.shadow = null;
       }
+      this._backdrop = null;
+      this._overlay = null;
       this._highlight = null;
       this._tooltip = null;
       this._notFoundPanel = null;
@@ -1010,6 +845,7 @@
       // Remove all overlay elements to prevent artifacts across navigations
       if (this._highlight) { this._highlight.remove(); this._highlight = null; }
       if (this._tooltip) { this._tooltip.remove(); this._tooltip = null; }
+      if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
       if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
       if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
     }
@@ -1038,10 +874,9 @@
         // Style it as a small pill at the top
         searchHint.style.cssText = `
           position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #FFFFFF; color: #999;
+          z-index: 2147483642; background: #1C1917; color: #A8A29E;
           padding: 6px 16px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #E5E5E5; pointer-events: none;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          border: 1px solid #292524; pointer-events: none;
           animation: guide-tooltip-in 0.2s ease-out;
           font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         `;
@@ -1112,7 +947,8 @@
             }).catch(() => {});
 
             const obstructor = isObstructed(result.element);
-            await this._scrollToElement(result);
+            this._scrollToElement(result);
+            await new Promise<void>((r) => setTimeout(r, 80));
             if (this._stepSeq !== seq) return;
             this._renderOverlay(step, result, urlMismatch, obstructor);
             this._startPositionTracking(step, result);
@@ -1123,11 +959,38 @@
           }
         } else {
           tickCount++;
-          // First try LLM recovery after timeout threshold
-          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'recovery' && lastStatus !== 'notfound') {
-            lastStatus = 'recovery';
-            this._stopElementPolling();
-            await this._tryLlmRecovery(step, seq, urlMismatch);
+          // Only show not-found after timeout threshold
+          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'notfound') {
+            lastStatus = 'notfound';
+            // Report health
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: false,
+                finderMethod: null,
+                finderConfidence: 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: false,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+
+            // Remove search hint
+            if (this.shadow) {
+              const hint = this.shadow.querySelector('[data-search-hint]');
+              if (hint) hint.remove();
+            }
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'notfound',
+            }).catch(() => {});
+            this._renderNotFound(step, urlMismatch);
+            // Keep polling even after showing not-found — element may appear later
           }
         }
       };
@@ -1135,393 +998,6 @@
       // Immediate first poll, then every 100ms
       poll();
       this._pollInterval = setInterval(poll, POLL_MS);
-    }
-
-    async _tryLlmRecovery(step: GuideStep, seq: number, urlMismatch: boolean): Promise<void> {
-      // Show "AI is looking..." indicator
-      if (this.shadow) {
-        const hint = this.shadow.querySelector('[data-search-hint]');
-        if (hint) hint.remove();
-        
-        const recoveryHint = document.createElement('div');
-        recoveryHint.className = 'guide-search-hint';
-        recoveryHint.setAttribute('data-search-hint', 'recovery');
-        recoveryHint.textContent = '🔄 AI is looking...';
-        recoveryHint.style.cssText = `
-          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #FFFFFF; color: #FF6B52;
-          padding: 8px 18px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #E5E5E5; pointer-events: none;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-          animation: guide-tooltip-in 0.2s ease-out;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        `;
-        this.shadow.appendChild(recoveryHint);
-      }
-
-      try {
-        // Collect all interactive elements on the page  
-        const pageElements = this._collectInteractiveElements();
-        
-        // Build target info from step
-        const targetInfo = this._buildTargetInfo(step);
-        
-        // Call recovery API
-        const recovery = await this._callRecoveryApi(targetInfo, pageElements);
-        
-        if (this._stepSeq !== seq) return; // Step changed during recovery
-        
-        // Remove recovery hint
-        if (this.shadow) {
-          const hint = this.shadow.querySelector('[data-search-hint="recovery"]');
-          if (hint) hint.remove();
-        }
-        
-        if (recovery.found && recovery.element_index !== null) {
-          // Recovery successful - highlight the found element
-          const foundElement = pageElements[recovery.element_index];
-          const domElement = this._findDomElementByInfo(foundElement);
-          
-          if (domElement && isVisible(domElement)) {
-            const result: FindResult = {
-              element: domElement,
-              confidence: recovery.confidence,
-              method: 'llm-recovery',
-              iframeOffset: { x: 0, y: 0 }
-            };
-            
-            this.currentResult = result;
-            
-            // Report successful recovery
-            chrome.runtime.sendMessage({
-              type: 'GUIDE_STEP_HEALTH',
-              workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-              stepNumber: this.currentIndex,
-              elementFound: true,
-              finderMethod: 'llm-recovery',
-              finderConfidence: recovery.confidence,
-              expectedUrl: step.expected_url || step.url || null,
-              actualUrl: window.location.href,
-              urlMatched: !urlMismatch,
-              timestamp: Date.now(),
-            }).catch(() => {});
-            
-            chrome.runtime.sendMessage({
-              type: 'GUIDE_STEP_CHANGED',
-              currentIndex: this.currentIndex,
-              totalSteps: this.steps.length,
-              stepStatus: 'found',
-            }).catch(() => {});
-            
-            // Render overlay and set up interactions
-            const obstructor = isObstructed(result.element);
-            this._renderOverlay(step, result, urlMismatch, obstructor);
-            this._startPositionTracking(step, result);
-            this._setupClickAdvance(result.element, step);
-            this._setupCompletionDetection(result.element, step);
-            
-            return; // Success!
-          }
-        }
-        
-        // Recovery failed - show original not-found UI
-        this._showRecoveryFailed(step, urlMismatch, recovery.error);
-        
-      } catch (error: any) {
-        if (this._stepSeq !== seq) return; // Step changed during recovery
-        
-        // Remove recovery hint on error
-        if (this.shadow) {
-          const hint = this.shadow.querySelector('[data-search-hint="recovery"]');
-          if (hint) hint.remove();
-        }
-        
-        console.warn('LLM recovery failed:', error);
-        this._showRecoveryFailed(step, urlMismatch, error.message);
-      }
-    }
-
-    _collectInteractiveElements(): any[] {
-      // Similar to the stept-engine DOM extraction but simpler for browser runtime
-      const interactiveSelectors = [
-        'a[href]', 'button', 'input', 'select', 'textarea',
-        '[role="button"]', '[role="link"]', '[role="textbox"]',
-        '[role="combobox"]', '[role="checkbox"]', '[role="radio"]',
-        '[role="tab"]', '[role="menuitem"]', '[role="option"]',
-        '[onclick]', '[tabindex]:not([tabindex="-1"])',
-        'label[for]', '[contenteditable="true"]'
-      ];
-      
-      const elements: any[] = [];
-      const seen = new Set<string>();
-      
-      document.querySelectorAll(interactiveSelectors.join(', ')).forEach((el: Element, index: number) => {
-        if (!isVisible(el)) return;
-        
-        const rect = el.getBoundingClientRect();
-        const text = (el.textContent || '').trim();
-        
-        // Deduplicate by position + text
-        const dedupeKey = `${Math.round(rect.x)},${Math.round(rect.y)},${text.slice(0, 20)}`;
-        if (seen.has(dedupeKey)) return;
-        seen.add(dedupeKey);
-        
-        const elementData = {
-          index: elements.length,
-          tagName: el.tagName.toLowerCase(),
-          text: text.slice(0, 200),
-          role: el.getAttribute('role'),
-          ariaLabel: el.getAttribute('aria-label'),
-          type: el.getAttribute('type'),
-          name: el.getAttribute('name'),
-          placeholder: el.getAttribute('placeholder'),
-          id: el.id || null,
-          href: (el.tagName === 'A' && (el as HTMLAnchorElement).href) ? (el as HTMLAnchorElement).href : null,
-          value: (el as any).value || null,
-          disabled: (el as any).disabled || false,
-          checked: (el as any).checked || false,
-          focused: document.activeElement === el,
-          testId: el.getAttribute('data-testid') || el.getAttribute('data-test') || el.getAttribute('data-cy') || null,
-          parentText: el.parentElement?.textContent?.slice(0, 100) || null
-        };
-        
-        elements.push(elementData);
-      });
-      
-      return elements;
-    }
-
-    _buildTargetInfo(step: GuideStep): any {
-      const info: any = {
-        step_title: step.title,
-        step_description: step.description,
-        action_type: step.action_type
-      };
-      
-      // Add element info if available
-      if ((step as any).element_info) {
-        const ei = (step as any).element_info;
-        Object.assign(info, {
-          content: ei.content,
-          text: ei.text || step.element_text,
-          tagName: ei.tagName,
-          role: ei.role || step.element_role,
-          ariaLabel: ei.ariaLabel,
-          placeholder: ei.placeholder,
-          type: ei.type,
-          title: ei.title
-        });
-      } else {
-        // Fallback to legacy fields
-        info.text = step.element_text;
-        info.role = step.element_role;
-      }
-      
-      return info;
-    }
-
-    async _callRecoveryApi(targetInfo: any, pageElements: any[]): Promise<any> {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          {
-            type: 'GUIDE_RECOVER_ELEMENT',
-            target: targetInfo,
-            pageElements: pageElements,
-            workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-            stepIndex: this.currentIndex,
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-              return;
-            }
-            if (!response || response.error) {
-              reject(new Error(response?.error || 'Recovery API failed'));
-              return;
-            }
-            resolve(response);
-          }
-        );
-      });
-    }
-
-    _findDomElementByInfo(elementInfo: any): Element | null {
-      // Try to find the DOM element that matches the elementInfo from the API response
-      // This uses the same logic as the collection phase
-      const selectors = [
-        'a[href]', 'button', 'input', 'select', 'textarea',
-        '[role="button"]', '[role="link"]', '[role="textbox"]',
-        '[role="combobox"]', '[role="checkbox"]', '[role="radio"]',
-        '[role="tab"]', '[role="menuitem"]', '[role="option"]',
-        '[onclick]', '[tabindex]:not([tabindex="-1"])',
-        'label[for]', '[contenteditable="true"]'
-      ];
-      
-      const candidates = Array.from(document.querySelectorAll(selectors.join(', ')));
-      let elementIndex = 0;
-      
-      for (const el of candidates) {
-        if (!isVisible(el)) continue;
-        
-        const rect = el.getBoundingClientRect();
-        const text = (el.textContent || '').trim();
-        
-        // Skip duplicates (same logic as collection)
-        const dedupeKey = `${Math.round(rect.x)},${Math.round(rect.y)},${text.slice(0, 20)}`;
-        
-        if (elementIndex === elementInfo.index) {
-          // Additional verification - check key attributes match
-          if (elementInfo.tagName === el.tagName.toLowerCase() &&
-              (elementInfo.text || '').slice(0, 50) === text.slice(0, 50)) {
-            return el;
-          }
-        }
-        
-        elementIndex++;
-      }
-      
-      return null;
-    }
-
-    _showRecoveryFailed(step: GuideStep, urlMismatch: boolean, error?: string): void {
-      // Report health
-      try {
-        chrome.runtime.sendMessage({
-          type: 'GUIDE_STEP_HEALTH',
-          workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-          stepNumber: this.currentIndex,
-          elementFound: false,
-          finderMethod: 'llm-recovery',
-          finderConfidence: 0,
-          expectedUrl: step.expected_url || step.url || null,
-          actualUrl: window.location.href,
-          urlMatched: !urlMismatch,
-          timestamp: Date.now(),
-          errorMessage: error || 'LLM recovery failed',
-        }).catch(() => {});
-      } catch {}
-      
-      chrome.runtime.sendMessage({
-        type: 'GUIDE_STEP_CHANGED',
-        currentIndex: this.currentIndex,
-        totalSteps: this.steps.length,
-        stepStatus: 'notfound',
-      }).catch(() => {});
-      
-      // Show enhanced not-found panel with recovery info
-      this._renderNotFound(step, urlMismatch);
-    }
-
-    _handleUrlChange(newUrl: string, oldUrl: string): void {
-      console.log('URL changed from', oldUrl, 'to', newUrl);
-      
-      // Update tracking
-      this._lastKnownUrl = newUrl;
-      
-      // Check if any step expects this URL
-      const matchingStepIndex = this._findStepForUrl(newUrl);
-      
-      if (matchingStepIndex !== -1 && matchingStepIndex !== this.currentIndex) {
-        // Auto-advance to the matching step
-        console.log(`Auto-advancing to step ${matchingStepIndex} for URL: ${newUrl}`);
-        
-        // Report the URL navigation
-        chrome.runtime.sendMessage({
-          type: 'GUIDE_URL_CHANGED',
-          oldUrl,
-          newUrl,
-          fromStep: this.currentIndex,
-          toStep: matchingStepIndex
-        }).catch(() => {});
-        
-        this.showStep(matchingStepIndex);
-      } else if (matchingStepIndex === -1) {
-        // No step matches this URL - pause the guide
-        console.log(`No step matches URL ${newUrl}, pausing guide`);
-        
-        this._clearOverlay();
-        this._showUrlMismatchPanel(newUrl);
-        
-        chrome.runtime.sendMessage({
-          type: 'GUIDE_STEP_CHANGED',
-          currentIndex: this.currentIndex,
-          totalSteps: this.steps.length,
-          stepStatus: 'url-mismatch',
-          actualUrl: newUrl
-        }).catch(() => {});
-      }
-      // If matchingStepIndex === this.currentIndex, we're already on the right step
-    }
-
-    _findStepForUrl(url: string): number {
-      // Find the step that expects this URL
-      for (let i = 0; i < this.steps.length; i++) {
-        const step = this.steps[i];
-        if (this._urlMatches(url, step.expected_url || step.url)) {
-          return i;
-        }
-      }
-      return -1; // No matching step found
-    }
-
-    _urlMatches(currentUrl: string, expectedUrl?: string | null): boolean {
-      if (!expectedUrl) return true; // No URL constraint
-      
-      try {
-        const current = new URL(currentUrl);
-        const expected = new URL(expectedUrl);
-        
-        // Match protocol, host, and pathname
-        return (
-          current.protocol === expected.protocol &&
-          current.host === expected.host &&
-          current.pathname === expected.pathname
-        );
-        // Note: We don't match search params or hash to be more flexible
-      } catch (e) {
-        // Fallback to simple string comparison if URL parsing fails
-        return currentUrl.includes(expectedUrl);
-      }
-    }
-
-    _showUrlMismatchPanel(currentUrl: string): void {
-      if (!this.shadow) return;
-      
-      // Clear existing panels
-      this._clearOverlay();
-
-      const panel = document.createElement("div");
-      panel.className = "guide-not-found";
-      
-      panel.innerHTML = `
-        <div class="guide-not-found-title">Unexpected page</div>
-        <div class="guide-not-found-desc">
-          The guide is paused because you navigated to an unexpected page.
-          <br><br>
-          Current: ${this._esc(currentUrl.length > 60 ? currentUrl.slice(0, 60) + '...' : currentUrl)}
-        </div>
-        <div class="guide-tooltip-actions" style="justify-content: center;">
-          <button class="guide-btn guide-btn-secondary" data-action="retry">Check again</button>
-          <button class="guide-btn guide-btn-ghost" data-action="close">Close guide</button>
-        </div>
-      `;
-      
-      panel.addEventListener("click", (e: Event) => {
-        const target = e.target as HTMLElement;
-        const action = target.closest("[data-action]")?.getAttribute("data-action");
-        
-        switch (action) {
-          case "retry":
-            // Re-check current URL and try to continue
-            this._handleUrlChange(window.location.href, this._lastKnownUrl);
-            break;
-          case "close":
-            this.stop();
-            break;
-        }
-      });
-      
-      this.shadow.appendChild(panel);
     }
 
     async showStep(index: number): Promise<void> {
@@ -1590,61 +1066,14 @@
       this._startElementPolling(step, seq, urlMismatch);
     }
 
-    _scrollToElement(result: FindResult): Promise<void> {
-      return new Promise<void>((resolve) => {
-        const rect = this._getAdjustedRect(result);
-
-        // Detect fixed/sticky headers
-        let headerOffset = 0;
-        const fixedEls = document.querySelectorAll('header, nav, [role="banner"], [role="navigation"]');
-        fixedEls.forEach(el => {
-          const style = window.getComputedStyle(el);
-          if (style.position === 'fixed' || style.position === 'sticky') {
-            const bottom = el.getBoundingClientRect().bottom;
-            if (bottom > 0 && bottom < window.innerHeight / 3) {
-              headerOffset = Math.max(headerOffset, bottom);
-            }
-          }
-        });
-
-        const viewportHeight = window.innerHeight;
-        const targetTop = headerOffset + 80; // 80px breathing room below headers
-        const targetBottom = viewportHeight - 120; // leave room for tooltip below
-
-        // Already well-positioned?
-        if (rect.top >= targetTop && rect.bottom <= targetBottom) {
-          resolve();
-          return;
-        }
-
-        // Calculate scroll target: place element in top-third of usable viewport
-        const usableTop = headerOffset + 80;
-        const scrollTarget = window.scrollY + rect.top - usableTop;
-
-        // Smooth scroll
-        window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
-
-        // Wait for scroll to settle (check position stability over 3 rAF frames)
-        let lastY = window.scrollY;
-        let stableFrames = 0;
-        const checkSettled = () => {
-          if (Math.abs(window.scrollY - lastY) < 1) {
-            stableFrames++;
-            if (stableFrames >= 3) {
-              resolve();
-              return;
-            }
-          } else {
-            stableFrames = 0;
-          }
-          lastY = window.scrollY;
-          requestAnimationFrame(checkSettled);
-        };
-        requestAnimationFrame(checkSettled);
-
-        // Safety timeout: don't wait forever
-        setTimeout(resolve, 1000);
-      });
+    _scrollToElement(result: FindResult): void {
+      // Use adjusted rect (accounts for iframe offset) to check visibility
+      const rect = this._getAdjustedRect(result);
+      const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
+        && rect.left >= 0 && rect.right <= window.innerWidth;
+      if (!inView) {
+        result.element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
     }
 
     // Get the element rect in top-frame coordinates (accounting for iframe offset + zoom)
@@ -1666,7 +1095,18 @@
       const rect = this._getAdjustedRect(result);
       const pad = 6;
 
-      // Create or update highlight ring (in-place) — no backdrop/dimming
+      // Create or update backdrop with cutout (in-place)
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+      this._updateCutout(this._overlay!, rect, pad);
+
+      // Create or update highlight ring (in-place)
       if (!this._highlight) {
         this._highlight = document.createElement("div");
         this._highlight.className = "guide-highlight";
@@ -1685,6 +1125,20 @@
       this._tooltip = this._createTooltip(step, urlMismatch, obstructor);
       this.shadow!.appendChild(this._tooltip);
       this._positionTooltip(this._tooltip, rect);
+    }
+
+    _updateCutout(overlay: HTMLDivElement, rect: AdjustedRect, pad: number): void {
+      const x = rect.left - pad;
+      const y = rect.top - pad;
+      const w = rect.width + pad * 2;
+      const h = rect.height + pad * 2;
+      const r = 6;
+      // Inset clip-path: full screen with a rounded rectangle cutout
+      overlay.style.clipPath = `polygon(
+        0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y}px,
+        ${x + w}px ${y}px, ${x + w}px ${y + h}px,
+        ${x}px ${y + h}px, ${x}px 100%, 100% 100%, 100% 0%
+      )`;
     }
 
     _createTooltip(step: GuideStep, urlMismatch: boolean, obstructor: Element | null): HTMLDivElement {
@@ -1843,6 +1297,17 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+      this._overlay!.style.clipPath = "none";
+
       const panel = document.createElement("div");
       panel.className = "guide-not-found";
 
@@ -1913,6 +1378,17 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+      this._overlay!.style.clipPath = "none";
+
       const panel = document.createElement("div");
       panel.className = "guide-not-found";
 
@@ -1976,7 +1452,7 @@
     }
 
     _startPositionTracking(step: GuideStep, result: FindResult): void {
-      const update = () => {
+      this.positionInterval = setInterval(() => {
         if (!result.element || !result.element.isConnected) {
           // Element removed from DOM — try to re-find
           findGuideElement(step).then((newResult) => {
@@ -1985,7 +1461,6 @@
               result = newResult;
             }
           });
-          this._positionFrame = requestAnimationFrame(update);
           return;
         }
 
@@ -1998,22 +1473,19 @@
           this._highlight.style.width = `${rect.width + pad * 2}px`;
           this._highlight.style.height = `${rect.height + pad * 2}px`;
         }
+        if (this._overlay) {
+          this._updateCutout(this._overlay, rect, pad);
+        }
         if (this._tooltip) {
           this._positionTooltip(this._tooltip, rect);
         }
-        this._positionFrame = requestAnimationFrame(update);
-      };
-      this._positionFrame = requestAnimationFrame(update);
+      }, 200);
     }
 
     _clearPositionTracking(): void {
       if (this.positionInterval) {
         clearInterval(this.positionInterval);
         this.positionInterval = null;
-      }
-      if (this._positionFrame) {
-        cancelAnimationFrame(this._positionFrame);
-        this._positionFrame = null;
       }
     }
 
@@ -2182,6 +1654,16 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+
       // Try to highlight the ancestor if it's visible
       const ancestorRect = ancestor.getBoundingClientRect();
       if (ancestorRect.width > 0 && ancestorRect.height > 0) {
@@ -2192,6 +1674,7 @@
           width: ancestorRect.width * zoom, height: ancestorRect.height * zoom,
         };
         const pad = 6;
+        this._updateCutout(this._overlay!, rect, pad);
         if (!this._highlight) {
           this._highlight = document.createElement("div");
           this._highlight.className = "guide-highlight";
@@ -2204,6 +1687,8 @@
         this._highlight.style.top = `${rect.top - pad}px`;
         this._highlight.style.width = `${rect.width + pad * 2}px`;
         this._highlight.style.height = `${rect.height + pad * 2}px`;
+      } else {
+        this._overlay!.style.clipPath = "none";
       }
 
       const panel = document.createElement("div");
@@ -2264,45 +1749,6 @@
   let activeRunner: GuideRunner | null = null;
   _window.__steptGuideRunner = null;
 
-  // ── Image Modal (shown on page when user clicks screenshot in sidepanel) ──
-
-  function _showImageModal(dataUrl: string): void {
-    // Remove any existing modal
-    const existing = document.getElementById('stept-image-modal');
-    if (existing) existing.remove();
-
-    const host = document.createElement('div');
-    host.id = 'stept-image-modal';
-    const shadow = host.attachShadow({ mode: 'closed' });
-
-    const style = document.createElement('style');
-    style.textContent = `
-      .backdrop {
-        position: fixed; inset: 0; z-index: 2147483647;
-        background: rgba(0,0,0,0.7);
-        display: flex; align-items: center; justify-content: center;
-        cursor: zoom-out; padding: 24px;
-      }
-      .backdrop img {
-        max-width: 90vw; max-height: 90vh;
-        object-fit: contain; border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      }
-    `;
-    shadow.appendChild(style);
-
-    const backdrop = document.createElement('div');
-    backdrop.className = 'backdrop';
-    backdrop.addEventListener('click', () => host.remove());
-
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    backdrop.appendChild(img);
-    shadow.appendChild(backdrop);
-
-    document.documentElement.appendChild(host);
-  }
-
   // ── Message Handling ──────────────────────────────────────────────
 
   chrome.runtime.onMessage.addListener((message: { type: string; guide: Guide; startIndex?: number; stepIndex?: number }, _sender: MessageSender, sendResponse: SendResponse) => {
@@ -2334,9 +1780,6 @@
       }
     } else if (message.type === "STOP_GUIDE") {
       if (activeRunner) activeRunner.stop();
-      sendResponse({ success: true });
-    } else if (message.type === "GUIDE_SHOW_IMAGE") {
-      _showImageModal((message as any).dataUrl);
       sendResponse({ success: true });
     }
     return false;

@@ -830,6 +830,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'GUIDE_SHOW_IMAGE': {
+        try {
+          const tabId = activeGuideState?.tabId;
+          if (tabId) {
+            await chrome.tabs.sendMessage(tabId, {
+              type: 'GUIDE_SHOW_IMAGE',
+              dataUrl: message.dataUrl,
+            });
+          }
+          sendResponse({ success: true });
+        } catch (e: any) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+      }
+
       case 'GUIDE_FIND_IN_FRAMES': {
         // Feature 4: Broadcast element search to all frames of a tab
         try {

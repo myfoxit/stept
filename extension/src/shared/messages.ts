@@ -47,6 +47,7 @@ export type BackgroundMessageType =
   | 'GUIDE_NAVIGATE'
   | 'GUIDE_GO_TO_STEP'
   | 'GUIDE_FIND_IN_FRAMES'
+  | 'GUIDE_SHOW_IMAGE'
   | 'GET_GUIDE_STATE'
   | 'FETCH_GUIDES'
   | 'FETCH_GUIDE'
@@ -79,7 +80,8 @@ export type ContentMessageType =
   | 'START_GUIDE'
   | 'STOP_GUIDE'
   | 'GUIDE_GOTO'
-  | 'GUIDE_FIND_IN_FRAME';
+  | 'GUIDE_FIND_IN_FRAME'
+  | 'GUIDE_SHOW_IMAGE';
 
 // Broadcast messages (background → sidepanel)
 export type BroadcastMessageType =
