@@ -917,7 +917,7 @@
       this._lastKnownUrl = window.location.href;
     }
 
-    async start(): Promise<void> {
+    async start(startIndex: number = 0): Promise<void> {
       this._createHost();
       
       // Start URL watching for multi-page handling
@@ -930,7 +930,7 @@
         this._showEmpty();
         return;
       }
-      await this.showStep(0);
+      await this.showStep(startIndex);
     }
 
     stop(): void {
@@ -2315,11 +2315,9 @@
         const runner = new GuideRunner(message.guide);
         activeRunner = runner;
         _window.__steptGuideRunner = runner;
-        if (typeof message.startIndex === "number" && message.startIndex > 0) {
-          runner.start().then(() => runner.showStep(message.startIndex!));
-        } else {
-          runner.start();
-        }
+        const startAt = (typeof message.startIndex === "number" && message.startIndex > 0) ? message.startIndex : 0;
+        runner.currentIndex = startAt;
+        runner.start(startAt);
         sendResponse({ success: true });
       } catch (e: unknown) {
         sendResponse({ success: false, error: (e as Error).message });

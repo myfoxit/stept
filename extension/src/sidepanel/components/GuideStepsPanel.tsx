@@ -105,7 +105,7 @@ function GuideStepItem({
     step.title || step.description || step.action_type || `Step ${index + 1}`;
 
   const circleContent =
-    state === 'completed' ? '\u2713' : state === 'active' || state === 'roadblock' ? '\u{1F5B1}' : `${index + 1}`;
+    state === 'completed' ? '\u2713' : `${index + 1}`;
 
   return (
     <div
@@ -264,11 +264,6 @@ function GuideStepImage({ step, index, imageCacheRef, onZoom }: GuideStepImagePr
       {dataUrl && (
         <>
           <img src={dataUrl} alt={`Step ${index + 1}`} style={imgStyle} />
-          {hasClickMarker && (
-            <div className="click-marker" style={{ left: '50%', top: '50%' }}>
-              <div className="click-marker-dot" />
-            </div>
-          )}
         </>
       )}
     </div>
