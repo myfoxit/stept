@@ -190,18 +190,50 @@
     return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
   }
 
+  function normalizeText(s: string): string {
+    return s.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
   function findByText(candidates: Element[], text: string, opts: FindByTextOpts = {}): Element | null {
     if (!text || !candidates.length) return null;
-    const target = text.trim().toLowerCase();
+    const target = normalizeText(text);
     let best: Element | null = null;
     let bestScore = Infinity;
 
     for (const el of candidates) {
       if (!isVisible(el)) continue;
-      const elText = (el.textContent || "").trim().toLowerCase();
-      if (elText === target) return el;
-      if (opts.fuzzy && elText.includes(target)) {
-        const score = Math.abs(elText.length - target.length);
+      const elText = normalizeText(el.textContent || "");
+      // Also check aria-label and title attributes
+      const ariaLabel = normalizeText(el.getAttribute('aria-label') || "");
+      const title = normalizeText(el.getAttribute('title') || "");
+      const placeholder = normalizeText((el as HTMLInputElement).placeholder || "");
+
+      // Exact match (normalized)
+      if (elText === target || ariaLabel === target || title === target) return el;
+      
+      // Contains match
+      if (elText.includes(target) || ariaLabel.includes(target)) {
+        const matchText = elText.includes(target) ? elText : ariaLabel;
+        const score = Math.abs(matchText.length - target.length);
+        if (score < bestScore) {
+          bestScore = score;
+          best = el;
+        }
+      }
+      
+      // Fuzzy: also check if target contains the element text (reverse contains)
+      // e.g., step says "Submit Order" but element just says "Submit"
+      if (opts.fuzzy && target.includes(elText) && elText.length >= 3) {
+        const score = Math.abs(elText.length - target.length) + 10; // +10 penalty for reverse match
+        if (score < bestScore) {
+          bestScore = score;
+          best = el;
+        }
+      }
+      
+      // Fuzzy: check placeholder for input elements
+      if (opts.fuzzy && placeholder && (placeholder.includes(target) || target.includes(placeholder))) {
+        const score = Math.abs(placeholder.length - target.length) + 5;
         if (score < bestScore) {
           bestScore = score;
           best = el;
@@ -271,6 +303,31 @@
           const els = container.querySelectorAll(step.element_info.tagName);
           const match = findByText(Array.from(els), step.element_text, { fuzzy: true });
           if (match) return { element: match, confidence: 0.5, method: "parent-context" };
+        }
+      }
+    }
+
+    // Level 7: Last resort — text search using step title/description as hint
+    // This catches cases where the recording only captured a CSS selector (now broken)
+    // but the step title describes the element (e.g., "Click the Submit button")
+    if (step.title || step.description) {
+      const hint = (step.title || step.description || '').toLowerCase();
+      // Extract likely element text from the hint
+      const textPatterns = [
+        /click (?:the |on )?["']?([^"']+?)["']?\s*(?:button|link|tab|menu|option)?$/i,
+        /type (?:in |into )?["']?([^"']+?)["']?/i,
+        /select ["']?([^"']+?)["']?/i,
+        /["']([^"']+?)["']/,  // Anything in quotes
+      ];
+      for (const pattern of textPatterns) {
+        const match = hint.match(pattern);
+        if (match && match[1]) {
+          const searchText = match[1].trim();
+          if (searchText.length >= 2) {
+            const allInteractive = root.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [onclick]');
+            const candidate = findByText(Array.from(allInteractive), searchText, { fuzzy: true });
+            if (candidate) return { element: candidate, confidence: 0.35, method: "title-hint" };
+          }
         }
       }
     }
@@ -803,10 +860,28 @@
     _startElementPolling(step: GuideStep, seq: number, urlMismatch: boolean): void {
       this._stopElementPolling();
       let tickCount = 0;
-      const POLL_MS = 100;
-      const TIMEOUT_TICKS = 30;  // 3 seconds before showing roadblock
-      let lastStatus: string | null = null;     // track to avoid redundant re-renders
+      const POLL_MS = 150;       // Slightly slower polling to reduce CPU
+      const TIMEOUT_TICKS = 13;  // ~2 seconds before showing roadblock (was 3s)
+      let lastStatus: string | null = null;
       let healthReported = false;
+
+      // Show a subtle "searching..." indicator immediately so user knows we're working
+      if (this.shadow) {
+        const searchHint = document.createElement('div');
+        searchHint.className = 'guide-search-hint';
+        searchHint.setAttribute('data-search-hint', 'true');
+        searchHint.textContent = 'Finding element...';
+        // Style it as a small pill at the top
+        searchHint.style.cssText = `
+          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+          z-index: 2147483642; background: #1C1917; color: #A8A29E;
+          padding: 6px 16px; border-radius: 20px; font-size: 12px;
+          border: 1px solid #292524; pointer-events: none;
+          animation: guide-tooltip-in 0.2s ease-out;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        `;
+        this.shadow.appendChild(searchHint);
+      }
 
       const poll = async (): Promise<void> => {
         if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
@@ -857,7 +932,11 @@
 
           if (lastStatus !== 'found') {
             lastStatus = 'found';
-            // Clear any previous not-found UI
+            // Clear search hint and any previous not-found UI
+            if (this.shadow) {
+              const hint = this.shadow.querySelector('[data-search-hint]');
+              if (hint) hint.remove();
+            }
             if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
 
             chrome.runtime.sendMessage({
@@ -899,6 +978,11 @@
               }).catch(() => {});
             } catch (_) {}
 
+            // Remove search hint
+            if (this.shadow) {
+              const hint = this.shadow.querySelector('[data-search-hint]');
+              if (hint) hint.remove();
+            }
             chrome.runtime.sendMessage({
               type: 'GUIDE_STEP_CHANGED',
               currentIndex: this.currentIndex,
@@ -1437,11 +1521,11 @@
         setTimeout(() => this.showStep(nextIndex), 400);
       };
 
-      // For links and options: fire on pointerdown (before navigation starts).
-      // For everything else: fire on click (after the action completes).
-      // This is Tango's approach to avoiding the race condition where the page
-      // navigates before the step is marked complete.
-      const eventType = (isLinkClick || isOption) ? "pointerdown" : "click";
+      // Always use click event. The Tango pointerdown approach for links causes
+      // premature advancement when navigation doesn't actually happen (SPAs).
+      // For actual page navigations, the background script will handle
+      // re-injection at the correct step index.
+      const eventType = "click";
 
       this._clickHandler = (_e: Event): void => advance();
       element.addEventListener(eventType, this._clickHandler, { once: true });
@@ -1462,15 +1546,16 @@
       // Keyboard shortcuts for step advancement (Tango pattern):
       // Enter on input fields, Tab, or Ctrl/Cmd+E
       this._keyHandler = (e: KeyboardEvent): void => {
+        // Ctrl/Cmd+E: manual step advance shortcut
         if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
           e.preventDefault();
           e.stopImmediatePropagation();
           advance();
-        } else if (e.key === 'Tab') {
-          advance();
-        } else if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
-          advance();
         }
+        // NOTE: Tab and Enter removed — they caused false step advances.
+        // Tab is normal field navigation, Enter submits forms. Neither means
+        // "I completed this guide step." Users advance via clicking the target
+        // element or pressing the Next button in the tooltip.
       };
       document.addEventListener('keydown', this._keyHandler, { capture: true });
     }
@@ -1533,15 +1618,12 @@
         }, opts);
         this._completionCleanup = (): void => ac.abort();
       } else if (actionType.includes('click')) {
-        // Watch for element removal from DOM after click (e.g. dropdown closing)
-        if (element.parentElement) {
-          this._completionObserver = new MutationObserver((_mutations: MutationRecord[]) => {
-            if (!element.isConnected) {
-              setTimeout(advance, 400);
-            }
-          });
-          this._completionObserver.observe(element.parentElement, { childList: true, subtree: true });
-        }
+        // Click advancement is handled by _setupClickAdvance — do NOT add a
+        // MutationObserver here. The previous implementation watched for element
+        // removal from DOM which caused double-advance (step jumping) because
+        // both the click handler AND the mutation observer would fire advance().
+        // SPA re-renders also falsely triggered this when the parent subtree
+        // was replaced, causing random step skips.
       } else if (actionType.includes('select')) {
         const onChange = (): void => {
           setTimeout(advance, 500);
