@@ -1,7 +1,7 @@
 // ===== ELEMENT IDENTIFICATION =====
 // Mechanical port from content.js — element info gathering, selectors, xpath, labels
 
-import { finder as medvFinder } from '@medv/finder';
+// No external dependency — we use our own generateSelectorSet for multi-selector capture
 
 export interface SelectorTree {
   selectors: string[];
@@ -257,51 +257,11 @@ export function generateSelectorSet(el: Element): string[] {
 }
 
 /**
- * Generate multiple selectors for an element using @medv/finder with different configs.
- * Based on Usertour's finderConfigs pattern for maximum reliability.
+ * Generate multiple selectors for an element using different strategies.
+ * Reuses our existing generateSelectorSet (no external dependencies).
  */
-function generateMedvSelectors(el: Element): string[] {
-  const selectors: string[] = [];
-  
-  // Usertour's finder configurations - same strategies as finderx.ts
-  const finderAttrs = [
-    'data-for', 'data-id', 'data-testid', 'data-test-id', 'for', 'id', 
-    'name', 'placeholder', 'role', 'data-cy', 'data-qa', 'data-automation-id'
-  ];
-
-  const defaultConfig = {
-    idName: () => false,
-    className: () => false,
-    tagName: () => false,
-    attr: () => false,
-    seedMinLength: 1,
-    optimizedMinLength: 2,
-    threshold: 1000,
-    maxNumberOfTries: 10_000,
-  };
-
-  const finderConfigs = [
-    { ...defaultConfig, tagName: () => true },
-    { ...defaultConfig, idName: () => true },
-    { ...defaultConfig, tagName: () => true, attr: (name: string) => finderAttrs.includes(name) },
-    { ...defaultConfig, className: () => true, attr: (name: string) => finderAttrs.includes(name) },
-    { ...defaultConfig, tagName: () => true, idName: () => true, className: () => true, attr: () => false },
-    { ...defaultConfig, tagName: () => true, idName: () => true, className: () => true, attr: (name: string) => finderAttrs.includes(name) },
-  ];
-
-  // Generate selector with each config
-  for (const config of finderConfigs) {
-    try {
-      const selector = medvFinder(el, config);
-      if (selector && _unique(selector)) {
-        selectors.push(selector);
-      }
-    } catch (e) {
-      // Config failed, continue with next
-    }
-  }
-
-  return [...new Set(selectors)]; // Deduplicate
+function generateMultiSelectors(el: Element): string[] {
+  return generateSelectorSet(el);
 }
 
 /**
@@ -311,7 +271,7 @@ function generateMedvSelectors(el: Element): string[] {
 export function captureSelectorTree(el: Element, depth = 0, maxDepth = 4): SelectorTree {
   // Generate multiple selectors for this element
   const directSelectors = generateSelectorSet(el);
-  const medvSelectors = generateMedvSelectors(el);
+  const medvSelectors = generateMultiSelectors(el);
   const selectors = [...new Set([...directSelectors, ...medvSelectors])];
 
   // Capture sibling selectors
@@ -319,11 +279,11 @@ export function captureSelectorTree(el: Element, depth = 0, maxDepth = 4): Selec
   let nextSiblingSelectors: string[] = [];
   
   if (el.previousElementSibling) {
-    prevSiblingSelectors = generateMedvSelectors(el.previousElementSibling);
+    prevSiblingSelectors = generateMultiSelectors(el.previousElementSibling);
   }
   
   if (el.nextElementSibling) {
-    nextSiblingSelectors = generateMedvSelectors(el.nextElementSibling);
+    nextSiblingSelectors = generateMultiSelectors(el.nextElementSibling);
   }
 
   // Build tree structure
