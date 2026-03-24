@@ -1,59 +1,11 @@
-// Guide Runtime — Complete rewrite with hybrid architecture
-// Event-driven ElementWatcher (Usertour pattern) + Multi-selector cascade (stept innovation)
-// Light Tango-style overlay + Progressive search timing + URL monitoring
-// MUST remain a single self-contained IIFE (Chrome extension requirement)
+// Guide Runtime — injected on demand into pages.
+// MUST remain a single self-contained IIFE.
+// NO imports, NO React, NO module splitting.
 
 (function () {
   'use strict';
 
-  // ═══ TYPE DEFINITIONS ═══
-
-  interface ElementInfo {
-    testId?: string;
-    tagName?: string;
-    parentChain?: ParentChainEntry[];
-    selectorSet?: string[];
-    selector?: string;
-    xpath?: string;
-  }
-
-  interface ParentChainEntry {
-    tag: string;
-    id?: string;
-    testId?: string;
-    role?: string;
-    ariaLabel?: string;
-    className?: string;
-  }
-
-  interface GuideStep {
-    id?: string;
-    selector?: string;
-    element_info?: ElementInfo;
-    element_role?: string;
-    element_text?: string;
-    xpath?: string;
-    title?: string;
-    description?: string;
-    action_type?: string;
-    expected_url?: string;
-    url?: string;
-    selectorSet?: string[];
-  }
-
-  interface Guide {
-    steps?: GuideStep[];
-    workflow_id?: string;
-    workflowId?: string;
-    id?: string;
-  }
-
-  interface FindResult {
-    element: Element;
-    confidence: number;
-    method: string;
-    iframeOffset?: { x: number; y: number };
-  }
+  // ── Inline Type Declarations ──────────────────────────────────────
 
   interface IframeOffset {
     x: number;
@@ -66,1256 +18,1770 @@
     depth: number;
   }
 
-  type GuideState = 
-    | { type: 'idle' }
-    | { type: 'searching'; step: GuideStep; retryCount: number }
-    | { type: 'found'; step: GuideStep; element: Element; confidence: number }
-    | { type: 'notfound'; step: GuideStep; timeoutReached: boolean }
-    | { type: 'completed' }
-    | { type: 'stopped' };
+  interface ElementInfo {
+    testId?: string;
+    tagName?: string;
+    parentChain?: ParentChainEntry[];
+  }
 
-  type GuideEvent =
-    | { type: 'START_GUIDE'; guide: Guide; startIndex?: number }
-    | { type: 'STOP_GUIDE' }
-    | { type: 'ELEMENT_FOUND'; element: Element; confidence: number; method: string }
-    | { type: 'ELEMENT_CHANGED'; element: Element }
-    | { type: 'ELEMENT_TIMEOUT' }
-    | { type: 'ACTION_COMPLETED' }
-    | { type: 'URL_CHANGED'; oldUrl: string; newUrl: string }
-    | { type: 'USER_SKIP' }
-    | { type: 'MARK_COMPLETE' };
+  interface ParentChainEntry {
+    id?: string;
+    testId?: string;
+    role?: string;
+  }
 
-  // Extend Window
+  interface GuideStep {
+    selector?: string;
+    element_info?: ElementInfo;
+    element_role?: string;
+    element_text?: string;
+    xpath?: string;
+    title?: string;
+    description?: string;
+    action_type?: string;
+    expected_url?: string;
+    url?: string;
+  }
+
+  interface FindResult {
+    element: Element;
+    confidence: number;
+    method: string;
+    iframeOffset?: IframeOffset;
+  }
+
+  interface AdjustedRect {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+  }
+
+  interface Guide {
+    steps?: GuideStep[];
+    workflow_id?: string;
+    workflowId?: string;
+    id?: string;
+  }
+
+  interface FindByTextOpts {
+    fuzzy?: boolean;
+  }
+
+  interface FrameFindResponse {
+    found: boolean;
+    rect?: { left: number; top: number; width: number; height: number };
+    frameRect?: { left: number; top: number; width: number; height: number } | null;
+    confidence?: number;
+    method?: string;
+  }
+
+  // Extend Window to carry our globals
   interface SteptWindow extends Window {
     __steptGuideLoaded?: boolean;
     __steptGuideRunner?: GuideRunner | null;
     __steptGuideRuntime?: typeof GuideRunner;
   }
 
+  // Chrome messaging types (minimal — no imports)
+  type MessageSender = chrome.runtime.MessageSender;
+  type SendResponse = (response?: unknown) => void;
+
   const _window = window as unknown as SteptWindow;
 
-  // ═══ DEDUPLICATION & CLEANUP ═══
+  // ── Deduplication ─────────────────────────────────────────────────
 
+  // Deduplication: kill any previous instance via custom event (Tango pattern).
+  // More reliable than checking window properties since the previous script
+  // context may have been garbage collected.
   const DEDUP_EVENT = "stept_guide_remove_" + chrome.runtime.id;
-  
   const cleanup = (): void => {
+    document.removeEventListener(DEDUP_EVENT, cleanup);
     if (_window.__steptGuideRunner) {
-      _window.__steptGuideRunner.destroy();
-      _window.__steptGuideRunner = null;
+      try {
+        _window.__steptGuideRunner._replacing = true;
+        _window.__steptGuideRunner.stop();
+      } catch {}
     }
-    document.querySelectorAll('[data-stept-guide]').forEach(el => el.remove());
   };
-
-  document.addEventListener(DEDUP_EVENT, cleanup);
-  cleanup();
+  // Fire event to kill previous instance
   document.dispatchEvent(new CustomEvent(DEDUP_EVENT));
+  // Listen for future instances
+  document.addEventListener(DEDUP_EVENT, cleanup);
+  _window.__steptGuideLoaded = true;
 
-  // ═══ EVENT EMITTER BASE CLASS ═══
+  // ── CSS Zoom Compensation ─────────────────────────────────────────
 
-  class EventEmitter {
-    private listeners: Map<string, Function[]> = new Map();
-
-    on(event: string, listener: Function): void {
-      if (!this.listeners.has(event)) {
-        this.listeners.set(event, []);
-      }
-      this.listeners.get(event)!.push(listener);
-    }
-
-    off(event: string, listener?: Function): void {
-      if (!listener) {
-        this.listeners.delete(event);
-        return;
-      }
-      const list = this.listeners.get(event);
-      if (list) {
-        const index = list.indexOf(listener);
-        if (index > -1) list.splice(index, 1);
-        if (list.length === 0) this.listeners.delete(event);
+  function getPageZoom(): number {
+    let zoom = 1;
+    for (const el of [document.documentElement, document.body]) {
+      if (!el) continue;
+      const z = (getComputedStyle(el) as CSSStyleDeclaration & { zoom?: string }).zoom;
+      if (z && z !== "normal") {
+        const n = parseFloat(z);
+        if (!isNaN(n) && n > 0) zoom *= n;
       }
     }
-
-    emit(event: string, ...args: any[]): void {
-      const list = this.listeners.get(event);
-      if (list) {
-        // Create a copy to avoid issues if listeners are removed during emission
-        [...list].forEach(listener => {
-          try {
-            listener(...args);
-          } catch (error) {
-            console.error('EventEmitter listener error:', error);
-          }
-        });
-      }
-    }
-
-    removeAllListeners(): void {
-      this.listeners.clear();
-    }
+    return zoom;
   }
 
-  // ═══ ELEMENT FINDER ═══
-  // Pure functions for element finding with multi-selector cascade
+  // ── Searchable Roots (document + shadow roots + same-origin iframes) ──
 
-  class ElementFinder {
-    private static CSS_ESCAPE_REGEX = /([!"#$%&'()*+,\-.\/:;<=>?@[\\\]^`{|}~])/g;
+  function collectSearchRoots(root: Document | ShadowRoot = document, depth: number = 0): SearchRoot[] {
+    // Returns array of { root: Document|ShadowRoot, iframeOffset: {x,y} }
+    const results: SearchRoot[] = [{ root, iframeOffset: { x: 0, y: 0 }, depth }];
+    if (depth > 5) return results; // prevent infinite recursion
 
-    private static cssEscape(value: string): string {
-      return value.replace(this.CSS_ESCAPE_REGEX, '\\$1');
-    }
-
-    private static isUnique(selector: string, root: Document | ShadowRoot = document): boolean {
-      try {
-        return root.querySelectorAll(selector).length === 1;
-      } catch {
-        return false;
-      }
-    }
-
-    // Main cascade function - tries all strategies in order
-    static findInCascade(step: GuideStep, searchRoots: SearchRoot[] = []): FindResult | null {
-      if (searchRoots.length === 0) {
-        searchRoots = this.getSearchRoots();
-      }
-
-      // Strategy 1: selectorSet (0-200ms) - Our main innovation
-      if (step.selectorSet && step.selectorSet.length > 0) {
-        const result = this.trySelectorsSet(step.selectorSet, searchRoots);
-        if (result) return { ...result, method: 'selectorSet', confidence: 0.95 };
-      }
-
-      // Strategy 2: Primary selector (200-300ms)
-      if (step.selector) {
-        const result = this.trySelector(step.selector, searchRoots);
-        if (result) return { ...result, method: 'selector', confidence: 0.9 };
-      }
-
-      // Strategy 3: Element info selectors (300-400ms)
-      if (step.element_info) {
-        const result = this.tryElementInfoSelectors(step.element_info, searchRoots);
-        if (result) return result;
-      }
-
-      // Strategy 4: Test ID variations (400-500ms)
-      if (step.element_info?.testId) {
-        const result = this.tryTestIdVariations(step.element_info.testId, searchRoots);
-        if (result) return { ...result, method: 'testId', confidence: 0.8 };
-      }
-
-      // Strategy 5: Role + text matching (500-700ms)
-      if (step.element_role && step.element_text) {
-        const result = this.tryRoleTextMatch(step.element_role, step.element_text, searchRoots);
-        if (result) return { ...result, method: 'roleText', confidence: 0.7 };
-      }
-
-      // Strategy 6: Tag + text fuzzy matching (700-900ms)
-      if (step.element_info?.tagName && step.element_text) {
-        const result = this.tryTagTextFuzzy(step.element_info.tagName, step.element_text, searchRoots);
-        if (result) return { ...result, method: 'tagTextFuzzy', confidence: 0.6 };
-      }
-
-      // Strategy 7: XPath fallback (900-1000ms)
-      if (step.xpath) {
-        const result = this.tryXPath(step.xpath, searchRoots);
-        if (result) return { ...result, method: 'xpath', confidence: 0.5 };
-      }
-
-      // Strategy 8: Parent chain context (1000-1500ms)
-      if (step.element_info?.parentChain) {
-        const result = this.tryParentChain(step, searchRoots);
-        if (result) return { ...result, method: 'parentChain', confidence: 0.4 };
-      }
-
-      // Strategy 9: Title hint extraction (1500-2000ms)
-      if (step.title || step.description) {
-        const result = this.tryTitleHints(step.title || step.description || '', searchRoots);
-        if (result) return { ...result, method: 'titleHint', confidence: 0.3 };
-      }
-
-      return null;
-    }
-
-    private static trySelectorsSet(selectors: string[], searchRoots: SearchRoot[]): FindResult | null {
-      for (const selector of selectors) {
-        const result = this.trySelector(selector, searchRoots);
-        if (result) return result;
-      }
-      return null;
-    }
-
-    private static trySelector(selector: string, searchRoots: SearchRoot[]): FindResult | null {
-      for (const { root, iframeOffset } of searchRoots) {
-        try {
-          const element = root.querySelector(selector);
-          if (element && this.isVisible(element as HTMLElement)) {
-            return { element, confidence: 0.9, method: 'selector', iframeOffset };
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      return null;
-    }
-
-    private static tryElementInfoSelectors(elementInfo: ElementInfo, searchRoots: SearchRoot[]): FindResult | null {
-      // Try selectorSet first if available
-      if (elementInfo.selectorSet) {
-        const result = this.trySelectorsSet(elementInfo.selectorSet, searchRoots);
-        if (result) return { ...result, method: 'elementInfo.selectorSet', confidence: 0.85 };
-      }
-
-      // Try primary selector
-      if (elementInfo.selector) {
-        const result = this.trySelector(elementInfo.selector, searchRoots);
-        if (result) return { ...result, method: 'elementInfo.selector', confidence: 0.8 };
-      }
-
-      return null;
-    }
-
-    private static tryTestIdVariations(testId: string, searchRoots: SearchRoot[]): FindResult | null {
-      const variations = [
-        `[data-testid="${this.cssEscape(testId)}"]`,
-        `[data-test="${this.cssEscape(testId)}"]`,
-        `[data-cy="${this.cssEscape(testId)}"]`,
-        `[data-qa="${this.cssEscape(testId)}"]`,
-        `[data-automation-id="${this.cssEscape(testId)}"]`,
-        `[data-e2e="${this.cssEscape(testId)}"]`,
-      ];
-
-      for (const selector of variations) {
-        const result = this.trySelector(selector, searchRoots);
-        if (result) return result;
-      }
-      return null;
-    }
-
-    private static tryRoleTextMatch(role: string, text: string, searchRoots: SearchRoot[]): FindResult | null {
-      for (const { root, iframeOffset } of searchRoots) {
-        try {
-          const elements = root.querySelectorAll(`[role="${role}"]`);
-          for (const el of elements) {
-            if (this.textMatches(el, text, { fuzzy: false }) && this.isVisible(el as HTMLElement)) {
-              return { element: el, confidence: 0.7, method: 'roleText', iframeOffset };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      return null;
-    }
-
-    private static tryTagTextFuzzy(tagName: string, text: string, searchRoots: SearchRoot[]): FindResult | null {
-      for (const { root, iframeOffset } of searchRoots) {
-        try {
-          const elements = root.querySelectorAll(tagName.toLowerCase());
-          for (const el of elements) {
-            if (this.textMatches(el, text, { fuzzy: true }) && this.isVisible(el as HTMLElement)) {
-              return { element: el, confidence: 0.6, method: 'tagTextFuzzy', iframeOffset };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      return null;
-    }
-
-    private static tryXPath(xpath: string, searchRoots: SearchRoot[]): FindResult | null {
-      for (const { root, iframeOffset } of searchRoots) {
-        try {
-          if (root === document || (root as any).evaluate) {
-            const doc = root === document ? document : (root as any).ownerDocument || document;
-            const result = doc.evaluate(xpath, root, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-            if (result.singleNodeValue && this.isVisible(result.singleNodeValue as HTMLElement)) {
-              return { 
-                element: result.singleNodeValue as Element, 
-                confidence: 0.5, 
-                method: 'xpath', 
-                iframeOffset 
-              };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      return null;
-    }
-
-    private static tryParentChain(step: GuideStep, searchRoots: SearchRoot[]): FindResult | null {
-      const parentChain = step.element_info?.parentChain;
-      if (!parentChain || parentChain.length === 0) return null;
-
-      for (const { root, iframeOffset } of searchRoots) {
-        try {
-          // Build selector from parent chain
-          let selector = '';
-          for (let i = parentChain.length - 1; i >= 0; i--) {
-            const parent = parentChain[i];
-            if (parent.id) {
-              selector += `#${this.cssEscape(parent.id)} `;
-            } else if (parent.testId) {
-              selector += `[data-testid="${this.cssEscape(parent.testId)}"] `;
-            } else if (parent.role) {
-              selector += `[role="${parent.role}"] `;
-            } else {
-              selector += `${parent.tag} `;
-            }
-          }
-
-          // Add target element selector
-          if (step.element_info?.tagName) {
-            selector += step.element_info.tagName.toLowerCase();
-          }
-
-          const elements = root.querySelectorAll(selector.trim());
-          for (const el of elements) {
-            if (step.element_text && !this.textMatches(el, step.element_text, { fuzzy: true })) {
-              continue;
-            }
-            if (this.isVisible(el as HTMLElement)) {
-              return { element: el, confidence: 0.4, method: 'parentChain', iframeOffset };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      return null;
-    }
-
-    private static tryTitleHints(titleText: string, searchRoots: SearchRoot[]): FindResult | null {
-      // Extract action words and target text from title
-      const actionWords = ['click', 'select', 'choose', 'press', 'tap', 'enter', 'type', 'fill'];
-      const words = titleText.toLowerCase().split(/\s+/);
-      
-      let targetText = '';
-      let foundAction = false;
-      
-      for (let i = 0; i < words.length; i++) {
-        if (actionWords.some(action => words[i].includes(action))) {
-          foundAction = true;
-          // Look for quoted text after action word
-          const remaining = words.slice(i + 1).join(' ');
-          const quotedMatch = remaining.match(/["']([^"']+)["']/);
-          if (quotedMatch) {
-            targetText = quotedMatch[1];
-            break;
-          }
-        }
-      }
-
-      if (!targetText || !foundAction) return null;
-
-      // Search for elements with matching text
-      for (const { root, iframeOffset } of searchRoots) {
-        try {
-          const elements = root.querySelectorAll('button, a, [role="button"], [role="link"], input[type="submit"], [onclick]');
-          for (const el of elements) {
-            if (this.textMatches(el, targetText, { fuzzy: true }) && this.isVisible(el as HTMLElement)) {
-              return { element: el, confidence: 0.3, method: 'titleHint', iframeOffset };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      return null;
-    }
-
-    private static textMatches(element: Element, targetText: string, opts: { fuzzy?: boolean } = {}): boolean {
-      const elementText = this.getElementText(element);
-      if (!elementText || !targetText) return false;
-
-      const normalize = (text: string) => text.toLowerCase().trim().replace(/\s+/g, ' ');
-      const normalizedElement = normalize(elementText);
-      const normalizedTarget = normalize(targetText);
-
-      if (normalizedElement.includes(normalizedTarget)) return true;
-      if (opts.fuzzy) {
-        // Simple fuzzy matching - check if most words match
-        const elementWords = normalizedElement.split(' ');
-        const targetWords = normalizedTarget.split(' ');
-        const matches = targetWords.filter(word => 
-          elementWords.some(elWord => elWord.includes(word) || word.includes(elWord))
-        );
-        return matches.length >= Math.ceil(targetWords.length * 0.6);
-      }
-      return false;
-    }
-
-    private static getElementText(element: Element): string {
-      return (element as HTMLElement).innerText || 
-             element.textContent || 
-             (element as HTMLInputElement).placeholder || 
-             element.getAttribute('aria-label') || 
-             element.getAttribute('title') || 
-             '';
-    }
-
-    private static isVisible(element: HTMLElement): boolean {
-      if (!element.isConnected) return false;
-      
-      const style = window.getComputedStyle(element);
-      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-        return false;
-      }
-
-      const rect = element.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    }
-
-    private static getSearchRoots(): SearchRoot[] {
-      const roots: SearchRoot[] = [{ root: document, iframeOffset: { x: 0, y: 0 }, depth: 0 }];
-
-      // Add shadow roots
-      document.querySelectorAll('*').forEach(el => {
-        if (el.shadowRoot) {
-          roots.push({ root: el.shadowRoot, iframeOffset: { x: 0, y: 0 }, depth: 1 });
+    try {
+      // Traverse shadow roots
+      root.querySelectorAll("*").forEach((el: Element) => {
+        if (el.shadowRoot && el.id !== "stept-guide-overlay") {
+          results.push(...collectSearchRoots(el.shadowRoot, depth + 1).map((r) => ({
+            ...r,
+            iframeOffset: results[0].iframeOffset, // same offset as parent
+          })));
         }
       });
 
-      // Add same-origin iframes
-      try {
-        document.querySelectorAll('iframe').forEach(iframe => {
-          try {
-            if (iframe.contentDocument) {
-              const rect = iframe.getBoundingClientRect();
-              roots.push({ 
-                root: iframe.contentDocument, 
-                iframeOffset: { x: rect.left, y: rect.top }, 
-                depth: 1 
-              });
-            }
-          } catch (e) {
-            // Cross-origin iframe, skip
-          }
-        });
-      } catch (e) {
-        // Iframe access denied
-      }
+      // Traverse same-origin iframes
+      root.querySelectorAll("iframe").forEach((iframe: HTMLIFrameElement) => {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return; // cross-origin or not loaded
+          const iframeRect = iframe.getBoundingClientRect();
+          const parentOffset = results[0].iframeOffset;
+          const offset: IframeOffset = {
+            x: parentOffset.x + iframeRect.left,
+            y: parentOffset.y + iframeRect.top,
+          };
+          results.push(
+            ...collectSearchRoots(doc, depth + 1).map((r) => ({
+              ...r,
+              iframeOffset: { x: offset.x + r.iframeOffset.x, y: offset.y + r.iframeOffset.y },
+            }))
+          );
+        } catch {
+          // cross-origin iframe — skip
+        }
+      });
+    } catch {}
 
-      return roots;
-    }
+    return results;
+  }
 
-    // Action-aware validation
-    static validateElementForAction(element: Element, actionType: string): boolean {
-      const el = element as HTMLElement;
-      
-      switch (actionType?.toLowerCase()) {
-        case 'click':
-          return this.isClickable(el);
-        case 'type':
-        case 'input':
-          return this.isInput(el);
-        case 'select':
-          return el.tagName.toLowerCase() === 'select' || el.getAttribute('role') === 'combobox';
-        default:
-          return true; // Unknown action type, assume valid
-      }
-    }
+  // ── Element Finder ────────────────────────────────────────────────
 
-    private static isClickable(element: HTMLElement): boolean {
-      const tag = element.tagName.toLowerCase();
-      if (['button', 'a', 'input'].includes(tag)) return true;
-      if (element.getAttribute('role') === 'button') return true;
-      if (element.onclick || element.getAttribute('onclick')) return true;
-      if (window.getComputedStyle(element).cursor === 'pointer') return true;
-      return false;
-    }
-
-    private static isInput(element: HTMLElement): boolean {
-      const tag = element.tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea') return true;
-      if (element.contentEditable === 'true') return true;
-      return false;
+  function safeQuerySelector(root: Document | ShadowRoot | Element, selector: string): Element | null {
+    try {
+      return root.querySelector(selector);
+    } catch {
+      return null;
     }
   }
 
-  // ═══ ELEMENT WATCHER ═══
-  // Event-driven element monitoring (Usertour pattern)
+  function isVisible(el: Element | null): boolean {
+    if (!el || !el.getBoundingClientRect) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+    const win = (el as HTMLElement).ownerDocument?.defaultView || window;
+    const style = win.getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+  }
 
-  class ElementWatcher extends EventEmitter {
-    private step: GuideStep;
-    private retryCount = 0;
-    private timeoutHandle: number | null = null;
-    private validationHandle: number | null = null;
-    private element: Element | null = null;
-    private readonly RETRY_DELAY = 200; // 200ms between attempts
-    private readonly MAX_TIMEOUT = 10000; // 10 seconds max
-    private readonly id: string;
+  function normalizeText(s: string): string {
+    return s.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
 
-    constructor(step: GuideStep) {
-      super();
-      this.step = step;
-      this.id = `watcher-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  function findByText(candidates: Element[], text: string, opts: FindByTextOpts = {}): Element | null {
+    if (!text || !candidates.length) return null;
+    const target = normalizeText(text);
+    let best: Element | null = null;
+    let bestScore = Infinity;
+
+    for (const el of candidates) {
+      if (!isVisible(el)) continue;
+      const elText = normalizeText(el.textContent || "");
+      // Also check aria-label and title attributes
+      const ariaLabel = normalizeText(el.getAttribute('aria-label') || "");
+      const title = normalizeText(el.getAttribute('title') || "");
+      const placeholder = normalizeText((el as HTMLInputElement).placeholder || "");
+
+      // Exact match (normalized)
+      if (elText === target || ariaLabel === target || title === target) return el;
+      
+      // Contains match
+      if (elText.includes(target) || ariaLabel.includes(target)) {
+        const matchText = elText.includes(target) ? elText : ariaLabel;
+        const score = Math.abs(matchText.length - target.length);
+        if (score < bestScore) {
+          bestScore = score;
+          best = el;
+        }
+      }
+      
+      // Fuzzy: also check if target contains the element text (reverse contains)
+      // e.g., step says "Submit Order" but element just says "Submit"
+      if (opts.fuzzy && target.includes(elText) && elText.length >= 3) {
+        const score = Math.abs(elText.length - target.length) + 10; // +10 penalty for reverse match
+        if (score < bestScore) {
+          bestScore = score;
+          best = el;
+        }
+      }
+      
+      // Fuzzy: check placeholder for input elements
+      if (opts.fuzzy && placeholder && (placeholder.includes(target) || target.includes(placeholder))) {
+        const score = Math.abs(placeholder.length - target.length) + 5;
+        if (score < bestScore) {
+          bestScore = score;
+          best = el;
+        }
+      }
+    }
+    return best;
+  }
+
+  // Search a single root for the step's element using all strategies
+  function findInRoot(root: Document | ShadowRoot, step: GuideStep): FindResult | null {
+    // CSS selector
+    if (step.selector) {
+      const el = safeQuerySelector(root, step.selector);
+      if (el && isVisible(el)) return { element: el, confidence: 1.0, method: "selector" };
     }
 
-    start(): void {
-      this.retryCount = 0;
-      this.findElement();
+    // data-testid
+    const testId = step.element_info?.testId;
+    if (testId) {
+      for (const attr of ["data-testid", "data-test", "data-cy"]) {
+        try {
+          const el = root.querySelector(`[${attr}="${CSS.escape(testId)}"]`);
+          if (el && isVisible(el)) return { element: el, confidence: 0.95, method: "testid" };
+        } catch {}
+      }
+    }
+
+    // ARIA role + text
+    if (step.element_role && step.element_text) {
+      const candidates = root.querySelectorAll(`[role="${step.element_role}"]`);
+      const match = findByText(Array.from(candidates), step.element_text);
+      if (match) return { element: match, confidence: 0.85, method: "role+text" };
+    }
+
+    // Tag + text (fuzzy)
+    if (step.element_info?.tagName && step.element_text) {
+      const candidates = root.querySelectorAll(step.element_info.tagName);
+      const match = findByText(Array.from(candidates), step.element_text, { fuzzy: true });
+      if (match) return { element: match, confidence: 0.7, method: "tag+text" };
+    }
+
+    // XPath (only works on Document nodes, not ShadowRoot)
+    if (step.xpath && root.nodeType === Node.DOCUMENT_NODE) {
+      try {
+        const result = (root as Document).evaluate(step.xpath, root, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const el = result.singleNodeValue as Element | null;
+        if (el && isVisible(el)) return { element: el, confidence: 0.6, method: "xpath" };
+      } catch {}
+    }
+
+    // Parent chain context
+    if (step.element_info?.parentChain?.length) {
+      const chain = step.element_info.parentChain;
+      for (const ancestor of chain) {
+        let container: Element | null = null;
+        if (ancestor.id) {
+          container = (root as Document).getElementById ? (root as Document).getElementById(ancestor.id) : root.querySelector(`#${CSS.escape(ancestor.id)}`);
+        } else if (ancestor.testId) {
+          container = safeQuerySelector(root, `[data-testid="${CSS.escape(ancestor.testId)}"]`);
+        } else if (ancestor.role) {
+          const candidates = root.querySelectorAll(`[role="${ancestor.role}"]`);
+          if (candidates.length === 1) container = candidates[0];
+        }
+        if (!container) continue;
+        if (step.element_info?.tagName && step.element_text) {
+          const els = container.querySelectorAll(step.element_info.tagName);
+          const match = findByText(Array.from(els), step.element_text, { fuzzy: true });
+          if (match) return { element: match, confidence: 0.5, method: "parent-context" };
+        }
+      }
+    }
+
+    // Level 7: Last resort — text search using step title/description as hint
+    // This catches cases where the recording only captured a CSS selector (now broken)
+    // but the step title describes the element (e.g., "Click the Submit button")
+    if (step.title || step.description) {
+      const hint = (step.title || step.description || '').toLowerCase();
+      // Extract likely element text from the hint
+      const textPatterns = [
+        /click (?:the |on )?["']?([^"']+?)["']?\s*(?:button|link|tab|menu|option)?$/i,
+        /type (?:in |into )?["']?([^"']+?)["']?/i,
+        /select ["']?([^"']+?)["']?/i,
+        /["']([^"']+?)["']/,  // Anything in quotes
+      ];
+      for (const pattern of textPatterns) {
+        const match = hint.match(pattern);
+        if (match && match[1]) {
+          const searchText = match[1].trim();
+          if (searchText.length >= 2) {
+            const allInteractive = root.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [onclick]');
+            const candidate = findByText(Array.from(allInteractive), searchText, { fuzzy: true });
+            if (candidate) return { element: candidate, confidence: 0.35, method: "title-hint" };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // ── Cross-origin iframe child frame mode (Feature 4) ──────────────
+  if (window !== window.top) {
+    // Running inside a child frame — only listen for element search requests
+    chrome.runtime.onMessage.addListener((message: { type: string; step: GuideStep }, _sender: MessageSender, sendResponse: SendResponse) => {
+      if (message.type === 'GUIDE_FIND_IN_FRAME') {
+        const result = findInRoot(document, message.step);
+        if (result) {
+          const rect = result.element.getBoundingClientRect();
+          let frameRect: DOMRect | null = null;
+          try { frameRect = (self as Window & { frameElement: Element | null }).frameElement?.getBoundingClientRect() ?? null; } catch {}
+          sendResponse({
+            found: true,
+            rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+            frameRect: frameRect ? { left: frameRect.left, top: frameRect.top, width: frameRect.width, height: frameRect.height } : null,
+            confidence: result.confidence,
+            method: result.method,
+          });
+        } else {
+          sendResponse({ found: false });
+        }
+      }
+      return false;
+    });
+    return; // Do NOT create overlay or register START_GUIDE in child frames
+  }
+
+  // Main finder: searches document + all shadow roots + all same-origin iframes
+  async function findGuideElement(step: GuideStep): Promise<FindResult | null> {
+    const searchRoots = collectSearchRoots();
+
+    let bestResult: FindResult | null = null;
+
+    for (const { root, iframeOffset } of searchRoots) {
+      const result = findInRoot(root, step);
+      if (result) {
+        result.iframeOffset = iframeOffset;
+        // Return immediately on high-confidence match
+        if (result.confidence >= 0.85) return result;
+        // Keep the best
+        if (!bestResult || result.confidence > bestResult.confidence) {
+          bestResult = result;
+        }
+      }
+    }
+
+    // Feature 4: If no high-confidence local result, try cross-origin frames via background
+    if (!bestResult || bestResult.confidence < 0.85) {
+      try {
+        const [activeTab] = await new Promise<chrome.tabs.Tab[]>(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+        if (activeTab?.id) {
+          const resp = await chrome.runtime.sendMessage({
+            type: 'GUIDE_FIND_IN_FRAMES',
+            step,
+            tabId: activeTab.id,
+          }) as FrameFindResponse | undefined;
+          if (resp && resp.found && (!bestResult || (resp.confidence || 0) > bestResult.confidence)) {
+            // Cross-origin match — we can't get the element directly, but return info
+            // for now, prefer local results if any exist
+            // (Cross-origin elements can't be directly manipulated from top frame)
+          }
+        }
+      } catch {} // ignore errors from cross-origin search
+    }
+
+    return bestResult;
+  }
+
+  // ── Obstructed Element Detection (Feature 3) ─────────────────────
+
+  function isObstructed(el: Element): Element | null {
+    if (!el || !el.getBoundingClientRect) return null;
+    const rect = el.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const topEl = document.elementFromPoint(centerX, centerY);
+    if (!topEl) return null;
+    if (topEl === el || el.contains(topEl)) return null;
+    // Check if it's part of our overlay
+    let node: Element | null = topEl;
+    while (node) {
+      if (node.tagName && node.tagName.toLowerCase() === 'stept-guide-overlay') return null;
+      node = node.parentElement;
+    }
+    return topEl;
+  }
+
+  // ── Intermediate Action Detection (Feature 8) ───────────────────
+
+  function needsIntermediateAction(el: Element): HTMLElement | null {
+    let node: HTMLElement | null = (el as HTMLElement).parentElement;
+    while (node && node !== document.documentElement) {
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none') return node;
+      if (style.visibility === 'hidden') return node;
+      if (node.getAttribute('aria-expanded') === 'false') return node;
+      if (node.tagName === 'DETAILS' && !node.hasAttribute('open')) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function describeElement(el: Element): string {
+    const tag = el.tagName?.toLowerCase() || 'element';
+    const text = (el.textContent || '').trim().slice(0, 40);
+    const label = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+    if (label) return `${tag} "${label}"`;
+    if (text) return `${tag} "${text}"`;
+    return tag;
+  }
+
+  // ── Overlay Renderer ──────────────────────────────────────────────
+
+  const STYLES = `
+    :host {
+      all: initial;
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      color: #E7E5E4;
+    }
+
+    .guide-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483640;
+      pointer-events: none;
+    }
+
+    .guide-backdrop-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      transition: clip-path 0.3s ease;
+      pointer-events: none;
+    }
+
+    .guide-highlight {
+      position: fixed;
+      z-index: 2147483641;
+      border: 2px solid #3AB08A;
+      border-radius: 6px;
+      box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25);
+      pointer-events: none;
+      transition: all 0.3s ease;
+      animation: guide-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes guide-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(58, 176, 138, 0.25); }
+      50% { box-shadow: 0 0 0 8px rgba(58, 176, 138, 0.15); }
+    }
+
+    .guide-tooltip {
+      position: fixed;
+      z-index: 2147483642;
+      background: #1C1917;
+      border: 1px solid #292524;
+      border-radius: 12px;
+      padding: 16px;
+      max-width: 320px;
+      min-width: 240px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
+      animation: guide-tooltip-in 0.25s ease-out;
+    }
+
+    @keyframes guide-tooltip-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .guide-tooltip-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #FAFAF9;
+      margin: 0 0 6px 0;
+      line-height: 1.3;
+    }
+
+    .guide-tooltip-desc {
+      font-size: 13px;
+      color: #A8A29E;
+      margin: 0 0 14px 0;
+      line-height: 1.5;
+    }
+
+    .guide-tooltip-progress {
+      font-size: 11px;
+      color: #78716C;
+      margin-bottom: 12px;
+    }
+
+    .guide-tooltip-progress-bar {
+      height: 3px;
+      background: #292524;
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .guide-tooltip-progress-fill {
+      height: 100%;
+      background: #3AB08A;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    .guide-tooltip-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .guide-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .guide-btn:hover { filter: brightness(1.1); }
+    .guide-btn:active { transform: scale(0.97); }
+
+    .guide-btn-primary {
+      background: #3AB08A;
+      color: #fff;
+    }
+
+    .guide-btn-secondary {
+      background: #292524;
+      color: #D6D3D1;
+    }
+
+    .guide-btn-ghost {
+      background: transparent;
+      color: #78716C;
+      padding: 8px 8px;
+    }
+
+    .guide-btn-ghost:hover { color: #D6D3D1; }
+
+    .guide-spacer { flex: 1; }
+
+    .guide-close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      color: #78716C;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      font-size: 18px;
+      border-radius: 4px;
+    }
+
+    .guide-close-btn:hover { color: #D6D3D1; background: #292524; }
+
+    .guide-btn-done {
+      background: #059669;
+      color: #fff;
+    }
+
+    .guide-obstruction-warning {
+      background: #451A03;
+      border: 1px solid #92400E;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #FDE68A;
+      line-height: 1.4;
+    }
+
+    .guide-intermediate-hint {
+      background: #1E1B4B;
+      border: 1px solid #3730A3;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #C7D2FE;
+      line-height: 1.4;
+    }
+
+    .guide-url-warning {
+      background: #451A03;
+      border: 1px solid #78350F;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #FDE68A;
+      line-height: 1.4;
+    }
+
+    .guide-navigate-btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: #78350F;
+      color: #FDE68A;
+      border: 1px solid #92400E;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .guide-navigate-btn:hover {
+      background: #92400E;
+    }
+
+    .guide-not-found {
+      background: #1C1917;
+      border: 1px solid #292524;
+      border-radius: 12px;
+      padding: 20px;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2147483642;
+      text-align: center;
+      max-width: 300px;
+      pointer-events: auto;
+      animation: guide-tooltip-in 0.25s ease-out;
+    }
+
+    .guide-not-found-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #FAFAF9;
+      margin-bottom: 8px;
+    }
+
+    .guide-not-found-desc {
+      font-size: 13px;
+      color: #A8A29E;
+      margin-bottom: 14px;
+    }
+
+    .guide-roadblock-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .guide-roadblock-step-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #D6D3D1;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: #292524;
+      border-radius: 6px;
+    }
+  `;
+
+  // ── Guide Runner ──────────────────────────────────────────────────
+
+  class GuideRunner {
+    guide: Guide;
+    steps: GuideStep[];
+    currentIndex: number;
+    host: HTMLElement | null;
+    shadow: ShadowRoot | null;
+    positionInterval: ReturnType<typeof setInterval> | null;
+    currentResult: FindResult | null;
+    _clickHandler: ((e: Event) => void) | null;
+    _stepSeq: number;
+    // Persistent overlay elements for in-place updates
+    _backdrop: HTMLDivElement | null;
+    _overlay: HTMLDivElement | null;
+    _highlight: HTMLDivElement | null;
+    _tooltip: HTMLDivElement | null;
+    _notFoundPanel: HTMLDivElement | null;
+    _intermediatePanel: HTMLDivElement | null;
+    // Internal state
+    _replacing: boolean;
+    _pollInterval: ReturnType<typeof setInterval> | null;
+    _inertObserver: MutationObserver | null;
+    _zoomObserver: MutationObserver | null;
+    _clickElement: Element | null;
+    _clickEventType: string | null;
+    _parentClickHandler: ((e: Event) => void) | null;
+    _clickParent: Element | null;
+    _keyHandler: ((e: KeyboardEvent) => void) | null;
+    _completionObserver: MutationObserver | null;
+    _completionCleanup: (() => void) | null;
+    _completionTimeout: ReturnType<typeof setTimeout> | null;
+
+    constructor(guide: Guide) {
+      this.guide = guide;
+      this.steps = guide.steps || [];
+      this.currentIndex = 0;
+      this.host = null;
+      this.shadow = null;
+      this.positionInterval = null;
+      this.currentResult = null;
+      this._clickHandler = null;
+      this._stepSeq = 0; // concurrency guard: increments on each showStep call
+      // Persistent overlay elements for in-place updates
+      this._backdrop = null;
+      this._overlay = null;
+      this._highlight = null;
+      this._tooltip = null;
+      this._notFoundPanel = null;
+      this._intermediatePanel = null;
+      // Internal state
+      this._replacing = false;
+      this._pollInterval = null;
+      this._inertObserver = null;
+      this._zoomObserver = null;
+      this._clickElement = null;
+      this._clickEventType = null;
+      this._parentClickHandler = null;
+      this._clickParent = null;
+      this._keyHandler = null;
+      this._completionObserver = null;
+      this._completionCleanup = null;
+      this._completionTimeout = null;
+    }
+
+    async start(): Promise<void> {
+      this._createHost();
+      if (this.steps.length === 0) {
+        this._showEmpty();
+        return;
+      }
+      await this.showStep(0);
     }
 
     stop(): void {
-      if (this.timeoutHandle) {
-        clearTimeout(this.timeoutHandle);
-        this.timeoutHandle = null;
+      this._stopElementPolling();
+      this._clearPositionTracking();
+      this._removeClickHandler();
+      this._disconnectCompletionObserver();
+      if (this._inertObserver) {
+        this._inertObserver.disconnect();
+        this._inertObserver = null;
       }
-      if (this.validationHandle) {
-        clearTimeout(this.validationHandle);
-        this.validationHandle = null;
+      if (this._zoomObserver) {
+        this._zoomObserver.disconnect();
+        this._zoomObserver = null;
       }
-      this.removeAllListeners();
+      if (this.host) {
+        this.host.remove();
+        this.host = null;
+        this.shadow = null;
+      }
+      this._backdrop = null;
+      this._overlay = null;
+      this._highlight = null;
+      this._tooltip = null;
+      this._notFoundPanel = null;
+      activeRunner = null;
+      // Only notify background if this is a user-initiated stop (not a replacement)
+      if (!this._replacing) {
+        chrome.runtime.sendMessage({ type: 'GUIDE_STOPPED' }).catch(() => {});
+      }
     }
 
-    private findElement(): void {
-      if (this.timeoutHandle) {
-        clearTimeout(this.timeoutHandle);
-        this.timeoutHandle = null;
-      }
+    _createHost(): void {
+      this.host = document.createElement("stept-guide-overlay");
+      this.shadow = this.host.attachShadow({ mode: "closed" });
 
-      // Check timeout
-      if (this.retryCount * this.RETRY_DELAY > this.MAX_TIMEOUT) {
-        this.emit('timeout');
-        return;
-      }
+      const style = document.createElement("style");
+      style.textContent = STYLES;
+      this.shadow.appendChild(style);
 
-      const result = ElementFinder.findInCascade(this.step);
-      if (result) {
-        // Validate element for action type if specified
-        if (this.step.action_type && !ElementFinder.validateElementForAction(result.element, this.step.action_type)) {
-          // Element found but not suitable for the action, keep searching
-          this.scheduleRetry();
-          return;
+      document.documentElement.appendChild(this.host);
+
+      // Protect overlay from being made inert by the page (modals/dialogs
+      // often set inert on everything outside themselves).
+      this._inertObserver = new MutationObserver(() => {
+        if (this.host && this.host.hasAttribute("inert")) {
+          this.host.removeAttribute("inert");
         }
+      });
+      this._inertObserver.observe(this.host, { attributes: true, attributeFilter: ["inert"] });
 
-        this.element = result.element;
-        this.emit('found', result.element, result.confidence, result.method);
-        this.startValidationLoop();
-      } else {
-        this.scheduleRetry();
+      // Zoom compensation: counteract page zoom so our overlay stays pixel-perfect.
+      const updateZoom = (): void => {
+        if (!this.host || this.host.parentElement !== document.documentElement) return;
+        const bodyZoom = parseFloat((getComputedStyle(document.body) as CSSStyleDeclaration & { zoom?: string }).zoom || '1') || 1;
+        const htmlZoom = parseFloat((getComputedStyle(document.documentElement) as CSSStyleDeclaration & { zoom?: string }).zoom || '1') || 1;
+        const totalZoom = bodyZoom * htmlZoom;
+        this.host.style.zoom = totalZoom === 1 ? "" : String(1 / totalZoom);
+      };
+      updateZoom();
+      this._zoomObserver = new MutationObserver(updateZoom);
+      this._zoomObserver.observe(document.body, { attributes: true, attributeFilter: ["style", "class"] });
+      this._zoomObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
+    }
+
+    _clearOverlay(): void {
+      this._stopElementPolling();
+      this._clearPositionTracking();
+      this._removeClickHandler();
+      this._disconnectCompletionObserver();
+      // Remove all overlay elements to prevent artifacts across navigations
+      if (this._highlight) { this._highlight.remove(); this._highlight = null; }
+      if (this._tooltip) { this._tooltip.remove(); this._tooltip = null; }
+      if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
+      if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
+      if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
+    }
+
+    _stopElementPolling(): void {
+      if (this._pollInterval) {
+        clearInterval(this._pollInterval);
+        this._pollInterval = null;
       }
     }
 
-    private scheduleRetry(): void {
-      this.retryCount++;
-      this.timeoutHandle = setTimeout(() => this.findElement(), this.RETRY_DELAY);
-    }
+    _startElementPolling(step: GuideStep, seq: number, urlMismatch: boolean): void {
+      this._stopElementPolling();
+      let tickCount = 0;
+      const POLL_MS = 150;       // Slightly slower polling to reduce CPU
+      const TIMEOUT_TICKS = 13;  // ~2 seconds before showing roadblock (was 3s)
+      let lastStatus: string | null = null;
+      let healthReported = false;
 
-    private startValidationLoop(): void {
-      if (!this.element) return;
+      // Show a subtle "searching..." indicator immediately so user knows we're working
+      if (this.shadow) {
+        const searchHint = document.createElement('div');
+        searchHint.className = 'guide-search-hint';
+        searchHint.setAttribute('data-search-hint', 'true');
+        searchHint.textContent = 'Finding element...';
+        // Style it as a small pill at the top
+        searchHint.style.cssText = `
+          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+          z-index: 2147483642; background: #1C1917; color: #A8A29E;
+          padding: 6px 16px; border-radius: 20px; font-size: 12px;
+          border: 1px solid #292524; pointer-events: none;
+          animation: guide-tooltip-in 0.2s ease-out;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        `;
+        this.shadow.appendChild(searchHint);
+      }
 
-      const validate = () => {
-        if (!this.element || !this.isElementValid()) {
-          // Element became invalid, restart search
-          this.element = null;
-          this.retryCount = 0; // Reset retry count for re-search
-          this.findElement();
+      const poll = async (): Promise<void> => {
+        if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
+
+        const result = await findGuideElement(step);
+
+        if (this._stepSeq !== seq) return; // another showStep started
+
+        if (result) {
+          tickCount = 0;  // reset on success
+          this.currentResult = result;
+
+          // Report health once on first find
+          if (!healthReported) {
+            healthReported = true;
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: true,
+                finderMethod: result.method || null,
+                finderConfidence: result.confidence || 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: true,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+          }
+
+          // Check intermediate action
+          const intermediateAncestor = needsIntermediateAction(result.element);
+          if (intermediateAncestor) {
+            if (lastStatus !== 'intermediate') {
+              lastStatus = 'intermediate';
+              this._stopElementPolling();
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_CHANGED',
+                currentIndex: this.currentIndex,
+                totalSteps: this.steps.length,
+                stepStatus: 'intermediate',
+              }).catch(() => {});
+              this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
+            }
+            return;
+          }
+
+          if (lastStatus !== 'found') {
+            lastStatus = 'found';
+            // Clear search hint and any previous not-found UI
+            if (this.shadow) {
+              const hint = this.shadow.querySelector('[data-search-hint]');
+              if (hint) hint.remove();
+            }
+            if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
+
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'active',
+            }).catch(() => {});
+
+            const obstructor = isObstructed(result.element);
+            this._scrollToElement(result);
+            await new Promise<void>((r) => setTimeout(r, 80));
+            if (this._stepSeq !== seq) return;
+            this._renderOverlay(step, result, urlMismatch, obstructor);
+            this._startPositionTracking(step, result);
+            this._setupClickAdvance(result.element, step);
+            this._setupCompletionDetection(result.element, step);
+            // Stop polling once element is found and handlers are set up
+            this._stopElementPolling();
+          }
         } else {
-          // Element still valid, check again in 1 second
-          this.validationHandle = setTimeout(validate, 1000);
+          tickCount++;
+          // Only show not-found after timeout threshold
+          if (tickCount >= TIMEOUT_TICKS && lastStatus !== 'notfound') {
+            lastStatus = 'notfound';
+            // Report health
+            try {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_STEP_HEALTH',
+                workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+                stepNumber: this.currentIndex,
+                elementFound: false,
+                finderMethod: null,
+                finderConfidence: 0,
+                expectedUrl: step.expected_url || step.url || null,
+                actualUrl: window.location.href,
+                urlMatched: false,
+                timestamp: Date.now(),
+              }).catch(() => {});
+            } catch (_) {}
+
+            // Remove search hint
+            if (this.shadow) {
+              const hint = this.shadow.querySelector('[data-search-hint]');
+              if (hint) hint.remove();
+            }
+            chrome.runtime.sendMessage({
+              type: 'GUIDE_STEP_CHANGED',
+              currentIndex: this.currentIndex,
+              totalSteps: this.steps.length,
+              stepStatus: 'notfound',
+            }).catch(() => {});
+            this._renderNotFound(step, urlMismatch);
+            // Keep polling even after showing not-found — element may appear later
+          }
         }
       };
 
-      this.validationHandle = setTimeout(validate, 1000);
+      // Immediate first poll, then every 100ms
+      poll();
+      this._pollInterval = setInterval(poll, POLL_MS);
     }
 
-    private isElementValid(): boolean {
-      if (!this.element) return false;
-      
-      // Check if element is still in DOM
-      if (!this.element.isConnected) return false;
-      
-      // Check if element is still visible
-      if (!ElementFinder['isVisible'](this.element as HTMLElement)) return false;
-      
-      // For actions, check if element is still suitable
-      if (this.step.action_type && !ElementFinder.validateElementForAction(this.element, this.step.action_type)) {
-        return false;
+    async showStep(index: number): Promise<void> {
+      if (index < 0 || index >= this.steps.length) {
+        this.stop();
+        return;
       }
+      // Concurrency guard: if another showStep starts, this one aborts
+      const seq = ++this._stepSeq;
+      this.currentIndex = index;
+      this._clearOverlay();
 
-      return true;
-    }
+      const step = this.steps[index];
+      const actionType = (step.action_type || '').toLowerCase();
 
-    getCurrentElement(): Element | null {
-      return this.element;
-    }
-  }
-
-  // ═══ URL WATCHER ═══
-  // Monitors URL changes for SPA detection and multi-page workflows
-
-  class URLWatcher extends EventEmitter {
-    private currentUrl: string;
-    private pollHandle: number | null = null;
-    private readonly POLL_INTERVAL = 500; // 500ms SPA polling
-
-    constructor() {
-      super();
-      this.currentUrl = window.location.href;
-    }
-
-    start(): void {
-      this.bindEvents();
-      this.startPolling();
-    }
-
-    stop(): void {
-      this.unbindEvents();
-      this.stopPolling();
-      this.removeAllListeners();
-    }
-
-    private bindEvents(): void {
-      window.addEventListener('popstate', this.handleURLChange);
-      window.addEventListener('hashchange', this.handleURLChange);
-    }
-
-    private unbindEvents(): void {
-      window.removeEventListener('popstate', this.handleURLChange);
-      window.removeEventListener('hashchange', this.handleURLChange);
-    }
-
-    private handleURLChange = (): void => {
-      this.checkURL();
-    };
-
-    private startPolling(): void {
-      this.pollHandle = setInterval(() => this.checkURL(), this.POLL_INTERVAL);
-    }
-
-    private stopPolling(): void {
-      if (this.pollHandle) {
-        clearInterval(this.pollHandle);
-        this.pollHandle = null;
-      }
-    }
-
-    private checkURL(): void {
-      const newUrl = window.location.href;
-      if (newUrl !== this.currentUrl) {
-        const oldUrl = this.currentUrl;
-        this.currentUrl = newUrl;
-        this.emit('url_changed', oldUrl, newUrl);
-      }
-    }
-
-    getCurrentUrl(): string {
-      return this.currentUrl;
-    }
-  }
-
-  // ═══ OVERLAY RENDERER ═══
-  // Light Tango-style overlay with dashed border and hint pill
-
-  class OverlayRenderer {
-    private overlayElement: HTMLDivElement | null = null;
-    private hintElement: HTMLDivElement | null = null;
-    private currentElement: Element | null = null;
-    private resizeObserver: ResizeObserver | null = null;
-
-    show(element: Element, step: GuideStep, confidence: number): void {
-      this.hide(); // Clean up previous overlay
-      this.currentElement = element;
-      this.createOverlay(element, step, confidence);
-      this.createHint(element, step, confidence);
-      this.observeElement(element);
-    }
-
-    hide(): void {
-      if (this.overlayElement) {
-        this.overlayElement.remove();
-        this.overlayElement = null;
-      }
-      if (this.hintElement) {
-        this.hintElement.remove();
-        this.hintElement = null;
-      }
-      if (this.resizeObserver) {
-        this.resizeObserver.disconnect();
-        this.resizeObserver = null;
-      }
-      this.currentElement = null;
-    }
-
-    private createOverlay(element: Element, step: GuideStep, confidence: number): void {
-      const rect = element.getBoundingClientRect();
-      
-      this.overlayElement = document.createElement('div');
-      this.overlayElement.setAttribute('data-stept-guide', 'overlay');
-      
-      // Light dashed border style (Tango pattern)
-      const borderColor = confidence > 0.8 ? '#2563eb' : confidence > 0.5 ? '#f59e0b' : '#ef4444';
-      
-      Object.assign(this.overlayElement.style, {
-        position: 'fixed',
-        left: `${rect.left}px`,
-        top: `${rect.top}px`,
-        width: `${rect.width}px`,
-        height: `${rect.height}px`,
-        border: `2px dashed ${borderColor}`,
-        backgroundColor: 'transparent',
-        pointerEvents: 'none',
-        zIndex: '999999',
-        borderRadius: '4px',
-        boxSizing: 'border-box',
-        transition: 'all 0.2s ease-in-out'
-      });
-
-      // Shadow DOM isolation
-      const shadowRoot = this.overlayElement.attachShadow({ mode: 'closed' });
-      const style = document.createElement('style');
-      style.textContent = `
-        :host {
-          all: initial;
-          contain: layout style paint;
-        }
-      `;
-      shadowRoot.appendChild(style);
-      
-      document.body.appendChild(this.overlayElement);
-    }
-
-    private createHint(element: Element, step: GuideStep, confidence: number): void {
-      const rect = element.getBoundingClientRect();
-      
-      this.hintElement = document.createElement('div');
-      this.hintElement.setAttribute('data-stept-guide', 'hint');
-      
-      // Hint pill content
-      const hintText = step.title || 'Next step';
-      const confidenceIcon = confidence > 0.8 ? '●' : confidence > 0.5 ? '◐' : '○';
-      
-      Object.assign(this.hintElement.style, {
-        position: 'fixed',
-        left: `${rect.left}px`,
-        top: `${rect.top - 35}px`, // Above element
-        backgroundColor: '#1f2937',
-        color: '#ffffff',
-        padding: '6px 12px',
-        borderRadius: '16px',
-        fontSize: '12px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontWeight: '500',
-        pointerEvents: 'none',
-        zIndex: '1000000',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        maxWidth: '200px',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        transition: 'all 0.2s ease-in-out'
-      });
-      
-      this.hintElement.textContent = `${confidenceIcon} ${hintText}`;
-      
-      // Adjust position if hint goes off-screen
-      const hintRect = this.hintElement.getBoundingClientRect();
-      if (rect.top - 35 < 0) {
-        // Show below if no room above
-        this.hintElement.style.top = `${rect.bottom + 5}px`;
-      }
-      if (rect.left + hintRect.width > window.innerWidth) {
-        // Adjust horizontal position
-        this.hintElement.style.left = `${window.innerWidth - hintRect.width - 10}px`;
-      }
-      
-      // Shadow DOM isolation
-      const shadowRoot = this.hintElement.attachShadow({ mode: 'closed' });
-      const style = document.createElement('style');
-      style.textContent = `
-        :host {
-          all: initial;
-          contain: layout style paint;
-        }
-      `;
-      shadowRoot.appendChild(style);
-      
-      document.body.appendChild(this.hintElement);
-    }
-
-    private observeElement(element: Element): void {
-      // Update overlay position when element moves/resizes
-      this.resizeObserver = new ResizeObserver(() => {
-        if (this.currentElement && this.overlayElement && this.hintElement) {
-          const rect = this.currentElement.getBoundingClientRect();
-          
-          // Update overlay
-          Object.assign(this.overlayElement.style, {
-            left: `${rect.left}px`,
-            top: `${rect.top}px`,
-            width: `${rect.width}px`,
-            height: `${rect.height}px`
-          });
-          
-          // Update hint
-          Object.assign(this.hintElement.style, {
-            left: `${rect.left}px`,
-            top: `${rect.top - 35}px`
-          });
-        }
-      });
-      
-      this.resizeObserver.observe(element);
-      this.resizeObserver.observe(document.body); // For viewport changes
-    }
-
-    updateConfidence(confidence: number): void {
-      if (this.overlayElement) {
-        const borderColor = confidence > 0.8 ? '#2563eb' : confidence > 0.5 ? '#f59e0b' : '#ef4444';
-        this.overlayElement.style.borderColor = borderColor;
-      }
-      if (this.hintElement) {
-        const confidenceIcon = confidence > 0.8 ? '●' : confidence > 0.5 ? '◐' : '○';
-        const text = this.hintElement.textContent || '';
-        this.hintElement.textContent = text.replace(/^[●◐○]\s/, `${confidenceIcon} `);
-      }
-    }
-  }
-
-  // ═══ GUIDE RUNNER ═══
-  // State machine for guide execution
-
-  class GuideRunner extends EventEmitter {
-    private state: GuideState = { type: 'idle' };
-    private guide: Guide | null = null;
-    private currentStepIndex = 0;
-    private elementWatcher: ElementWatcher | null = null;
-    private urlWatcher: URLWatcher | null = null;
-    private overlayRenderer: OverlayRenderer;
-    private searchProgressTimer: number | null = null;
-
-    constructor() {
-      super();
-      this.overlayRenderer = new OverlayRenderer();
-    }
-
-    // Public API
-    startGuide(guide: Guide, startIndex: number = 0): void {
-      this.stopGuide();
-      this.guide = guide;
-      this.currentStepIndex = startIndex;
-      this.setState({ type: 'idle' });
-      
-      this.setupURLWatcher();
-      this.executeStep(this.currentStepIndex);
-      
-      this.sendMessage('GUIDE_STEP_CHANGED', {
-        stepIndex: this.currentStepIndex,
-        totalSteps: guide.steps?.length || 0,
-        step: this.getCurrentStep()
-      });
-    }
-
-    stopGuide(): void {
-      this.cleanup();
-      this.setState({ type: 'stopped' });
-      this.sendMessage('GUIDE_STOPPED', {});
-    }
-
-    skipStep(): void {
-      this.advanceToNextStep();
-    }
-
-    markComplete(): void {
-      this.emit('action_completed');
-    }
-
-    getCurrentState(): GuideState {
-      return this.state;
-    }
-
-    getCurrentStep(): GuideStep | null {
-      if (!this.guide?.steps || this.currentStepIndex >= this.guide.steps.length) {
-        return null;
-      }
-      return this.guide.steps[this.currentStepIndex];
-    }
-
-    destroy(): void {
-      this.cleanup();
-      this.removeAllListeners();
-    }
-
-    // Private methods
-    private setState(newState: GuideState): void {
-      this.state = newState;
-      this.emit('state_changed', newState);
-    }
-
-    private setupURLWatcher(): void {
-      if (!this.urlWatcher) {
-        this.urlWatcher = new URLWatcher();
-        this.urlWatcher.on('url_changed', this.handleURLChange.bind(this));
-        this.urlWatcher.start();
-      }
-    }
-
-    private handleURLChange(oldUrl: string, newUrl: string): void {
-      const currentStep = this.getCurrentStep();
-      if (!currentStep) return;
-
-      // Check if URL change is expected for current step
-      if (this.urlMatches(newUrl, currentStep.expected_url)) {
-        return; // Expected URL change, continue
-      }
-
-      // Check if URL matches a future step (user jumped ahead)
-      if (this.guide?.steps) {
-        for (let i = this.currentStepIndex + 1; i < this.guide.steps.length; i++) {
-          const step = this.guide.steps[i];
-          if (this.urlMatches(newUrl, step.expected_url)) {
-            // User jumped ahead, skip to that step
-            this.currentStepIndex = i;
-            this.executeStep(this.currentStepIndex);
-            return;
-          }
-        }
-      }
-
-      // Unexpected URL change - try to continue with current step
-      if (this.state.type === 'searching' || this.state.type === 'found') {
-        // Restart element search on new page
-        this.executeStep(this.currentStepIndex);
-      }
-    }
-
-    private urlMatches(currentUrl: string, expectedUrl?: string): boolean {
-      if (!expectedUrl) return true;
-      
-      try {
-        const current = new URL(currentUrl);
-        const expected = new URL(expectedUrl);
-        
-        // Compare pathname and optionally search params
-        return current.pathname === expected.pathname &&
-               (!expected.search || current.search === expected.search);
-      } catch (e) {
-        // Fallback to simple string matching
-        return currentUrl.includes(expectedUrl);
-      }
-    }
-
-    private executeStep(stepIndex: number): void {
-      const step = this.getCurrentStep();
-      if (!step) {
-        this.setState({ type: 'completed' });
-        this.sendMessage('GUIDE_STEP_CHANGED', { completed: true });
+      // Navigate / new-tab steps have no element to highlight — auto-advance
+      const isNavigateStep = actionType === 'navigate';
+      if (isNavigateStep) {
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: index,
+          totalSteps: this.steps.length,
+          stepStatus: 'completed',
+        }).catch(() => {});
+        // Small delay so the sidepanel can update, then advance
+        await new Promise<void>((r) => setTimeout(r, 300));
+        if (this._stepSeq !== seq) return;
+        this.showStep(index + 1);
         return;
       }
 
-      this.cleanupCurrentStep();
-      this.setState({ type: 'searching', step, retryCount: 0 });
-      
-      // Progressive search timing
-      this.startProgressiveSearch(step);
-      
-      this.sendMessage('GUIDE_STEP_CHANGED', {
-        stepIndex: this.currentStepIndex,
-        totalSteps: this.guide?.steps?.length || 0,
-        step
-      });
-    }
-
-    private startProgressiveSearch(step: GuideStep): void {
-      this.elementWatcher = new ElementWatcher(step);
-      
-      this.elementWatcher.on('found', (element: Element, confidence: number, method: string) => {
-        this.handleElementFound(element, confidence, method);
-      });
-      
-      this.elementWatcher.on('timeout', () => {
-        this.handleElementTimeout();
-      });
-      
-      // Start progressive search indicators
-      this.scheduleSearchProgress();
-      
-      this.elementWatcher.start();
-    }
-
-    private scheduleSearchProgress(): void {
-      // Show "searching..." indicator after 1 second
-      this.searchProgressTimer = setTimeout(() => {
-        if (this.state.type === 'searching') {
-          this.sendMessage('GUIDE_STEP_HEALTH', {
-            status: 'searching',
-            message: 'Looking for element...',
-            showScreenshot: false
-          });
-        }
-      }, 1000);
-
-      // Show screenshot fallback after 2 seconds
-      setTimeout(() => {
-        if (this.state.type === 'searching') {
-          this.sendMessage('GUIDE_STEP_HEALTH', {
-            status: 'not_found',
-            message: 'Element not found. See screenshot for reference.',
-            showScreenshot: true
-          });
-        }
-      }, 2000);
-    }
-
-    private handleElementFound(element: Element, confidence: number, method: string): void {
-      if (this.searchProgressTimer) {
-        clearTimeout(this.searchProgressTimer);
-        this.searchProgressTimer = null;
-      }
-
-      this.setState({ type: 'found', step: this.getCurrentStep()!, element, confidence });
-      this.overlayRenderer.show(element, this.getCurrentStep()!, confidence);
-      
-      // Set up action completion detection
-      this.setupActionDetection(element);
-      
-      this.sendMessage('GUIDE_STEP_HEALTH', {
-        status: 'found',
-        method,
-        confidence,
-        message: `Found via ${method} (${Math.round(confidence * 100)}% confidence)`
-      });
-    }
-
-    private handleElementTimeout(): void {
-      if (this.searchProgressTimer) {
-        clearTimeout(this.searchProgressTimer);
-        this.searchProgressTimer = null;
-      }
-
-      this.setState({ type: 'notfound', step: this.getCurrentStep()!, timeoutReached: true });
-      
-      this.sendMessage('GUIDE_STEP_HEALTH', {
-        status: 'timeout',
-        message: 'Could not find element after 10 seconds',
-        showScreenshot: true,
-        allowMarkComplete: true
-      });
-    }
-
-    private setupActionDetection(element: Element): void {
-      const step = this.getCurrentStep();
-      if (!step) return;
-
-      const actionType = step.action_type?.toLowerCase();
-      
-      if (actionType === 'click') {
-        // Listen for click on the element
-        const clickHandler = (e: Event) => {
-          if (e.target === element) {
-            element.removeEventListener('click', clickHandler);
-            setTimeout(() => this.handleActionCompleted(), 100);
-          }
-        };
-        element.addEventListener('click', clickHandler);
-      } else if (actionType === 'type' || actionType === 'input') {
-        // Listen for input events
-        const inputHandler = (e: Event) => {
-          if (e.target === element) {
-            element.removeEventListener('input', inputHandler);
-            setTimeout(() => this.handleActionCompleted(), 500);
-          }
-        };
-        element.addEventListener('input', inputHandler);
-      } else {
-        // For unknown action types, listen for any interaction
-        const interactionHandler = (e: Event) => {
-          if (e.target === element) {
-            element.removeEventListener('click', interactionHandler);
-            setTimeout(() => this.handleActionCompleted(), 100);
-          }
-        };
-        element.addEventListener('click', interactionHandler);
-      }
-
-      // Also listen for DOM mutations that might indicate completion
-      const observer = new MutationObserver(() => {
-        // Simple heuristic: if URL changes or new elements appear, action might be complete
-        setTimeout(() => this.handleActionCompleted(), 1000);
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-      
-      // Store observer for cleanup
-      (element as any).__steptObserver = observer;
-    }
-
-    private handleActionCompleted(): void {
-      this.advanceToNextStep();
-    }
-
-    private advanceToNextStep(): void {
-      this.cleanupCurrentStep();
-      this.currentStepIndex++;
-      
-      if (this.currentStepIndex < (this.guide?.steps?.length || 0)) {
-        this.executeStep(this.currentStepIndex);
-      } else {
-        this.setState({ type: 'completed' });
-        this.sendMessage('GUIDE_STEP_CHANGED', { completed: true });
-      }
-    }
-
-    private cleanupCurrentStep(): void {
-      if (this.elementWatcher) {
-        this.elementWatcher.stop();
-        this.elementWatcher = null;
-      }
-      
-      if (this.searchProgressTimer) {
-        clearTimeout(this.searchProgressTimer);
-        this.searchProgressTimer = null;
-      }
-      
-      this.overlayRenderer.hide();
-      
-      // Clean up any mutation observers
-      document.querySelectorAll('*').forEach(el => {
-        if ((el as any).__steptObserver) {
-          (el as any).__steptObserver.disconnect();
-          delete (el as any).__steptObserver;
-        }
-      });
-    }
-
-    private cleanup(): void {
-      this.cleanupCurrentStep();
-      
-      if (this.urlWatcher) {
-        this.urlWatcher.stop();
-        this.urlWatcher = null;
-      }
-      
-      this.overlayRenderer.hide();
-    }
-
-    private sendMessage(type: string, data: any): void {
-      try {
-        chrome.runtime.sendMessage({ type, data });
-      } catch (e) {
-        console.warn('Failed to send message to sidepanel:', e);
-      }
-    }
-  }
-
-  // ═══ MESSAGE HANDLER ═══
-  // Chrome extension messaging
-
-  class MessageHandler {
-    private guideRunner: GuideRunner;
-
-    constructor(guideRunner: GuideRunner) {
-      this.guideRunner = guideRunner;
-      this.bindMessages();
-    }
-
-    private bindMessages(): void {
-      chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
-    }
-
-    private handleMessage(
-      message: any,
-      sender: chrome.runtime.MessageSender,
-      sendResponse: (response?: any) => void
-    ): boolean {
-      try {
-        switch (message.type) {
-          case 'START_GUIDE':
-            this.handleStartGuide(message.data, sendResponse);
-            return true;
-
-          case 'STOP_GUIDE':
-            this.handleStopGuide(sendResponse);
-            return true;
-
-          case 'GUIDE_GOTO':
-            this.handleGotoStep(message.data, sendResponse);
-            return true;
-
-          case 'SKIP_STEP':
-            this.handleSkipStep(sendResponse);
-            return true;
-
-          case 'MARK_COMPLETE':
-            this.handleMarkComplete(sendResponse);
-            return true;
-
-          case 'GET_STATUS':
-            this.handleGetStatus(sendResponse);
-            return true;
-
-          default:
-            return false;
-        }
-      } catch (error) {
-        console.error('Message handler error:', error);
-        sendResponse({ error: error.message });
-        return true;
-      }
-    }
-
-    private handleStartGuide(data: { guide: Guide; startIndex?: number }, sendResponse: (response?: any) => void): void {
-      if (!data.guide || !data.guide.steps || data.guide.steps.length === 0) {
-        sendResponse({ error: 'Invalid guide data' });
+      // Hover steps can't be guided — treat as roadblock
+      const isHoverStep = actionType.includes('hover') || actionType.includes('mouseover');
+      if (isHoverStep) {
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: index,
+          totalSteps: this.steps.length,
+          stepStatus: 'roadblock',
+        }).catch(() => {});
+        this._renderRoadblock(step);
         return;
       }
 
-      this.guideRunner.startGuide(data.guide, data.startIndex || 0);
-      sendResponse({ success: true });
+      // Check URL mismatch
+      let urlMismatch = false;
+      if (step.expected_url) {
+        try {
+          const expected = new URL(step.expected_url);
+          const current = new URL(window.location.href);
+          urlMismatch = expected.pathname !== current.pathname;
+        } catch {}
+      }
+
+      // Notify sidepanel we're searching
+      chrome.runtime.sendMessage({
+        type: 'GUIDE_STEP_CHANGED',
+        currentIndex: index,
+        totalSteps: this.steps.length,
+        stepStatus: 'active',
+      }).catch(() => {});
+
+      // Continuous polling for element (like Tango's 100ms Automatix pattern).
+      // Instead of 5 retries with long waits, poll every 100ms and show
+      // roadblock only after 30 ticks (3s). Element positions update in real-time.
+      this._startElementPolling(step, seq, urlMismatch);
     }
 
-    private handleStopGuide(sendResponse: (response?: any) => void): void {
-      this.guideRunner.stopGuide();
-      sendResponse({ success: true });
+    _scrollToElement(result: FindResult): void {
+      // Use adjusted rect (accounts for iframe offset) to check visibility
+      const rect = this._getAdjustedRect(result);
+      const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
+        && rect.left >= 0 && rect.right <= window.innerWidth;
+      if (!inView) {
+        result.element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
     }
 
-    private handleGotoStep(data: { stepIndex: number }, sendResponse: (response?: any) => void): void {
-      // Restart guide at specific step
-      const currentGuide = (this.guideRunner as any).guide;
-      if (currentGuide) {
-        this.guideRunner.startGuide(currentGuide, data.stepIndex);
+    // Get the element rect in top-frame coordinates (accounting for iframe offset + zoom)
+    _getAdjustedRect(result: FindResult): AdjustedRect {
+      const raw = result.element.getBoundingClientRect();
+      const offset = result.iframeOffset || { x: 0, y: 0 };
+      const zoom = getPageZoom();
+      return {
+        left: (raw.left + offset.x) * zoom,
+        top: (raw.top + offset.y) * zoom,
+        right: (raw.right + offset.x) * zoom,
+        bottom: (raw.bottom + offset.y) * zoom,
+        width: raw.width * zoom,
+        height: raw.height * zoom,
+      };
+    }
+
+    _renderOverlay(step: GuideStep, result: FindResult, urlMismatch: boolean, obstructor: Element | null): void {
+      const rect = this._getAdjustedRect(result);
+      const pad = 6;
+
+      // Create or update backdrop with cutout (in-place)
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+      this._updateCutout(this._overlay!, rect, pad);
+
+      // Create or update highlight ring (in-place)
+      if (!this._highlight) {
+        this._highlight = document.createElement("div");
+        this._highlight.className = "guide-highlight";
+        this.shadow!.appendChild(this._highlight);
+      }
+      this._highlight.style.display = "";
+      this._highlight.style.left = `${rect.left - pad}px`;
+      this._highlight.style.top = `${rect.top - pad}px`;
+      this._highlight.style.width = `${rect.width + pad * 2}px`;
+      this._highlight.style.height = `${rect.height + pad * 2}px`;
+
+      // Recreate tooltip (content changes each step)
+      if (this._tooltip) {
+        this._tooltip.remove();
+      }
+      this._tooltip = this._createTooltip(step, urlMismatch, obstructor);
+      this.shadow!.appendChild(this._tooltip);
+      this._positionTooltip(this._tooltip, rect);
+    }
+
+    _updateCutout(overlay: HTMLDivElement, rect: AdjustedRect, pad: number): void {
+      const x = rect.left - pad;
+      const y = rect.top - pad;
+      const w = rect.width + pad * 2;
+      const h = rect.height + pad * 2;
+      const r = 6;
+      // Inset clip-path: full screen with a rounded rectangle cutout
+      overlay.style.clipPath = `polygon(
+        0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y}px,
+        ${x + w}px ${y}px, ${x + w}px ${y + h}px,
+        ${x}px ${y + h}px, ${x}px 100%, 100% 100%, 100% 0%
+      )`;
+    }
+
+    _createTooltip(step: GuideStep, urlMismatch: boolean, obstructor: Element | null): HTMLDivElement {
+      const total = this.steps.length;
+      const idx = this.currentIndex;
+      const progressPct = ((idx + 1) / total) * 100;
+
+      const tooltip = document.createElement("div");
+      tooltip.className = "guide-tooltip";
+
+      let html = `<button class="guide-close-btn" data-action="close">&times;</button>`;
+
+      if (urlMismatch) {
+        html += `<div class="guide-url-warning">
+          This step expects a different page.
+          <br><button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
+        </div>`;
+      }
+
+      // Feature 3: Obstruction warning
+      if (obstructor) {
+        const obDesc = describeElement(obstructor);
+        html += `<div class="guide-obstruction-warning">
+          This element is behind another element. You may need to close a dialog or scroll.
+          <br><small>Obstructed by: &lt;${this._esc(obDesc)}&gt;</small>
+        </div>`;
+      }
+
+      // Feature 2: Determine if this is a non-click step (Type, Key, Select, Navigate)
+      const actionType = (step.action_type || '').toLowerCase();
+      const isNonClickStep = actionType.includes('type') || actionType.includes('key') || actionType.includes('select') || actionType.includes('navigate');
+
+      html += `
+        <div class="guide-tooltip-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
+        ${step.description && step.description !== step.title ? `<div class="guide-tooltip-desc">${this._esc(step.description)}</div>` : ""}
+        <div class="guide-tooltip-progress">
+          Step ${idx + 1} of ${total}
+          <div class="guide-tooltip-progress-bar">
+            <div class="guide-tooltip-progress-fill" style="width: ${progressPct}%"></div>
+          </div>
+        </div>
+        <div class="guide-tooltip-actions">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <div class="guide-spacer"></div>
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          ${isNonClickStep ? `<button class="guide-btn guide-btn-done" data-action="done">&#10003; Step Done</button>` : ""}
+          <button class="guide-btn guide-btn-primary" data-action="next">${idx === total - 1 ? "Finish" : "Next"}</button>
+        </div>
+      `;
+
+      tooltip.innerHTML = html;
+
+      // Stop ALL events on the tooltip from reaching the document.
+      // In shadow DOM, stopPropagation prevents crossing the shadow boundary,
+      // so modal "outside click" handlers on document never see these clicks.
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        tooltip.addEventListener(evt, (e: Event) => e.stopPropagation());
+      }
+
+      // Wire up action buttons
+      tooltip.addEventListener("click", (e: Event) => {
+        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
+        if (!action) return;
+        switch (action) {
+          case "next":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
+          case "back":
+            this.showStep(this.currentIndex - 1);
+            break;
+          case "done":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
+          case "skip":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
+          case "close":
+            this.stop();
+            break;
+          case "navigate": {
+            const navStep = this.steps[this.currentIndex];
+            if (navStep.expected_url) {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_NAVIGATE',
+                url: navStep.expected_url,
+                stepIndex: this.currentIndex,
+              });
+            }
+            break;
+          }
+        }
+      });
+
+      return tooltip;
+    }
+
+    _positionTooltip(tooltip: HTMLDivElement, rect: AdjustedRect): void {
+      // Determine best position: bottom, top, right, left
+      const gap = 14;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Measure tooltip (approximate, will refine after render)
+      requestAnimationFrame(() => {
+        const tr = tooltip.getBoundingClientRect();
+        const tw = tr.width || 300;
+        const th = tr.height || 200;
+
+        const spaceBelow = vh - rect.bottom;
+        const spaceAbove = rect.top;
+        const spaceRight = vw - rect.right;
+        const spaceLeft = rect.left;
+
+        let top: number, left: number;
+
+        if (spaceBelow >= th + gap) {
+          // Below
+          top = rect.bottom + gap;
+          left = Math.max(8, Math.min(rect.left, vw - tw - 8));
+        } else if (spaceAbove >= th + gap) {
+          // Above
+          top = rect.top - th - gap;
+          left = Math.max(8, Math.min(rect.left, vw - tw - 8));
+        } else if (spaceRight >= tw + gap) {
+          // Right
+          top = Math.max(8, Math.min(rect.top, vh - th - 8));
+          left = rect.right + gap;
+        } else if (spaceLeft >= tw + gap) {
+          // Left
+          top = Math.max(8, Math.min(rect.top, vh - th - 8));
+          left = rect.left - tw - gap;
+        } else {
+          // Fallback: center bottom
+          top = Math.min(rect.bottom + gap, vh - th - 8);
+          left = Math.max(8, (vw - tw) / 2);
+        }
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+      });
+    }
+
+    _renderNotFound(step: GuideStep, urlMismatch: boolean): void {
+      const idx = this.currentIndex;
+      const total = this.steps.length;
+
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+      this._overlay!.style.clipPath = "none";
+
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+
+      let notFoundHtml = `
+        <div class="guide-not-found-title">Element not found</div>
+        <div class="guide-not-found-desc">
+          Could not locate the target element for step ${idx + 1}.
+          ${urlMismatch ? "This step expects a different page." : "The page may have changed."}
+        </div>
+      `;
+
+      if (urlMismatch && step.expected_url) {
+        notFoundHtml += `<div style="margin-bottom: 12px;">
+          <button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
+        </div>`;
+      }
+
+      notFoundHtml += `
+        <div class="guide-tooltip-progress">
+          Step ${idx + 1} of ${total}
+        </div>
+        <div class="guide-tooltip-actions" style="justify-content: center;">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          <button class="guide-btn guide-btn-primary" data-action="close">Close</button>
+        </div>
+      `;
+
+      panel.innerHTML = notFoundHtml;
+
+      // Stop events from reaching document (same as tooltip)
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        panel.addEventListener(evt, (e: Event) => e.stopPropagation());
+      }
+
+      panel.addEventListener("click", (e: Event) => {
+        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
+        if (!action) return;
+        switch (action) {
+          case "back":
+            this.showStep(this.currentIndex - 1);
+            break;
+          case "skip":
+            this.showStep(this.currentIndex + 1);
+            break;
+          case "close":
+            this.stop();
+            break;
+          case "navigate": {
+            const navStep = this.steps[this.currentIndex];
+            if (navStep.expected_url) {
+              chrome.runtime.sendMessage({
+                type: 'GUIDE_NAVIGATE',
+                url: navStep.expected_url,
+                stepIndex: this.currentIndex,
+              });
+            }
+            break;
+          }
+        }
+      });
+
+      this._notFoundPanel = panel;
+      this.shadow!.appendChild(panel);
+    }
+
+    _renderRoadblock(step: GuideStep): void {
+      const idx = this.currentIndex;
+      const total = this.steps.length;
+
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+      this._overlay!.style.clipPath = "none";
+
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+
+      panel.innerHTML = `
+        <div class="guide-roadblock-icon">\u26A0</div>
+        <div class="guide-not-found-title">We hit a roadblock</div>
+        <div class="guide-not-found-desc">
+          This step involves a hover action that can't be automated.
+          Try performing the action on the screen to move forward.
+        </div>
+        <div class="guide-roadblock-step-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
+        <div class="guide-tooltip-progress">
+          Step ${idx + 1} of ${total}
+        </div>
+        <div class="guide-tooltip-actions" style="justify-content: center;">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          <button class="guide-btn guide-btn-done" data-action="done">&#10003; Mark as complete</button>
+        </div>
+      `;
+
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        panel.addEventListener(evt, (e: Event) => e.stopPropagation());
+      }
+
+      panel.addEventListener("click", (e: Event) => {
+        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
+        if (!action) return;
+        switch (action) {
+          case "back":
+            this.showStep(this.currentIndex - 1);
+            break;
+          case "skip":
+          case "done":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
+        }
+      });
+
+      this._notFoundPanel = panel;
+      this.shadow!.appendChild(panel);
+    }
+
+    _showEmpty(): void {
+      this._clearOverlay();
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+      panel.innerHTML = `
+        <div class="guide-not-found-title">No steps in this guide</div>
+        <div class="guide-not-found-desc">This guide has no steps to display.</div>
+        <button class="guide-btn guide-btn-primary" data-action="close">Close</button>
+      `;
+      panel.addEventListener("click", (e: Event) => {
+        if ((e.target as HTMLElement).closest("[data-action=close]")) this.stop();
+      });
+      this.shadow!.appendChild(panel);
+    }
+
+    _startPositionTracking(step: GuideStep, result: FindResult): void {
+      this.positionInterval = setInterval(() => {
+        if (!result.element || !result.element.isConnected) {
+          // Element removed from DOM — try to re-find
+          findGuideElement(step).then((newResult) => {
+            if (newResult) {
+              this.currentResult = newResult;
+              result = newResult;
+            }
+          });
+          return;
+        }
+
+        const rect = this._getAdjustedRect(result);
+        const pad = 6;
+
+        if (this._highlight) {
+          this._highlight.style.left = `${rect.left - pad}px`;
+          this._highlight.style.top = `${rect.top - pad}px`;
+          this._highlight.style.width = `${rect.width + pad * 2}px`;
+          this._highlight.style.height = `${rect.height + pad * 2}px`;
+        }
+        if (this._overlay) {
+          this._updateCutout(this._overlay, rect, pad);
+        }
+        if (this._tooltip) {
+          this._positionTooltip(this._tooltip, rect);
+        }
+      }, 200);
+    }
+
+    _clearPositionTracking(): void {
+      if (this.positionInterval) {
+        clearInterval(this.positionInterval);
+        this.positionInterval = null;
+      }
+    }
+
+    _setupClickAdvance(element: Element, step: GuideStep): void {
+      // For click steps: advance when user clicks the target element
+      const isClickStep = step.action_type && step.action_type.toLowerCase().includes("click");
+      if (!isClickStep) return;
+
+      const nextIndex = this.currentIndex + 1;
+      const isLinkClick = element.tagName === 'A' || !!(element as HTMLElement).closest('a');
+      const isOption = element.tagName === 'OPTION' || (element as HTMLElement).role === 'option';
+
+      const advance = (): void => {
+        this._removeClickHandler();
+        if (nextIndex >= this.steps.length) {
+          this.stop();
+          return;
+        }
+        // Notify background IMMEDIATELY so it has the right index
+        // before any page navigation destroys this context.
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: nextIndex,
+          totalSteps: this.steps.length,
+          stepStatus: 'active',
+        }).catch(() => {});
+
+        // For link/option clicks that may navigate away, don't try to show
+        // the next step locally — the page will unload and background
+        // will re-inject.
+        if (isLinkClick || isOption) return;
+
+        setTimeout(() => this.showStep(nextIndex), 400);
+      };
+
+      // Always use click event. The Tango pointerdown approach for links causes
+      // premature advancement when navigation doesn't actually happen (SPAs).
+      // For actual page navigations, the background script will handle
+      // re-injection at the correct step index.
+      const eventType = "click";
+
+      this._clickHandler = (_e: Event): void => advance();
+      element.addEventListener(eventType, this._clickHandler, { once: true });
+      this._clickElement = element;
+      this._clickEventType = eventType;
+
+      // Also listen on parent in case the exact element gets replaced (SPAs)
+      if (element.parentElement) {
+        this._parentClickHandler = (e: Event): void => {
+          if (e.target === element || element.contains(e.target as Node)) {
+            advance();
+          }
+        };
+        element.parentElement.addEventListener(eventType, this._parentClickHandler, { once: true });
+        this._clickParent = element.parentElement;
+      }
+
+      // Keyboard shortcuts for step advancement (Tango pattern):
+      // Enter on input fields, Tab, or Ctrl/Cmd+E
+      this._keyHandler = (e: KeyboardEvent): void => {
+        // Ctrl/Cmd+E: manual step advance shortcut
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          advance();
+        }
+        // NOTE: Tab and Enter removed — they caused false step advances.
+        // Tab is normal field navigation, Enter submits forms. Neither means
+        // "I completed this guide step." Users advance via clicking the target
+        // element or pressing the Next button in the tooltip.
+      };
+      document.addEventListener('keydown', this._keyHandler, { capture: true });
+    }
+
+    _removeClickHandler(): void {
+      const eventType = this._clickEventType || "click";
+      if (this._clickHandler && this._clickElement) {
+        this._clickElement.removeEventListener(eventType, this._clickHandler);
+        this._clickHandler = null;
+        this._clickElement = null;
+      }
+      if (this._parentClickHandler && this._clickParent) {
+        this._clickParent.removeEventListener(eventType, this._parentClickHandler);
+        this._parentClickHandler = null;
+        this._clickParent = null;
+      }
+      if (this._keyHandler) {
+        document.removeEventListener('keydown', this._keyHandler, { capture: true });
+        this._keyHandler = null;
+      }
+      this._clickEventType = null;
+    }
+
+    // Feature 5: Completion detection via MutationObserver and event listeners
+    _setupCompletionDetection(element: Element, step: GuideStep): void {
+      const actionType = (step.action_type || '').toLowerCase();
+      const advance = (): void => {
+        this._disconnectCompletionObserver();
+        if (this.currentIndex >= this.steps.length - 1) {
+          this.stop();
+        } else {
+          this.showStep(this.currentIndex + 1);
+        }
+      };
+
+      if (actionType.includes('type')) {
+        // Watch for value changes on input/textarea via input, change, and paste
+        const onInput = (): void => {
+          if (this._tooltip) {
+            const indicator = this._tooltip.querySelector('.guide-completion-indicator');
+            if (!indicator) {
+              const div = document.createElement('div');
+              div.className = 'guide-completion-indicator';
+              div.style.cssText = 'color:#059669;font-size:12px;margin-top:6px;';
+              div.textContent = 'Step completed \u2713';
+              this._tooltip.appendChild(div);
+            }
+          }
+          if (this._completionTimeout) clearTimeout(this._completionTimeout);
+          this._completionTimeout = setTimeout(advance, 1500);
+        };
+        const ac = new AbortController();
+        const opts: AddEventListenerOptions & { signal: AbortSignal } = { capture: true, signal: ac.signal };
+        element.addEventListener('input', onInput, opts);
+        element.addEventListener('change', onInput, opts);
+        element.addEventListener('paste', onInput, opts);
+        // Also listen on document for events that bubble (covers iframes)
+        document.addEventListener('input', (e: Event) => {
+          if (e.target === element || element.contains(e.target as Node)) onInput();
+        }, opts);
+        this._completionCleanup = (): void => ac.abort();
+      } else if (actionType.includes('click')) {
+        // Click advancement is handled by _setupClickAdvance — do NOT add a
+        // MutationObserver here. The previous implementation watched for element
+        // removal from DOM which caused double-advance (step jumping) because
+        // both the click handler AND the mutation observer would fire advance().
+        // SPA re-renders also falsely triggered this when the parent subtree
+        // was replaced, causing random step skips.
+      } else if (actionType.includes('select')) {
+        const onChange = (): void => {
+          setTimeout(advance, 500);
+        };
+        element.addEventListener('change', onChange, { once: true });
+        this._completionCleanup = (): void => element.removeEventListener('change', onChange);
+      }
+      // Navigate steps are auto-skipped — no detection needed
+    }
+
+    _disconnectCompletionObserver(): void {
+      if (this._completionObserver) {
+        this._completionObserver.disconnect();
+        this._completionObserver = null;
+      }
+      if (this._completionCleanup) {
+        this._completionCleanup();
+        this._completionCleanup = null;
+      }
+      if (this._completionTimeout) {
+        clearTimeout(this._completionTimeout);
+        this._completionTimeout = null;
+      }
+    }
+
+    // Feature 8: Intermediate action hint (element hidden behind collapsed ancestor)
+    _renderIntermediateHint(step: GuideStep, ancestor: HTMLElement, urlMismatch: boolean): void {
+      const idx = this.currentIndex;
+      const total = this.steps.length;
+
+      // Show backdrop without cutout
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow!.appendChild(this._backdrop);
+      }
+
+      // Try to highlight the ancestor if it's visible
+      const ancestorRect = ancestor.getBoundingClientRect();
+      if (ancestorRect.width > 0 && ancestorRect.height > 0) {
+        const zoom = getPageZoom();
+        const rect: AdjustedRect = {
+          left: ancestorRect.left * zoom, top: ancestorRect.top * zoom,
+          right: ancestorRect.right * zoom, bottom: ancestorRect.bottom * zoom,
+          width: ancestorRect.width * zoom, height: ancestorRect.height * zoom,
+        };
+        const pad = 6;
+        this._updateCutout(this._overlay!, rect, pad);
+        if (!this._highlight) {
+          this._highlight = document.createElement("div");
+          this._highlight.className = "guide-highlight";
+          this.shadow!.appendChild(this._highlight);
+        }
+        this._highlight.style.display = "";
+        this._highlight.style.borderColor = "#6366F1";
+        this._highlight.style.boxShadow = "0 0 0 4px rgba(99, 102, 241, 0.25)";
+        this._highlight.style.left = `${rect.left - pad}px`;
+        this._highlight.style.top = `${rect.top - pad}px`;
+        this._highlight.style.width = `${rect.width + pad * 2}px`;
+        this._highlight.style.height = `${rect.height + pad * 2}px`;
+      } else {
+        this._overlay!.style.clipPath = "none";
+      }
+
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+
+      const ancestorDesc = describeElement(ancestor);
+      panel.innerHTML = `
+        <div class="guide-intermediate-hint">
+          First, open <strong>${this._esc(ancestorDesc)}</strong> to reveal the target element.
+        </div>
+        <div class="guide-not-found-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
+        <div class="guide-tooltip-progress">Step ${idx + 1} of ${total}</div>
+        <div class="guide-tooltip-actions" style="justify-content: center;">
+          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
+          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
+          <button class="guide-btn guide-btn-primary" data-action="retry">Check again</button>
+        </div>
+      `;
+
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        panel.addEventListener(evt, (e: Event) => e.stopPropagation());
+      }
+
+      panel.addEventListener("click", (e: Event) => {
+        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
+        if (!action) return;
+        switch (action) {
+          case "retry":
+            this.showStep(this.currentIndex);
+            break;
+          case "back":
+            this.showStep(this.currentIndex - 1);
+            break;
+          case "skip":
+            if (this.currentIndex >= this.steps.length - 1) {
+              this.stop();
+            } else {
+              this.showStep(this.currentIndex + 1);
+            }
+            break;
+        }
+      });
+
+      this._intermediatePanel = panel;
+      this.shadow!.appendChild(panel);
+    }
+
+    _esc(text: string): string {
+      if (!text) return "";
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  }
+
+  // ── Active Runner Singleton ───────────────────────────────────────
+
+  let activeRunner: GuideRunner | null = null;
+  _window.__steptGuideRunner = null;
+
+  // ── Message Handling ──────────────────────────────────────────────
+
+  chrome.runtime.onMessage.addListener((message: { type: string; guide: Guide; startIndex?: number; stepIndex?: number }, _sender: MessageSender, sendResponse: SendResponse) => {
+    if (message.type === "START_GUIDE") {
+      try {
+        if (activeRunner) {
+          activeRunner._replacing = true; // don't send GUIDE_STOPPED
+          activeRunner.stop();
+        }
+        const runner = new GuideRunner(message.guide);
+        activeRunner = runner;
+        _window.__steptGuideRunner = runner;
+        if (typeof message.startIndex === "number" && message.startIndex > 0) {
+          runner.start().then(() => runner.showStep(message.startIndex!));
+        } else {
+          runner.start();
+        }
+        sendResponse({ success: true });
+      } catch (e: unknown) {
+        sendResponse({ success: false, error: (e as Error).message });
+      }
+    } else if (message.type === "GUIDE_GOTO") {
+      // Lightweight step jump — don't restart the runner
+      if (activeRunner && typeof message.stepIndex === "number") {
+        activeRunner.showStep(message.stepIndex);
         sendResponse({ success: true });
       } else {
-        sendResponse({ error: 'No active guide' });
+        sendResponse({ success: false });
       }
-    }
-
-    private handleSkipStep(sendResponse: (response?: any) => void): void {
-      this.guideRunner.skipStep();
+    } else if (message.type === "STOP_GUIDE") {
+      if (activeRunner) activeRunner.stop();
       sendResponse({ success: true });
     }
-
-    private handleMarkComplete(sendResponse: (response?: any) => void): void {
-      this.guideRunner.markComplete();
-      sendResponse({ success: true });
-    }
-
-    private handleGetStatus(sendResponse: (response?: any) => void): void {
-      const state = this.guideRunner.getCurrentState();
-      const currentStep = this.guideRunner.getCurrentStep();
-      sendResponse({
-        state,
-        currentStep,
-        stepIndex: (this.guideRunner as any).currentStepIndex,
-        totalSteps: ((this.guideRunner as any).guide?.steps?.length) || 0
-      });
-    }
-  }
-
-  // ═══ INITIALIZATION ═══
-
-  if (!_window.__steptGuideLoaded) {
-    _window.__steptGuideLoaded = true;
-    
-    const guideRunner = new GuideRunner();
-    const messageHandler = new MessageHandler(guideRunner);
-    
-    _window.__steptGuideRunner = guideRunner;
-    _window.__steptGuideRuntime = GuideRunner;
-    
-    console.log('Stept Guide Runtime initialized (v2.0 - hybrid architecture)');
-  }
-
+    return false;
+  });
 })();
