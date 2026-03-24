@@ -699,6 +699,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'GUIDE_URL_CHANGED': {
+        // Handle URL changes during guide execution
+        if (activeGuideState && sender.tab?.id === activeGuideState.tabId) {
+          debugLog('Guide URL changed:', {
+            fromStep: message.fromStep,
+            toStep: message.toStep,
+            oldUrl: message.oldUrl,
+            newUrl: message.newUrl,
+          });
+          
+          // Update the current step index if auto-advancing
+          if (message.toStep !== undefined && message.toStep !== message.fromStep) {
+            setActiveGuideState({
+              ...activeGuideState,
+              currentIndex: message.toStep,
+              stepStatus: 'navigating',
+            });
+            
+            // Persist the new step index
+            try {
+              await chrome.storage.session.set({
+                guideProgress: {
+                  guide: activeGuideState.guide,
+                  currentIndex: message.toStep,
+                  tabId: activeGuideState.tabId,
+                },
+              });
+            } catch (e) {
+              debugLog('Failed to persist guide progress:', e);
+            }
+          }
+          
+          notifyGuideStateUpdate();
+        }
+        sendResponse({ success: true });
+        break;
+      }
+
       case 'GUIDE_STOPPED': {
         // Staleness detection: flush health batch to backend (fire-and-forget)
         if (healthBatch.length > 0) {

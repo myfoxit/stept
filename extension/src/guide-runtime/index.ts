@@ -813,6 +813,56 @@
     }
   `;
 
+  // ── URL Watcher for Multi-Page Handling ─────────────────────────
+
+  class URLWatcher {
+    private _interval: ReturnType<typeof setInterval> | null = null;
+    private _lastUrl: string;
+    private _onUrlChange: (newUrl: string, oldUrl: string) => void;
+
+    constructor(onUrlChange: (newUrl: string, oldUrl: string) => void) {
+      this._lastUrl = window.location.href;
+      this._onUrlChange = onUrlChange;
+    }
+
+    start(): void {
+      this.stop(); // Ensure no duplicate intervals
+      
+      // Listen for browser navigation events
+      window.addEventListener('popstate', this._handleUrlChange);
+      window.addEventListener('hashchange', this._handleUrlChange);
+      
+      // Poll for URL changes (for SPA navigation that doesn't trigger events)
+      this._interval = setInterval(() => {
+        this._checkUrlChange();
+      }, 500);
+    }
+
+    stop(): void {
+      if (this._interval) {
+        clearInterval(this._interval);
+        this._interval = null;
+      }
+      
+      window.removeEventListener('popstate', this._handleUrlChange);
+      window.removeEventListener('hashchange', this._handleUrlChange);
+    }
+
+    private _handleUrlChange = (): void => {
+      // Small delay to ensure the page has processed the navigation
+      setTimeout(() => this._checkUrlChange(), 100);
+    };
+
+    private _checkUrlChange(): void {
+      const currentUrl = window.location.href;
+      if (currentUrl !== this._lastUrl) {
+        const oldUrl = this._lastUrl;
+        this._lastUrl = currentUrl;
+        this._onUrlChange(currentUrl, oldUrl);
+      }
+    }
+  }
+
   // ── Guide Runner ──────────────────────────────────────────────────
 
   class GuideRunner {
@@ -845,6 +895,9 @@
     _completionObserver: MutationObserver | null;
     _completionCleanup: (() => void) | null;
     _completionTimeout: ReturnType<typeof setTimeout> | null;
+    // Multi-page handling
+    _urlWatcher: URLWatcher | null;
+    _lastKnownUrl: string;
 
     constructor(guide: Guide) {
       this.guide = guide;
@@ -876,10 +929,20 @@
       this._completionObserver = null;
       this._completionCleanup = null;
       this._completionTimeout = null;
+      // Multi-page handling
+      this._urlWatcher = null;
+      this._lastKnownUrl = window.location.href;
     }
 
     async start(): Promise<void> {
       this._createHost();
+      
+      // Start URL watching for multi-page handling
+      this._urlWatcher = new URLWatcher((newUrl: string, oldUrl: string) => {
+        this._handleUrlChange(newUrl, oldUrl);
+      });
+      this._urlWatcher.start();
+      
       if (this.steps.length === 0) {
         this._showEmpty();
         return;
@@ -899,6 +962,10 @@
       if (this._zoomObserver) {
         this._zoomObserver.disconnect();
         this._zoomObserver = null;
+      }
+      if (this._urlWatcher) {
+        this._urlWatcher.stop();
+        this._urlWatcher = null;
       }
       if (this.host) {
         this.host.remove();
@@ -1355,6 +1422,129 @@
       
       // Show enhanced not-found panel with recovery info
       this._renderNotFound(step, urlMismatch);
+    }
+
+    _handleUrlChange(newUrl: string, oldUrl: string): void {
+      console.log('URL changed from', oldUrl, 'to', newUrl);
+      
+      // Update tracking
+      this._lastKnownUrl = newUrl;
+      
+      // Check if any step expects this URL
+      const matchingStepIndex = this._findStepForUrl(newUrl);
+      
+      if (matchingStepIndex !== -1 && matchingStepIndex !== this.currentIndex) {
+        // Auto-advance to the matching step
+        console.log(`Auto-advancing to step ${matchingStepIndex} for URL: ${newUrl}`);
+        
+        // Report the URL navigation
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_URL_CHANGED',
+          oldUrl,
+          newUrl,
+          fromStep: this.currentIndex,
+          toStep: matchingStepIndex
+        }).catch(() => {});
+        
+        this.showStep(matchingStepIndex);
+      } else if (matchingStepIndex === -1) {
+        // No step matches this URL - pause the guide
+        console.log(`No step matches URL ${newUrl}, pausing guide`);
+        
+        this._clearOverlay();
+        this._showUrlMismatchPanel(newUrl);
+        
+        chrome.runtime.sendMessage({
+          type: 'GUIDE_STEP_CHANGED',
+          currentIndex: this.currentIndex,
+          totalSteps: this.steps.length,
+          stepStatus: 'url-mismatch',
+          actualUrl: newUrl
+        }).catch(() => {});
+      }
+      // If matchingStepIndex === this.currentIndex, we're already on the right step
+    }
+
+    _findStepForUrl(url: string): number {
+      // Find the step that expects this URL
+      for (let i = 0; i < this.steps.length; i++) {
+        const step = this.steps[i];
+        if (this._urlMatches(url, step.expected_url || step.url)) {
+          return i;
+        }
+      }
+      return -1; // No matching step found
+    }
+
+    _urlMatches(currentUrl: string, expectedUrl?: string | null): boolean {
+      if (!expectedUrl) return true; // No URL constraint
+      
+      try {
+        const current = new URL(currentUrl);
+        const expected = new URL(expectedUrl);
+        
+        // Match protocol, host, and pathname
+        return (
+          current.protocol === expected.protocol &&
+          current.host === expected.host &&
+          current.pathname === expected.pathname
+        );
+        // Note: We don't match search params or hash to be more flexible
+      } catch (e) {
+        // Fallback to simple string comparison if URL parsing fails
+        return currentUrl.includes(expectedUrl);
+      }
+    }
+
+    _showUrlMismatchPanel(currentUrl: string): void {
+      if (!this.shadow) return;
+      
+      // Clear existing panels
+      this._clearOverlay();
+      
+      // Show backdrop
+      if (!this._backdrop) {
+        this._backdrop = document.createElement("div");
+        this._backdrop.className = "guide-backdrop";
+        this._overlay = document.createElement("div");
+        this._overlay.className = "guide-backdrop-overlay";
+        this._backdrop.appendChild(this._overlay);
+        this.shadow.appendChild(this._backdrop);
+      }
+      this._overlay!.style.clipPath = "none";
+      
+      const panel = document.createElement("div");
+      panel.className = "guide-not-found";
+      
+      panel.innerHTML = `
+        <div class="guide-not-found-title">Unexpected page</div>
+        <div class="guide-not-found-desc">
+          The guide is paused because you navigated to an unexpected page.
+          <br><br>
+          Current: ${this._esc(currentUrl.length > 60 ? currentUrl.slice(0, 60) + '...' : currentUrl)}
+        </div>
+        <div class="guide-tooltip-actions" style="justify-content: center;">
+          <button class="guide-btn guide-btn-secondary" data-action="retry">Check again</button>
+          <button class="guide-btn guide-btn-ghost" data-action="close">Close guide</button>
+        </div>
+      `;
+      
+      panel.addEventListener("click", (e: Event) => {
+        const target = e.target as HTMLElement;
+        const action = target.closest("[data-action]")?.getAttribute("data-action");
+        
+        switch (action) {
+          case "retry":
+            // Re-check current URL and try to continue
+            this._handleUrlChange(window.location.href, this._lastKnownUrl);
+            break;
+          case "close":
+            this.stop();
+            break;
+        }
+      });
+      
+      this.shadow.appendChild(panel);
     }
 
     async showStep(index: number): Promise<void> {
