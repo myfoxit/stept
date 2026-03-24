@@ -867,6 +867,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'GUIDE_RECOVER_ELEMENT': {
+        try {
+          const API_BASE_URL = await getApiBaseUrl();
+          const baseOrigin = new URL(API_BASE_URL).origin;
+          const resp = await authedFetch(`${baseOrigin}/api/v1/guide/recover-element`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target: message.target,
+              page_elements: message.pageElements,
+              workflow_id: message.workflowId,
+              step_index: message.stepIndex,
+            }),
+          });
+          if (resp.ok) {
+            sendResponse(await resp.json());
+          } else {
+            sendResponse({ error: `Recovery API failed: ${resp.status}` });
+          }
+        } catch (e: any) {
+          debugLog('GUIDE_RECOVER_ELEMENT error:', e.message);
+          sendResponse({ error: e.message });
+        }
+        break;
+      }
+
       default:
         sendResponse({ error: 'Unknown message type' });
     }

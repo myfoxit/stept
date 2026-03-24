@@ -566,51 +566,32 @@
       all: initial;
       font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 14px;
-      color: #E7E5E4;
-    }
-
-    .guide-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 2147483640;
-      pointer-events: none;
-    }
-
-    .guide-backdrop-overlay {
-      position: fixed;
-      inset: 0;
-      background: transparent;
-      transition: clip-path 0.3s ease;
-      pointer-events: none;
+      color: #1A1A1A;
     }
 
     .guide-highlight {
       position: fixed;
       z-index: 2147483641;
-      border: 2px dashed #3AB08A;
+      border: 2px solid #FF6B52;
       border-radius: 6px;
-      box-shadow: none;
+      box-shadow: 0 0 0 4px rgba(255, 107, 82, 0.15);
       pointer-events: none;
       transition: all 0.3s ease;
-    }
-
-    @keyframes guide-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
     }
 
     .guide-tooltip {
       position: fixed;
       z-index: 2147483642;
-      background: #1C1917;
-      border: 1px solid #292524;
-      border-radius: 12px;
+      background: #FFFFFF;
+      border: 1px solid #E5E5E5;
+      border-radius: 14px;
       padding: 16px;
-      max-width: 320px;
+      max-width: 300px;
       min-width: 240px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
       pointer-events: auto;
       animation: guide-tooltip-in 0.25s ease-out;
+      color: #1A1A1A;
     }
 
     @keyframes guide-tooltip-in {
@@ -621,27 +602,27 @@
     .guide-tooltip-title {
       font-size: 15px;
       font-weight: 600;
-      color: #FAFAF9;
+      color: #1A1A1A;
       margin: 0 0 6px 0;
       line-height: 1.3;
     }
 
     .guide-tooltip-desc {
       font-size: 13px;
-      color: #A8A29E;
+      color: #666666;
       margin: 0 0 14px 0;
       line-height: 1.5;
     }
 
     .guide-tooltip-progress {
       font-size: 11px;
-      color: #78716C;
+      color: #999999;
       margin-bottom: 12px;
     }
 
     .guide-tooltip-progress-bar {
       height: 3px;
-      background: #292524;
+      background: #F0F0F0;
       border-radius: 2px;
       margin-top: 6px;
       overflow: hidden;
@@ -649,7 +630,7 @@
 
     .guide-tooltip-progress-fill {
       height: 100%;
-      background: #3AB08A;
+      background: #FF6B52;
       border-radius: 2px;
       transition: width 0.3s ease;
     }
@@ -676,22 +657,23 @@
     .guide-btn:active { transform: scale(0.97); }
 
     .guide-btn-primary {
-      background: #3AB08A;
+      background: #FF6B52;
       color: #fff;
     }
 
     .guide-btn-secondary {
-      background: #292524;
-      color: #D6D3D1;
+      background: #F5F5F5;
+      color: #333;
+      border: 1px solid #E0E0E0;
     }
 
     .guide-btn-ghost {
       background: transparent;
-      color: #78716C;
+      color: #999;
       padding: 8px 8px;
     }
 
-    .guide-btn-ghost:hover { color: #D6D3D1; }
+    .guide-btn-ghost:hover { color: #666; }
 
     .guide-spacer { flex: 1; }
 
@@ -701,7 +683,7 @@
       right: 8px;
       background: none;
       border: none;
-      color: #78716C;
+      color: #CCCCCC;
       cursor: pointer;
       padding: 4px;
       line-height: 1;
@@ -709,43 +691,43 @@
       border-radius: 4px;
     }
 
-    .guide-close-btn:hover { color: #D6D3D1; background: #292524; }
+    .guide-close-btn:hover { color: #666; background: #F5F5F5; }
 
     .guide-btn-done {
-      background: #059669;
+      background: #10B981;
       color: #fff;
     }
 
     .guide-obstruction-warning {
-      background: #451A03;
-      border: 1px solid #92400E;
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
       border-radius: 8px;
       padding: 10px 12px;
       margin-bottom: 12px;
       font-size: 12px;
-      color: #FDE68A;
+      color: #92400E;
       line-height: 1.4;
     }
 
     .guide-intermediate-hint {
-      background: #1E1B4B;
-      border: 1px solid #3730A3;
+      background: #EEF2FF;
+      border: 1px solid #C7D2FE;
       border-radius: 8px;
       padding: 10px 12px;
       margin-bottom: 12px;
       font-size: 12px;
-      color: #C7D2FE;
+      color: #4338CA;
       line-height: 1.4;
     }
 
     .guide-url-warning {
-      background: #451A03;
-      border: 1px solid #78350F;
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
       border-radius: 8px;
       padding: 10px 12px;
       margin-bottom: 12px;
       font-size: 12px;
-      color: #FDE68A;
+      color: #92400E;
       line-height: 1.4;
     }
 
@@ -753,9 +735,9 @@
       display: inline-block;
       margin-top: 8px;
       padding: 6px 12px;
-      background: #78350F;
-      color: #FDE68A;
-      border: 1px solid #92400E;
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FDE68A;
       border-radius: 6px;
       font-size: 12px;
       font-weight: 500;
@@ -765,13 +747,13 @@
     }
 
     .guide-navigate-btn:hover {
-      background: #92400E;
+      background: #FDE68A;
     }
 
     .guide-not-found {
-      background: #1C1917;
-      border: 1px solid #292524;
-      border-radius: 12px;
+      background: #FFFFFF;
+      border: 1px solid #E5E5E5;
+      border-radius: 14px;
       padding: 20px;
       position: fixed;
       top: 50%;
@@ -781,34 +763,35 @@
       text-align: center;
       max-width: 300px;
       pointer-events: auto;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
       animation: guide-tooltip-in 0.25s ease-out;
     }
 
     .guide-not-found-title {
       font-size: 15px;
       font-weight: 600;
-      color: #FAFAF9;
+      color: #1A1A1A;
       margin-bottom: 8px;
     }
 
     .guide-not-found-desc {
       font-size: 13px;
-      color: #A8A29E;
+      color: #666666;
       margin-bottom: 14px;
     }
 
     .guide-roadblock-icon {
-      font-size: 28px;
+      font-size: 24px;
       margin-bottom: 8px;
     }
 
     .guide-roadblock-step-title {
       font-size: 13px;
       font-weight: 500;
-      color: #D6D3D1;
+      color: #333;
       margin-bottom: 10px;
       padding: 8px 12px;
-      background: #292524;
+      background: #F5F5F5;
       border-radius: 6px;
     }
   `;
@@ -876,8 +859,6 @@
     _clickHandler: ((e: Event) => void) | null;
     _stepSeq: number;
     // Persistent overlay elements for in-place updates
-    _backdrop: HTMLDivElement | null;
-    _overlay: HTMLDivElement | null;
     _highlight: HTMLDivElement | null;
     _tooltip: HTMLDivElement | null;
     _notFoundPanel: HTMLDivElement | null;
@@ -895,6 +876,8 @@
     _completionObserver: MutationObserver | null;
     _completionCleanup: (() => void) | null;
     _completionTimeout: ReturnType<typeof setTimeout> | null;
+    // Position tracking via rAF
+    _positionFrame: number | null;
     // Multi-page handling
     _urlWatcher: URLWatcher | null;
     _lastKnownUrl: string;
@@ -910,8 +893,6 @@
       this._clickHandler = null;
       this._stepSeq = 0; // concurrency guard: increments on each showStep call
       // Persistent overlay elements for in-place updates
-      this._backdrop = null;
-      this._overlay = null;
       this._highlight = null;
       this._tooltip = null;
       this._notFoundPanel = null;
@@ -929,6 +910,8 @@
       this._completionObserver = null;
       this._completionCleanup = null;
       this._completionTimeout = null;
+      // Position tracking via rAF
+      this._positionFrame = null;
       // Multi-page handling
       this._urlWatcher = null;
       this._lastKnownUrl = window.location.href;
@@ -963,6 +946,10 @@
         this._zoomObserver.disconnect();
         this._zoomObserver = null;
       }
+      if (this._positionFrame) {
+        cancelAnimationFrame(this._positionFrame);
+        this._positionFrame = null;
+      }
       if (this._urlWatcher) {
         this._urlWatcher.stop();
         this._urlWatcher = null;
@@ -972,8 +959,6 @@
         this.host = null;
         this.shadow = null;
       }
-      this._backdrop = null;
-      this._overlay = null;
       this._highlight = null;
       this._tooltip = null;
       this._notFoundPanel = null;
@@ -1025,7 +1010,6 @@
       // Remove all overlay elements to prevent artifacts across navigations
       if (this._highlight) { this._highlight.remove(); this._highlight = null; }
       if (this._tooltip) { this._tooltip.remove(); this._tooltip = null; }
-      if (this._backdrop) { this._backdrop.remove(); this._backdrop = null; this._overlay = null; }
       if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
       if (this._intermediatePanel) { this._intermediatePanel.remove(); this._intermediatePanel = null; }
     }
@@ -1054,9 +1038,10 @@
         // Style it as a small pill at the top
         searchHint.style.cssText = `
           position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #1C1917; color: #A8A29E;
+          z-index: 2147483642; background: #FFFFFF; color: #999;
           padding: 6px 16px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #292524; pointer-events: none;
+          border: 1px solid #E5E5E5; pointer-events: none;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           animation: guide-tooltip-in 0.2s ease-out;
           font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         `;
@@ -1127,8 +1112,7 @@
             }).catch(() => {});
 
             const obstructor = isObstructed(result.element);
-            this._scrollToElement(result);
-            await new Promise<void>((r) => setTimeout(r, 80));
+            await this._scrollToElement(result);
             if (this._stepSeq !== seq) return;
             this._renderOverlay(step, result, urlMismatch, obstructor);
             this._startPositionTracking(step, result);
@@ -1165,9 +1149,10 @@
         recoveryHint.textContent = '🔄 AI is looking...';
         recoveryHint.style.cssText = `
           position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #1C1917; color: #3AB08A;
+          z-index: 2147483642; background: #FFFFFF; color: #FF6B52;
           padding: 8px 18px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #292524; pointer-events: none;
+          border: 1px solid #E5E5E5; pointer-events: none;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           animation: guide-tooltip-in 0.2s ease-out;
           font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         `;
@@ -1336,25 +1321,28 @@
     }
 
     async _callRecoveryApi(targetInfo: any, pageElements: any[]): Promise<any> {
-      const response = await fetch('/api/v1/guide/recover-element', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // TODO: Add auth headers if needed
-        },
-        body: JSON.stringify({
-          target: targetInfo,
-          page_elements: pageElements,
-          workflow_id: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
-          step_index: this.currentIndex
-        })
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          {
+            type: 'GUIDE_RECOVER_ELEMENT',
+            target: targetInfo,
+            pageElements: pageElements,
+            workflowId: this.guide.workflow_id || this.guide.workflowId || this.guide.id,
+            stepIndex: this.currentIndex,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            if (!response || response.error) {
+              reject(new Error(response?.error || 'Recovery API failed'));
+              return;
+            }
+            resolve(response);
+          }
+        );
       });
-      
-      if (!response.ok) {
-        throw new Error(`Recovery API failed: ${response.status}`);
-      }
-      
-      return await response.json();
     }
 
     _findDomElementByInfo(elementInfo: any): Element | null {
@@ -1501,18 +1489,7 @@
       
       // Clear existing panels
       this._clearOverlay();
-      
-      // Show backdrop
-      if (!this._backdrop) {
-        this._backdrop = document.createElement("div");
-        this._backdrop.className = "guide-backdrop";
-        this._overlay = document.createElement("div");
-        this._overlay.className = "guide-backdrop-overlay";
-        this._backdrop.appendChild(this._overlay);
-        this.shadow.appendChild(this._backdrop);
-      }
-      this._overlay!.style.clipPath = "none";
-      
+
       const panel = document.createElement("div");
       panel.className = "guide-not-found";
       
@@ -1613,14 +1590,61 @@
       this._startElementPolling(step, seq, urlMismatch);
     }
 
-    _scrollToElement(result: FindResult): void {
-      // Use adjusted rect (accounts for iframe offset) to check visibility
-      const rect = this._getAdjustedRect(result);
-      const inView = rect.top >= 0 && rect.bottom <= window.innerHeight
-        && rect.left >= 0 && rect.right <= window.innerWidth;
-      if (!inView) {
-        result.element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-      }
+    _scrollToElement(result: FindResult): Promise<void> {
+      return new Promise<void>((resolve) => {
+        const rect = this._getAdjustedRect(result);
+
+        // Detect fixed/sticky headers
+        let headerOffset = 0;
+        const fixedEls = document.querySelectorAll('header, nav, [role="banner"], [role="navigation"]');
+        fixedEls.forEach(el => {
+          const style = window.getComputedStyle(el);
+          if (style.position === 'fixed' || style.position === 'sticky') {
+            const bottom = el.getBoundingClientRect().bottom;
+            if (bottom > 0 && bottom < window.innerHeight / 3) {
+              headerOffset = Math.max(headerOffset, bottom);
+            }
+          }
+        });
+
+        const viewportHeight = window.innerHeight;
+        const targetTop = headerOffset + 80; // 80px breathing room below headers
+        const targetBottom = viewportHeight - 120; // leave room for tooltip below
+
+        // Already well-positioned?
+        if (rect.top >= targetTop && rect.bottom <= targetBottom) {
+          resolve();
+          return;
+        }
+
+        // Calculate scroll target: place element in top-third of usable viewport
+        const usableTop = headerOffset + 80;
+        const scrollTarget = window.scrollY + rect.top - usableTop;
+
+        // Smooth scroll
+        window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+
+        // Wait for scroll to settle (check position stability over 3 rAF frames)
+        let lastY = window.scrollY;
+        let stableFrames = 0;
+        const checkSettled = () => {
+          if (Math.abs(window.scrollY - lastY) < 1) {
+            stableFrames++;
+            if (stableFrames >= 3) {
+              resolve();
+              return;
+            }
+          } else {
+            stableFrames = 0;
+          }
+          lastY = window.scrollY;
+          requestAnimationFrame(checkSettled);
+        };
+        requestAnimationFrame(checkSettled);
+
+        // Safety timeout: don't wait forever
+        setTimeout(resolve, 1000);
+      });
     }
 
     // Get the element rect in top-frame coordinates (accounting for iframe offset + zoom)
@@ -1642,18 +1666,7 @@
       const rect = this._getAdjustedRect(result);
       const pad = 6;
 
-      // Create or update backdrop with cutout (in-place)
-      if (!this._backdrop) {
-        this._backdrop = document.createElement("div");
-        this._backdrop.className = "guide-backdrop";
-        this._overlay = document.createElement("div");
-        this._overlay.className = "guide-backdrop-overlay";
-        this._backdrop.appendChild(this._overlay);
-        this.shadow!.appendChild(this._backdrop);
-      }
-      this._updateCutout(this._overlay!, rect, pad);
-
-      // Create or update highlight ring (in-place)
+      // Create or update highlight ring (in-place) — no backdrop/dimming
       if (!this._highlight) {
         this._highlight = document.createElement("div");
         this._highlight.className = "guide-highlight";
@@ -1672,20 +1685,6 @@
       this._tooltip = this._createTooltip(step, urlMismatch, obstructor);
       this.shadow!.appendChild(this._tooltip);
       this._positionTooltip(this._tooltip, rect);
-    }
-
-    _updateCutout(overlay: HTMLDivElement, rect: AdjustedRect, pad: number): void {
-      const x = rect.left - pad;
-      const y = rect.top - pad;
-      const w = rect.width + pad * 2;
-      const h = rect.height + pad * 2;
-      const r = 6;
-      // Inset clip-path: full screen with a rounded rectangle cutout
-      overlay.style.clipPath = `polygon(
-        0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y}px,
-        ${x + w}px ${y}px, ${x + w}px ${y + h}px,
-        ${x}px ${y + h}px, ${x}px 100%, 100% 100%, 100% 0%
-      )`;
     }
 
     _createTooltip(step: GuideStep, urlMismatch: boolean, obstructor: Element | null): HTMLDivElement {
@@ -1844,17 +1843,6 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
-      // Show backdrop without cutout
-      if (!this._backdrop) {
-        this._backdrop = document.createElement("div");
-        this._backdrop.className = "guide-backdrop";
-        this._overlay = document.createElement("div");
-        this._overlay.className = "guide-backdrop-overlay";
-        this._backdrop.appendChild(this._overlay);
-        this.shadow!.appendChild(this._backdrop);
-      }
-      this._overlay!.style.clipPath = "none";
-
       const panel = document.createElement("div");
       panel.className = "guide-not-found";
 
@@ -1925,17 +1913,6 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
-      // Show backdrop without cutout
-      if (!this._backdrop) {
-        this._backdrop = document.createElement("div");
-        this._backdrop.className = "guide-backdrop";
-        this._overlay = document.createElement("div");
-        this._overlay.className = "guide-backdrop-overlay";
-        this._backdrop.appendChild(this._overlay);
-        this.shadow!.appendChild(this._backdrop);
-      }
-      this._overlay!.style.clipPath = "none";
-
       const panel = document.createElement("div");
       panel.className = "guide-not-found";
 
@@ -1999,7 +1976,7 @@
     }
 
     _startPositionTracking(step: GuideStep, result: FindResult): void {
-      this.positionInterval = setInterval(() => {
+      const update = () => {
         if (!result.element || !result.element.isConnected) {
           // Element removed from DOM — try to re-find
           findGuideElement(step).then((newResult) => {
@@ -2008,6 +1985,7 @@
               result = newResult;
             }
           });
+          this._positionFrame = requestAnimationFrame(update);
           return;
         }
 
@@ -2020,19 +1998,22 @@
           this._highlight.style.width = `${rect.width + pad * 2}px`;
           this._highlight.style.height = `${rect.height + pad * 2}px`;
         }
-        if (this._overlay) {
-          this._updateCutout(this._overlay, rect, pad);
-        }
         if (this._tooltip) {
           this._positionTooltip(this._tooltip, rect);
         }
-      }, 200);
+        this._positionFrame = requestAnimationFrame(update);
+      };
+      this._positionFrame = requestAnimationFrame(update);
     }
 
     _clearPositionTracking(): void {
       if (this.positionInterval) {
         clearInterval(this.positionInterval);
         this.positionInterval = null;
+      }
+      if (this._positionFrame) {
+        cancelAnimationFrame(this._positionFrame);
+        this._positionFrame = null;
       }
     }
 
@@ -2201,16 +2182,6 @@
       const idx = this.currentIndex;
       const total = this.steps.length;
 
-      // Show backdrop without cutout
-      if (!this._backdrop) {
-        this._backdrop = document.createElement("div");
-        this._backdrop.className = "guide-backdrop";
-        this._overlay = document.createElement("div");
-        this._overlay.className = "guide-backdrop-overlay";
-        this._backdrop.appendChild(this._overlay);
-        this.shadow!.appendChild(this._backdrop);
-      }
-
       // Try to highlight the ancestor if it's visible
       const ancestorRect = ancestor.getBoundingClientRect();
       if (ancestorRect.width > 0 && ancestorRect.height > 0) {
@@ -2221,7 +2192,6 @@
           width: ancestorRect.width * zoom, height: ancestorRect.height * zoom,
         };
         const pad = 6;
-        this._updateCutout(this._overlay!, rect, pad);
         if (!this._highlight) {
           this._highlight = document.createElement("div");
           this._highlight.className = "guide-highlight";
@@ -2234,8 +2204,6 @@
         this._highlight.style.top = `${rect.top - pad}px`;
         this._highlight.style.width = `${rect.width + pad * 2}px`;
         this._highlight.style.height = `${rect.height + pad * 2}px`;
-      } else {
-        this._overlay!.style.clipPath = "none";
       }
 
       const panel = document.createElement("div");

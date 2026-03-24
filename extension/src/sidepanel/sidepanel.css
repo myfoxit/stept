@@ -1291,84 +1291,253 @@ body, #root {
   transform: scale(1.08);
 }
 
-/* Guide Steps Panel */
-/* Guide Steps Panel — Tango-style vertical stepper */
-.guide-steps-panel { padding: 0 16px; }
-.guide-steps-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0 4px 0;
-}
-.guide-steps-header .guide-exit-btn {
-  background: none; border: none; cursor: pointer; color: #3C4043;
-  font-size: 13px; font-weight: 400; padding: 4px 0; display: flex; align-items: center; gap: 4px;
-}
-.guide-steps-header .guide-exit-btn:hover { color: #111827; }
-.guide-steps-close { background: none; border: none; cursor: pointer; color: #6b7280; padding: 4px; border-radius: 4px; display: flex; align-items: center; }
-.guide-steps-close:hover { color: #111827; background: #F5F5F4; }
-.guide-steps-title {
-  font-size: 17px; font-weight: 700; color: #202124; padding: 8px 0 12px 0; line-height: 1.3;
-}
-.guide-steps-list {
-  display: flex; flex-direction: column; gap: 0;
-  max-height: calc(100vh - 200px); overflow-y: auto; padding-bottom: 120px;
+/* ============================================================
+   Guide Panel — Tango-style full-panel guide player
+   ============================================================ */
+
+.guide-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #fff;
+  font-family: Inter, -apple-system, system-ui, sans-serif;
 }
 
-/* Vertical stepper: each step item */
-.guide-stepper-item {
-  display: flex; gap: 12px; position: relative; cursor: pointer;
-  padding: 0 0 0 0; min-height: 36px;
-}
-.guide-stepper-item:last-child .guide-stepper-line { display: none; }
-
-/* Left column: circle + connector line */
-.guide-stepper-left {
-  display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 24px;
-}
-.guide-stepper-circle {
-  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: 11px; font-weight: 600; transition: all 0.2s;
-}
-.guide-stepper-circle.future { background: #E0E0E0; color: #9AA0A6; }
-.guide-stepper-circle.active { background: #4f46e5; color: white; }
-.guide-stepper-circle.completed { background: #34A853; color: white; }
-.guide-stepper-circle.roadblock { background: #EA4335; color: white; }
-.guide-stepper-line {
-  width: 2px; flex: 1; background: #DADCE0; min-height: 12px;
+.guide-panel-header {
+  padding: 16px 16px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* Right column: step content */
-.guide-stepper-content {
-  flex: 1; padding-bottom: 16px; min-width: 0; overflow: hidden; word-break: break-word;
+.guide-back-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+  transition: color 0.15s;
 }
-.guide-stepper-instruction {
-  font-size: 13px; color: #202124; font-weight: 500; line-height: 1.4; padding-top: 2px;
+.guide-back-btn:hover { color: #333; }
+
+.guide-panel-title {
+  padding: 8px 16px 20px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1A1A1A;
+  line-height: 1.25;
+}
+
+.guide-panel-steps {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px;
+}
+
+/* Each step row */
+.guide-step {
+  display: flex;
+  gap: 12px;
+  cursor: pointer;
+}
+
+/* Left indicator: circle + connector */
+.guide-step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.guide-step-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.guide-step-circle.completed {
+  background: #D1F2D1;
+  color: #34A853;
+}
+.guide-step-circle.active,
+.guide-step-circle.roadblock {
+  background: #FF6B52;
+  color: #fff;
+}
+.guide-step-circle.future {
+  background: #EBEBEB;
+  color: #999;
+}
+
+.guide-step-connector {
+  width: 2px;
+  flex: 1;
+  background: #E0E0E0;
+  min-height: 16px;
+}
+.guide-step:last-child .guide-step-connector { display: none; }
+
+/* Right body: text + detail */
+.guide-step-body {
+  flex: 1;
+  padding-bottom: 16px;
+  min-width: 0;
+}
+
+.guide-step-text {
+  font-size: 14px;
+  line-height: 1.4;
+  padding-top: 2px;
   word-break: break-word;
 }
-.guide-stepper-item.future .guide-stepper-instruction { color: #9AA0A6; }
-.guide-stepper-item.completed .guide-stepper-instruction { color: #5F6368; }
+.guide-step.completed .guide-step-text {
+  color: #AAAAAA;
+  font-weight: 400;
+}
+.guide-step.active .guide-step-text,
+.guide-step.roadblock .guide-step-text {
+  color: #1A1A1A;
+  font-weight: 600;
+}
+.guide-step.future .guide-step-text {
+  color: #BBBBBB;
+  font-weight: 400;
+}
 
-/* Expanded step detail (screenshot + actions) for active/roadblock steps */
-.guide-stepper-detail {
+/* Active step expanded detail */
+.guide-step-active-detail {
   margin-top: 8px;
 }
-.guide-stepper-roadblock-msg {
-  font-size: 12px; color: #3C4043; line-height: 1.5; margin-bottom: 8px;
+
+.guide-step-prompt {
+  font-size: 13px;
+  color: #666;
+  margin: 8px 0 12px;
+  line-height: 1.5;
 }
-.guide-stepper-screenshot {
-  position: relative; border-radius: 6px; overflow: hidden;
-  border: 1px solid #E0E0E0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 8px;
-  background: #f9fafb; min-height: 60px;
+
+.guide-step-screenshot {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #E0E0E0;
+  margin-bottom: 12px;
+  cursor: zoom-in;
+  background: #f9fafb;
 }
-.guide-stepper-screenshot img {
-  width: 100%; display: block; border-radius: 5px;
+.guide-step-screenshot img {
+  width: 100%;
+  display: block;
 }
-.guide-stepper-mark-complete {
-  background: none; border: 1px solid #D93025; color: #D93025; border-radius: 16px;
-  padding: 5px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s;
+
+.guide-mark-complete-btn {
+  background: none;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FF6B52;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.guide-mark-complete-btn:hover {
+  background: #FFF5F3;
+  border-color: #FF6B52;
+}
+
+/* Footer with Pause */
+.guide-panel-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #EEEEEE;
+}
+
+.guide-pause-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
   font-family: inherit;
 }
-.guide-stepper-mark-complete:hover { background: #FEF2F2; }
+.guide-pause-btn:hover { color: #333; }
 
-.guide-stop-btn { width: 100%; margin-top: 12px; padding: 8px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; color: #DC2626; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; font-family: inherit; }
-.guide-stop-btn:hover { background: #FEF2F2; border-color: #FECACA; }
+/* Screenshot zoom modal */
+.guide-zoom-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 24px;
+}
+.guide-zoom-modal img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Click marker — three-layer animated indicator */
+.click-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.click-marker-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: rgba(255, 107, 82, 0.18);
+  animation: click-marker-pulse-anim 2s ease-in-out infinite;
+}
+
+.click-marker-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2.5px solid #FF6B52;
+  opacity: 0.7;
+}
+
+.click-marker-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #FF6B52;
+  box-shadow: 0 0 6px rgba(255, 107, 82, 0.5);
+}
+
+@keyframes click-marker-pulse-anim {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.4); opacity: 0; }
+}

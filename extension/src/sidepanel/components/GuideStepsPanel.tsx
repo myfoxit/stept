@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { sendToBackground } from '@/shared/messages';
 import type { GuideData, GuideStep } from '../App';
 
@@ -17,12 +17,13 @@ export default function GuideStepsPanel({
 }: GuideStepsPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const imageCacheRef = useRef<Record<string, string>>({});
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   // Scroll active into view
   useEffect(() => {
     if (!listRef.current) return;
     const active = listRef.current.querySelector(
-      '.guide-stepper-item.active, .guide-stepper-item.roadblock',
+      '.guide-step.active, .guide-step.roadblock',
     );
     if (active) {
       active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -46,21 +47,18 @@ export default function GuideStepsPanel({
   if (!guide.steps || guide.steps.length === 0) return null;
 
   return (
-    <div className="guide-steps-panel" id="guideStepsPanel">
-      <div className="guide-steps-header">
-        <button
-          className="guide-exit-btn"
-          id="guideStepsClose"
-          title="Exit guide"
-          onClick={onStop}
-        >
+    <div className="guide-panel">
+      <div className="guide-panel-header">
+        <button className="guide-back-btn" onClick={onStop}>
           &larr; Exit
         </button>
       </div>
-      <div className="guide-steps-title" id="guideTitle">
+
+      <div className="guide-panel-title">
         {guide.title || 'Interactive Guide'}
       </div>
-      <div className="guide-steps-list" id="guideStepsList" ref={listRef}>
+
+      <div className="guide-panel-steps" ref={listRef}>
         {guide.steps.map((step, i) => (
           <GuideStepItem
             key={i}
@@ -69,16 +67,22 @@ export default function GuideStepsPanel({
             state={getDesiredState(i)}
             totalSteps={guide.steps.length}
             imageCacheRef={imageCacheRef}
+            onZoom={setZoomedImage}
           />
         ))}
       </div>
-      <button
-        className="guide-stop-btn"
-        id="guideStopBtn"
-        onClick={onStop}
-      >
-        Stop Guide
-      </button>
+
+      <div className="guide-panel-footer">
+        <button className="guide-pause-btn" onClick={onStop}>
+          &#9208; Pause
+        </button>
+      </div>
+
+      {zoomedImage && (
+        <div className="guide-zoom-modal" onClick={() => setZoomedImage(null)}>
+          <img src={zoomedImage} alt="Zoomed screenshot" />
+        </div>
+      )}
     </div>
   );
 }
@@ -89,6 +93,7 @@ interface GuideStepItemProps {
   state: 'completed' | 'active' | 'roadblock' | 'future';
   totalSteps: number;
   imageCacheRef: React.MutableRefObject<Record<string, string>>;
+  onZoom: (url: string) => void;
 }
 
 function GuideStepItem({
@@ -97,62 +102,63 @@ function GuideStepItem({
   state,
   totalSteps,
   imageCacheRef,
+  onZoom,
 }: GuideStepItemProps) {
   const desc =
     step.title || step.description || step.action_type || `Step ${index + 1}`;
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const circleContent =
-    state === 'completed' ? '\u2713' : state === 'roadblock' ? '\u26A0' : `${index + 1}`;
-
-  const showDetail = state === 'active' || state === 'roadblock';
+    state === 'completed' ? '\u2713' : state === 'active' || state === 'roadblock' ? '\u{1F5B1}' : `${index + 1}`;
 
   return (
     <div
-      className={`guide-stepper-item ${state}`}
+      className={`guide-step ${state}`}
       data-step-index={index}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('button')) return;
         sendToBackground({ type: 'GUIDE_GO_TO_STEP', stepIndex: index });
       }}
     >
-      <div className="guide-stepper-left">
-        <div className={`guide-stepper-circle ${state}`}>{circleContent}</div>
-        {index < totalSteps - 1 && <div className="guide-stepper-line" />}
+      <div className="guide-step-indicator">
+        <div className={`guide-step-circle ${state}`}>{circleContent}</div>
+        {index < totalSteps - 1 && <div className="guide-step-connector" />}
       </div>
-      <div className="guide-stepper-content">
-        <div className="guide-stepper-instruction">{desc}</div>
-        {showDetail && (
-          <div className="guide-stepper-detail" style={{ display: '' }}>
-            {state === 'roadblock' && (
-              <div className="guide-stepper-roadblock-msg">
-                We hit a roadblock. Try taking action on the screen to move
-                forward.
-              </div>
+      <div className="guide-step-body">
+        <div className="guide-step-text">{desc}</div>
+
+        {(state === 'active' || state === 'roadblock') && (
+          <div className="guide-step-active-detail">
+            {state === 'roadblock' ? (
+              <p className="guide-step-prompt">
+                We hit a roadblock. Try taking action on the screen to move forward.
+              </p>
+            ) : (
+              <p className="guide-step-prompt">
+                It's your move! Complete the action to keep moving forward.
+              </p>
             )}
+
             {step.screenshot_url && (
               <GuideStepImage
                 step={step}
                 index={index}
                 imageCacheRef={imageCacheRef}
+                onZoom={onZoom}
               />
             )}
-            {state === 'roadblock' && (
-              <button
-                className="guide-stepper-mark-complete"
-                data-action="mark-complete"
-                data-step-index={index}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  sendToBackground({
-                    type: 'GUIDE_GO_TO_STEP',
-                    stepIndex: index + 1,
-                  });
-                }}
-              >
-                &#x2713; Mark as complete
-              </button>
-            )}
+
+            <button
+              className="guide-mark-complete-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                sendToBackground({
+                  type: 'GUIDE_GO_TO_STEP',
+                  stepIndex: index + 1,
+                });
+              }}
+            >
+              &#x2713; Mark as complete
+            </button>
           </div>
         )}
       </div>
@@ -164,10 +170,10 @@ interface GuideStepImageProps {
   step: GuideStep;
   index: number;
   imageCacheRef: React.MutableRefObject<Record<string, string>>;
+  onZoom: (url: string) => void;
 }
 
-function GuideStepImage({ step, index, imageCacheRef }: GuideStepImageProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+function GuideStepImage({ step, index, imageCacheRef, onZoom }: GuideStepImageProps) {
   const [dataUrl, setDataUrl] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -179,7 +185,6 @@ function GuideStepImage({ step, index, imageCacheRef }: GuideStepImageProps) {
       return;
     }
 
-    // Check cache
     const cached = imageCacheRef.current[step.screenshot_url];
     if (cached) {
       setDataUrl(cached);
@@ -224,9 +229,11 @@ function GuideStepImage({ step, index, imageCacheRef }: GuideStepImageProps) {
 
   return (
     <div
-      className="guide-stepper-screenshot"
-      data-step-index={index}
-      ref={containerRef}
+      className="guide-step-screenshot"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (dataUrl) onZoom(dataUrl);
+      }}
     >
       {loading && (
         <div style={{ padding: 8, color: '#9AA0A6', fontSize: 11 }}>
@@ -240,11 +247,7 @@ function GuideStepImage({ step, index, imageCacheRef }: GuideStepImageProps) {
       )}
       {dataUrl && (
         <>
-          <img
-            className="step-screenshot"
-            src={dataUrl}
-            alt={`Step ${index + 1}`}
-          />
+          <img src={dataUrl} alt={`Step ${index + 1}`} />
           {hasClickMarker && (
             <div className="click-marker" style={clickMarkerStyle}>
               <div className="click-marker-pulse" />

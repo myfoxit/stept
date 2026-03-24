@@ -7,6 +7,7 @@ import StepsList from './components/StepsList';
 import UploadPanel from './components/UploadPanel';
 import RecordingFooter from './components/RecordingFooter';
 import SettingsPanel from './components/SettingsPanel';
+import GuideStepsPanel from './components/GuideStepsPanel';
 
 export interface AppState {
   isAuthenticated: boolean;
@@ -164,6 +165,21 @@ export default function App() {
 
   // Determine which view to show
   const { isAuthenticated, isRecording } = appState;
+
+  // When a guide is active, the entire side panel becomes the guide player
+  if (activeGuide) {
+    return (
+      <GuideStepsPanel
+        guide={activeGuide.guide}
+        currentIndex={activeGuide.currentIndex}
+        stepStatus={activeGuide.stepStatus}
+        onStop={() => {
+          sendToBackground({ type: 'STOP_GUIDE' });
+          setActiveGuide(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="container">
