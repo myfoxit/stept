@@ -264,6 +264,14 @@ function GuideStepImage({ step, index, imageCacheRef, onZoom }: GuideStepImagePr
       {dataUrl && (
         <>
           <img src={dataUrl} alt={`Step ${index + 1}`} style={imgStyle} />
+          {hasClickMarker && (
+            <div className="click-marker" style={{
+              left: `${(step.screenshot_relative_position!.x / step.screenshot_size!.width) * 100}%`,
+              top: `${(step.screenshot_relative_position!.y / step.screenshot_size!.height) * 100}%`,
+            }}>
+              <div className="click-marker-dot" />
+            </div>
+          )}
         </>
       )}
     </div>
