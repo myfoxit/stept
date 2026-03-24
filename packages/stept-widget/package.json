@@ -1,0 +1,14 @@
+{
+  "name": "@stept/widget",
+  "version": "0.1.0",
+  "description": "Stept embeddable widget — add interactive guides to any web app with one script tag",
+  "main": "dist/stept-widget.js",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "typescript": "^5.3.0"
+  }
+}
