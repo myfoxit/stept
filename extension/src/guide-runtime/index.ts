@@ -1030,6 +1030,7 @@
     private _interval: ReturnType<typeof setInterval> | null = null;
     private _lastUrl: string;
     private _onUrlChange: (newUrl: string, oldUrl: string) => void;
+    private _navigationHandler: ((e: any) => void) | null = null;
 
     constructor(onUrlChange: (newUrl: string, oldUrl: string) => void) {
       this._lastUrl = window.location.href;
@@ -1038,11 +1039,19 @@
 
     start(): void {
       this.stop(); // Ensure no duplicate intervals
-      
+
       // Listen for browser navigation events
       window.addEventListener('popstate', this._handleUrlChange);
       window.addEventListener('hashchange', this._handleUrlChange);
-      
+
+      // Navigation API (instant SPA detection, no polling needed)
+      if ('navigation' in window) {
+        this._navigationHandler = () => {
+          setTimeout(() => this._checkUrlChange(), 0);
+        };
+        (window as any).navigation.addEventListener('navigatesuccess', this._navigationHandler);
+      }
+
       // Poll for URL changes (for SPA navigation that doesn't trigger events)
       this._interval = setInterval(() => {
         this._checkUrlChange();
@@ -1054,9 +1063,14 @@
         clearInterval(this._interval);
         this._interval = null;
       }
-      
+
       window.removeEventListener('popstate', this._handleUrlChange);
       window.removeEventListener('hashchange', this._handleUrlChange);
+
+      if (this._navigationHandler && 'navigation' in window) {
+        (window as any).navigation.removeEventListener('navigatesuccess', this._navigationHandler);
+        this._navigationHandler = null;
+      }
     }
 
     private _handleUrlChange = (): void => {
@@ -1697,8 +1711,16 @@
     }
 
     _findStepForUrl(url: string): number {
-      // Find the step that expects this URL
-      for (let i = 0; i < this.steps.length; i++) {
+      // Find the first matching step AT OR AFTER currentIndex to prevent backwards jumps
+      // when multiple steps share the same URL.
+      for (let i = this.currentIndex; i < this.steps.length; i++) {
+        const step = this.steps[i];
+        if (this._urlMatches(url, step.expected_url || step.url)) {
+          return i;
+        }
+      }
+      // Fallback: search from the beginning (handles navigating back)
+      for (let i = 0; i < this.currentIndex; i++) {
         const step = this.steps[i];
         if (this._urlMatches(url, step.expected_url || step.url)) {
           return i;
