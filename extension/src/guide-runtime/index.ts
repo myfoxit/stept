@@ -604,218 +604,42 @@
     .guide-tooltip {
       position: fixed;
       z-index: 2147483642;
-      background: #FFFFFF;
-      border: 1px solid #E5E5E5;
-      border-radius: 14px;
-      padding: 16px;
-      max-width: 300px;
-      min-width: 240px;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
-      pointer-events: auto;
-      animation: guide-tooltip-in 0.25s ease-out;
-      color: #1A1A1A;
+      background: #1A1A2E;
+      border-radius: 24px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 340px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      pointer-events: none;
+      animation: guide-tooltip-in 0.2s ease-out;
+    }
+
+    .guide-tooltip-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FF6B52;
+      flex-shrink: 0;
+    }
+
+    .guide-tooltip-text {
+      font-size: 13px;
+      font-weight: 500;
+      color: #FFFFFF;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     @keyframes guide-tooltip-in {
-      from { opacity: 0; transform: translateY(8px); }
+      from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .guide-tooltip-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #1A1A1A;
-      margin: 0 0 6px 0;
-      line-height: 1.3;
-    }
 
-    .guide-tooltip-desc {
-      font-size: 13px;
-      color: #666666;
-      margin: 0 0 14px 0;
-      line-height: 1.5;
-    }
-
-    .guide-tooltip-progress {
-      font-size: 11px;
-      color: #999999;
-      margin-bottom: 12px;
-    }
-
-    .guide-tooltip-progress-bar {
-      height: 3px;
-      background: #F0F0F0;
-      border-radius: 2px;
-      margin-top: 6px;
-      overflow: hidden;
-    }
-
-    .guide-tooltip-progress-fill {
-      height: 100%;
-      background: #FF6B52;
-      border-radius: 2px;
-      transition: width 0.3s ease;
-    }
-
-    .guide-tooltip-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .guide-btn {
-      border: none;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 13px;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      outline: none;
-    }
-
-    .guide-btn:hover { filter: brightness(1.1); }
-    .guide-btn:active { transform: scale(0.97); }
-
-    .guide-btn-primary {
-      background: #FF6B52;
-      color: #fff;
-    }
-
-    .guide-btn-secondary {
-      background: #F5F5F5;
-      color: #333;
-      border: 1px solid #E0E0E0;
-    }
-
-    .guide-btn-ghost {
-      background: transparent;
-      color: #999;
-      padding: 8px 8px;
-    }
-
-    .guide-btn-ghost:hover { color: #666; }
-
-    .guide-spacer { flex: 1; }
-
-    .guide-close-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: none;
-      border: none;
-      color: #CCCCCC;
-      cursor: pointer;
-      padding: 4px;
-      line-height: 1;
-      font-size: 18px;
-      border-radius: 4px;
-    }
-
-    .guide-close-btn:hover { color: #666; background: #F5F5F5; }
-
-    .guide-btn-done {
-      background: #10B981;
-      color: #fff;
-    }
-
-    .guide-obstruction-warning {
-      background: #FFFBEB;
-      border: 1px solid #FDE68A;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
-      font-size: 12px;
-      color: #92400E;
-      line-height: 1.4;
-    }
-
-    .guide-intermediate-hint {
-      background: #EEF2FF;
-      border: 1px solid #C7D2FE;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
-      font-size: 12px;
-      color: #4338CA;
-      line-height: 1.4;
-    }
-
-    .guide-url-warning {
-      background: #FFFBEB;
-      border: 1px solid #FDE68A;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
-      font-size: 12px;
-      color: #92400E;
-      line-height: 1.4;
-    }
-
-    .guide-navigate-btn {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 6px 12px;
-      background: #FEF3C7;
-      color: #92400E;
-      border: 1px solid #FDE68A;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.15s ease;
-    }
-
-    .guide-navigate-btn:hover {
-      background: #FDE68A;
-    }
-
-    .guide-not-found {
-      background: #FFFFFF;
-      border: 1px solid #E5E5E5;
-      border-radius: 14px;
-      padding: 20px;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 2147483642;
-      text-align: center;
-      max-width: 300px;
-      pointer-events: auto;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
-      animation: guide-tooltip-in 0.25s ease-out;
-    }
-
-    .guide-not-found-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #1A1A1A;
-      margin-bottom: 8px;
-    }
-
-    .guide-not-found-desc {
-      font-size: 13px;
-      color: #666666;
-      margin-bottom: 14px;
-    }
-
-    .guide-roadblock-icon {
-      font-size: 24px;
-      margin-bottom: 8px;
-    }
-
-    .guide-roadblock-step-title {
-      font-size: 13px;
-      font-weight: 500;
-      color: #333;
-      margin-bottom: 10px;
-      padding: 8px 12px;
-      background: #F5F5F5;
-      border-radius: 6px;
-    }
   `;
 
   // ── URL Watcher for Multi-Page Handling ─────────────────────────
@@ -1051,25 +875,6 @@
       let lastStatus: string | null = null;
       let healthReported = false;
 
-      // Show a subtle "searching..." indicator immediately so user knows we're working
-      if (this.shadow) {
-        const searchHint = document.createElement('div');
-        searchHint.className = 'guide-search-hint';
-        searchHint.setAttribute('data-search-hint', 'true');
-        searchHint.textContent = 'Finding element...';
-        // Style it as a small pill at the top
-        searchHint.style.cssText = `
-          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #FFFFFF; color: #999;
-          padding: 6px 16px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #E5E5E5; pointer-events: none;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-          animation: guide-tooltip-in 0.2s ease-out;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        `;
-        this.shadow.appendChild(searchHint);
-      }
-
       const poll = async (): Promise<void> => {
         if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
 
@@ -1100,30 +905,18 @@
             } catch (_) {}
           }
 
-          // Check intermediate action
+          // Check intermediate action — element exists but hidden behind
+          // a collapsed ancestor. Just keep polling; it will become visible
+          // when the ancestor is expanded.
           const intermediateAncestor = needsIntermediateAction(result.element);
           if (intermediateAncestor) {
-            if (lastStatus !== 'intermediate') {
-              lastStatus = 'intermediate';
-              this._stopElementPolling();
-              chrome.runtime.sendMessage({
-                type: 'GUIDE_STEP_CHANGED',
-                currentIndex: this.currentIndex,
-                totalSteps: this.steps.length,
-                stepStatus: 'intermediate',
-              }).catch(() => {});
-              this._renderIntermediateHint(step, intermediateAncestor, urlMismatch);
-            }
+            // Don't stop polling — keep looking for a visible element
             return;
           }
 
           if (lastStatus !== 'found') {
             lastStatus = 'found';
             // Clear search hint and any previous not-found UI
-            if (this.shadow) {
-              const hint = this.shadow.querySelector('[data-search-hint]');
-              if (hint) hint.remove();
-            }
             if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
 
             chrome.runtime.sendMessage({
@@ -1160,27 +953,7 @@
     }
 
     async _tryLlmRecovery(step: GuideStep, seq: number, urlMismatch: boolean): Promise<void> {
-      // Show "AI is looking..." indicator
-      if (this.shadow) {
-        const hint = this.shadow.querySelector('[data-search-hint]');
-        if (hint) hint.remove();
-        
-        const recoveryHint = document.createElement('div');
-        recoveryHint.className = 'guide-search-hint';
-        recoveryHint.setAttribute('data-search-hint', 'recovery');
-        recoveryHint.textContent = '🔄 AI is looking...';
-        recoveryHint.style.cssText = `
-          position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-          z-index: 2147483642; background: #FFFFFF; color: #FF6B52;
-          padding: 8px 18px; border-radius: 20px; font-size: 12px;
-          border: 1px solid #E5E5E5; pointer-events: none;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-          animation: guide-tooltip-in 0.2s ease-out;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        `;
-        this.shadow.appendChild(recoveryHint);
-      }
-
+      // Silent LLM recovery — no in-page UI, sidepanel handles status
       try {
         // Collect all interactive elements on the page  
         const pageElements = this._collectInteractiveElements();
@@ -1192,12 +965,6 @@
         const recovery = await this._callRecoveryApi(targetInfo, pageElements);
         
         if (this._stepSeq !== seq) return; // Step changed during recovery
-        
-        // Remove recovery hint
-        if (this.shadow) {
-          const hint = this.shadow.querySelector('[data-search-hint="recovery"]');
-          if (hint) hint.remove();
-        }
         
         if (recovery.found && recovery.element_index !== null) {
           // Recovery successful - highlight the found element
@@ -1251,12 +1018,6 @@
         
       } catch (error: any) {
         if (this._stepSeq !== seq) return; // Step changed during recovery
-        
-        // Remove recovery hint on error
-        if (this.shadow) {
-          const hint = this.shadow.querySelector('[data-search-hint="recovery"]');
-          if (hint) hint.remove();
-        }
         
         console.warn('LLM recovery failed:', error);
         this._showRecoveryFailed(step, urlMismatch, error.message);
@@ -1430,11 +1191,7 @@
         stepStatus: 'notfound',
       }).catch(() => {});
       
-      // Show enhanced not-found panel with recovery info
-      this._renderNotFound(step, urlMismatch);
-
       // Keep a slow background poll running — element may appear later
-      // (e.g., lazy-loaded content, SPA re-render, user scrolls)
       const seq = this._stepSeq;
       this._pollInterval = setInterval(async () => {
         if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
@@ -1442,8 +1199,6 @@
         if (this._stepSeq !== seq) return;
         if (result) {
           this._stopElementPolling();
-          // Element appeared! Clear the not-found panel and show overlay
-          if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
           this.currentResult = result;
           chrome.runtime.sendMessage({
             type: 'GUIDE_STEP_CHANGED',
@@ -1535,43 +1290,14 @@
     }
 
     _showUrlMismatchPanel(currentUrl: string): void {
-      if (!this.shadow) return;
-      
-      // Clear existing panels
-      this._clearOverlay();
-
-      const panel = document.createElement("div");
-      panel.className = "guide-not-found";
-      
-      panel.innerHTML = `
-        <div class="guide-not-found-title">Unexpected page</div>
-        <div class="guide-not-found-desc">
-          The guide is paused because you navigated to an unexpected page.
-          <br><br>
-          Current: ${this._esc(currentUrl.length > 60 ? currentUrl.slice(0, 60) + '...' : currentUrl)}
-        </div>
-        <div class="guide-tooltip-actions" style="justify-content: center;">
-          <button class="guide-btn guide-btn-secondary" data-action="retry">Check again</button>
-          <button class="guide-btn guide-btn-ghost" data-action="close">Close guide</button>
-        </div>
-      `;
-      
-      panel.addEventListener("click", (e: Event) => {
-        const target = e.target as HTMLElement;
-        const action = target.closest("[data-action]")?.getAttribute("data-action");
-        
-        switch (action) {
-          case "retry":
-            // Re-check current URL and try to continue
-            this._handleUrlChange(window.location.href, this._lastKnownUrl);
-            break;
-          case "close":
-            this.stop();
-            break;
-        }
-      });
-      
-      this.shadow.appendChild(panel);
+      // Just notify sidepanel - no modal
+      chrome.runtime.sendMessage({
+        type: 'GUIDE_STEP_CHANGED',
+        currentIndex: this.currentIndex,
+        totalSteps: this.steps.length,
+        stepStatus: 'url-mismatch',
+        actualUrl: currentUrl
+      }).catch(() => {});
     }
 
     async showStep(index: number): Promise<void> {
@@ -1737,108 +1463,19 @@
       this._positionTooltip(this._tooltip, rect);
     }
 
-    _createTooltip(step: GuideStep, urlMismatch: boolean, obstructor: Element | null): HTMLDivElement {
-      const total = this.steps.length;
-      const idx = this.currentIndex;
-      const progressPct = ((idx + 1) / total) * 100;
-
+    _createTooltip(step: GuideStep, _urlMismatch: boolean, _obstructor: Element | null): HTMLDivElement {
       const tooltip = document.createElement("div");
       tooltip.className = "guide-tooltip";
 
-      let html = `<button class="guide-close-btn" data-action="close">&times;</button>`;
-
-      if (urlMismatch) {
-        html += `<div class="guide-url-warning">
-          This step expects a different page.
-          <br><button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
-        </div>`;
-      }
-
-      // Feature 3: Obstruction warning
-      if (obstructor) {
-        const obDesc = describeElement(obstructor);
-        html += `<div class="guide-obstruction-warning">
-          This element is behind another element. You may need to close a dialog or scroll.
-          <br><small>Obstructed by: &lt;${this._esc(obDesc)}&gt;</small>
-        </div>`;
-      }
-
-      // Feature 2: Determine if this is a non-click step (Type, Key, Select, Navigate)
-      const actionType = (step.action_type || '').toLowerCase();
-      const isNonClickStep = actionType.includes('type') || actionType.includes('key') || actionType.includes('select') || actionType.includes('navigate');
-
-      html += `
-        <div class="guide-tooltip-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
-        ${step.description && step.description !== step.title ? `<div class="guide-tooltip-desc">${this._esc(step.description)}</div>` : ""}
-        <div class="guide-tooltip-progress">
-          Step ${idx + 1} of ${total}
-          <div class="guide-tooltip-progress-bar">
-            <div class="guide-tooltip-progress-fill" style="width: ${progressPct}%"></div>
-          </div>
-        </div>
-        <div class="guide-tooltip-actions">
-          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
-          <div class="guide-spacer"></div>
-          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
-          ${isNonClickStep ? `<button class="guide-btn guide-btn-done" data-action="done">&#10003; Step Done</button>` : ""}
-          <button class="guide-btn guide-btn-primary" data-action="next">${idx === total - 1 ? "Finish" : "Next"}</button>
-        </div>
+      // Tango-style dark pill: coral dot + step instruction text
+      const stepText = step.title || step.description || `Step ${this.currentIndex + 1}`;
+      tooltip.innerHTML = `
+        <span class="guide-tooltip-dot"></span>
+        <span class="guide-tooltip-text">${this._esc(stepText)}</span>
       `;
 
-      tooltip.innerHTML = html;
-
-      // Stop ALL events on the tooltip from reaching the document.
-      // In shadow DOM, stopPropagation prevents crossing the shadow boundary,
-      // so modal "outside click" handlers on document never see these clicks.
-      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
-        tooltip.addEventListener(evt, (e: Event) => e.stopPropagation());
-      }
-
-      // Wire up action buttons
-      tooltip.addEventListener("click", (e: Event) => {
-        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
-        if (!action) return;
-        switch (action) {
-          case "next":
-            if (this.currentIndex >= this.steps.length - 1) {
-              this.stop();
-            } else {
-              this.showStep(this.currentIndex + 1);
-            }
-            break;
-          case "back":
-            this.showStep(this.currentIndex - 1);
-            break;
-          case "done":
-            if (this.currentIndex >= this.steps.length - 1) {
-              this.stop();
-            } else {
-              this.showStep(this.currentIndex + 1);
-            }
-            break;
-          case "skip":
-            if (this.currentIndex >= this.steps.length - 1) {
-              this.stop();
-            } else {
-              this.showStep(this.currentIndex + 1);
-            }
-            break;
-          case "close":
-            this.stop();
-            break;
-          case "navigate": {
-            const navStep = this.steps[this.currentIndex];
-            if (navStep.expected_url) {
-              chrome.runtime.sendMessage({
-                type: 'GUIDE_NAVIGATE',
-                url: navStep.expected_url,
-                stepIndex: this.currentIndex,
-              });
-            }
-            break;
-          }
-        }
-      });
+      // Non-interactive — all actions happen via the side panel
+      tooltip.style.pointerEvents = "none";
 
       return tooltip;
     }
@@ -1890,135 +1527,28 @@
     }
 
     _renderNotFound(step: GuideStep, urlMismatch: boolean): void {
-      const idx = this.currentIndex;
-      const total = this.steps.length;
-
-      const panel = document.createElement("div");
-      panel.className = "guide-not-found";
-
-      let notFoundHtml = `
-        <div class="guide-not-found-title">Element not found</div>
-        <div class="guide-not-found-desc">
-          Could not locate the target element for step ${idx + 1}.
-          ${urlMismatch ? "This step expects a different page." : "The page may have changed."}
-        </div>
-      `;
-
-      if (urlMismatch && step.expected_url) {
-        notFoundHtml += `<div style="margin-bottom: 12px;">
-          <button class="guide-navigate-btn" data-action="navigate">Navigate to page</button>
-        </div>`;
-      }
-
-      notFoundHtml += `
-        <div class="guide-tooltip-progress">
-          Step ${idx + 1} of ${total}
-        </div>
-        <div class="guide-tooltip-actions" style="justify-content: center;">
-          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
-          <button class="guide-btn guide-btn-primary" data-action="skip">Skip</button>
-        </div>
-      `;
-
-      panel.innerHTML = notFoundHtml;
-
-      // Stop events from reaching document (same as tooltip)
-      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
-        panel.addEventListener(evt, (e: Event) => e.stopPropagation());
-      }
-
-      panel.addEventListener("click", (e: Event) => {
-        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
-        if (!action) return;
-        switch (action) {
-          case "back":
-            this.showStep(this.currentIndex - 1);
-            break;
-          case "skip":
-            this.showStep(this.currentIndex + 1);
-            break;
-          case "navigate": {
-            const navStep = this.steps[this.currentIndex];
-            if (navStep.expected_url) {
-              chrome.runtime.sendMessage({
-                type: 'GUIDE_NAVIGATE',
-                url: navStep.expected_url,
-                stepIndex: this.currentIndex,
-              });
-            }
-            break;
-          }
-        }
-      });
-
-      this._notFoundPanel = panel;
-      this.shadow!.appendChild(panel);
+      // Just notify sidepanel - no modal
+      chrome.runtime.sendMessage({
+        type: 'GUIDE_STEP_CHANGED',
+        currentIndex: this.currentIndex,
+        totalSteps: this.steps.length,
+        stepStatus: 'notfound',
+      }).catch(() => {});
     }
 
     _renderRoadblock(step: GuideStep): void {
-      const idx = this.currentIndex;
-      const total = this.steps.length;
-
-      const panel = document.createElement("div");
-      panel.className = "guide-not-found";
-
-      panel.innerHTML = `
-        <div class="guide-roadblock-icon">\u26A0</div>
-        <div class="guide-not-found-title">We hit a roadblock</div>
-        <div class="guide-not-found-desc">
-          This step involves a hover action that can't be automated.
-          Try performing the action on the screen to move forward.
-        </div>
-        <div class="guide-roadblock-step-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
-        <div class="guide-tooltip-progress">
-          Step ${idx + 1} of ${total}
-        </div>
-        <div class="guide-tooltip-actions" style="justify-content: center;">
-          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
-          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
-          <button class="guide-btn guide-btn-done" data-action="done">&#10003; Mark as complete</button>
-        </div>
-      `;
-
-      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
-        panel.addEventListener(evt, (e: Event) => e.stopPropagation());
-      }
-
-      panel.addEventListener("click", (e: Event) => {
-        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
-        if (!action) return;
-        switch (action) {
-          case "back":
-            this.showStep(this.currentIndex - 1);
-            break;
-          case "skip":
-          case "done":
-            if (this.currentIndex >= this.steps.length - 1) {
-              this.stop();
-            } else {
-              this.showStep(this.currentIndex + 1);
-            }
-            break;
-        }
-      });
-
-      this._notFoundPanel = panel;
-      this.shadow!.appendChild(panel);
+      // Just notify sidepanel - no modal
+      chrome.runtime.sendMessage({
+        type: 'GUIDE_STEP_CHANGED',
+        currentIndex: this.currentIndex,
+        totalSteps: this.steps.length,
+        stepStatus: 'roadblock',
+      }).catch(() => {});
     }
 
     _showEmpty(): void {
-      this._clearOverlay();
-      const panel = document.createElement("div");
-      panel.className = "guide-not-found";
-      panel.innerHTML = `
-        <div class="guide-not-found-title">No steps in this guide</div>
-        <div class="guide-not-found-desc">This guide has no steps to display.</div>
-        <button class="guide-btn guide-btn-primary" data-action="close">Close</button>
-      `;
-      panel.addEventListener("click", (e: Event) => {
-        if ((e.target as HTMLElement).closest("[data-action=close]")) this.stop();
-      });
-      this.shadow!.appendChild(panel);
+      // Just stop the guide
+      this.stop();
     }
 
     _startPositionTracking(step: GuideStep, result: FindResult): void {
@@ -2225,76 +1755,8 @@
 
     // Feature 8: Intermediate action hint (element hidden behind collapsed ancestor)
     _renderIntermediateHint(step: GuideStep, ancestor: HTMLElement, urlMismatch: boolean): void {
-      const idx = this.currentIndex;
-      const total = this.steps.length;
-
-      // Try to highlight the ancestor if it's visible
-      const ancestorRect = ancestor.getBoundingClientRect();
-      if (ancestorRect.width > 0 && ancestorRect.height > 0) {
-        const zoom = getPageZoom();
-        const rect: AdjustedRect = {
-          left: ancestorRect.left * zoom, top: ancestorRect.top * zoom,
-          right: ancestorRect.right * zoom, bottom: ancestorRect.bottom * zoom,
-          width: ancestorRect.width * zoom, height: ancestorRect.height * zoom,
-        };
-        const pad = 6;
-        if (!this._highlight) {
-          this._highlight = document.createElement("div");
-          this._highlight.className = "guide-highlight";
-          this.shadow!.appendChild(this._highlight);
-        }
-        this._highlight.style.display = "";
-        this._highlight.style.borderColor = "#6366F1";
-        this._highlight.style.boxShadow = "0 0 0 4px rgba(99, 102, 241, 0.25)";
-        this._highlight.style.left = `${rect.left - pad}px`;
-        this._highlight.style.top = `${rect.top - pad}px`;
-        this._highlight.style.width = `${rect.width + pad * 2}px`;
-        this._highlight.style.height = `${rect.height + pad * 2}px`;
-      }
-
-      const panel = document.createElement("div");
-      panel.className = "guide-not-found";
-
-      const ancestorDesc = describeElement(ancestor);
-      panel.innerHTML = `
-        <div class="guide-intermediate-hint">
-          First, open <strong>${this._esc(ancestorDesc)}</strong> to reveal the target element.
-        </div>
-        <div class="guide-not-found-title">${this._esc(step.title || step.description || `Step ${idx + 1}`)}</div>
-        <div class="guide-tooltip-progress">Step ${idx + 1} of ${total}</div>
-        <div class="guide-tooltip-actions" style="justify-content: center;">
-          ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
-          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
-          <button class="guide-btn guide-btn-primary" data-action="retry">Check again</button>
-        </div>
-      `;
-
-      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
-        panel.addEventListener(evt, (e: Event) => e.stopPropagation());
-      }
-
-      panel.addEventListener("click", (e: Event) => {
-        const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
-        if (!action) return;
-        switch (action) {
-          case "retry":
-            this.showStep(this.currentIndex);
-            break;
-          case "back":
-            this.showStep(this.currentIndex - 1);
-            break;
-          case "skip":
-            if (this.currentIndex >= this.steps.length - 1) {
-              this.stop();
-            } else {
-              this.showStep(this.currentIndex + 1);
-            }
-            break;
-        }
-      });
-
-      this._intermediatePanel = panel;
-      this.shadow!.appendChild(panel);
+      // Just re-poll for the element - no modal
+      // Keep the current polling logic running
     }
 
     _esc(text: string): string {

@@ -37,9 +37,9 @@ export default function GuideStepsPanel({
       if (idx < currentIndex) return 'completed';
       if (idx === currentIndex) {
         const status = stepStatus || 'active';
-        return status === 'roadblock' || status === 'notfound'
-          ? 'roadblock'
-          : 'active';
+        // Always show active state visually for current step
+        // Only change the prompt text, not the visual state
+        return 'active';
       }
       return 'future';
     },
@@ -67,6 +67,7 @@ export default function GuideStepsPanel({
             step={step}
             index={i}
             state={getDesiredState(i)}
+            stepStatus={i === currentIndex ? stepStatus : undefined}
             totalSteps={guide.steps.length}
             imageCacheRef={imageCacheRef}
             onZoom={handleZoom}
@@ -87,7 +88,8 @@ export default function GuideStepsPanel({
 interface GuideStepItemProps {
   step: GuideStep;
   index: number;
-  state: 'completed' | 'active' | 'roadblock' | 'future';
+  state: 'completed' | 'active' | 'future';
+  stepStatus?: string;
   totalSteps: number;
   imageCacheRef: React.MutableRefObject<Record<string, string>>;
   onZoom: (url: string) => void;
@@ -97,6 +99,7 @@ function GuideStepItem({
   step,
   index,
   state,
+  stepStatus,
   totalSteps,
   imageCacheRef,
   onZoom,
@@ -123,15 +126,19 @@ function GuideStepItem({
       <div className="guide-step-body">
         <div className="guide-step-text">{desc}</div>
 
-        {(state === 'active' || state === 'roadblock') && (
+        {state === 'active' && (
           <div className="guide-step-active-detail">
-            {state === 'roadblock' ? (
+            {stepStatus === 'roadblock' ? (
               <p className="guide-step-prompt">
-                We hit a roadblock. Try taking action on the screen to move forward.
+                Perform this action on the page, then mark as complete.
+              </p>
+            ) : stepStatus === 'notfound' ? (
+              <p className="guide-step-prompt">
+                Looking for the element... Try scrolling or navigating to the right page.
               </p>
             ) : (
               <p className="guide-step-prompt">
-                It's your move! Complete the action to keep moving forward.
+                Complete this step on the page.
               </p>
             )}
 
