@@ -1827,7 +1827,13 @@
     }
 
     _scrollToElement(result: FindResult): Promise<void> {
+      // Double-RAF: ensure layout is fully settled before the caller measures/renders
+      const doubleRAF = () => new Promise<void>(r =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r()))
+      );
+
       return new Promise<void>((resolve) => {
+        const settled = () => doubleRAF().then(resolve);
         const rect = this._getAdjustedRect(result);
 
         // Detect fixed/sticky headers
@@ -1849,7 +1855,7 @@
 
         // Already well-positioned?
         if (rect.top >= targetTop && rect.bottom <= targetBottom) {
-          resolve();
+          settled();
           return;
         }
 
@@ -1867,7 +1873,7 @@
           if (Math.abs(window.scrollY - lastY) < 1) {
             stableFrames++;
             if (stableFrames >= 3) {
-              resolve();
+              settled();
               return;
             }
           } else {
@@ -1879,7 +1885,7 @@
         requestAnimationFrame(checkSettled);
 
         // Safety timeout: don't wait forever
-        setTimeout(resolve, 1000);
+        setTimeout(() => settled(), 1000);
       });
     }
 
@@ -2087,7 +2093,7 @@
       const eventType = "click";
 
       this._clickHandler = (_e: Event): void => advance();
-      element.addEventListener(eventType, this._clickHandler, { once: true });
+      element.addEventListener(eventType, this._clickHandler, { capture: true, once: true });
       this._clickElement = element;
       this._clickEventType = eventType;
 
@@ -2098,7 +2104,7 @@
             advance();
           }
         };
-        element.parentElement.addEventListener(eventType, this._parentClickHandler, { once: true });
+        element.parentElement.addEventListener(eventType, this._parentClickHandler, { capture: true, once: true });
         this._clickParent = element.parentElement;
       }
 
@@ -2122,12 +2128,12 @@
     _removeClickHandler(): void {
       const eventType = this._clickEventType || "click";
       if (this._clickHandler && this._clickElement) {
-        this._clickElement.removeEventListener(eventType, this._clickHandler);
+        this._clickElement.removeEventListener(eventType, this._clickHandler, { capture: true } as EventListenerOptions);
         this._clickHandler = null;
         this._clickElement = null;
       }
       if (this._parentClickHandler && this._clickParent) {
-        this._clickParent.removeEventListener(eventType, this._parentClickHandler);
+        this._clickParent.removeEventListener(eventType, this._parentClickHandler, { capture: true } as EventListenerOptions);
         this._parentClickHandler = null;
         this._clickParent = null;
       }
