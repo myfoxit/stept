@@ -385,6 +385,33 @@
       }
     }
 
+    // Placeholder match (for input/textarea elements — critical for React/Radix forms)
+    const placeholder = (step as any).element_info?.placeholder;
+    if (placeholder) {
+      const el = safeQuerySelector(root, `[placeholder="${CSS.escape(placeholder)}"]`);
+      if (el && isVisible(el)) return { element: el, confidence: 0.9, method: "placeholder" };
+    }
+
+    // aria-label match
+    const ariaLabel = (step as any).element_info?.ariaLabel || (step as any).ariaLabel;
+    if (ariaLabel) {
+      const el = safeQuerySelector(root, `[aria-label="${CSS.escape(ariaLabel)}"]`);
+      if (el && isVisible(el)) return { element: el, confidence: 0.9, method: "aria-label" };
+    }
+
+    // Tag + text: exact content match (higher confidence than fuzzy)
+    const content = (step as any).element_info?.content || step.element_text;
+    const tagName = (step as any).element_info?.tagName;
+    if (tagName && content) {
+      const candidates = Array.from(root.querySelectorAll(tagName)).filter(el => isVisible(el));
+      // Exact text match first
+      const exact = candidates.find(el => {
+        const t = (el.textContent || '').trim();
+        return t === content.trim();
+      });
+      if (exact) return { element: exact, confidence: 0.85, method: "tag+exact-text" };
+    }
+
     // ARIA role + text
     if (step.element_role && step.element_text) {
       const candidates = root.querySelectorAll(`[role="${step.element_role}"]`);
