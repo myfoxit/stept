@@ -6,6 +6,20 @@
 (function () {
   'use strict';
 
+  // ── Debug Logger — writes to chrome.storage.local for inspection ──
+  const _logs: string[] = [];
+  function log(...args: any[]): void {
+    const ts = new Date().toISOString().slice(11, 23);
+    const msg = `[${ts}] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}`;
+    _logs.push(msg);
+    console.log('[stept-guide]', ...args);
+    // Persist to storage (last 200 entries)
+    try {
+      const keep = _logs.slice(-200);
+      chrome.storage.local.set({ stept_guide_logs: keep });
+    } catch {}
+  }
+
   // ── Type Declarations ──────────────────────────────────────────────
 
   interface IframeOffset {
@@ -905,20 +919,25 @@
 
     _startElementPolling(step: GuideStep, seq: number, urlMismatch: boolean): void {
       this._stopElementPolling();
+      let pollCount = 0;
       
       const poll = async (): Promise<void> => {
         if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
+        pollCount++;
 
         const result = await findGuideElement(step);
         if (this._stepSeq !== seq) return;
 
         if (result) {
+          const tag = result.element.tagName?.toLowerCase();
+          const text = (result.element.textContent || '').trim().slice(0, 30);
+          log(`FOUND element for step ${this.currentIndex} after ${pollCount} polls: <${tag}> "${text}" (method=${result.method}, confidence=${result.confidence.toFixed(2)})`);
           this.currentResult = result;
           
           // Check for intermediate action
           const intermediateAncestor = needsIntermediateAction(result.element);
           if (intermediateAncestor) {
-            // Keep polling until ancestor is expanded
+            log(`Step ${this.currentIndex}: element needs intermediate action (hidden by ancestor)`);
             return;
           }
 
@@ -936,11 +955,15 @@
           this._startPositionTracking(step, result);
           this._setupClickAdvance(result.element, step);
           this._stopElementPolling();
+        } else if (pollCount === 1 || pollCount % 20 === 0) {
+          // Log on first poll and every 3 seconds
+          log(`Step ${this.currentIndex}: element NOT found (poll #${pollCount}, url=${window.location.href.slice(0,50)})`);
         }
       };
 
+      log(`Starting element polling for step ${this.currentIndex} (urlMismatch=${urlMismatch})`);
       poll();
-      this._pollInterval = setInterval(poll, 150); // Tango's 150ms timing
+      this._pollInterval = setInterval(poll, 150);
     }
 
     _handleUrlChange(newUrl: string, oldUrl: string): void {
@@ -999,9 +1022,9 @@
     }
 
     async showStep(index: number): Promise<void> {
-      console.log(`[stept] showStep(${index}) of ${this.steps.length}`);
+      log(`showStep(${index}) of ${this.steps.length}, url=${window.location.href.slice(0,60)}`);
       if (index < 0 || index >= this.steps.length) {
-        console.log(`[stept] showStep(${index}) — out of bounds, stopping`);
+        log(`showStep(${index}) — OUT OF BOUNDS, stopping`);
         this.stop();
         return;
       }
@@ -1012,11 +1035,12 @@
 
       const step = this.steps[index];
       const actionType = (step.action_type || '').toLowerCase();
-      console.log(`[stept] Step ${index}: actionType="${actionType}", title="${step.title || ''}", url="${step.expected_url || ''}"`, step.element_info ? `tag=${step.element_info.tagName}, text="${step.element_info.content || step.element_info.text || ''}"` : 'no element_info');
+      const ei = (step as any).element_info || {};
+      log(`Step ${index}: type="${actionType}", tag=${ei.tagName || 'none'}, text="${(ei.content || ei.text || '').slice(0,40)}", expectedUrl=${(step.expected_url || '').slice(0,50)}`);
 
       // Navigate steps auto-advance
       if (actionType === 'navigate') {
-        console.log(`[stept] Navigate step — auto-advancing to ${index + 1}`);
+        log(`Navigate step ${index} — auto-advancing to ${index + 1}`);
         const nextIndex = index + 1;
         chrome.runtime.sendMessage({
           type: 'GUIDE_STEP_CHANGED',
@@ -1302,8 +1326,10 @@
 
   chrome.runtime.onMessage.addListener((message: { type: string; guide: Guide; startIndex?: number; stepIndex?: number }, _sender: any, sendResponse: (response?: any) => void) => {
     if (message.type === "START_GUIDE") {
+      log('>>> START_GUIDE received', { startIndex: message.startIndex, steps: message.guide?.steps?.length, url: window.location.href });
       try {
         if (activeRunner) {
+          log('Stopping previous runner');
           activeRunner._replacing = true;
           activeRunner.stop();
         }
@@ -1311,17 +1337,21 @@
         activeRunner = runner;
         _window.__steptGuideRunner = runner;
         const startAt = (typeof message.startIndex === "number" && message.startIndex > 0) ? message.startIndex : 0;
+        log('Starting runner at step', startAt);
         runner.currentIndex = startAt;
         runner.start(startAt);
         sendResponse({ success: true });
       } catch (e: unknown) {
+        log('START_GUIDE ERROR:', (e as Error).message);
         sendResponse({ success: false, error: (e as Error).message });
       }
     } else if (message.type === "GUIDE_GOTO") {
+      log('>>> GUIDE_GOTO received', { stepIndex: message.stepIndex, hasRunner: !!activeRunner, url: window.location.href });
       if (activeRunner && typeof message.stepIndex === "number") {
         activeRunner.showStep(message.stepIndex);
         sendResponse({ success: true });
       } else {
+        log('GUIDE_GOTO FAILED — no runner or invalid index');
         sendResponse({ success: false });
       }
     } else if (message.type === "PING") {
