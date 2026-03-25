@@ -376,7 +376,8 @@
       
       if (bestCandidate && bestScore > 0) {
         const maxPossible = calculateMaxPossible(step);
-        const minRequired = Math.floor(maxPossible * 0.3); // 30% minimum
+        // Tango uses a fixed threshold of 4 points — proven to reduce false matches
+        const minRequired = maxPossible < 8 ? Math.floor(maxPossible * 0.5) : 4;
         
         if (bestScore >= minRequired) {
           return {
@@ -936,10 +937,9 @@
     
     const best = allScorecards[0];
     
-    // Minimum score threshold (Tango's ratio approach)
-    // Calculate max possible score for this step's data
+    // Tango uses a fixed threshold of 4 points minimum
     const maxPossible = calculateMaxPossible(step);
-    const minRequired = Math.floor(maxPossible * 0.3); // 30% minimum
+    const minRequired = maxPossible < 8 ? Math.floor(maxPossible * 0.5) : 4;
     
     if (best.score < minRequired) return null;
     
@@ -1015,6 +1015,20 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    .guide-tooltip-done {
+      margin-left: 4px;
+      padding: 2px 8px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 10px;
+      color: #FFFFFF;
+      font-size: 11px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .guide-tooltip-done:hover { background: rgba(255, 255, 255, 0.3); }
 
     @keyframes guide-tooltip-in {
       from { opacity: 0; transform: translateY(6px); }
@@ -1120,6 +1134,8 @@
     _completionTimeout: ReturnType<typeof setTimeout> | null;
     // Element disconnection watchdog (SPA re-render detection)
     _disconnectObserver: MutationObserver | null;
+    // Double-advance guard
+    _advancing: boolean;
     // Position tracking via rAF
     _positionFrame: number | null;
     // Multi-page handling
@@ -1156,6 +1172,8 @@
       this._completionTimeout = null;
       // Element disconnection watchdog
       this._disconnectObserver = null;
+      // Double-advance guard
+      this._advancing = false;
       // Position tracking via rAF
       this._positionFrame = null;
       // Multi-page handling
@@ -1765,6 +1783,8 @@
         this.stop();
         return;
       }
+      // Reset double-advance guard
+      this._advancing = false;
       // Concurrency guard: if another showStep starts, this one aborts
       const seq = ++this._stepSeq;
       this.currentIndex = index;
@@ -1776,30 +1796,37 @@
       // Navigate / new-tab steps have no element to highlight — auto-advance
       const isNavigateStep = actionType === 'navigate';
       if (isNavigateStep) {
+        const nextIndex = index + 1;
+        // Notify background of the NEXT step (not current) so it has the right index
+        // when re-injecting after page navigation
         chrome.runtime.sendMessage({
           type: 'GUIDE_STEP_CHANGED',
-          currentIndex: index,
+          currentIndex: nextIndex,
           totalSteps: this.steps.length,
-          stepStatus: 'completed',
+          stepStatus: 'active',
         }).catch(() => {});
-        // Small delay so the sidepanel can update, then advance
-        await new Promise<void>((r) => setTimeout(r, 300));
+        // Brief delay for background state to update
+        await new Promise<void>((r) => setTimeout(r, 100));
         if (this._stepSeq !== seq) return;
-        this.showStep(index + 1);
+        if (nextIndex >= this.steps.length) {
+          this.stop();
+          return;
+        }
+        this.showStep(nextIndex);
         return;
       }
 
-      // Hover steps can't be guided — treat as roadblock
+      // Hover steps — still try to find the element and show tooltip with ✓ button
+      // User performs the hover action manually, then clicks ✓ to advance
       const isHoverStep = actionType.includes('hover') || actionType.includes('mouseover');
       if (isHoverStep) {
         chrome.runtime.sendMessage({
           type: 'GUIDE_STEP_CHANGED',
           currentIndex: index,
           totalSteps: this.steps.length,
-          stepStatus: 'roadblock',
+          stepStatus: 'active',
         }).catch(() => {});
-        this._renderRoadblock(step);
-        return;
+        // Fall through to normal element finding — the tooltip has a ✓ button
       }
 
       // Check URL mismatch
@@ -1933,15 +1960,42 @@
       const tooltip = document.createElement("div");
       tooltip.className = "guide-tooltip";
 
-      // Tango-style dark pill: coral dot + step instruction text
       const stepText = step.title || step.description || `Step ${this.currentIndex + 1}`;
       tooltip.innerHTML = `
         <span class="guide-tooltip-dot"></span>
         <span class="guide-tooltip-text">${this._esc(stepText)}</span>
+        <button class="guide-tooltip-done" type="button">✓</button>
       `;
 
-      // Non-interactive — all actions happen via the side panel
-      tooltip.style.pointerEvents = "none";
+      // Enable pointer events for the done button
+      tooltip.style.pointerEvents = "auto";
+
+      // Stop events from reaching the page (prevents modal "outside click" handlers)
+      for (const evt of ["click", "mousedown", "mouseup", "pointerdown", "pointerup"]) {
+        tooltip.addEventListener(evt, (e: Event) => e.stopPropagation());
+      }
+
+      // Wire up done button
+      const doneBtn = tooltip.querySelector('.guide-tooltip-done');
+      if (doneBtn) {
+        doneBtn.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          const nextIndex = this.currentIndex + 1;
+          this._removeClickHandler();
+          this._disconnectCompletionObserver();
+          chrome.runtime.sendMessage({
+            type: 'GUIDE_STEP_CHANGED',
+            currentIndex: nextIndex,
+            totalSteps: this.steps.length,
+            stepStatus: 'active',
+          }).catch(() => {});
+          if (nextIndex >= this.steps.length) {
+            this.stop();
+          } else {
+            setTimeout(() => this.showStep(nextIndex), 100);
+          }
+        });
+      }
 
       return tooltip;
     }
@@ -2064,6 +2118,8 @@
       const isOption = element.tagName === 'OPTION' || (element as HTMLElement).role === 'option';
 
       const advance = (): void => {
+        if (this._advancing) return; // prevent double-advance
+        this._advancing = true;
         this._removeClickHandler();
         if (nextIndex >= this.steps.length) {
           this.stop();
