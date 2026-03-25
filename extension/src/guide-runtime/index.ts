@@ -187,7 +187,16 @@
     if (rect.width === 0 && rect.height === 0) return false;
     const win = (el as HTMLElement).ownerDocument?.defaultView || window;
     const style = win.getComputedStyle(el);
-    return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+    // Also check ancestors for hidden containers (prevents false matches
+    // in elements that are technically styled visible but inside hidden parents)
+    let parent = el.parentElement;
+    while (parent && parent !== document.documentElement) {
+      const ps = win.getComputedStyle(parent);
+      if (ps.display === "none" || ps.visibility === "hidden") return false;
+      parent = parent.parentElement;
+    }
+    return true;
   }
 
   function normalizeText(s: string): string {
@@ -521,28 +530,41 @@
   function isObstructed(el: Element): Element | null {
     if (!el || !el.getBoundingClientRect) return null;
     const rect = el.getBoundingClientRect();
+    // Check center and also near edges (element might be partially covered)
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     const topEl = document.elementFromPoint(centerX, centerY);
     if (!topEl) return null;
-    if (topEl === el || el.contains(topEl)) return null;
+    if (topEl === el || el.contains(topEl) || topEl.contains(el)) return null;
     // Check if it's part of our overlay
     let node: Element | null = topEl;
     while (node) {
       if (node.tagName && node.tagName.toLowerCase() === 'stept-guide-overlay') return null;
       node = node.parentElement;
     }
-    return topEl;
+    // Only report as obstructed if the blocking element is a modal/dialog/overlay
+    // (high z-index fixed/absolute positioned). Don't flag normal page elements
+    // that happen to overlap at the center point.
+    const topStyle = window.getComputedStyle(topEl);
+    const position = topStyle.position;
+    const zIndex = parseInt(topStyle.zIndex, 10);
+    if ((position === 'fixed' || position === 'absolute') && zIndex > 100) {
+      return topEl;
+    }
+    // Also check for dialog/modal roles
+    const role = topEl.getAttribute('role') || topEl.closest('[role="dialog"], [role="alertdialog"], [aria-modal="true"]')?.getAttribute('role');
+    if (role === 'dialog' || role === 'alertdialog') return topEl;
+    return null;
   }
 
   // ── Intermediate Action Detection (Feature 8) ───────────────────
 
   function needsIntermediateAction(el: Element): HTMLElement | null {
+    // Only check for truly interactive collapsed containers that the user
+    // can expand. Don't check display:none/visibility:hidden — isVisible()
+    // already filters those out, so if we got here the element IS visible.
     let node: HTMLElement | null = (el as HTMLElement).parentElement;
     while (node && node !== document.documentElement) {
-      const style = window.getComputedStyle(node);
-      if (style.display === 'none') return node;
-      if (style.visibility === 'hidden') return node;
       if (node.getAttribute('aria-expanded') === 'false') return node;
       if (node.tagName === 'DETAILS' && !node.hasAttribute('open')) return node;
       node = node.parentElement;
@@ -1024,8 +1046,8 @@
     _startElementPolling(step: GuideStep, seq: number, urlMismatch: boolean): void {
       this._stopElementPolling();
       let tickCount = 0;
-      const POLL_MS = 150;       // Slightly slower polling to reduce CPU
-      const TIMEOUT_TICKS = 13;  // ~2 seconds before showing roadblock (was 3s)
+      const POLL_MS = 200;       // 200ms between polls
+      const TIMEOUT_TICKS = 25;  // ~5 seconds before LLM recovery attempt
       let lastStatus: string | null = null;
       let healthReported = false;
 
@@ -1410,6 +1432,34 @@
       
       // Show enhanced not-found panel with recovery info
       this._renderNotFound(step, urlMismatch);
+
+      // Keep a slow background poll running — element may appear later
+      // (e.g., lazy-loaded content, SPA re-render, user scrolls)
+      const seq = this._stepSeq;
+      this._pollInterval = setInterval(async () => {
+        if (this._stepSeq !== seq) { this._stopElementPolling(); return; }
+        const result = await findGuideElement(step);
+        if (this._stepSeq !== seq) return;
+        if (result) {
+          this._stopElementPolling();
+          // Element appeared! Clear the not-found panel and show overlay
+          if (this._notFoundPanel) { this._notFoundPanel.remove(); this._notFoundPanel = null; }
+          this.currentResult = result;
+          chrome.runtime.sendMessage({
+            type: 'GUIDE_STEP_CHANGED',
+            currentIndex: this.currentIndex,
+            totalSteps: this.steps.length,
+            stepStatus: 'active',
+          }).catch(() => {});
+          const obstructor = isObstructed(result.element);
+          await this._scrollToElement(result);
+          if (this._stepSeq !== seq) return;
+          this._renderOverlay(step, result, urlMismatch, obstructor);
+          this._startPositionTracking(step, result);
+          this._setupClickAdvance(result.element, step);
+          this._setupCompletionDetection(result.element, step);
+        }
+      }, 2000); // Check every 2s in background
     }
 
     _handleUrlChange(newUrl: string, oldUrl: string): void {
@@ -1867,7 +1917,7 @@
         <div class="guide-tooltip-actions" style="justify-content: center;">
           ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
           <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
-          <button class="guide-btn guide-btn-primary" data-action="close">Close</button>
+          <button class="guide-btn guide-btn-primary" data-action="retry">Try again</button>
         </div>
       `;
 
@@ -1882,14 +1932,15 @@
         const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
         if (!action) return;
         switch (action) {
+          case "retry":
+            // Re-run the current step (restarts element polling from scratch)
+            this.showStep(this.currentIndex);
+            break;
           case "back":
             this.showStep(this.currentIndex - 1);
             break;
           case "skip":
             this.showStep(this.currentIndex + 1);
-            break;
-          case "close":
-            this.stop();
             break;
           case "navigate": {
             const navStep = this.steps[this.currentIndex];
