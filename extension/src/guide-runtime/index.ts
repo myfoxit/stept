@@ -1104,6 +1104,8 @@
     _completionObserver: MutationObserver | null;
     _completionCleanup: (() => void) | null;
     _completionTimeout: ReturnType<typeof setTimeout> | null;
+    // Element disconnection watchdog (SPA re-render detection)
+    _disconnectObserver: MutationObserver | null;
     // Position tracking via rAF
     _positionFrame: number | null;
     // Multi-page handling
@@ -1138,6 +1140,8 @@
       this._completionObserver = null;
       this._completionCleanup = null;
       this._completionTimeout = null;
+      // Element disconnection watchdog
+      this._disconnectObserver = null;
       // Position tracking via rAF
       this._positionFrame = null;
       // Multi-page handling
@@ -1163,6 +1167,7 @@
 
     stop(): void {
       this._stopElementPolling();
+      this._stopDisconnectWatchdog();
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
@@ -1232,6 +1237,7 @@
 
     _clearOverlay(): void {
       this._stopElementPolling();
+      this._stopDisconnectWatchdog();
       this._clearPositionTracking();
       this._removeClickHandler();
       this._disconnectCompletionObserver();
@@ -1247,6 +1253,52 @@
         clearInterval(this._pollInterval);
         this._pollInterval = null;
       }
+    }
+
+    _stopDisconnectWatchdog(): void {
+      if (this._disconnectObserver) {
+        this._disconnectObserver.disconnect();
+        this._disconnectObserver = null;
+      }
+    }
+
+    _startDisconnectWatchdog(element: Element, step: GuideStep, seq: number, urlMismatch: boolean): void {
+      this._stopDisconnectWatchdog();
+      const parent = element.parentNode;
+      if (!parent) return;
+
+      this._disconnectObserver = new MutationObserver(() => {
+        if (this._stepSeq !== seq) { this._stopDisconnectWatchdog(); return; }
+        if (element.isConnected) return; // still attached, ignore
+
+        // Element was removed from DOM (SPA re-render)
+        this._stopDisconnectWatchdog();
+        this._clearPositionTracking();
+        this._removeClickHandler();
+        this._disconnectCompletionObserver();
+
+        // Try to re-find the element immediately
+        findGuideElement(step).then(async (newResult) => {
+          if (this._stepSeq !== seq) return;
+          if (newResult) {
+            // Re-found: re-attach everything
+            this.currentResult = newResult;
+            const obstructor = isObstructed(newResult.element);
+            await this._scrollToElement(newResult);
+            if (this._stepSeq !== seq) return;
+            this._renderOverlay(step, newResult, urlMismatch, obstructor);
+            this._startPositionTracking(step, newResult);
+            this._setupClickAdvance(newResult.element, step);
+            this._setupCompletionDetection(newResult.element, step);
+            this._startDisconnectWatchdog(newResult.element, step, seq, urlMismatch);
+          } else {
+            // Not found yet — restart element polling
+            this._startElementPolling(step, seq, urlMismatch);
+          }
+        });
+      });
+
+      this._disconnectObserver.observe(parent, { childList: true, subtree: true });
     }
 
     _startElementPolling(step: GuideStep, seq: number, urlMismatch: boolean): void {
@@ -1317,6 +1369,8 @@
             this._setupCompletionDetection(result.element, step);
             // Stop polling once element is found and handlers are set up
             this._stopElementPolling();
+            // Start watchdog to detect SPA re-renders that disconnect the element
+            this._startDisconnectWatchdog(result.element, step, seq, urlMismatch);
           }
         } else {
           tickCount++;
@@ -1390,7 +1444,8 @@
             this._startPositionTracking(step, result);
             this._setupClickAdvance(result.element, step);
             this._setupCompletionDetection(result.element, step);
-            
+            this._startDisconnectWatchdog(result.element, step, seq, urlMismatch);
+
             return; // Success!
           }
         }
@@ -1595,6 +1650,7 @@
           this._startPositionTracking(step, result);
           this._setupClickAdvance(result.element, step);
           this._setupCompletionDetection(result.element, step);
+          this._startDisconnectWatchdog(result.element, step, seq, urlMismatch);
         }
       }, 2000); // Check every 2s in background
     }
