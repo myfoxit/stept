@@ -356,8 +356,40 @@
     return findByText(Array.from(allInteractive), content, { fuzzy: true });
   }
 
-  // Search a single root for the step's element using the NEW three-layer approach
+  // Search a single root for the step's element using the NEW scoring approach
   function findInRoot(root: Document | ShadowRoot, step: GuideStep): FindResult | null {
+    // Primary approach: Multi-signal scoring
+    const candidates = collectCandidates(root, step);
+    if (candidates.length > 0) {
+      let bestScore = 0;
+      let bestCandidate: Element | null = null;
+      let bestWins: string[] = [];
+      
+      for (const candidate of candidates) {
+        const scorecard = scoreCandidate(candidate, step);
+        if (scorecard.score > bestScore) {
+          bestScore = scorecard.score;
+          bestCandidate = candidate;
+          bestWins = scorecard.wins;
+        }
+      }
+      
+      if (bestCandidate && bestScore > 0) {
+        const maxPossible = calculateMaxPossible(step);
+        const minRequired = Math.floor(maxPossible * 0.3); // 30% minimum
+        
+        if (bestScore >= minRequired) {
+          return {
+            element: bestCandidate,
+            confidence: bestScore / maxPossible,
+            method: `scoring(${bestWins.join(',')})`
+          };
+        }
+      }
+    }
+
+    // Fallback cascade for edge cases and backward compatibility
+    
     // Layer 1: Try new SelectorTree structure first
     if ((step as any).element_info?.selectorTree) {
       const treeResult = findElementByTree((step as any).element_info.selectorTree, (step as any).element_info?.content);
@@ -365,8 +397,6 @@
         return { element: treeResult.element, confidence: treeResult.confidence, method: treeResult.method };
       }
     }
-
-    // Fallback to existing strategies for backward compatibility
 
     // CSS selector
     if (step.selector) {
@@ -606,6 +636,331 @@
     if (label) return `${tag} "${label}"`;
     if (text) return `${tag} "${text}"`;
     return tag;
+  }
+
+  // ── Multi-Signal Scoring System ───────────────────────────────────
+
+  const POINT_MAP: Record<string, number> = {
+    automationIdExact: 10,
+    accessibleNameExact: 9,
+    labelExact: 9,
+    labelledByMatch: 6,
+    contenteditable: 5,
+    labelLoose: 5,
+    accessibleNameLoose: 4,
+    attributesId: 4,
+    attributesName: 4,
+    attributesHref: 3,
+    parentMatch: 3,
+    fingerprintMatch: 3,
+    attributesClassExact: 2,
+    attributesDataset: 2,
+    attributesPlaceholder: 2,
+    attributesRole: 2,
+    attributesValue: 2,
+    boundsSizeExact: 2,
+    cssSelector: 2,
+    childMatch: 2,
+    parentTextExact: 2,
+    attributesTagName: 1,
+    attributesType: 1,
+    attributesClassPartial: 1,
+    boundsSizeLoose: 1,
+    parentTextPartial: 1,
+  };
+
+  interface Scorecard {
+    element: Element;
+    score: number;
+    wins: string[];
+  }
+
+  function computeElementHash(el: Element): string {
+    const parts = [];
+    // Parent path (tag names only, no indices — survives reordering)
+    let p = el.parentElement;
+    const parents = [];
+    while (p && p !== document.body) {
+      parents.unshift(p.tagName.toLowerCase());
+      p = p.parentElement;
+    }
+    parts.push(parents.join('/'));
+    
+    // Stable attributes only
+    const stable = ['role', 'name', 'type', 'placeholder', 'aria-label', 'href', 'data-testid'];
+    for (const attr of stable) {
+      const v = el.getAttribute(attr);
+      if (v) parts.push(`${attr}=${v}`);
+    }
+    
+    // Accessible name
+    if ((el as any).computedName) parts.push(`an=${(el as any).computedName}`);
+    
+    return parts.join('|');
+  }
+
+  function collectCandidates(root: Document | ShadowRoot, step: GuideStep): Element[] {
+    const tag = step.element_info?.tagName;
+    const candidates: Element[] = [];
+    
+    // Start with elements matching the tag
+    if (tag) {
+      candidates.push(...Array.from(root.querySelectorAll(tag)));
+    }
+    
+    // Add all interactive elements (for cross-tag matches)
+    const interactive = 'a,button,input,select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"],[tabindex]:not([tabindex="-1"]),[onclick],[contenteditable="true"]';
+    candidates.push(...Array.from(root.querySelectorAll(interactive)));
+    
+    // Deduplicate
+    return [...new Set(candidates)].filter(el => isVisible(el));
+  }
+
+  function scoreCandidate(el: Element, step: GuideStep): Scorecard {
+    const sc: Scorecard = { element: el, score: 0, wins: [] };
+    const info = step.element_info || {};
+    
+    function award(key: string) {
+      sc.score += POINT_MAP[key] || 0;
+      sc.wins.push(key);
+    }
+    
+    // --- Tag ---
+    if (info.tagName && el.tagName.toLowerCase() === info.tagName.toLowerCase()) {
+      award('attributesTagName');
+    }
+    
+    // --- Automation ID (data-testid, data-cy, etc.) ---
+    const testId = info.testId || (info as any).testId;
+    if (testId) {
+      for (const attr of ['data-testid', 'data-test', 'data-cy', 'data-qa', 'data-automation-id']) {
+        if (el.getAttribute(attr) === testId) {
+          award('automationIdExact');
+          break;
+        }
+      }
+    }
+    
+    // --- Accessible Name (NEW - strongest text signal) ---
+    const recordedName = (info as any).computedName;
+    const currentName = (el as any).computedName;
+    if (recordedName && currentName) {
+      if (currentName === recordedName) award('accessibleNameExact');
+      else if (normalizeText(currentName).includes(normalizeText(recordedName)) ||
+               normalizeText(recordedName).includes(normalizeText(currentName))) {
+        award('accessibleNameLoose');
+      }
+    }
+    
+    // --- Label/Text (Tango's labelExact/labelLoose) ---
+    const recordedText = (info as any).content || (info as any).text || step.element_text;
+    if (recordedText) {
+      const elText = (el.textContent || '').trim();
+      const normalized = normalizeText(elText);
+      const target = normalizeText(recordedText);
+      if (normalized === target) award('labelExact');
+      else if (normalized.includes(target) || target.includes(normalized)) award('labelLoose');
+    }
+    
+    // --- ID (only if stable) ---
+    if ((info as any).id && el.id === (info as any).id && !(/\d/.test((info as any).id))) {
+      award('attributesId');
+    }
+    
+    // --- Placeholder ---
+    if ((info as any).placeholder && (el as HTMLInputElement).placeholder === (info as any).placeholder) {
+      award('attributesPlaceholder');
+    }
+    
+    // --- aria-label ---
+    if ((info as any).ariaLabel && el.getAttribute('aria-label') === (info as any).ariaLabel) {
+      award('labelExact');  // Same weight as text match
+    }
+    
+    // --- Role ---
+    if ((info as any).role && (el.getAttribute('role') === (info as any).role || (el as any).computedRole === (info as any).role)) {
+      award('attributesRole');
+    }
+    
+    // --- Name attribute ---
+    if ((info as any).name && el.getAttribute('name') === (info as any).name) {
+      award('attributesName');
+    }
+    
+    // --- Type ---
+    if ((info as any).type && (el as HTMLInputElement).type === (info as any).type) {
+      award('attributesType');
+    }
+    
+    // --- Href ---
+    if ((info as any).href && (el as HTMLAnchorElement).href) {
+      if ((el as HTMLAnchorElement).href === (info as any).href) award('attributesHref');
+      else if ((el as HTMLAnchorElement).href.includes((info as any).href) || (info as any).href.includes((el as HTMLAnchorElement).href)) {
+        award('attributesHref'); // partial
+      }
+    }
+    
+    // --- CSS Selector (only if it uniquely matches THIS element) ---
+    if (step.selector) {
+      try {
+        const matched = document.querySelector(step.selector);
+        if (matched === el) award('cssSelector');
+      } catch {}
+    }
+    
+    // --- CSS Selectors from selectorSet/selectorTree ---
+    const selectorSet = (info as any).selectorSet;
+    const selectorTree = (info as any).selectorTree;
+    if (selectorSet && Array.isArray(selectorSet)) {
+      for (const sel of selectorSet) {
+        try {
+          const matched = document.querySelector(sel);
+          if (matched === el) {
+            award('cssSelector');
+            break;
+          }
+        } catch {}
+      }
+    } else if (selectorTree && selectorTree.selectors && Array.isArray(selectorTree.selectors)) {
+      for (const sel of selectorTree.selectors) {
+        try {
+          const matched = document.querySelector(sel);
+          if (matched === el) {
+            award('cssSelector');
+            break;
+          }
+        } catch {}
+      }
+    }
+    
+    // --- Bounds (element dimensions) ---
+    if ((info as any).elementRect) {
+      const rect = el.getBoundingClientRect();
+      const recorded = (info as any).elementRect;
+      if (Math.round(rect.width) === recorded.width && 
+          Math.round(rect.height) === recorded.height) {
+        award('boundsSizeExact');
+      } else if (recorded.width > 0 && recorded.height > 0) {
+        const wDiff = Math.abs(rect.width - recorded.width) / recorded.width;
+        const hDiff = Math.abs(rect.height - recorded.height) / recorded.height;
+        if (wDiff < 0.1 && hDiff < 0.1) award('boundsSizeLoose');
+      }
+    }
+    
+    // --- Class (with dynamic filtering) ---
+    if ((info as any).className && el.className) {
+      const DYNAMIC = /\b(focus|hover|active|selected|loading|animate|transition|visible|hidden|open|closed)\b/gi;
+      const recorded = ((info as any).className || '').replace(DYNAMIC, '').trim();
+      const current = (typeof el.className === 'string' ? el.className : '').replace(DYNAMIC, '').trim();
+      if (recorded === current) award('attributesClassExact');
+      else if (recorded && current) {
+        const recSet = new Set<string>(recorded.split(/\s+/));
+        const curSet = new Set<string>(current.split(/\s+/));
+        const overlap = [...recSet].filter(c => curSet.has(c)).length;
+        if (overlap > 0 && overlap >= recSet.size * 0.5) award('attributesClassPartial');
+      }
+    }
+    
+    // --- Parent text ---
+    if ((info as any).parentText && el.parentElement) {
+      const pt = (el.parentElement.textContent || '').trim().slice(0, 100);
+      const recordedParentText = String((info as any).parentText || '');
+      if (pt === recordedParentText) award('parentTextExact');
+      else if (pt.includes(recordedParentText.slice(0, 30))) award('parentTextPartial');
+    }
+    
+    // --- Fingerprint (NEW) ---
+    if ((info as any).fingerprint) {
+      const currentFP = computeElementHash(el);
+      if (currentFP === (info as any).fingerprint) award('fingerprintMatch');
+    }
+    
+    // --- Contenteditable ---
+    if (el.getAttribute('contenteditable') === 'true') {
+      award('contenteditable');
+    }
+    
+    return sc;
+  }
+
+  function calculateMaxPossible(step: GuideStep): number {
+    const info = step.element_info || {};
+    let maxScore = 0;
+    
+    // Check which signals are available and add their max points
+    if (info.tagName) maxScore += POINT_MAP.attributesTagName;
+    if ((info as any).testId) maxScore += POINT_MAP.automationIdExact;
+    if ((info as any).computedName) maxScore += POINT_MAP.accessibleNameExact;
+    if ((info as any).content || (info as any).text || step.element_text) maxScore += POINT_MAP.labelExact;
+    if ((info as any).id) maxScore += POINT_MAP.attributesId;
+    if ((info as any).placeholder) maxScore += POINT_MAP.attributesPlaceholder;
+    if ((info as any).ariaLabel) maxScore += POINT_MAP.labelExact;
+    if ((info as any).role) maxScore += POINT_MAP.attributesRole;
+    if ((info as any).name) maxScore += POINT_MAP.attributesName;
+    if ((info as any).type) maxScore += POINT_MAP.attributesType;
+    if ((info as any).href) maxScore += POINT_MAP.attributesHref;
+    if (step.selector || (info as any).selectorSet || (info as any).selectorTree) maxScore += POINT_MAP.cssSelector;
+    if ((info as any).elementRect) maxScore += POINT_MAP.boundsSizeExact;
+    if ((info as any).className) maxScore += POINT_MAP.attributesClassExact;
+    if ((info as any).parentText) maxScore += POINT_MAP.parentTextExact;
+    if ((info as any).fingerprint) maxScore += POINT_MAP.fingerprintMatch;
+    
+    return Math.max(maxScore, 1); // At minimum, tag name should be worth something
+  }
+
+  function distanceToRecordedPosition(el: Element, recordedRect: any): number {
+    const currentRect = el.getBoundingClientRect();
+    const dx = currentRect.left - recordedRect.left;
+    const dy = currentRect.top - recordedRect.top;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function findElementByScoring(step: GuideStep): FindResult | null {
+    const searchRoots = collectSearchRoots();
+    let allScorecards: Scorecard[] = [];
+    
+    for (const { root, iframeOffset } of searchRoots) {
+      const candidates = collectCandidates(root, step);
+      for (const el of candidates) {
+        const sc = scoreCandidate(el, step);
+        if (sc.score > 0) {
+          allScorecards.push(sc);
+        }
+      }
+    }
+    
+    // Sort by score descending
+    allScorecards.sort((a, b) => b.score - a.score);
+    
+    if (allScorecards.length === 0) return null;
+    
+    const best = allScorecards[0];
+    
+    // Minimum score threshold (Tango's ratio approach)
+    // Calculate max possible score for this step's data
+    const maxPossible = calculateMaxPossible(step);
+    const minRequired = Math.floor(maxPossible * 0.3); // 30% minimum
+    
+    if (best.score < minRequired) return null;
+    
+    // If top two candidates are very close, use viewport proximity as tiebreaker
+    if (allScorecards.length > 1) {
+      const second = allScorecards[1];
+      if (best.score - second.score <= 2 && step.element_info && (step.element_info as any).elementRect) {
+        // Tiebreaker: prefer element closest to recorded position
+        const bestDist = distanceToRecordedPosition(best.element, (step.element_info as any).elementRect);
+        const secondDist = distanceToRecordedPosition(second.element, (step.element_info as any).elementRect);
+        if (secondDist < bestDist * 0.5) {
+          return { element: second.element, confidence: second.score / maxPossible, method: 'scoring+position' };
+        }
+      }
+    }
+    
+    return { 
+      element: best.element, 
+      confidence: best.score / maxPossible, 
+      method: `scoring(${best.wins.join(',')})` 
+    };
   }
 
   // ── Overlay Renderer ──────────────────────────────────────────────
