@@ -2271,6 +2271,8 @@
       } else {
         sendResponse({ success: false });
       }
+    } else if (message.type === "PING") {
+      sendResponse({ pong: true });
     } else if (message.type === "STOP_GUIDE") {
       if (activeRunner) activeRunner.stop();
       sendResponse({ success: true });

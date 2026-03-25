@@ -35,11 +35,27 @@ export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: num
   const onCompleted = (details: chrome.webNavigation.WebNavigationFramedCallbackDetails) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
     chrome.webNavigation.onCompleted.removeListener(onCompleted);
-    setTimeout(async () => {
+    // Ping/retry: wait for content script to be ready instead of hardcoded 1500ms delay
+    (async () => {
+      const MAX_ATTEMPTS = 20;
+      const INTERVAL_MS = 200;
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        try {
+          const resp = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+          if (resp && (resp as any).pong) {
+            await _injectGuideNow(tabId, guide, startIndex);
+            return;
+          }
+        } catch {
+          // Content script not ready yet
+        }
+        await new Promise((r) => setTimeout(r, INTERVAL_MS));
+      }
+      // Final fallback: try injection anyway after all retries exhausted
       try {
         await _injectGuideNow(tabId, guide, startIndex);
       } catch (e) { debugLog('Guide inject after load failed:', e); }
-    }, 1500);
+    })();
   };
   chrome.webNavigation.onCompleted.addListener(onCompleted);
 }
