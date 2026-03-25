@@ -1992,14 +1992,9 @@
     _startPositionTracking(step: GuideStep, result: FindResult): void {
       const update = () => {
         if (!result.element || !result.element.isConnected) {
-          // Element removed from DOM — try to re-find
-          findGuideElement(step).then((newResult) => {
-            if (newResult) {
-              this.currentResult = newResult;
-              result = newResult;
-            }
-          });
-          this._positionFrame = requestAnimationFrame(update);
+          // Element disconnected — cancel rAF and let the disconnect watchdog handle re-finding.
+          // The watchdog (MutationObserver on parent) will trigger re-find + re-setup.
+          this._positionFrame = null;
           return;
         }
 
