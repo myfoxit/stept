@@ -999,7 +999,9 @@
     }
 
     async showStep(index: number): Promise<void> {
+      console.log(`[stept] showStep(${index}) of ${this.steps.length}`);
       if (index < 0 || index >= this.steps.length) {
+        console.log(`[stept] showStep(${index}) — out of bounds, stopping`);
         this.stop();
         return;
       }
@@ -1010,9 +1012,11 @@
 
       const step = this.steps[index];
       const actionType = (step.action_type || '').toLowerCase();
+      console.log(`[stept] Step ${index}: actionType="${actionType}", title="${step.title || ''}", url="${step.expected_url || ''}"`, step.element_info ? `tag=${step.element_info.tagName}, text="${step.element_info.content || step.element_info.text || ''}"` : 'no element_info');
 
       // Navigate steps auto-advance
       if (actionType === 'navigate') {
+        console.log(`[stept] Navigate step — auto-advancing to ${index + 1}`);
         const nextIndex = index + 1;
         chrome.runtime.sendMessage({
           type: 'GUIDE_STEP_CHANGED',

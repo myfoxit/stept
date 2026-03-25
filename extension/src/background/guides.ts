@@ -6,6 +6,9 @@ import {
 import { authedFetch } from './auth';
 import { getApiBaseUrl } from './settings';
 
+// Guard against double-injection: tracks tabs where _injectGuideAfterLoad is pending
+const pendingAfterLoadTabs = new Set<number>();
+
 export async function _injectGuideNow(tabId: number, guide: any, startIndex: number): Promise<void> {
   // First try lightweight step jump if runner is already active (with retries)
   if (startIndex > 0) {
@@ -31,10 +34,14 @@ export async function _injectGuideNow(tabId: number, guide: any, startIndex: num
   await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
 }
 
+export { pendingAfterLoadTabs };
+
 export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: number): void {
+  pendingAfterLoadTabs.add(tabId);
   const onCompleted = (details: chrome.webNavigation.WebNavigationFramedCallbackDetails) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
     chrome.webNavigation.onCompleted.removeListener(onCompleted);
+    pendingAfterLoadTabs.delete(tabId);
     // Ping/retry: wait for content script to be ready instead of hardcoded 1500ms delay
     (async () => {
       const MAX_ATTEMPTS = 20;

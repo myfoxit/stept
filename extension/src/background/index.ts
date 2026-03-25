@@ -21,7 +21,7 @@ import {
   addStep, deleteStep,
 } from './recording';
 import { uploadCapture, beginStreamingSession, enqueueStreamingUpload, enqueueDomSnapshotUpload } from './upload';
-import { _injectGuideNow, _injectGuideAfterLoad } from './guides';
+import { _injectGuideNow, _injectGuideAfterLoad, pendingAfterLoadTabs } from './guides';
 import { trackPageChange, checkContextLinks } from './navigation';
 
 // ──────────────────────────────────────────────────────────────
@@ -971,7 +971,10 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   checkContextLinks(details.url);
 
   // Feature 7: Resume guide on navigation if there's saved progress for this tab
-  if (activeGuideState && activeGuideState.tabId === details.tabId && activeGuideState.guide) {
+  // Skip if _injectGuideAfterLoad is already handling this tab (prevents double-injection)
+  if (pendingAfterLoadTabs.has(details.tabId)) {
+    debugLog('Skipping re-inject — _injectGuideAfterLoad is handling tab', details.tabId);
+  } else if (activeGuideState && activeGuideState.tabId === details.tabId && activeGuideState.guide) {
     // Re-read currentIndex AFTER a brief wait — the GUIDE_STEP_CHANGED message
     // from auto-advancing navigate steps may still be in flight
     await new Promise((r) => setTimeout(r, 500));
