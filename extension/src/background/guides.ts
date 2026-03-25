@@ -7,13 +7,16 @@ import { authedFetch } from './auth';
 import { getApiBaseUrl } from './settings';
 
 export async function _injectGuideNow(tabId: number, guide: any, startIndex: number): Promise<void> {
-  // First try lightweight step jump if runner is already active
+  // First try lightweight step jump if runner is already active (with retries)
   if (startIndex > 0) {
-    try {
-      const resp = await chrome.tabs.sendMessage(tabId, { type: 'GUIDE_GOTO', stepIndex: startIndex });
-      if (resp && (resp as any).success) return;
-    } catch {
-      // Runner not active — fall through to full injection
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const resp = await chrome.tabs.sendMessage(tabId, { type: 'GUIDE_GOTO', stepIndex: startIndex });
+        if (resp && (resp as any).success) return;
+      } catch {
+        // Runner not active or not ready yet
+      }
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 200));
     }
   }
   // Full injection: start or restart the guide runner
