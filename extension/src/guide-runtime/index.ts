@@ -1916,8 +1916,7 @@
         </div>
         <div class="guide-tooltip-actions" style="justify-content: center;">
           ${idx > 0 ? `<button class="guide-btn guide-btn-secondary" data-action="back">Back</button>` : ""}
-          <button class="guide-btn guide-btn-ghost" data-action="skip">Skip</button>
-          <button class="guide-btn guide-btn-primary" data-action="retry">Try again</button>
+          <button class="guide-btn guide-btn-primary" data-action="skip">Skip</button>
         </div>
       `;
 
@@ -1932,10 +1931,6 @@
         const action = (e.target as HTMLElement).closest("[data-action]")?.getAttribute("data-action");
         if (!action) return;
         switch (action) {
-          case "retry":
-            // Re-run the current step (restarts element polling from scratch)
-            this.showStep(this.currentIndex);
-            break;
           case "back":
             this.showStep(this.currentIndex - 1);
             break;
