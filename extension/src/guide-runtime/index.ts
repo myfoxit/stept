@@ -397,6 +397,7 @@
     mutationObserver: MutationObserver | null;
     positionFrame: number | null;
     clickCleanup: (() => void) | null;
+    navigationCleanup: (() => void) | null;
     lastUrl: string;
     bootVersion: number;
 
@@ -412,6 +413,7 @@
       this.mutationObserver = null;
       this.positionFrame = null;
       this.clickCleanup = null;
+      this.navigationCleanup = null;
       this.lastUrl = location.href;
       this.bootVersion = 0;
       this.installNavigationHooks();
@@ -615,12 +617,30 @@
         chrome.runtime.sendMessage({ type: 'GUIDE_URL_CHANGED', oldUrl, newUrl: current, fromStep: this.currentIndex, sessionId: this.sessionId }).catch(() => {});
         this.wake();
       };
+      const wake = () => this.wake();
+      const onVisibilityChange = () => {
+        if (!document.hidden) this.wake();
+      };
+      const onFocus = () => this.wake();
+      const onPageShow = () => this.wake();
       window.addEventListener('popstate', emitUrlChange);
       window.addEventListener('hashchange', emitUrlChange);
+      window.addEventListener('focus', onFocus, true);
+      window.addEventListener('pageshow', onPageShow, true);
+      document.addEventListener('visibilitychange', onVisibilityChange, true);
       const pushState = history.pushState.bind(history);
-      history.pushState = ((...args: Parameters<History['pushState']>) => { const result = pushState(...args); emitUrlChange(); return result; }) as History['pushState'];
+      history.pushState = ((...args: Parameters<History['pushState']>) => { const result = pushState(...args); emitUrlChange(); wake(); return result; }) as History['pushState'];
       const replaceState = history.replaceState.bind(history);
-      history.replaceState = ((...args: Parameters<History['replaceState']>) => { const result = replaceState(...args); emitUrlChange(); return result; }) as History['replaceState'];
+      history.replaceState = ((...args: Parameters<History['replaceState']>) => { const result = replaceState(...args); emitUrlChange(); wake(); return result; }) as History['replaceState'];
+      this.navigationCleanup = () => {
+        window.removeEventListener('popstate', emitUrlChange);
+        window.removeEventListener('hashchange', emitUrlChange);
+        window.removeEventListener('focus', onFocus, true);
+        window.removeEventListener('pageshow', onPageShow, true);
+        document.removeEventListener('visibilitychange', onVisibilityChange, true);
+        history.pushState = pushState;
+        history.replaceState = replaceState;
+      };
     }
 
     private urlMatchesStep(step: GuideStep): boolean {

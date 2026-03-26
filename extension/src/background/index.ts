@@ -969,44 +969,57 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 });
 
-chrome.webNavigation.onCompleted.addListener(async (details) => {
-  if (details.frameId !== 0) return;
-  trackPageChange(details.tabId, 'navigation');
-  checkContextLinks(details.url);
+async function handleGuideNavigationEvent(tabId: number, url?: string, source: 'navigation' | 'history' = 'navigation'): Promise<void> {
+  trackPageChange(tabId, source);
+  if (url) checkContextLinks(url);
 
   // Feature 7: Resume guide on navigation if there's saved progress for this tab
   // Skip if _injectGuideAfterLoad is already handling this tab (prevents double-injection)
-  if (pendingAfterLoadTabs.has(details.tabId)) {
-    debugLog('Skipping re-inject — _injectGuideAfterLoad is handling tab', details.tabId);
-  } else if (activeGuideState && activeGuideState.tabId === details.tabId && activeGuideState.guide) {
-    // Re-read currentIndex AFTER a brief wait — the GUIDE_STEP_CHANGED message
-    // from auto-advancing navigate steps may still be in flight
-    await new Promise((r) => setTimeout(r, 500));
-    
-    // Re-read state after the wait (may have been updated by GUIDE_STEP_CHANGED)
-    const currentIndex = activeGuideState?.currentIndex ?? 0;
-    const step = activeGuideState?.guide?.steps?.[currentIndex];
-    if (step) {
-      try {
-        // Try to tell existing guide to jump to the right step (no restart)
-        try {
-          const resp = await chrome.tabs.sendMessage(details.tabId, {
-            type: 'GUIDE_GOTO', stepIndex: currentIndex,
-          });
-          if (resp && (resp as any).success) {
-            debugLog('Guide already running, sent GOTO to step', currentIndex);
-            return; // guide handled it, don't re-inject
-          }
-        } catch {
-          // No listener — need full inject
-        }
-        debugLog('Full guide re-inject at step', currentIndex);
-        await _injectGuideNow(details.tabId, activeGuideState!.guide, currentIndex, activeGuideState?.sessionId);
-      } catch (e) {
-        debugLog('Guide re-inject on navigation failed:', e);
-      }
-    }
+  if (pendingAfterLoadTabs.has(tabId)) {
+    debugLog('Skipping re-inject — _injectGuideAfterLoad is handling tab', tabId);
+    return;
   }
+  if (!(activeGuideState && activeGuideState.tabId === tabId && activeGuideState.guide)) {
+    return;
+  }
+
+  // Re-read currentIndex AFTER a brief wait — the GUIDE_STEP_CHANGED message
+  // from auto-advancing navigate steps may still be in flight
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Re-read state after the wait (may have been updated by GUIDE_STEP_CHANGED)
+  const currentIndex = activeGuideState?.currentIndex ?? 0;
+  const step = activeGuideState?.guide?.steps?.[currentIndex];
+  if (!step) return;
+
+  try {
+    // Try to tell existing guide to jump to the right step (no restart)
+    try {
+      const resp = await chrome.tabs.sendMessage(tabId, {
+        type: 'GUIDE_GOTO', stepIndex: currentIndex,
+      });
+      if (resp && (resp as any).success) {
+        debugLog('Guide already running, sent GOTO to step', currentIndex);
+        return; // guide handled it, don't re-inject
+      }
+    } catch {
+      // No listener — need full inject
+    }
+    debugLog('Full guide re-inject at step', currentIndex, 'after', source);
+    await _injectGuideNow(tabId, activeGuideState!.guide, currentIndex, activeGuideState?.sessionId);
+  } catch (e) {
+    debugLog('Guide re-inject on navigation failed:', e);
+  }
+}
+
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  await handleGuideNavigationEvent(details.tabId, details.url, 'navigation');
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  await handleGuideNavigationEvent(details.tabId, details.url, 'history');
 });
 
 // Listen for tab updates to inject content script into newly loaded pages
