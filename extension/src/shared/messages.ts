@@ -80,7 +80,6 @@ export type ContentMessageType =
   // Guide
   | 'START_GUIDE'
   | 'STOP_GUIDE'
-  | 'GUIDE_GOTO'
   | 'GUIDE_FIND_IN_FRAME'
   | 'GUIDE_SHOW_IMAGE';
 
