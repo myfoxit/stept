@@ -950,12 +950,6 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 });
 
-// Debounce navigation re-pushes: both onCompleted and onHistoryStateUpdated
-// can fire for the same navigation, and completeStep's GUIDE_STEP_CHANGED
-// may still be in flight. Debounce per-tab so only one inject fires.
-let _navDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-let _navDebounceTabId: number | null = null;
-
 async function handleGuideNavigationEvent(tabId: number, url?: string, source: 'navigation' | 'history' = 'navigation'): Promise<void> {
   trackPageChange(tabId, source);
   if (url) checkContextLinks(url);
@@ -964,30 +958,17 @@ async function handleGuideNavigationEvent(tabId: number, url?: string, source: '
     return;
   }
 
-  // Debounce: if we already have a pending inject for this tab, skip.
-  // This prevents double-fire from onCompleted + onHistoryStateUpdated.
-  if (_navDebounceTabId === tabId && _navDebounceTimer != null) {
-    return;
+  // Small delay for DOM to settle after navigation
+  await new Promise((r) => setTimeout(r, 100));
+
+  const currentIndex = activeGuideState?.currentIndex ?? 0;
+  if (!activeGuideState?.guide?.steps?.[currentIndex]) return;
+
+  try {
+    await _injectGuideNow(tabId, activeGuideState.guide, currentIndex, activeGuideState.sessionId);
+  } catch (e) {
+    debugLog('Guide re-inject on navigation failed:', e);
   }
-  if (_navDebounceTimer != null) clearTimeout(_navDebounceTimer);
-  _navDebounceTabId = tabId;
-
-  _navDebounceTimer = setTimeout(async () => {
-    _navDebounceTimer = null;
-    _navDebounceTabId = null;
-
-    // Re-read state AFTER debounce — GUIDE_STEP_CHANGED from completeStep()
-    // may have updated currentIndex during this window.
-    if (!activeGuideState || activeGuideState.tabId !== tabId || !activeGuideState.guide) return;
-    const currentIndex = activeGuideState.currentIndex ?? 0;
-    if (!activeGuideState.guide.steps?.[currentIndex]) return;
-
-    try {
-      await _injectGuideNow(tabId, activeGuideState.guide, currentIndex, activeGuideState.sessionId);
-    } catch (e) {
-      debugLog('Guide re-inject on navigation failed:', e);
-    }
-  }, 250);
 }
 
 chrome.webNavigation.onCompleted.addListener(async (details) => {

@@ -417,8 +417,6 @@
     }
 
     start(message: RuntimeStartMessage): void {
-      // Cancel any pending activateStep from a previous boot (e.g. completeStep's setTimeout)
-      this.clearStepBindings();
       this.guide = message.guide || { steps: [] };
       this.steps = Array.isArray(this.guide.steps) ? this.guide.steps : [];
       this.currentIndex = Math.max(0, message.startIndex || 0);
@@ -562,12 +560,7 @@
         return;
       }
       this.sendStepChanged('advancing');
-      const boot = this.bootVersion;
-      window.setTimeout(() => {
-        // If start() was called (e.g. from background re-push), don't interfere
-        if (this.bootVersion !== boot) return;
-        this.activateStep(nextIndex, reason);
-      }, 80);
+      window.setTimeout(() => this.activateStep(nextIndex, reason), 80);
     }
 
     private trackPosition(): void {
