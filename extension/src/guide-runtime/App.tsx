@@ -7,8 +7,12 @@ import { Tooltip } from './components/Tooltip';
 export function App() {
   const state = useSyncExternalStore(subscribe, getState);
   const step = getCurrentStep();
+  // Tango's approach: element finding is gated by DOMAIN match, not URL path match.
+  // The "paused" flag is for automation (auto-clicking), not for element finding.
+  // Check if the current domain matches the step's expected domain.
+  const domainMatches = !step?.expected_url || sameDomain(step.expected_url, location.href);
   const result = useElementFinder(
-    state.status === 'active' && !state.paused ? step : null,
+    state.status === 'active' && domainMatches ? step : null,
     state.currentIndex,
   );
 
@@ -66,6 +70,21 @@ export function App() {
       <Tooltip step={step} result={result} onDone={handleDone} />
     </>
   );
+}
+
+function sameDomain(expectedUrl: string, currentUrl: string): boolean {
+  try {
+    const expected = new URL(expectedUrl);
+    const current = new URL(currentUrl);
+    // Extract registrable domain (e.g., "openai.com" from "platform.openai.com")
+    const getDomain = (hostname: string) => {
+      const parts = hostname.split('.');
+      return parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
+    };
+    return getDomain(expected.hostname) === getDomain(current.hostname);
+  } catch {
+    return true; // If URL parsing fails, don't block
+  }
 }
 
 function sendHealth(elementFound: boolean, finderMethod: string, finderConfidence: number): void {
