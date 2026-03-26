@@ -7,11 +7,8 @@ import { Tooltip } from './components/Tooltip';
 export function App() {
   const state = useSyncExternalStore(subscribe, getState);
   const step = getCurrentStep();
-  // Always try to find the element when active — even if background says "paused"
-  // (URL mismatch). The element might still be on the page (e.g., sidebar navigation
-  // that persists across routes). If it's not there, polling returns null harmlessly.
   const result = useElementFinder(
-    state.status === 'active' ? step : null,
+    state.status === 'active' && !state.paused ? step : null,
     state.currentIndex,
   );
 
@@ -59,7 +56,7 @@ export function App() {
     }).catch(() => {});
   }, [result]);
 
-  if (state.status !== 'active' || !step || !result?.element) {
+  if (state.status !== 'active' || state.paused || !step || !result?.element) {
     return null;
   }
 
