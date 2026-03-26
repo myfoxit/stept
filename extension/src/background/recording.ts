@@ -20,7 +20,7 @@ export async function ensureContentScript(tabId: number): Promise<boolean> {
 
   try {
     await chrome.scripting.executeScript({
-      target: { tabId },
+      target: { tabId, allFrames: true },
       files: ['vendor/rrweb-snapshot.min.js', 'redaction.js', 'content.js'],
     });
     await new Promise((r) => setTimeout(r, 50));

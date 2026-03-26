@@ -576,12 +576,12 @@
   };
 
   // Main element finder (Mn function)
-  const findElementByScoring = (step: GuideStep): Element | null => {
+  const findElementByScoring = (step: GuideStep, searchRoot: ParentNode = document): Element | null => {
     const tagName = step.element_info?.tagName;
     if (!tagName) return null;
 
-    // Get all candidates of the same tag
-    const candidates = Array.from(document.querySelectorAll(tagName)).map(createScorecard);
+    // Get all candidates of the same tag inside the current search root
+    const candidates = Array.from(searchRoot.querySelectorAll(tagName)).map(createScorecard);
     
     // Build attributes object from step
     const attributes: Record<string, any> = {
@@ -823,6 +823,7 @@
     _positionFrame: number | null;
     _urlWatcher: URLWatcher | null;
     _clickHandler: ((e: Event) => void) | null;
+    _pointerDownHandler: ((e: Event) => void) | null = null;
     _clickElement: Element | null;
 
     constructor(guide: Guide) {
@@ -1015,7 +1016,8 @@
         const expected = new URL(expectedUrl);
         return current.protocol === expected.protocol &&
                current.host === expected.host &&
-               current.pathname === expected.pathname;
+               current.pathname === expected.pathname &&
+               current.search === expected.search;
       } catch (e) {
         return currentUrl.includes(expectedUrl);
       }

@@ -633,7 +633,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               const tab = await chrome.tabs.get(tabId);
               const expected = new URL(targetUrl);
               const current = new URL(tab.url || '');
-              needsNavigation = expected.origin !== current.origin || expected.pathname !== current.pathname;
+              needsNavigation =
+                expected.origin !== current.origin ||
+                expected.pathname !== current.pathname ||
+                expected.search !== current.search;
             } catch { needsNavigation = true; }
           }
 
