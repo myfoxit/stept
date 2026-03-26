@@ -110,6 +110,30 @@ export class ElementFinder {
     const contextual = this.findByContext(step, roots);
     if (contextual) candidates.push(contextual);
 
+    // Fallback: search ALL clickable/interactive elements by text (tag-agnostic).
+    // This catches cases where the recorded tagName differs from the live DOM
+    // (e.g. recorded as <a> but rendered as <div role="link">).
+    if (candidates.length === 0 && text) {
+      const fallback = this.findByText(
+        (root) => Array.from(root.querySelectorAll('a, button, [role="link"], [role="button"], [role="menuitem"], [role="tab"], [role="option"], [onclick], [tabindex]')),
+        text, roots, 'text-fallback',
+      );
+      if (fallback) candidates.push(fallback);
+    }
+
+    // Last resort: search ANY visible element whose text matches exactly
+    if (candidates.length === 0 && text) {
+      const lastResort = this.findByText(
+        (root) => Array.from(root.querySelectorAll('*')).filter((el) => {
+          const t = el.tagName.toLowerCase();
+          return t !== 'html' && t !== 'body' && t !== 'head' && t !== 'script' && t !== 'style';
+        }),
+        text, roots, 'text-global',
+      );
+      // Only accept exact text matches for the global search (avoid false positives)
+      if (lastResort && lastResort.confidence >= 0.86) candidates.push(lastResort);
+    }
+
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => b.confidence - a.confidence);
     return candidates[0] || null;
