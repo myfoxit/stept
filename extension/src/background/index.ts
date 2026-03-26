@@ -928,6 +928,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Event listeners
 // ──────────────────────────────────────────────────────────────
 
+async function wakeGuideTab(tabId: number): Promise<void> {
+  try {
+    await ensureContentScript(tabId);
+    await chrome.tabs.sendMessage(tabId, { type: 'GUIDE_WAKE' }).catch(() => {});
+  } catch {}
+}
+
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   trackPageChange(activeInfo.tabId, 'tab-switch');
 
@@ -1014,6 +1021,17 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
 });
 
 // Listen for tab updates to inject content script into newly loaded pages
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  if (!activeGuideState?.tabId) return;
+  try {
+    const tab = await chrome.tabs.get(activeGuideState.tabId);
+    if (tab.windowId === windowId) {
+      await wakeGuideTab(activeGuideState.tabId);
+    }
+  } catch {}
+});
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (
     changeInfo.status === 'complete' &&

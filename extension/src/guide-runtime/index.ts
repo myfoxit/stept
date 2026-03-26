@@ -1477,6 +1477,13 @@
         log('GUIDE_GOTO FAILED — no runner or invalid index');
         sendResponse({ success: false });
       }
+    } else if (message.type === "GUIDE_WAKE") {
+      if (activeRunner) {
+        activeRunner._wakeCurrentStep('background wake');
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false });
+      }
     } else if (message.type === "PING") {
       sendResponse({ pong: true });
     } else if (message.type === "STOP_GUIDE") {
