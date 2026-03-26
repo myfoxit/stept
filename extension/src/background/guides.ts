@@ -1,20 +1,33 @@
-import {
-  state, debugLog, activeGuideState, setActiveGuideState,
-  notifyGuideStateUpdate, healthBatch, setHealthBatch,
-  healthBatchWorkflowId, setHealthBatchWorkflowId,
-} from './state';
-import { authedFetch } from './auth';
-import { getApiBaseUrl } from './settings';
+import { debugLog } from './state';
 
 // Guard against double-injection: tracks tabs where _injectGuideAfterLoad is pending
 const pendingAfterLoadTabs = new Set<number>();
 
+function isNavigateLikeStep(step: any): boolean {
+  const actionType = String(step?.action_type || step?.actionType || '').toLowerCase();
+  return actionType === 'navigate' || actionType === 'new-tab' || actionType === 'new_tab';
+}
+
+export function getReplayStartIndex(guide: any, startIndex: number): number {
+  const steps = Array.isArray(guide?.steps) ? guide.steps : [];
+  if (steps.length === 0) return 0;
+
+  let index = Math.max(0, startIndex || 0);
+  while (index < steps.length && isNavigateLikeStep(steps[index])) {
+    index += 1;
+  }
+
+  return Math.min(index, steps.length - 1);
+}
+
 export async function _injectGuideNow(tabId: number, guide: any, startIndex: number): Promise<void> {
+  const replayIndex = getReplayStartIndex(guide, startIndex);
+
   // First try lightweight step jump if runner is already active (with retries)
-  if (startIndex > 0) {
+  if (replayIndex > 0) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const resp = await chrome.tabs.sendMessage(tabId, { type: 'GUIDE_GOTO', stepIndex: startIndex });
+        const resp = await chrome.tabs.sendMessage(tabId, { type: 'GUIDE_GOTO', stepIndex: replayIndex });
         if (resp && (resp as any).success) return;
       } catch {
         // Runner not active or not ready yet
@@ -22,30 +35,35 @@ export async function _injectGuideNow(tabId: number, guide: any, startIndex: num
       if (attempt < 2) await new Promise((r) => setTimeout(r, 200));
     }
   }
+
   // Full injection: start or restart the guide runner
   try {
-    const resp = await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
+    const resp = await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex: replayIndex });
     if (resp && (resp as any).success) return;
   } catch {
     // No listener — need to inject script
   }
+
   await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['guide-runtime.js'] });
   await new Promise((r) => setTimeout(r, 300));
-  await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex });
+  await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex: replayIndex });
 }
 
 export { pendingAfterLoadTabs };
 
 export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: number): void {
   pendingAfterLoadTabs.add(tabId);
+
   const onCompleted = (details: chrome.webNavigation.WebNavigationFramedCallbackDetails) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
+
     chrome.webNavigation.onCompleted.removeListener(onCompleted);
     pendingAfterLoadTabs.delete(tabId);
-    // Ping/retry: wait for content script to be ready instead of hardcoded 1500ms delay
+
     (async () => {
       const MAX_ATTEMPTS = 20;
       const INTERVAL_MS = 200;
+
       for (let i = 0; i < MAX_ATTEMPTS; i++) {
         try {
           const resp = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
@@ -58,11 +76,15 @@ export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: num
         }
         await new Promise((r) => setTimeout(r, INTERVAL_MS));
       }
+
       // Final fallback: try injection anyway after all retries exhausted
       try {
         await _injectGuideNow(tabId, guide, startIndex);
-      } catch (e) { debugLog('Guide inject after load failed:', e); }
+      } catch (e) {
+        debugLog('Guide inject after load failed:', e);
+      }
     })();
   };
+
   chrome.webNavigation.onCompleted.addListener(onCompleted);
 }

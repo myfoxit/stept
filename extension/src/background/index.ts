@@ -21,7 +21,7 @@ import {
   addStep, deleteStep,
 } from './recording';
 import { uploadCapture, beginStreamingSession, enqueueStreamingUpload, enqueueDomSnapshotUpload } from './upload';
-import { _injectGuideNow, _injectGuideAfterLoad, pendingAfterLoadTabs } from './guides';
+import { _injectGuideNow, _injectGuideAfterLoad, pendingAfterLoadTabs, getReplayStartIndex } from './guides';
 import { trackPageChange, checkContextLinks } from './navigation';
 
 // ──────────────────────────────────────────────────────────────
@@ -624,7 +624,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
           }
 
-          setActiveGuideState({ guide, currentIndex: startIndex, tabId });
+          const replayStartIndex = getReplayStartIndex(guide, startIndex);
+          setActiveGuideState({ guide, currentIndex: replayStartIndex, tabId });
 
           // Check if current tab needs navigation
           let needsNavigation = false;
@@ -642,9 +643,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
           if (needsNavigation && targetUrl) {
             await chrome.tabs.update(tabId, { url: targetUrl, active: true });
-            _injectGuideAfterLoad(tabId, guide, startIndex);
+            _injectGuideAfterLoad(tabId, guide, replayStartIndex);
           } else {
-            await _injectGuideNow(tabId, guide, startIndex);
+            await _injectGuideNow(tabId, guide, replayStartIndex);
           }
 
           notifyGuideStateUpdate();

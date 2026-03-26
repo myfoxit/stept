@@ -1043,19 +1043,27 @@
     }
 
     _findStepForUrl(url: string): number {
-      for (let i = this.currentIndex; i < this.steps.length; i++) {
-        const step = this.steps[i];
-        if (this._urlMatches(url, step.expected_url)) {
-          return i;
+      const findMatchingIndex = (start: number, end: number): number => {
+        for (let i = start; i < end; i++) {
+          const step = this.steps[i];
+          if (!this._urlMatches(url, step.expected_url)) continue;
+
+          let resolved = i;
+          while (resolved < this.steps.length) {
+            const candidate = this.steps[resolved];
+            const actionType = String(candidate?.action_type || '').toLowerCase();
+            const isNavigateLike = actionType === 'navigate' || actionType === 'new-tab' || actionType === 'new_tab';
+            if (!isNavigateLike) break;
+            resolved += 1;
+          }
+          return resolved < this.steps.length ? resolved : i;
         }
-      }
-      for (let i = 0; i < this.currentIndex; i++) {
-        const step = this.steps[i];
-        if (this._urlMatches(url, step.expected_url)) {
-          return i;
-        }
-      }
-      return -1;
+        return -1;
+      };
+
+      const forwardMatch = findMatchingIndex(this.currentIndex, this.steps.length);
+      if (forwardMatch !== -1) return forwardMatch;
+      return findMatchingIndex(0, this.currentIndex);
     }
 
     _urlMatches(currentUrl: string, expectedUrl?: string | null): boolean {
