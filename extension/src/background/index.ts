@@ -958,11 +958,18 @@ async function handleGuideNavigationEvent(tabId: number, url?: string, source: '
     return;
   }
 
-  // Small delay for DOM to settle after navigation
-  await new Promise((r) => setTimeout(r, 100));
+  // Wait for two reasons:
+  // 1. DOM needs time to settle after navigation
+  // 2. GUIDE_STEP_CHANGED from completeStep() may still be in flight —
+  //    if a click triggered this navigation, the content script advanced
+  //    the step index and sent GUIDE_STEP_CHANGED, but we might read
+  //    the old index if we don't wait for that message to arrive.
+  await new Promise((r) => setTimeout(r, 300));
 
-  const currentIndex = activeGuideState?.currentIndex ?? 0;
-  if (!activeGuideState?.guide?.steps?.[currentIndex]) return;
+  // Re-read state AFTER the wait — it may have been updated by GUIDE_STEP_CHANGED
+  if (!activeGuideState || activeGuideState.tabId !== tabId || !activeGuideState.guide) return;
+  const currentIndex = activeGuideState.currentIndex ?? 0;
+  if (!activeGuideState.guide.steps?.[currentIndex]) return;
 
   try {
     await _injectGuideNow(tabId, activeGuideState.guide, currentIndex, activeGuideState.sessionId);
