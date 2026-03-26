@@ -440,7 +440,7 @@ export function WorkflowView() {
         if (!sent) {
           // Fallback: Navigate to first step URL with guide param
           // Extension will pick it up via URL detection
-          const firstUrl = guide.steps[0]?.expected_url;
+          const firstUrl = guide.steps.find((step) => step.expected_url)?.expected_url;
           if (firstUrl) {
             const url = new URL(firstUrl);
             url.searchParams.set('stept-guide', workflowId);

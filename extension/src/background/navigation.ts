@@ -4,9 +4,7 @@ import {
   lastUserActionTime, contextMatches, setContextMatches,
   lastContextUrl, setLastContextUrl,
 } from './state';
-import { addStep } from './recording';
 import { getApiBaseUrl } from './settings';
-import { authedFetch } from './auth';
 
 async function fetchContextMatches(
   apiUrl: string,
@@ -34,34 +32,26 @@ export async function trackPageChange(tabId: number, reason: string): Promise<vo
 
   try {
     const tab = await chrome.tabs.get(tabId);
-    if (
-      !tab.url ||
-      (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))
-    )
+    if (!tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) {
       return;
+    }
 
     const now = Date.now();
     if (
       lastTrackedPage.tabId === tabId &&
       lastTrackedPage.url === tab.url &&
       now - lastTrackedPage.time < 2000
-    )
+    ) {
       return;
+    }
     setLastTrackedPage({ tabId, url: tab.url, time: now });
 
     if (now - lastUserActionTime < NAVIGATION_SUPPRESS_WINDOW) {
-      debugLog('Suppressing navigate step (caused by recent user action)');
+      debugLog('Navigation detected after recent user action; tracking URL as context only');
       return;
     }
 
-    await addStep({
-      actionType: 'Navigate',
-      pageTitle: tab.title || '',
-      description: `Navigate to "${tab.title || tab.url}"`,
-      url: tab.url,
-      windowSize: { width: 0, height: 0 },
-      viewportSize: { width: 0, height: 0 },
-    });
+    debugLog('Tracked page change as URL context only:', { tabId, url: tab.url, reason });
   } catch (e) {
     debugLog('Page tracking failed:', e);
   }
@@ -89,14 +79,12 @@ export async function checkContextLinks(tabUrl: string): Promise<void> {
       }
     }
 
-    // Notify sidepanel (runtime message)
     chrome.runtime.sendMessage({
       type: 'CONTEXT_MATCHES_UPDATED',
       matches: contextMatches,
       url: tabUrl,
     }).catch(() => {});
 
-    // Notify content script on the active tab (page-level indicator)
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (activeTab?.id) {
@@ -105,7 +93,9 @@ export async function checkContextLinks(tabUrl: string): Promise<void> {
           matches: contextMatches,
         }).catch(() => {});
       }
-    } catch { /* no active tab */ }
+    } catch {
+      // no active tab
+    }
   } catch (e) {
     debugLog('Context link check failed:', e);
     setContextMatches([]);
