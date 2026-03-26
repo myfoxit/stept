@@ -869,6 +869,7 @@
     _clickHandler: ((e: Event) => void) | null;
     _pointerDownHandler: ((e: Event) => void) | null = null;
     _clickElement: Element | null;
+    _visibilityWakeHandler: (() => void) | null = null;
 
     constructor(guide: Guide) {
       this.guide = guide;
@@ -891,6 +892,7 @@
 
     async start(startIndex: number = 0): Promise<void> {
       this._createHost();
+      this._installVisibilityWakeHandlers();
       
       this._urlWatcher = new URLWatcher((newUrl: string, oldUrl: string) => {
         this._handleUrlChange(newUrl, oldUrl);
@@ -953,6 +955,39 @@
       this._removeClickHandler();
       if (this._highlight) { this._highlight.remove(); this._highlight = null; }
       if (this._tooltip) { this._tooltip.remove(); this._tooltip = null; }
+    }
+
+    _isPageRenderable(): boolean {
+      return document.visibilityState === 'visible' && document.hasFocus();
+    }
+
+    _wakeCurrentStep(reason: string): void {
+      if (!this._isPageRenderable()) return;
+      const index = this.currentIndex;
+      log(`Waking current step ${index} after ${reason}`);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (this.currentIndex === index) {
+            this.showStep(index);
+          }
+        });
+      });
+    }
+
+    _installVisibilityWakeHandlers(): void {
+      this._removeVisibilityWakeHandlers();
+      this._visibilityWakeHandler = () => this._wakeCurrentStep('visibility/focus change');
+      document.addEventListener('visibilitychange', this._visibilityWakeHandler);
+      window.addEventListener('focus', this._visibilityWakeHandler);
+      window.addEventListener('pageshow', this._visibilityWakeHandler);
+    }
+
+    _removeVisibilityWakeHandlers(): void {
+      if (!this._visibilityWakeHandler) return;
+      document.removeEventListener('visibilitychange', this._visibilityWakeHandler);
+      window.removeEventListener('focus', this._visibilityWakeHandler);
+      window.removeEventListener('pageshow', this._visibilityWakeHandler);
+      this._visibilityWakeHandler = null;
     }
 
     _stopElementPolling(): void {
@@ -1083,6 +1118,10 @@
 
     async showStep(index: number): Promise<void> {
       log(`showStep(${index}) of ${this.steps.length}, url=${window.location.href.slice(0,60)}`);
+      if (!this._isPageRenderable()) {
+        log(`showStep(${index}) deferred: page not renderable yet (visible=${document.visibilityState}, hasFocus=${document.hasFocus()})`);
+        return;
+      }
       if (index < 0 || index >= this.steps.length) {
         log(`showStep(${index}) — OUT OF BOUNDS, stopping`);
         this.stop();
@@ -1099,7 +1138,7 @@
       log(`Step ${index}: type="${actionType}", tag=${ei.tagName || 'none'}, text="${(ei.content || ei.text || '').slice(0,40)}", expectedUrl=${(step.expected_url || '').slice(0,50)}`);
 
       // Navigate steps auto-advance
-      if (actionType === 'navigate') {
+      if (actionType === 'navigate' || actionType === 'new-tab' || actionType === 'new_tab') {
         log(`Navigate step ${index} — auto-advancing to ${index + 1}`);
         const nextIndex = index + 1;
         chrome.runtime.sendMessage({

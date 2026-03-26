@@ -604,6 +604,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             // 2. No matching tab found -> create a NEW tab
             if (!tabId) {
+              const currentWindow = await chrome.windows.getCurrent().catch(() => null);
+              if (currentWindow?.id !== undefined) {
+                await chrome.windows.update(currentWindow.id, { focused: true }).catch(() => {});
+              }
               const newTab = await chrome.tabs.create({ url: targetUrl, active: true });
               tabId = newTab.id!;
               setActiveGuideState({ guide, currentIndex: startIndex, tabId });
