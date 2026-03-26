@@ -54,37 +54,68 @@ export { pendingAfterLoadTabs };
 export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: number): void {
   pendingAfterLoadTabs.add(tabId);
 
+  let settled = false;
+
+  const cleanup = (): void => {
+    chrome.webNavigation.onCompleted.removeListener(onCompleted);
+    chrome.webNavigation.onHistoryStateUpdated.removeListener(onHistoryUpdated);
+    chrome.tabs.onUpdated.removeListener(onTabUpdated);
+    pendingAfterLoadTabs.delete(tabId);
+  };
+
+  const runInjection = async (): Promise<void> => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+
+    const MAX_ATTEMPTS = 20;
+    const INTERVAL_MS = 200;
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      try {
+        const resp = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+        if (resp && (resp as any).pong) {
+          await _injectGuideNow(tabId, guide, startIndex);
+          return;
+        }
+      } catch {
+        // Content script not ready yet
+      }
+      await new Promise((r) => setTimeout(r, INTERVAL_MS));
+    }
+
+    try {
+      await _injectGuideNow(tabId, guide, startIndex);
+    } catch (e) {
+      debugLog('Guide inject after load failed:', e);
+    }
+  };
+
   const onCompleted = (details: chrome.webNavigation.WebNavigationFramedCallbackDetails) => {
     if (details.tabId !== tabId || details.frameId !== 0) return;
+    runInjection();
+  };
 
-    chrome.webNavigation.onCompleted.removeListener(onCompleted);
-    pendingAfterLoadTabs.delete(tabId);
+  const onHistoryUpdated = (details: chrome.webNavigation.WebNavigationTransitionCallbackDetails) => {
+    if (details.tabId !== tabId || details.frameId !== 0) return;
+    runInjection();
+  };
 
-    (async () => {
-      const MAX_ATTEMPTS = 20;
-      const INTERVAL_MS = 200;
-
-      for (let i = 0; i < MAX_ATTEMPTS; i++) {
-        try {
-          const resp = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
-          if (resp && (resp as any).pong) {
-            await _injectGuideNow(tabId, guide, startIndex);
-            return;
-          }
-        } catch {
-          // Content script not ready yet
-        }
-        await new Promise((r) => setTimeout(r, INTERVAL_MS));
-      }
-
-      // Final fallback: try injection anyway after all retries exhausted
-      try {
-        await _injectGuideNow(tabId, guide, startIndex);
-      } catch (e) {
-        debugLog('Guide inject after load failed:', e);
-      }
-    })();
+  const onTabUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+    if (updatedTabId !== tabId) return;
+    if (changeInfo.status === 'complete') {
+      runInjection();
+    }
   };
 
   chrome.webNavigation.onCompleted.addListener(onCompleted);
+  chrome.webNavigation.onHistoryStateUpdated.addListener(onHistoryUpdated);
+  chrome.tabs.onUpdated.addListener(onTabUpdated);
+
+  // If the tab is already complete (fast load / bfcache), don't wait for an event we may have missed.
+  chrome.tabs.get(tabId).then((tab) => {
+    if (tab.status === 'complete') {
+      runInjection();
+    }
+  }).catch(() => {});
 }

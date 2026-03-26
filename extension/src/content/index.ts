@@ -44,8 +44,18 @@ if (window.__steptContentLoaded) {
 } else {
   window.__steptContentLoaded = true;
 
+  // Relay trusted page messages to background for Guide Me startup
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== window) return;
+    const data = event.data as { type?: string; guide?: unknown } | undefined;
+    if (!data || data.type !== 'STEPT_START_GUIDE' || !data.guide) return;
+    chrome.runtime.sendMessage({ type: 'START_GUIDE', guide: data.guide }, () => {
+      void chrome.runtime.lastError;
+    });
+  });
+
   // Listen for messages from background
-  chrome.runtime.onMessage.addListener((message: { type: string }, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
+  chrome.runtime.onMessage.addListener((message: any, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
     debugLog('Content script received message:', message.type);
     switch (message.type) {
       case 'START_RECORDING':
@@ -54,7 +64,6 @@ if (window.__steptContentLoaded) {
         break;
       case 'STOP_RECORDING':
         stopCapturing();
-        // Clean up any active redaction/blur
         if ((window as any).__steptRedaction?.removeAll) {
           (window as any).__steptRedaction.removeAll();
         }
@@ -62,7 +71,6 @@ if (window.__steptContentLoaded) {
         break;
       case 'PAUSE_RECORDING':
         stopCapturing();
-        // Update dock UI
         if (getDockElement()) {
           setDockIsPaused(true);
           const shadow = getDockShadow();
@@ -72,7 +80,6 @@ if (window.__steptContentLoaded) {
         break;
       case 'RESUME_RECORDING':
         startCapturing();
-        // Update dock UI
         if (getDockElement()) {
           setDockIsPaused(false);
           const shadow = getDockShadow();
