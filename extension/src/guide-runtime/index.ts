@@ -73,10 +73,12 @@
   }
 
   interface FindResult {
-    element: Element;
+    element?: Element;
     confidence: number;
     method: string;
     iframeOffset?: IframeOffset;
+    rect?: AdjustedRect;
+    requiresManualInteraction?: boolean;
   }
 
   interface AdjustedRect {
@@ -634,7 +636,7 @@
     let bestResult: FindResult | null = null;
 
     for (const { root, iframeOffset } of searchRoots) {
-      const result = findElementByScoring(step);
+      const result = findElementByScoring(step, root);
       if (result) {
         const visibility = isElementVisible(result);
         if (visibility.status !== 'Visible') continue; // Skip invisible elements
@@ -651,6 +653,26 @@
       }
     }
 
+    // Cross-frame fallback: ask the background script to query other frames.
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: 'GUIDE_FIND_IN_FRAMES', step });
+      if (resp && resp.found && resp.rect) {
+        return {
+          confidence: resp.confidence || 0.7,
+          method: resp.method || 'frame-fallback',
+          rect: {
+            left: (resp.frameRect?.left || 0) + resp.rect.left,
+            top: (resp.frameRect?.top || 0) + resp.rect.top,
+            width: resp.rect.width,
+            height: resp.rect.height,
+            right: (resp.frameRect?.left || 0) + resp.rect.left + resp.rect.width,
+            bottom: (resp.frameRect?.top || 0) + resp.rect.top + resp.rect.height,
+          },
+          requiresManualInteraction: true,
+        };
+      }
+    } catch {}
+
     return bestResult;
   }
 
@@ -658,7 +680,7 @@
   if (window !== window.top) {
     chrome.runtime.onMessage.addListener((message: { type: string; step: GuideStep }, _sender: any, sendResponse: (response?: any) => void) => {
       if (message.type === 'GUIDE_FIND_IN_FRAME') {
-        const result = findElementByScoring(message.step);
+        const result = findElementByScoring(message.step, document);
         if (result) {
           const rect = result.getBoundingClientRect();
           let frameRect: DOMRect | null = null;
@@ -764,6 +786,8 @@
     private _interval: ReturnType<typeof setInterval> | null = null;
     private _lastUrl: string;
     private _onUrlChange: (newUrl: string, oldUrl: string) => void;
+    private _origPushState: History['pushState'] | null = null;
+    private _origReplaceState: History['replaceState'] | null = null;
 
     constructor(onUrlChange: (newUrl: string, oldUrl: string) => void) {
       this._lastUrl = window.location.href;
@@ -775,6 +799,26 @@
 
       window.addEventListener('popstate', this._handleUrlChange);
       window.addEventListener('hashchange', this._handleUrlChange);
+      window.addEventListener('pageshow', this._handleUrlChange);
+      document.addEventListener('visibilitychange', this._handleUrlChange);
+
+      // Hook SPA navigations that do not emit popstate immediately.
+      if (!this._origPushState) {
+        this._origPushState = history.pushState.bind(history);
+        history.pushState = ((...args: Parameters<History['pushState']>) => {
+          const ret = this._origPushState!(...args);
+          this._handleUrlChange();
+          return ret;
+        }) as History['pushState'];
+      }
+      if (!this._origReplaceState) {
+        this._origReplaceState = history.replaceState.bind(history);
+        history.replaceState = ((...args: Parameters<History['replaceState']>) => {
+          const ret = this._origReplaceState!(...args);
+          this._handleUrlChange();
+          return ret;
+        }) as History['replaceState'];
+      }
 
       // Poll for URL changes (500ms like Tango)
       this._interval = setInterval(() => {
@@ -930,16 +974,18 @@
         if (this._stepSeq !== seq) return;
 
         if (result) {
-          const tag = result.element.tagName?.toLowerCase();
-          const text = (result.element.textContent || '').trim().slice(0, 30);
+          const tag = result.element?.tagName?.toLowerCase() || 'frame-target';
+          const text = (result.element?.textContent || '').trim().slice(0, 30);
           log(`FOUND element for step ${this.currentIndex} after ${pollCount} polls: <${tag}> "${text}" (method=${result.method}, confidence=${result.confidence.toFixed(2)})`);
           this.currentResult = result;
           
           // Check for intermediate action
-          const intermediateAncestor = needsIntermediateAction(result.element);
-          if (intermediateAncestor) {
-            log(`Step ${this.currentIndex}: element needs intermediate action (hidden by ancestor)`);
-            return;
+          if (result.element) {
+            const intermediateAncestor = needsIntermediateAction(result.element);
+            if (intermediateAncestor) {
+              log(`Step ${this.currentIndex}: element needs intermediate action (hidden by ancestor)`);
+              return;
+            }
           }
 
           chrome.runtime.sendMessage({
@@ -954,7 +1000,11 @@
           
           this._renderOverlay(step, result, urlMismatch);
           this._startPositionTracking(step, result);
-          this._setupClickAdvance(result.element, step);
+          if (result.element && !result.requiresManualInteraction) {
+            this._setupClickAdvance(result.element, step);
+          } else if (result.requiresManualInteraction) {
+            log(`Step ${this.currentIndex}: frame fallback active — waiting for manual interaction`);
+          }
           this._stopElementPolling();
         } else if (pollCount === 1 || pollCount % 20 === 0) {
           // Log on first poll and every 3 seconds
@@ -1068,7 +1118,10 @@
         try {
           const expected = new URL(step.expected_url);
           const current = new URL(window.location.href);
-          urlMismatch = expected.pathname !== current.pathname;
+          urlMismatch =
+            expected.origin !== current.origin ||
+            expected.pathname !== current.pathname ||
+            expected.search !== current.search;
         } catch {}
       }
 
@@ -1101,7 +1154,7 @@
     }
 
     _getAdjustedRect(result: FindResult): AdjustedRect {
-      const raw = result.element.getBoundingClientRect();
+      const raw = result.element!.getBoundingClientRect();
       const offset = result.iframeOffset || { x: 0, y: 0 };
       const zoom = getPageZoom();
       return {
@@ -1244,7 +1297,10 @@
       if (!isClickStep) return;
 
       const nextIndex = this.currentIndex + 1;
+      let advanced = false;
       const advance = (): void => {
+        if (advanced) return;
+        advanced = true;
         this._removeClickHandler();
         if (nextIndex >= this.steps.length) {
           this.stop();
@@ -1260,17 +1316,35 @@
         setTimeout(() => this.showStep(nextIndex), 400);
       };
 
+      const isNavigationTrigger =
+        element instanceof HTMLAnchorElement ||
+        (element instanceof HTMLButtonElement && element.type === 'submit') ||
+        (element instanceof HTMLInputElement && element.type === 'submit') ||
+        !!element.closest('a[href], button[type="submit"], input[type="submit"], [role="link"]');
+
       this._clickHandler = (_e: Event): void => advance();
       element.addEventListener("click", this._clickHandler, { capture: true, once: true });
+
+      if (isNavigationTrigger) {
+        this._pointerDownHandler = (_e: Event): void => advance();
+        element.addEventListener("pointerdown", this._pointerDownHandler, { capture: true, once: true });
+      }
+
       this._clickElement = element;
     }
 
     _removeClickHandler(): void {
-      if (this._clickHandler && this._clickElement) {
-        this._clickElement.removeEventListener("click", this._clickHandler, { capture: true } as EventListenerOptions);
-        this._clickHandler = null;
-        this._clickElement = null;
+      if (this._clickElement) {
+        if (this._clickHandler) {
+          this._clickElement.removeEventListener("click", this._clickHandler, { capture: true } as EventListenerOptions);
+        }
+        if (this._pointerDownHandler) {
+          this._clickElement.removeEventListener("pointerdown", this._pointerDownHandler, { capture: true } as EventListenerOptions);
+        }
       }
+      this._clickHandler = null;
+      this._pointerDownHandler = null;
+      this._clickElement = null;
     }
 
     _esc(text: string): string {
