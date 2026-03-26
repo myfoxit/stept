@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync, renameSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, renameSync, rmSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { build as esbuild } from 'esbuild';
 
 // Manual multi-entry config for Chrome Extension MV3
 // Each entry becomes a separate bundle
@@ -10,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     {
       name: 'copy-extension-assets',
-      closeBundle() {
+      async closeBundle() {
         // Copy manifest
         copyFileSync('manifest.json', 'dist/manifest.json');
         // Copy vendor
@@ -35,6 +36,25 @@ export default defineConfig(({ mode }) => ({
         }
         // Clean up empty public dir
         if (existsSync('dist/public')) rmSync('dist/public', { recursive: true });
+
+        // Build guide-runtime separately with esbuild — it needs React
+        // inlined as a single IIFE file (content scripts can't import modules)
+        await esbuild({
+          entryPoints: [resolve(__dirname, 'src/guide-runtime/index.ts')],
+          bundle: true,
+          format: 'iife',
+          outfile: 'dist/guide-runtime.js',
+          minify: true,
+          jsx: 'automatic',
+          jsxImportSource: 'react',
+          tsconfig: resolve(__dirname, 'tsconfig.json'),
+          alias: {
+            '@': resolve(__dirname, 'src'),
+          },
+          define: {
+            'process.env.NODE_ENV': '"production"',
+          },
+        });
       },
     },
   ],
@@ -62,7 +82,7 @@ export default defineConfig(({ mode }) => ({
         // Content scripts (no React — vanilla TS)
         'content': resolve(__dirname, 'src/content/index.ts'),
         'redaction': resolve(__dirname, 'src/content/redaction.ts'),
-        'guide-runtime': resolve(__dirname, 'src/guide-runtime/index.ts'),
+        // guide-runtime is built separately via esbuild (needs React inlined as IIFE)
         // UI pages (React)
         'sidepanel': resolve(__dirname, 'public/sidepanel.html'),
         'popup': resolve(__dirname, 'public/popup.html'),
@@ -77,6 +97,7 @@ export default defineConfig(({ mode }) => ({
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
+
       },
     },
   },

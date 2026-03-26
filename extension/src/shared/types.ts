@@ -117,6 +117,7 @@ export interface ActiveGuideState {
   stepStatus?: string;
   sessionId?: string;
   targetUrl?: string | null;
+  paused?: boolean;
 }
 
 export interface ContextMatch {

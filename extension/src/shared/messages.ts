@@ -43,6 +43,7 @@ export type BackgroundMessageType =
   | 'STOP_GUIDE'
   | 'GUIDE_STEP_HEALTH'
   | 'GUIDE_STEP_CHANGED'
+  | 'GUIDE_STEP_COMPLETED'
   | 'GUIDE_STOPPED'
   | 'GUIDE_NAVIGATE'
   | 'GUIDE_GO_TO_STEP'
@@ -80,6 +81,7 @@ export type ContentMessageType =
   // Guide
   | 'START_GUIDE'
   | 'STOP_GUIDE'
+  | 'GUIDE_STATE_UPDATE'
   | 'GUIDE_FIND_IN_FRAME'
   | 'GUIDE_SHOW_IMAGE';
 
