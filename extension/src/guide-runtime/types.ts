@@ -39,6 +39,14 @@ export interface ElementInfo {
   parentChain?: ParentChainEntry[] | null;
   parentText?: string | null;
   stableClassName?: string | null;
+  elementRect?: { x: number; y: number; width: number; height: number } | null;
+  value?: string | null;
+  alt?: string | null;
+  cols?: string | null;
+  rows?: string | null;
+  minlength?: string | null;
+  maxlength?: string | null;
+  contenteditable?: string | null;
 }
 
 export interface GuideStep {
