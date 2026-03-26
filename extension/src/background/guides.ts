@@ -23,10 +23,29 @@ export function urlMatchesStep(url: string, step: any): boolean {
   try {
     const expected = new URL(expectedUrl);
     const current = new URL(url);
-    return expected.origin === current.origin && expected.pathname === current.pathname;
+    if (expected.origin !== current.origin) return false;
+    // Exact path match
+    if (expected.pathname === current.pathname) return true;
+    // Flexible match: ignore dynamic path segments like project IDs (UUIDs, short IDs).
+    // Compare the last meaningful path segment(s) so /projects/abc/settings matches /projects/xyz/settings
+    const expectedParts = expected.pathname.split('/').filter(Boolean);
+    const currentParts = current.pathname.split('/').filter(Boolean);
+    if (expectedParts.length === currentParts.length) {
+      const match = expectedParts.every((part, i) => part === currentParts[i] || looksLikeDynamicSegment(part) || looksLikeDynamicSegment(currentParts[i]));
+      if (match) return true;
+    }
+    return false;
   } catch {
     return url.includes(expectedUrl);
   }
+}
+
+function looksLikeDynamicSegment(segment: string): boolean {
+  // UUID
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)) return true;
+  // Short ID (alphanumeric, 6-24 chars, mixed case or digits)
+  if (/^[a-zA-Z0-9]{6,24}$/.test(segment) && /\d/.test(segment)) return true;
+  return false;
 }
 
 export function urlMatchesGuide(url: string, guide: any): boolean {
