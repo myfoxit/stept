@@ -110,28 +110,11 @@ export class ElementFinder {
     const contextual = this.findByContext(step, roots);
     if (contextual) candidates.push(contextual);
 
-    // Fallback: search ALL clickable/interactive elements by text (tag-agnostic).
-    // This catches cases where the recorded tagName differs from the live DOM
-    // (e.g. recorded as <a> but rendered as <div role="link">).
-    if (candidates.length === 0 && text) {
-      const fallback = this.findByText(
-        (root) => Array.from(root.querySelectorAll('a, button, [role="link"], [role="button"], [role="menuitem"], [role="tab"], [role="option"], [onclick], [tabindex]')),
-        text, roots, 'text-fallback',
-      );
-      if (fallback) candidates.push(fallback);
-    }
-
-    // Last resort: search ANY visible element whose text matches exactly
-    if (candidates.length === 0 && text) {
-      const lastResort = this.findByText(
-        (root) => Array.from(root.querySelectorAll('*')).filter((el) => {
-          const t = el.tagName.toLowerCase();
-          return t !== 'html' && t !== 'body' && t !== 'head' && t !== 'script' && t !== 'style';
-        }),
-        text, roots, 'text-global',
-      );
-      // Only accept exact text matches for the global search (avoid false positives)
-      if (lastResort && lastResort.confidence >= 0.86) candidates.push(lastResort);
+    // Broadened context search: if narrow tag-based context failed,
+    // run the full scoring system against interactive elements (tag-agnostic)
+    if (candidates.length === 0) {
+      const broadContext = this.findByContextBroad(step, roots);
+      if (broadContext) candidates.push(broadContext);
     }
 
     if (candidates.length === 0) return null;
@@ -176,6 +159,76 @@ export class ElementFinder {
           return { element: result, confidence: 0.64, method: 'xpath', iframeOffset };
         }
       } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Broad context search: runs the full multi-signal scoring system against
+   * ALL interactive elements, not just elements matching a specific tag.
+   * Used as fallback when the narrow tag-based search fails.
+   */
+  private static findByContextBroad(step: GuideStep, roots: SearchRoot[]): FindResult | null {
+    const info = step.element_info;
+    const expectedText = normalizeText(info?.text || info?.content || step.element_text || '');
+    if (!expectedText && !info?.ariaLabel && !info?.id && !info?.href) return null;
+
+    const INTERACTIVE_SELECTOR = 'a, button, input, select, textarea, [role="link"], [role="button"], [role="menuitem"], [role="tab"], [role="option"], [role="treeitem"], [role="listitem"], [tabindex], [onclick], [data-testid]';
+
+    for (const { root, iframeOffset } of roots) {
+      const elements = Array.from(root.querySelectorAll(INTERACTIVE_SELECTOR)).filter(isProbablyVisible);
+      let best: { element: Element; score: number } | null = null;
+
+      for (const element of elements) {
+        let score = 0;
+        const text = normalizeText((element as HTMLElement).innerText || element.textContent || '');
+
+        // Text match (highest value signals)
+        if (expectedText && text) {
+          if (text === expectedText) score += 4;
+          else if (text.includes(expectedText) || expectedText.includes(text)) score += 2;
+        }
+
+        // Attribute matches
+        if (info?.id && element.id === info.id) score += 5;
+        if (info?.name && element.getAttribute('name') === info.name) score += 2;
+        if (info?.placeholder && element.getAttribute('placeholder') === info.placeholder) score += 2;
+        if (info?.href && element.getAttribute('href') === info.href) score += 3;
+        if (info?.role && element.getAttribute('role') === info.role) score += 2;
+        if (info?.ariaLabel && element.getAttribute('aria-label') === info.ariaLabel) score += 3;
+        if (info?.testId) {
+          for (const attr of ['data-testid', 'data-test', 'data-cy']) {
+            if (element.getAttribute(attr) === info.testId) { score += 4; break; }
+          }
+        }
+
+        // Tag bonus: if the tag matches the recorded one, small bonus
+        if (info?.tagName && element.tagName.toLowerCase() === info.tagName.toLowerCase()) score += 1;
+
+        // Stable class match
+        if (info?.stableClassName && typeof (element as HTMLElement).className === 'string') {
+          const stable = normalizeText(info.stableClassName);
+          if (stable && normalizeText((element as HTMLElement).className).includes(stable)) score += 1;
+        }
+
+        // Parent chain scoring
+        if (info?.parentChain?.length) {
+          let current = element.parentElement;
+          for (const parent of info.parentChain) {
+            if (!current) break;
+            if (parent.id && current.id === parent.id) score += 2;
+            if (parent.role && current.getAttribute('role') === parent.role) score += 1;
+            if (parent.testId && [current.getAttribute('data-testid'), current.getAttribute('data-test')].includes(parent.testId)) score += 2;
+            current = current.parentElement;
+          }
+        }
+
+        if (!best || score > best.score) best = { element, score };
+      }
+
+      if (best && best.score >= 4) {
+        return { element: best.element, confidence: Math.min(0.84, 0.45 + best.score * 0.05), method: 'context-broad', iframeOffset };
+      }
     }
     return null;
   }
