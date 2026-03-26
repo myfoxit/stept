@@ -48,6 +48,7 @@ export type BackgroundMessageType =
   | 'GUIDE_GO_TO_STEP'
   | 'GUIDE_FIND_IN_FRAMES'
   | 'GUIDE_SHOW_IMAGE'
+  | 'GUIDE_RUNTIME_READY'
   | 'GET_GUIDE_STATE'
   | 'FETCH_GUIDES'
   | 'FETCH_GUIDE'

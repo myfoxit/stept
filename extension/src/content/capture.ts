@@ -327,7 +327,7 @@ function applyJsOverrides(): void {
 
   // 1. Force WebGL preserveDrawingBuffer so canvas.toDataURL() works
   const origGetContext = HTMLCanvasElement.prototype.getContext;
-  HTMLCanvasElement.prototype.getContext = function (type: string, opts?: any) {
+  HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, opts?: any) {
     if (type === 'webgl' || type === 'webgl2') {
       opts = Object.assign({}, opts, { preserveDrawingBuffer: true });
     }
@@ -339,7 +339,7 @@ function applyJsOverrides(): void {
   URL.revokeObjectURL = function (url: string) {
     // No-op during recording — blobs stay alive for snapshot capture
     if (isRecording) return;
-    return origRevoke.call(this, url);
+    return origRevoke(url);
   };
 
   debugLog('JS overrides applied (WebGL buffer, blob revocation)');

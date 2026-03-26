@@ -20,38 +20,24 @@ export function getReplayStartIndex(guide: any, startIndex: number): number {
   return Math.min(index, steps.length - 1);
 }
 
-export async function _injectGuideNow(tabId: number, guide: any, startIndex: number): Promise<void> {
+export async function _injectGuideNow(tabId: number, guide: any, startIndex: number, sessionId?: string): Promise<void> {
   const replayIndex = getReplayStartIndex(guide, startIndex);
 
-  // First try lightweight step jump if runner is already active (with retries)
-  if (replayIndex > 0) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const resp = await chrome.tabs.sendMessage(tabId, { type: 'GUIDE_GOTO', stepIndex: replayIndex });
-        if (resp && (resp as any).success) return;
-      } catch {
-        // Runner not active or not ready yet
-      }
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 200));
-    }
-  }
-
-  // Full injection: start or restart the guide runner
   try {
-    const resp = await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex: replayIndex });
+    const resp = await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex: replayIndex, sessionId });
     if (resp && (resp as any).success) return;
   } catch {
     // No listener — need to inject script
   }
 
   await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['guide-runtime.js'] });
-  await new Promise((r) => setTimeout(r, 300));
-  await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex: replayIndex });
+  await new Promise((r) => setTimeout(r, 120));
+  await chrome.tabs.sendMessage(tabId, { type: 'START_GUIDE', guide, startIndex: replayIndex, sessionId });
 }
 
 export { pendingAfterLoadTabs };
 
-export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: number): void {
+export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: number, sessionId?: string): void {
   pendingAfterLoadTabs.add(tabId);
 
   let settled = false;
@@ -75,7 +61,7 @@ export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: num
       try {
         const resp = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
         if (resp && (resp as any).pong) {
-          await _injectGuideNow(tabId, guide, startIndex);
+          await _injectGuideNow(tabId, guide, startIndex, sessionId);
           return;
         }
       } catch {
@@ -85,7 +71,7 @@ export function _injectGuideAfterLoad(tabId: number, guide: any, startIndex: num
     }
 
     try {
-      await _injectGuideNow(tabId, guide, startIndex);
+      await _injectGuideNow(tabId, guide, startIndex, sessionId);
     } catch (e) {
       debugLog('Guide inject after load failed:', e);
     }
