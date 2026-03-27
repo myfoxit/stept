@@ -150,57 +150,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5 mb-2"
             >
               <Link to="#" className="flex items-center gap-0 !no-underline">
-                <svg
-                  style={{ width: "32px", height: "auto" }}
-                  width="28"
-                  height="27"
-                  viewBox="0 0 38 36"
-                >
-                  <rect
-                    x="0"
-                    y="4"
-                    width="32"
-                    height="32"
-                    rx="9"
-                    fill="#4f46e5"
-                  />
-                  <rect
-                    x="7"
-                    y="11"
-                    width="10"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <rect
-                    x="7"
-                    y="17.5"
-                    width="18"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <rect
-                    x="7"
-                    y="24"
-                    width="14"
-                    height="3.5"
-                    rx="1.75"
-                    fill="white"
-                  />
-                  <path
-                    d="M33 0 L34.5 4.5 L38 6 L34.5 7.5 L33 12 L31.5 7.5 L28 6 L31.5 4.5 Z"
-                    fill="#4f46e5"
-                  />
-                </svg>
-                <span
-                  className="text-[1.25rem] tracking-wide text-foreground  font-bold"
-                  style={{
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Stept
-                </span>
+                <svg style={{height: "34px" , width: "auto"}} viewBox="0 0 200 40">
+  <rect x="0" y="6" width="20" height="11" rx="5.5" fill="#4f46e5"/>
+  <rect x="0" y="22" width="20" height="11" rx="5.5" fill="#4f46e5" opacity=".4"/>
+  <text x="28" y="29" font-family="'DM Sans'" font-size="24"
+    font-weight="500" fill="#1c1917">stept</text>
+</svg>
+                
+               
               </Link>
             </SidebarMenuButton>
             <div className="flex items-center gap-0.5 ml-auto">
