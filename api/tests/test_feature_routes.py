@@ -143,6 +143,11 @@ async def test_video_import_upload_status_and_list(
     fake_job = SimpleNamespace(id="job-1", status="queued", progress=0, stage="queued", task_id=None)
     fake_task = SimpleNamespace(id="celery-1")
 
+    # Ensure the task attribute exists even when Celery is not available
+    import app.tasks.ai_tasks as _ai_tasks
+    if not hasattr(_ai_tasks, "process_video_import_task"):
+        _ai_tasks.process_video_import_task = SimpleNamespace(delay=lambda *a, **k: fake_task)
+
     with patch("app.routers.video_import.UPLOAD_DIR", str(tmp_path)), patch(
         "app.crud.media_jobs.enqueue_or_get_job", new=AsyncMock(return_value=fake_job)
     ), patch("app.crud.media_jobs.get_job_for_session", new=AsyncMock(return_value=fake_job)), patch(

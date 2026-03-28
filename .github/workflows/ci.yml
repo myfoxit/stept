@@ -51,7 +51,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/stept_test
           DATABASE_URL_TEST: postgresql+asyncpg://postgres:postgres@localhost:5432/stept_test
           JWT_SECRET: test-secret
-          STEPT_ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcw==
+          STEPT_ENCRYPTION_KEY: 7fo96AgKwf8GtKyNmvd1dZnx225X7ufDv6uWM-cPF6k=
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: test
           STEPT_ENABLE_AI_CHAT: 'true'
