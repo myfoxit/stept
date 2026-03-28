@@ -413,6 +413,144 @@ async def test_guide_analytics_normalizes_widget_event_shape(async_client: Async
     assert row["avg_time_ms"] == 30000
 
 
+async def test_guide_analytics_sorts_rows_and_uses_started_sessions_for_duration(async_client: AsyncClient, auth_headers: dict, test_project: dict):
+    session_alpha = await async_client.post(
+        "/api/v1/process-recording/session/create",
+        headers=auth_headers,
+        json={"name": "Alpha Guide", "project_id": test_project["id"], "client": "TestRecorder", "timestamp": "2026-03-28T07:00:00"},
+    )
+    session_beta = await async_client.post(
+        "/api/v1/process-recording/session/create",
+        headers=auth_headers,
+        json={"name": "Beta Guide", "project_id": test_project["id"], "client": "TestRecorder", "timestamp": "2026-03-28T07:00:00"},
+    )
+    assert session_alpha.status_code == 200
+    assert session_beta.status_code == 200
+
+    alpha_id = session_alpha.json().get("session_id") or session_alpha.json().get("sessionId")
+    beta_id = session_beta.json().get("session_id") or session_beta.json().get("sessionId")
+
+    ingest_resp = await async_client.post(
+        "/api/v1/widget/events",
+        json=[
+            {
+                "type": "guide_started",
+                "timestamp": "2026-03-28T07:00:00",
+                "pageUrl": "https://example.com/alpha",
+                "guideId": alpha_id,
+                "sessionId": "alpha-sess-1",
+            },
+            {
+                "type": "guide_completed",
+                "timestamp": "2026-03-28T07:00:30",
+                "pageUrl": "https://example.com/alpha",
+                "guideId": alpha_id,
+                "sessionId": "alpha-sess-1",
+            },
+            {
+                "type": "guide_completed",
+                "timestamp": "2026-03-28T07:01:00",
+                "pageUrl": "https://example.com/alpha",
+                "guideId": alpha_id,
+                "sessionId": "alpha-orphan-completion",
+            },
+            {
+                "type": "guide_started",
+                "timestamp": "2026-03-28T07:00:00",
+                "pageUrl": "https://example.com/beta",
+                "guideId": beta_id,
+                "sessionId": "beta-sess-1",
+            },
+            {
+                "type": "guide_started",
+                "timestamp": "2026-03-28T07:02:00",
+                "pageUrl": "https://example.com/beta",
+                "guideId": beta_id,
+                "sessionId": "beta-sess-2",
+            },
+        ],
+    )
+    assert ingest_resp.status_code == 204
+
+    guides = await async_client.get(
+        f"/api/v1/analytics/guides?project_id={test_project['id']}&period=30d",
+        headers=auth_headers,
+    )
+    assert guides.status_code == 200
+
+    rows = guides.json()["guides"]
+    assert [row["name"] for row in rows] == ["Beta Guide", "Alpha Guide"]
+
+    alpha_row = next(row for row in rows if row["guide_id"] == alpha_id)
+    assert alpha_row["views"] == 1
+    assert alpha_row["completions"] == 2
+    assert alpha_row["avg_time_ms"] == 30000
+
+
+async def test_guide_analytics_funnel_counts_distinct_sessions(async_client: AsyncClient, auth_headers: dict, test_project: dict):
+    session_resp = await async_client.post(
+        "/api/v1/process-recording/session/create",
+        headers=auth_headers,
+        json={"name": "Distinct Funnel Guide", "project_id": test_project["id"], "client": "TestRecorder", "timestamp": "2026-03-28T07:00:00"},
+    )
+    assert session_resp.status_code == 200
+    workflow_id = session_resp.json().get("session_id") or session_resp.json().get("sessionId")
+
+    ingest_resp = await async_client.post(
+        "/api/v1/widget/events",
+        json=[
+            {
+                "type": "step_viewed",
+                "timestamp": "2026-03-28T07:00:00",
+                "pageUrl": "https://example.com/funnel",
+                "guideId": workflow_id,
+                "stepIndex": 0,
+                "sessionId": "sess-1",
+            },
+            {
+                "type": "step_viewed",
+                "timestamp": "2026-03-28T07:00:05",
+                "pageUrl": "https://example.com/funnel",
+                "guideId": workflow_id,
+                "stepIndex": 0,
+                "sessionId": "sess-1",
+            },
+            {
+                "type": "step_completed",
+                "timestamp": "2026-03-28T07:00:10",
+                "pageUrl": "https://example.com/funnel",
+                "guideId": workflow_id,
+                "stepIndex": 0,
+                "sessionId": "sess-1",
+            },
+            {
+                "type": "step_completed",
+                "timestamp": "2026-03-28T07:00:12",
+                "pageUrl": "https://example.com/funnel",
+                "guideId": workflow_id,
+                "stepIndex": 0,
+                "sessionId": "sess-1",
+            },
+            {
+                "type": "step_viewed",
+                "timestamp": "2026-03-28T07:01:00",
+                "pageUrl": "https://example.com/funnel",
+                "guideId": workflow_id,
+                "stepIndex": 0,
+                "sessionId": "sess-2",
+            },
+        ],
+    )
+    assert ingest_resp.status_code == 204
+
+    funnel = await async_client.get(
+        f"/api/v1/analytics/guide/{workflow_id}/funnel?project_id={test_project['id']}&period=30d",
+        headers=auth_headers,
+    )
+    assert funnel.status_code == 200
+    assert funnel.json()["steps"] == [{"step_index": 0, "views": 2, "completions": 1, "rate": 50.0}]
+
+
 async def test_guide_recovery_endpoints(async_client: AsyncClient, auth_headers: dict):
     with patch(
         "app.routers.guide_recovery.recover_element_with_llm",
