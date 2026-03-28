@@ -200,6 +200,40 @@ describe('AnalyticsPage', () => {
     });
   });
 
+  it('shows loading placeholders while analytics queries are still pending', () => {
+    mockUseAnalyticsOverview.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+    mockUseGuidesAnalytics.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+
+    render(<AnalyticsPage />);
+
+    expect(screen.getByText('Loading analytics…')).toBeInTheDocument();
+    expect(screen.getByText('Loading guide rows…')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('shows the self-healing trust callout and success-rate copy when events are present', () => {
+    mockUseAnalyticsOverview.mockReturnValue({
+      data: {
+        ...overviewData,
+        self_healing_count: 12,
+        self_healing_success_rate: 83.3,
+      },
+      isLoading: false,
+    });
+
+    render(<AnalyticsPage />);
+
+    expect(screen.getByText(/Self-healing is shown because matching events were present/i)).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText(/83.3% success rate on observed recovery attempts/i)).toBeInTheDocument();
+  });
+
   it('shows the empty state when no guide rows are available', () => {
     mockUseGuidesAnalytics.mockReturnValue({
       data: { guides: [] },
