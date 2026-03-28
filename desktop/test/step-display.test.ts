@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+
 
 import { getStepSubtitle, getStepTitle, isAiAnnotated } from '../src/renderer/utils/stepDisplay';
 

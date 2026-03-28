@@ -1,16 +1,16 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
-
 import { searchRecordings } from './search';
 
 describe('searchRecordings', () => {
+  const originalFetch = globalThis.fetch;
+
   afterEach(() => {
-    vi.unstubAllGlobals();
+    globalThis.fetch = originalFetch;
   });
 
   it('builds the search URL with project and limit parameters', async () => {
-    const json = vi.fn().mockResolvedValue({ total_results: 1, results: [{ id: 'rec-1' }] });
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json });
-    vi.stubGlobal('fetch', fetchMock);
+    const json = jest.fn().mockResolvedValue({ total_results: 1, results: [{ id: 'rec-1' }] });
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true, json });
+    (globalThis as any).fetch = fetchMock;
 
     const result = await searchRecordings(
       'https://api.stept.test/api/v1',
@@ -32,11 +32,11 @@ describe('searchRecordings', () => {
   });
 
   it('omits project_id when no project is selected', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue({ total_results: 0, results: [] }),
+      json: jest.fn().mockResolvedValue({ total_results: 0, results: [] }),
     });
-    vi.stubGlobal('fetch', fetchMock);
+    (globalThis as any).fetch = fetchMock;
 
     await searchRecordings('https://api.stept.test/api/v1', 'token-123', 'analytics', null);
 
@@ -44,7 +44,7 @@ describe('searchRecordings', () => {
   });
 
   it('throws a status-rich error when the backend rejects the query', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 });
 
     await expect(
       searchRecordings('https://api.stept.test/api/v1', 'token-123', 'dashboard', 'project-1'),

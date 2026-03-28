@@ -1,15 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('./settings', () => ({
-  getApiBaseUrl: vi.fn().mockResolvedValue('https://api.test/api/v1'),
+jest.mock('./settings', () => ({
+  getApiBaseUrl: jest.fn().mockResolvedValue('https://api.test/api/v1'),
 }));
 
-vi.mock('./auth', () => ({
-  authedFetch: vi.fn(),
+jest.mock('./auth', () => ({
+  authedFetch: jest.fn(),
 }));
 
-vi.mock('@/shared/storage', () => ({
-  getScreenshot: vi.fn(),
+jest.mock('@/shared/storage', () => ({
+  getScreenshot: jest.fn(),
 }));
 
 import * as screenshotDB from '@/shared/storage';
@@ -25,11 +23,11 @@ import { beginStreamingSession, enqueueStreamingUpload, uploadCapture } from './
 
 describe('background/upload', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     (globalThis as any).chrome = {
-      runtime: { sendMessage: vi.fn().mockResolvedValue(undefined) },
+      runtime: { sendMessage: jest.fn().mockResolvedValue(undefined) },
     };
-    globalThis.fetch = vi.fn().mockImplementation(async (input: string) => {
+    globalThis.fetch = jest.fn().mockImplementation(async (input: string) => {
       if (typeof input === 'string' && input.startsWith('data:')) {
         return new Response(new Blob(['img'], { type: 'image/jpeg' }), { status: 200 });
       }
@@ -50,7 +48,7 @@ describe('background/upload', () => {
   });
 
   it('creates a streaming session and stores its session id', async () => {
-    vi.mocked(authedFetch).mockResolvedValueOnce(new Response(JSON.stringify({ session_id: 'sess_123' }), { status: 200 }));
+    jest.mocked(authedFetch).mockResolvedValueOnce(new Response(JSON.stringify({ session_id: 'sess_123' }), { status: 200 }));
 
     await beginStreamingSession();
 
@@ -62,7 +60,7 @@ describe('background/upload', () => {
 
   it('uploads queued streaming screenshots and reports progress', async () => {
     setStreamingSessionId('sess_stream');
-    vi.mocked(authedFetch).mockResolvedValue(new Response('{}', { status: 200 }));
+    jest.mocked(authedFetch).mockResolvedValue(new Response('{}', { status: 200 }));
 
     enqueueStreamingUpload(1, 'data:image/jpeg;base64,aaa');
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -82,8 +80,8 @@ describe('background/upload', () => {
   it('finalizes upload using existing streamed state and idb-backed screenshots', async () => {
     setStreamingSessionId('sess_done');
     setStreamingUploaded(new Set([1]));
-    vi.mocked(screenshotDB.getScreenshot).mockResolvedValue('data:image/jpeg;base64,bbb');
-    vi.mocked(authedFetch)
+    jest.mocked(screenshotDB.getScreenshot).mockResolvedValue('data:image/jpeg;base64,bbb');
+    jest.mocked(authedFetch)
       .mockResolvedValueOnce(new Response('{}', { status: 200 }))
       .mockResolvedValueOnce(new Response('{}', { status: 200 }))
       .mockResolvedValueOnce(new Response('{}', { status: 200 }));
@@ -107,7 +105,7 @@ describe('background/upload', () => {
   });
 
   it('returns a stable error when upload session creation fails', async () => {
-    vi.mocked(authedFetch).mockResolvedValueOnce(new Response('nope', { status: 500 }));
+    jest.mocked(authedFetch).mockResolvedValueOnce(new Response('nope', { status: 500 }));
 
     const result = await uploadCapture();
 

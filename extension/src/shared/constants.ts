@@ -1,7 +1,7 @@
 import type { BuildConfig } from './types';
 
 export const BUILD_CONFIG: BuildConfig = {
-  mode: (import.meta.env.BUILD_MODE as 'self-hosted' | 'cloud') || 'self-hosted',
+  mode: (process.env.BUILD_MODE as 'self-hosted' | 'cloud') || 'self-hosted',
   cloudApiUrl: 'https://app.stept.ai/api/v1',
   defaultApiUrl: 'http://localhost:8000/api/v1',
 };

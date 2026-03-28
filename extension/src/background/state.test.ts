@@ -1,8 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('@/shared/storage', () => ({
-  saveScreenshot: vi.fn(),
-  clearAllScreenshots: vi.fn(),
+jest.mock('@/shared/storage', () => ({
+  saveScreenshot: jest.fn(),
+  clearAllScreenshots: jest.fn(),
 }));
 
 import * as screenshotDB from '@/shared/storage';
@@ -35,16 +33,16 @@ import {
 } from './state';
 
 describe('background/state', () => {
-  const localSet = vi.fn().mockResolvedValue(undefined);
-  const localRemove = vi.fn().mockResolvedValue(undefined);
-  const sessionSet = vi.fn().mockResolvedValue(undefined);
-  const sessionRemove = vi.fn().mockResolvedValue(undefined);
-  const sendMessage = vi.fn().mockResolvedValue(undefined);
+  const localSet = jest.fn().mockResolvedValue(undefined);
+  const localRemove = jest.fn().mockResolvedValue(undefined);
+  const sessionSet = jest.fn().mockResolvedValue(undefined);
+  const sessionRemove = jest.fn().mockResolvedValue(undefined);
+  const sendMessage = jest.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(screenshotDB.saveScreenshot).mockResolvedValue(undefined);
-    vi.mocked(screenshotDB.clearAllScreenshots).mockResolvedValue(undefined);
+    jest.clearAllMocks();
+    jest.mocked(screenshotDB.saveScreenshot).mockResolvedValue(undefined);
+    jest.mocked(screenshotDB.clearAllScreenshots).mockResolvedValue(undefined);
     (globalThis as any).chrome = {
       storage: {
         local: { set: localSet, remove: localRemove },
@@ -181,12 +179,12 @@ describe('background/state', () => {
   });
 
   it('marks user activity with the current timestamp', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-28T10:00:00Z'));
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-03-28T10:00:00Z'));
 
     markUserAction();
 
     expect(lastUserActionTime).toBe(new Date('2026-03-28T10:00:00Z').getTime());
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 });

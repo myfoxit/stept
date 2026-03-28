@@ -1,20 +1,18 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('./settings', () => ({
-  getApiBaseUrl: vi.fn().mockResolvedValue('https://api.test/api/v1'),
+jest.mock('./settings', () => ({
+  getApiBaseUrl: jest.fn().mockResolvedValue('https://api.test/api/v1'),
 }));
 
-vi.mock('./state', async () => {
-  const actual = await vi.importActual<typeof import('./state')>('./state');
+jest.mock('./state', () => {
+  const actual = jest.requireActual('./state');
   return {
     ...actual,
-    persistAuth: vi.fn().mockResolvedValue(undefined),
-    debugLog: vi.fn(),
+    persistAuth: jest.fn().mockResolvedValue(undefined),
+    debugLog: jest.fn(),
   };
 });
 
 describe('background/auth', () => {
-  const localRemove = vi.fn().mockResolvedValue(undefined);
+  const localRemove = jest.fn().mockResolvedValue(undefined);
   let authedFetch: typeof import('./auth').authedFetch;
   let refreshAccessToken: typeof import('./auth').refreshAccessToken;
   let tryAutoLogin: typeof import('./auth').tryAutoLogin;
@@ -22,35 +20,35 @@ describe('background/auth', () => {
   let state: typeof import('./state').state;
 
   beforeAll(async () => {
-    vi.stubGlobal('chrome', {
+    (globalThis as any).chrome = {
       storage: { local: { remove: localRemove } },
-      alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
-      runtime: { sendMessage: vi.fn().mockResolvedValue(undefined) },
-    });
+      alarms: { create: jest.fn(), onAlarm: { addListener: jest.fn() } },
+      runtime: { sendMessage: jest.fn().mockResolvedValue(undefined) },
+    };
 
     ({ authedFetch, refreshAccessToken, tryAutoLogin } = await import('./auth'));
     ({ persistAuth, state } = await import('./state'));
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubGlobal('chrome', {
+    jest.clearAllMocks();
+    (globalThis as any).chrome = {
       storage: {
         local: { remove: localRemove },
       },
-      alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
-      runtime: { sendMessage: vi.fn().mockResolvedValue(undefined) },
-    });
+      alarms: { create: jest.fn(), onAlarm: { addListener: jest.fn() } },
+      runtime: { sendMessage: jest.fn().mockResolvedValue(undefined) },
+    };
     state.accessToken = 'access_1';
     state.refreshToken = 'refresh_1';
     state.isAuthenticated = true;
     state.currentUser = { id: 'user_1' };
     state.userProjects = [{ id: 'proj_1' }];
-    globalThis.fetch = vi.fn() as any;
+    globalThis.fetch = jest.fn() as any;
   });
 
   it('refreshes access tokens and persists the new auth state', async () => {
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+    jest.mocked(globalThis.fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       access_token: 'access_2',
       refresh_token: 'refresh_2',
     }), { status: 200 }));
@@ -64,7 +62,7 @@ describe('background/auth', () => {
   });
 
   it('clears auth state when token refresh is rejected', async () => {
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(new Response('', { status: 401 }));
+    jest.mocked(globalThis.fetch).mockResolvedValueOnce(new Response('', { status: 401 }));
 
     await expect(refreshAccessToken()).resolves.toBe(false);
 
@@ -89,7 +87,7 @@ describe('background/auth', () => {
       refresh_token: 'fresh_refresh',
     }), { status: 200 });
     const second = new Response(JSON.stringify({ ok: true }), { status: 200 });
-    vi.mocked(globalThis.fetch)
+    jest.mocked(globalThis.fetch)
       .mockResolvedValueOnce(first)
       .mockResolvedValueOnce(refresh)
       .mockResolvedValueOnce(second);
@@ -97,10 +95,10 @@ describe('background/auth', () => {
     const response = await authedFetch('https://service.test/data', { headers: { 'X-Test': '1' } });
 
     expect(response.status).toBe(200);
-    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe('https://service.test/data');
-    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe('https://api.test/api/v1/auth/token');
-    expect(vi.mocked(globalThis.fetch).mock.calls[2]?.[0]).toBe('https://service.test/data');
-    expect(vi.mocked(globalThis.fetch).mock.calls[2]?.[1]).toMatchObject({
+    expect(jest.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe('https://service.test/data');
+    expect(jest.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe('https://api.test/api/v1/auth/token');
+    expect(jest.mocked(globalThis.fetch).mock.calls[2]?.[0]).toBe('https://service.test/data');
+    expect(jest.mocked(globalThis.fetch).mock.calls[2]?.[1]).toMatchObject({
       headers: {
         'X-Test': '1',
         Authorization: 'Bearer fresh_access',
@@ -116,7 +114,7 @@ describe('background/auth', () => {
   });
 
   it('auto-login clears invalid refresh tokens after auth rejection', async () => {
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(new Response('', { status: 403 }));
+    jest.mocked(globalThis.fetch).mockResolvedValueOnce(new Response('', { status: 403 }));
 
     await expect(tryAutoLogin()).resolves.toBe(false);
 

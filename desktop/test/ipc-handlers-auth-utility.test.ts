@@ -1,75 +1,74 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handlers = new Map<string, Function>();
-const shellOpenExternal = vi.fn().mockResolvedValue(undefined);
-const appOn = vi.fn();
-const appGetVersion = vi.fn().mockReturnValue('1.2.3');
+const shellOpenExternal = jest.fn().mockResolvedValue(undefined);
+const appOn = jest.fn();
+const appGetVersion = jest.fn().mockReturnValue('1.2.3');
 
-vi.mock('electron', () => ({
+jest.mock('electron', () => ({
   ipcMain: {
-    handle: vi.fn((channel: string, fn: Function) => handlers.set(channel, fn)),
+    handle: jest.fn((channel: string, fn: Function) => handlers.set(channel, fn)),
   },
   shell: {
     openExternal: shellOpenExternal,
   },
   app: {
     on: appOn,
-    emit: vi.fn(),
+    emit: jest.fn(),
     getVersion: appGetVersion,
   },
   BrowserWindow: {
-    getAllWindows: vi.fn().mockReturnValue([]),
+    getAllWindows: jest.fn().mockReturnValue([]),
   },
   Notification: {
-    isSupported: vi.fn().mockReturnValue(false),
+    isSupported: jest.fn().mockReturnValue(false),
   },
   webContents: {
-    getAllWebContents: vi.fn().mockReturnValue([]),
+    getAllWebContents: jest.fn().mockReturnValue([]),
   },
 }));
 
 const authServiceInstance = {
-  getAccessToken: vi.fn().mockReturnValue('token_1'),
-  getStatus: vi.fn().mockResolvedValue({ user: { id: 'user_1' } }),
-  initiateLogin: vi.fn().mockResolvedValue(undefined),
-  handleCallback: vi.fn().mockResolvedValue(true),
-  logout: vi.fn().mockResolvedValue(undefined),
-  tryAutoLogin: vi.fn().mockResolvedValue(true),
-  on: vi.fn(),
+  getAccessToken: jest.fn().mockReturnValue('token_1'),
+  getStatus: jest.fn().mockResolvedValue({ user: { id: 'user_1' } }),
+  initiateLogin: jest.fn().mockResolvedValue(undefined),
+  handleCallback: jest.fn().mockResolvedValue(true),
+  logout: jest.fn().mockResolvedValue(undefined),
+  tryAutoLogin: jest.fn().mockResolvedValue(true),
+  on: jest.fn(),
 };
 
 const settingsManagerInstance = {
-  getSettings: vi.fn().mockReturnValue({
+  getSettings: jest.fn().mockReturnValue({
     cloudEndpoint: 'https://api.stept.ai/api/v1',
     chatApiUrl: 'https://api.stept.ai/api/v1',
   }),
-  saveSettings: vi.fn().mockResolvedValue(undefined),
-  resetSettings: vi.fn().mockResolvedValue(undefined),
-  isLlmConfigured: vi.fn().mockReturnValue(false),
+  saveSettings: jest.fn().mockResolvedValue(undefined),
+  resetSettings: jest.fn().mockResolvedValue(undefined),
+  isLlmConfigured: jest.fn().mockReturnValue(false),
 };
 
-vi.mock('../src/main/auth', () => ({ AuthService: vi.fn(() => authServiceInstance) }));
-vi.mock('../src/main/settings', () => ({ SettingsManager: vi.fn(() => settingsManagerInstance) }));
-vi.mock('../src/main/recording', () => ({ RecordingService: vi.fn(() => ({ dispose: vi.fn(), removeAllListeners: vi.fn(), on: vi.fn(), setIgnoredShortcuts: vi.fn(), startRecording: vi.fn(), stopRecording: vi.fn(), pauseRecording: vi.fn(), resumeRecording: vi.fn(), getState: vi.fn().mockReturnValue({}) })) }));
-vi.mock('../src/main/screenshot', () => ({ ScreenshotService: vi.fn(() => ({ dispose: vi.fn(), takeScreenshot: vi.fn(), getDisplays: vi.fn(), getWindows: vi.fn() })) }));
-vi.mock('../src/main/chat', () => ({ ChatService: vi.fn(() => ({ sendMessage: vi.fn() })) }));
-vi.mock('../src/main/cloud-upload', () => ({ CloudUploadService: vi.fn(() => ({ beginSession: vi.fn(), on: vi.fn(), enqueueImage: vi.fn(), setAudioPath: vi.fn(), finishUpload: vi.fn(), uploadRecording: vi.fn() })) }));
-vi.mock('../src/main/context-watcher', () => ({ ContextWatcherService: vi.fn(() => ({ getActiveContext: vi.fn().mockResolvedValue(null), getLastActiveContext: vi.fn().mockReturnValue(null), configure: vi.fn(), removeAllListeners: vi.fn(), on: vi.fn(), start: vi.fn(), stop: vi.fn(), forceMatchCheck: vi.fn() })) }));
-vi.mock('../src/main/smart-annotation', () => ({ SmartAnnotationService: vi.fn(() => ({ clearQueue: vi.fn(), annotateWorkflow: vi.fn() })) }));
-vi.mock('../src/main/audio-capture', () => ({ AudioCaptureService: vi.fn(() => ({ dispose: vi.fn(), getDevices: vi.fn().mockResolvedValue([]), startCapture: vi.fn(), stopCapture: vi.fn(), getIsCapturing: vi.fn().mockReturnValue(false), pauseCapture: vi.fn(), resumeCapture: vi.fn() })) }));
-vi.mock('../src/main/transcription', () => ({ TranscriptionService: vi.fn(() => ({ dispose: vi.fn(), transcribe: vi.fn(), alignToSteps: vi.fn() })) }));
+jest.mock('../src/main/auth', () => ({ AuthService: jest.fn(() => authServiceInstance) }));
+jest.mock('../src/main/settings', () => ({ SettingsManager: jest.fn(() => settingsManagerInstance) }));
+jest.mock('../src/main/recording', () => ({ RecordingService: jest.fn(() => ({ dispose: jest.fn(), removeAllListeners: jest.fn(), on: jest.fn(), setIgnoredShortcuts: jest.fn(), startRecording: jest.fn(), stopRecording: jest.fn(), pauseRecording: jest.fn(), resumeRecording: jest.fn(), getState: jest.fn().mockReturnValue({}) })) }));
+jest.mock('../src/main/screenshot', () => ({ ScreenshotService: jest.fn(() => ({ dispose: jest.fn(), takeScreenshot: jest.fn(), getDisplays: jest.fn(), getWindows: jest.fn() })) }));
+jest.mock('../src/main/chat', () => ({ ChatService: jest.fn(() => ({ sendMessage: jest.fn() })) }));
+jest.mock('../src/main/cloud-upload', () => ({ CloudUploadService: jest.fn(() => ({ beginSession: jest.fn(), on: jest.fn(), enqueueImage: jest.fn(), setAudioPath: jest.fn(), finishUpload: jest.fn(), uploadRecording: jest.fn() })) }));
+jest.mock('../src/main/context-watcher', () => ({ ContextWatcherService: jest.fn(() => ({ getActiveContext: jest.fn().mockResolvedValue(null), getLastActiveContext: jest.fn().mockReturnValue(null), configure: jest.fn(), removeAllListeners: jest.fn(), on: jest.fn(), start: jest.fn(), stop: jest.fn(), forceMatchCheck: jest.fn() })) }));
+jest.mock('../src/main/smart-annotation', () => ({ SmartAnnotationService: jest.fn(() => ({ clearQueue: jest.fn(), annotateWorkflow: jest.fn() })) }));
+jest.mock('../src/main/audio-capture', () => ({ AudioCaptureService: jest.fn(() => ({ dispose: jest.fn(), getDevices: jest.fn().mockResolvedValue([]), startCapture: jest.fn(), stopCapture: jest.fn(), getIsCapturing: jest.fn().mockReturnValue(false), pauseCapture: jest.fn(), resumeCapture: jest.fn() })) }));
+jest.mock('../src/main/transcription', () => ({ TranscriptionService: jest.fn(() => ({ dispose: jest.fn(), transcribe: jest.fn(), alignToSteps: jest.fn() })) }));
 
 describe('setupIpcHandlers', () => {
   beforeEach(() => {
     handlers.clear();
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it('wires auth callback/logout handlers and forwards auth status changes', async () => {
     const { setupIpcHandlers } = await import('../src/main/ipc-handlers');
     setupIpcHandlers(authServiceInstance as any, settingsManagerInstance as any);
 
-    const sender = { send: vi.fn() };
+    const sender = { send: jest.fn() };
     const authCallback = handlers.get('auth:handle-callback');
     const logout = handlers.get('auth:logout');
 

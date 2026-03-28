@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/** @jest-environment jsdom */
 
 import { ElementFinder, getAdjustedRect, normalizeText } from './element-finder';
 import type { GuideStep } from './types';
@@ -9,7 +9,7 @@ describe('element-finder helpers', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: 720, configurable: true });
 
-    HTMLElement.prototype.getBoundingClientRect = vi.fn(() => ({
+    HTMLElement.prototype.getBoundingClientRect = jest.fn(() => ({
       x: 20,
       y: 30,
       left: 20,
@@ -21,7 +21,7 @@ describe('element-finder helpers', () => {
       toJSON: () => ({}),
     }));
 
-    SVGElement.prototype.getBoundingClientRect = vi.fn(() => ({
+    SVGElement.prototype.getBoundingClientRect = jest.fn(() => ({
       x: 20,
       y: 30,
       left: 20,
@@ -33,7 +33,7 @@ describe('element-finder helpers', () => {
       toJSON: () => ({}),
     }));
 
-    document.elementFromPoint = vi.fn((_x: number, _y: number) => {
+    document.elementFromPoint = jest.fn((_x: number, _y: number) => {
       const hit = document.querySelector('[data-hit-target="true"]');
       return (hit as Element | null) ?? document.body;
     });

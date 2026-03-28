@@ -68,7 +68,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   define: {
-    'import.meta.env.BUILD_MODE': JSON.stringify(mode === 'cloud' ? 'cloud' : 'self-hosted'),
+    'process.env.BUILD_MODE': JSON.stringify(mode === 'cloud' ? 'cloud' : 'self-hosted'),
   },
   build: {
     outDir: 'dist',
