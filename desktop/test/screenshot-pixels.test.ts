@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -150,7 +150,7 @@ function colorMatches(pixel: { r: number; g: number; b: number }, expected: { r:
 // Image dimension tests
 // =====================================================================
 
-describe.skipIf(!sharpAvailable)('screenshot image dimensions', () => {
+(sharpAvailable ? describe : describe.skip)('screenshot image dimensions', () => {
   it('1x scale → image size equals input', async () => {
     const img = await createTestImage(1920, 1080, { r: 128, g: 128, b: 128 });
     const annotated = await annotateImage(img, { x: 500, y: 300 }, 1.0);
@@ -190,7 +190,7 @@ describe.skipIf(!sharpAvailable)('screenshot image dimensions', () => {
 // Annotation placement tests — the money tests
 // =====================================================================
 
-describe.skipIf(!sharpAvailable)('annotation pixel placement', () => {
+(sharpAvailable ? describe : describe.skip)('annotation pixel placement', () => {
   it('annotation center is reddish at 1x scale', async () => {
     const img = await createTestImage(800, 600, { r: 200, g: 200, b: 200 }); // gray background
     const clickX = 400;
@@ -278,7 +278,7 @@ describe.skipIf(!sharpAvailable)('annotation pixel placement', () => {
 // Full DPI pipeline: raw coords → logical → annotation pixel verification
 // =====================================================================
 
-describe.skipIf(!sharpAvailable)('full DPI pipeline pixel verification', () => {
+(sharpAvailable ? describe : describe.skip)('full DPI pipeline pixel verification', () => {
   /**
    * Simulate the EXACT recording pipeline:
    * 1. Raw event arrives with physical coords (on Windows) or logical (on macOS)
@@ -410,7 +410,7 @@ describe.skipIf(!sharpAvailable)('full DPI pipeline pixel verification', () => {
 // Annotation size scaling tests
 // =====================================================================
 
-describe.skipIf(!sharpAvailable)('annotation size scales with DPI', () => {
+(sharpAvailable ? describe : describe.skip)('annotation size scales with DPI', () => {
   it('annotation circle is larger at 2x than at 1x', async () => {
     const img1x = await createTestImage(800, 600, { r: 200, g: 200, b: 200 });
     const img2x = await createTestImage(1600, 1200, { r: 200, g: 200, b: 200 });

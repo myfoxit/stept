@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { Readable } from 'stream';
 
@@ -13,8 +12,8 @@ import { Readable } from 'stream';
 interface MockProcess extends EventEmitter {
   stdout: Readable;
   stderr: Readable;
-  stdin: { write: ReturnType<typeof vi.fn> };
-  kill: ReturnType<typeof vi.fn>;
+  stdin: { write: ReturnType<typeof jest.fn> };
+  kill: ReturnType<typeof jest.fn>;
   pid: number;
 }
 
@@ -24,8 +23,8 @@ function createMockProcess(): MockProcess {
   const proc = new EventEmitter() as MockProcess;
   proc.stdout = stdout;
   proc.stderr = stderr;
-  proc.stdin = { write: vi.fn() };
-  proc.kill = vi.fn();
+  proc.stdin = { write: jest.fn() };
+  proc.kill = jest.fn();
   proc.pid = 12345;
   return proc;
 }

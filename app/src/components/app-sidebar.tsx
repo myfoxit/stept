@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   Check,
   ChevronDown,
   Chrome,
@@ -67,6 +68,11 @@ const data = {
     avatar: "/profile.png",
   },
   navMain: [
+    {
+      title: "Analytics",
+      url: "/analytics",
+      icon: Activity,
+    },
     {
       title: "Shared with me",
       url: "/shared",

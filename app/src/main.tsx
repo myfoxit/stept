@@ -34,6 +34,7 @@ import { KnowledgeBasePage } from "@/pages/knowledge-base";
 import { AuditLogPage } from "@/pages/audit-log";
 import { VideoImportPage } from "@/pages/video-import";
 import TrashPage from "@/pages/trash";
+import { AnalyticsPage } from "@/pages/analytics";
 import NotFoundPage from "@/pages/NotFoundPage";
 import VerifyPage from "@/pages/VerifyPage";
 import { DeviceConsentPage } from "@/pages/device-consent";
@@ -109,6 +110,7 @@ function AppRoutes() {
           />
           <Route path="/shared" element={<SharedWithMePage />} />
           <Route path="/team" element={<TeamPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
           {features.knowledge_base && <Route path="/knowledge" element={<KnowledgeBasePage />} />}
           <Route path="/audit" element={<AuditLogPage />} />
           {features.video_import && <Route path="/video-import" element={<VideoImportPage />} />}

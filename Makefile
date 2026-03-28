@@ -1,4 +1,4 @@
-.PHONY: dev dev-down dev-logs build test test-backend test-frontend test-e2e test-db lint migrate clean restart-backend generate-key
+.PHONY: dev dev-down dev-logs build test test-backend test-frontend test-desktop test-extension test-e2e test-db lint migrate clean restart-backend generate-key
 
 COMPOSE_DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
@@ -36,7 +36,7 @@ TEST_ENCRYPTION_KEY ?= $(or $(STEPT_ENCRYPTION_KEY),test-key-for-testing-only-32
 TEST_JWT_SECRET ?= $(or $(JWT_SECRET),test-secret)
 
 # ─── Tests ────────────────────────────────────────────────────
-test: test-backend test-frontend
+test: test-backend test-frontend test-desktop test-extension
 
 # Create test DB + run backend tests INSIDE Docker
 test-backend: test-db
@@ -89,6 +89,12 @@ test-e2e: test-db
 # Frontend tests (local, no Docker needed)
 test-frontend:
 	cd app && pnpm install --frozen-lockfile && pnpm test
+
+test-desktop:
+	cd desktop && pnpm test
+
+test-extension:
+	cd extension && pnpm test
 
 # ─── Lint ─────────────────────────────────────────────────────
 lint:
